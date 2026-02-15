@@ -39,5 +39,5 @@
     "keepWeekly": 12,
     "keepMonthly": 12
   },
-  "passphrase": "REPLACE_WITH_ACTUAL_PASSPHRASE"
+  "passphrase": "REPLACE_WITH_ACTUAL_PASSPHRASE_OR_USE_ENV_VAR"
 }

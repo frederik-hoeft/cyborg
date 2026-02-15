@@ -14,7 +14,7 @@ public sealed class JsonLogSink : ILogSink
     public void Write(LogEntry entry)
     {
         var jsonEntry = new JsonLogEntry(
-            entry.Timestamp.ToString("ddd MMM  d hh:mm:ss tt zzz yyyy"),
+            entry.Timestamp.ToString("ddd MMM dd hh:mm:ss tt zzz yyyy"),
             entry.Level.ToString().ToUpperInvariant(),
             entry.Message,
             entry.Exception

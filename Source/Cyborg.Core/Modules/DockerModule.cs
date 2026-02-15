@@ -37,12 +37,12 @@ public sealed class DockerModule : ModuleBase
     {
         Logger.Info($"Attempting to stop '{_config.ContainerGroup}' docker container group...");
 
-        var command = $"-c {_config.ComposePath} down";
-        
         if (!string.IsNullOrEmpty(_config.User))
         {
-            command = $"-c \"{command}\"";
-            var result = await _executor.ExecuteAsync("/usr/bin/su", $"{command} {_config.User}", cancellationToken: cancellationToken);
+            var result = await _executor.ExecuteAsync(
+                "/usr/bin/su",
+                $"{_config.User} -c \"{_config.ComposePath} down\"",
+                cancellationToken: cancellationToken);
             
             if (!result.Success)
             {
@@ -72,12 +72,12 @@ public sealed class DockerModule : ModuleBase
 
         Logger.Info($"Attempting to start '{_config.ContainerGroup}' docker container group...");
 
-        var command = $"-c {_config.ComposePath} up -d";
-        
         if (!string.IsNullOrEmpty(_config.User))
         {
-            command = $"-c \"{command}\"";
-            var result = await _executor.ExecuteAsync("/usr/bin/su", $"{command} {_config.User}", cancellationToken: cancellationToken);
+            var result = await _executor.ExecuteAsync(
+                "/usr/bin/su",
+                $"{_config.User} -c \"{_config.ComposePath} up -d\"",
+                cancellationToken: cancellationToken);
             
             if (result.Success)
             {

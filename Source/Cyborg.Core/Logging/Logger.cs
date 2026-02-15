@@ -11,7 +11,7 @@ public sealed class Logger : ILogger
 
     public void Log(LogLevel level, string message)
     {
-        var entry = new LogEntry(DateTime.Now, level, message);
+        var entry = new LogEntry(DateTime.UtcNow, level, message);
         foreach (var sink in _sinks)
         {
             sink.Write(entry);

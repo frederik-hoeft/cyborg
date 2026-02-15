@@ -1,20 +1,25 @@
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Text.RegularExpressions;
 using Cyborg.Core.Configuration;
 using Cyborg.Core.Execution;
 using Cyborg.Core.Logging;
 
 namespace Cyborg.Core.Modules;
 
-public sealed class WakeOnLanModule : ModuleBase
+public sealed partial class WakeOnLanModule : ModuleBase
 {
+    private static readonly Regex MacAddressPattern = MacAddressRegex();
     private readonly ProcessExecutor _executor;
     private readonly List<BackupHostConfiguration> _hosts;
     private readonly WakeOnLanConfiguration _config;
     private readonly List<string> _wokenHosts = new();
 
     public override string Name => "WakeOnLan";
+
+    [GeneratedRegex(@"^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$", RegexOptions.Compiled)]
+    private static partial Regex MacAddressRegex();
 
     public WakeOnLanModule(
         ILogger logger,
@@ -110,6 +115,11 @@ public sealed class WakeOnLanModule : ModuleBase
 
     private async Task SendWakeOnLanPacketAsync(string ipAddress, string macAddress)
     {
+        if (!MacAddressPattern.IsMatch(macAddress))
+        {
+            throw new ArgumentException($"Invalid MAC address format: {macAddress}", nameof(macAddress));
+        }
+
         var result = await _executor.ExecuteAsync(
             "/usr/bin/wakeonlan",
             $"-i {ipAddress} {macAddress.Replace(":", "")}");

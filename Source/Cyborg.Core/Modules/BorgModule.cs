@@ -56,8 +56,8 @@ public sealed class BorgModule : ModuleBase
         var repository = $"ssh://borg@{host.Hostname}:{host.Port}{host.Repository}";
         var archiveName = $"::{_config.ArchiveName}";
         
-        var excludeArgs = string.Join(" ", _config.ExcludePatterns.Select(p => $"--exclude {p}"));
-        var arguments = $"create --show-rc --stats --compression {_config.Compression} --exclude-caches {excludeArgs} {archiveName} {_config.SourcePath}";
+        var excludeArgs = string.Join(" ", _config.ExcludePatterns.Select(p => $"--exclude \"{p}\""));
+        var arguments = $"create --show-rc --stats --compression {_config.Compression} --exclude-caches {excludeArgs} {archiveName} \"{_config.SourcePath}\"";
 
         var env = new Dictionary<string, string>
         {
@@ -94,9 +94,13 @@ public sealed class BorgModule : ModuleBase
     private async Task PruneRepositoryAsync(BackupHostConfiguration host, CancellationToken cancellationToken)
     {
         var repository = $"ssh://borg@{host.Hostname}:{host.Port}{host.Repository}";
-        var archivePrefix = _config.ArchiveName.Split('-')[0]; // Extract prefix from archive name template
         
-        var arguments = $"prune --list --glob-archives {archivePrefix}-* --show-rc " +
+        // Extract prefix from archive name template (e.g., "overleaf-{now}" -> "overleaf")
+        var archivePrefix = _config.ArchiveName.Contains('-') 
+            ? _config.ArchiveName.Split('-')[0] 
+            : _config.ArchiveName.Replace("{now}", "").Replace("{utcnow}", "").Trim();
+        
+        var arguments = $"prune --list --glob-archives \"{archivePrefix}-*\" --show-rc " +
                        $"--keep-daily {_config.KeepDaily} " +
                        $"--keep-weekly {_config.KeepWeekly} " +
                        $"--keep-monthly {_config.KeepMonthly}";
