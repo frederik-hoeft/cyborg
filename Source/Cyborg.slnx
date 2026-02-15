@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Cyborg.Cli/Cyborg.Cli.csproj" />
+  <Project Path="Cyborg.Core/Cyborg.Core.csproj" />
+</Solution>

@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "h7Rvj/rW9F0=",
+  "success": true,
+  "projectFilePath": "/home/runner/work/cyborg/cyborg/Source/Cyborg.Core/Cyborg.Core.csproj",
+  "expectedPackageFiles": [
+    "/home/runner/.nuget/packages/microsoft.net.illink.tasks/10.0.2/microsoft.net.illink.tasks.10.0.2.nupkg.sha512"
+  ],
+  "logs": []
+}

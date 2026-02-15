@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "dgSpecHash": "kckEhRClRPg=",
+  "success": true,
+  "projectFilePath": "/home/runner/work/cyborg/cyborg/Source/Cyborg.Cli/Cyborg.Cli.csproj",
+  "expectedPackageFiles": [
+    "/home/runner/.nuget/packages/consoleappframework/5.7.13/consoleappframework.5.7.13.nupkg.sha512",
+    "/home/runner/.nuget/packages/jab/0.12.0/jab.0.12.0.nupkg.sha512",
+    "/home/runner/.nuget/packages/microsoft.dotnet.ilcompiler/10.0.2/microsoft.dotnet.ilcompiler.10.0.2.nupkg.sha512",
+    "/home/runner/.nuget/packages/microsoft.net.illink.tasks/10.0.2/microsoft.net.illink.tasks.10.0.2.nupkg.sha512",
+    "/home/runner/.nuget/packages/runtime.linux-x64.microsoft.dotnet.ilcompiler/10.0.2/runtime.linux-x64.microsoft.dotnet.ilcompiler.10.0.2.nupkg.sha512"
+  ],
+  "logs": []
+}
