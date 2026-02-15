@@ -41,7 +41,7 @@ public sealed class DockerModule : ModuleBase
         {
             var result = await _executor.ExecuteAsync(
                 "/usr/bin/su",
-                $"{_config.User} -c \"{_config.ComposePath} down\"",
+                $"- {_config.User} -c \"{_config.ComposePath} down\"",
                 cancellationToken: cancellationToken);
             
             if (!result.Success)
@@ -76,7 +76,7 @@ public sealed class DockerModule : ModuleBase
         {
             var result = await _executor.ExecuteAsync(
                 "/usr/bin/su",
-                $"{_config.User} -c \"{_config.ComposePath} up -d\"",
+                $"- {_config.User} -c \"{_config.ComposePath} up -d\"",
                 cancellationToken: cancellationToken);
             
             if (result.Success)

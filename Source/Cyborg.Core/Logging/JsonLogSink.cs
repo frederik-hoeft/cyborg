@@ -13,6 +13,8 @@ public sealed class JsonLogSink : ILogSink
 
     public void Write(LogEntry entry)
     {
+        // Format matches the bash script output format for compatibility
+        // Example: "Sun Feb  1 04:25:01 AM CET 2026"
         var jsonEntry = new JsonLogEntry(
             entry.Timestamp.ToString("ddd MMM dd hh:mm:ss tt zzz yyyy"),
             entry.Level.ToString().ToUpperInvariant(),

@@ -120,9 +120,10 @@ public sealed partial class WakeOnLanModule : ModuleBase
             throw new ArgumentException($"Invalid MAC address format: {macAddress}", nameof(macAddress));
         }
 
+        var cleanMacAddress = macAddress.Replace(":", "");
         var result = await _executor.ExecuteAsync(
             "/usr/bin/wakeonlan",
-            $"-i {ipAddress} {macAddress.Replace(":", "")}");
+            $"-i \"{ipAddress}\" \"{cleanMacAddress}\"");
 
         if (!result.Success)
         {
