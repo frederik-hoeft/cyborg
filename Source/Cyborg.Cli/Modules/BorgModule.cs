@@ -2,7 +2,7 @@ using Cyborg.Core.Configuration;
 using Cyborg.Core.Execution;
 using Cyborg.Core.Logging;
 
-namespace Cyborg.Core.Modules;
+namespace Cyborg.Cli.Modules;
 
 public sealed class BorgModule : ModuleBase
 {

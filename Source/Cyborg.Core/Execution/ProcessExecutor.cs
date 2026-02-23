@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using Cyborg.Core.Logging;
 
 namespace Cyborg.Core.Execution;
@@ -28,7 +29,7 @@ public sealed class ProcessExecutor
     {
         _logger.Exec($"{executable} {arguments}");
 
-        var startInfo = new ProcessStartInfo
+        ProcessStartInfo startInfo = new()
         {
             FileName = executable,
             Arguments = arguments,
@@ -47,10 +48,10 @@ public sealed class ProcessExecutor
             }
         }
 
-        using var process = new Process { StartInfo = startInfo };
-        
-        var outputBuilder = new System.Text.StringBuilder();
-        var errorBuilder = new System.Text.StringBuilder();
+        using Process process = new Process { StartInfo = startInfo };
+
+        StringBuilder outputBuilder = new System.Text.StringBuilder();
+        StringBuilder errorBuilder = new System.Text.StringBuilder();
 
         process.OutputDataReceived += (_, e) =>
         {

@@ -1,6 +1,5 @@
 using ConsoleAppFramework;
 using Cyborg.Core;
-using Cyborg.Core.Configuration;
 using Cyborg.Core.Execution;
 using Cyborg.Core.Logging;
 using Cyborg.Core.Modules;

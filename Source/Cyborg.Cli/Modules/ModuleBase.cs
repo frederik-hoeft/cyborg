@@ -1,6 +1,6 @@
 using Cyborg.Core.Logging;
 
-namespace Cyborg.Core.Modules;
+namespace Cyborg.Cli.Modules;
 
 public abstract class ModuleBase : IModule
 {

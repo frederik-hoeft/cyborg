@@ -1,8 +1,9 @@
 using Cyborg.Core.Configuration;
 using Cyborg.Core.Execution;
 using Cyborg.Core.Logging;
+using Cyborg.Core.Modules;
 
-namespace Cyborg.Core.Modules;
+namespace Cyborg.Cli.Modules;
 
 public sealed class BackupOrchestrator
 {

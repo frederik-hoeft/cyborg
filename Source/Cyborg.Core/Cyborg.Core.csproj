@@ -8,4 +8,20 @@
     <IsTrimmable>true</IsTrimmable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Folder Include="Modules\Common\" />
+    <Folder Include="Modules\Jobs\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Jab" Version="0.12.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+      <ProjectReference Include="..\Cyborg.Core.Aot.Roslyn\Cyborg.Core.Aot.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false">
+          <PrivateAssets>all</PrivateAssets>
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      </ProjectReference>
+  </ItemGroup>
+
 </Project>

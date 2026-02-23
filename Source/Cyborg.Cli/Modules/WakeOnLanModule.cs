@@ -1,7 +1,7 @@
 using System.Net;
-using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
+using Cyborg.Cli.Modules;
 using Cyborg.Core.Configuration;
 using Cyborg.Core.Execution;
 using Cyborg.Core.Logging;
