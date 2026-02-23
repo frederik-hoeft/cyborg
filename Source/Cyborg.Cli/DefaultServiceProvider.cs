@@ -1,12 +1,10 @@
-﻿using Jab;
-using SmartmonExporter.Configuration;
-using SmartmonExporter.Configuration.Named;
-using SmartmonExporter.Domain;
+﻿using Cyborg.Core;
+using Cyborg.Modules;
+using Jab;
 
-namespace SmartmonExporter;
+namespace Cyborg.Cli;
 
 [ServiceProvider]
-[Singleton<INamedServiceProvider, NamedServiceProvider>]
-[Import<IConfigurationModule>]
-[Import<ISmartMetricsModule>]
+[Import<ICyborgCoreServices>]
+[Import<ICyborgModuleServices>]
 internal sealed partial class DefaultServiceProvider;

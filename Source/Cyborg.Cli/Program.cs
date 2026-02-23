@@ -1,6 +1,6 @@
-using ConsoleAppFramework;
+﻿using ConsoleAppFramework;
 using Cyborg.Cli;
 
-var app = ConsoleApp.Create();
-app.Add<BackupCommands>();
+ConsoleApp.ConsoleAppBuilder app = ConsoleApp.Create();
+app.Add<Commands>();
 await app.RunAsync(args);

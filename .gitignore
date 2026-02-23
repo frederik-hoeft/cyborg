@@ -10,4 +10,4 @@ Source/**/*.user
 Source/**/*.suo
 Source/**/*.cache
 Source/.vs/
-artifacts/**
+artifacts/

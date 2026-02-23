@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Cyborg.Cli": {
+      "commandName": "Project",
+      "commandLineArgs": "run daily"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+﻿using Cyborg.Core.Modules.Configuration.Model;
+using Cyborg.Core.Modules.Configuration.Serialization;
+using System.Text.Json;
+
+namespace Cyborg.Core.Modules.Configuration;
+
+public sealed class DefaultModuleConfigurationLoader(IModuleLoaderContext configurationContext) : IModuleConfigurationLoader
+{
+    public async Task<IModuleWorker> LoadModuleAsync(string configurationFilePath, CancellationToken cancellationToken)
+    {
+        await using FileStream stream = File.OpenRead(configurationFilePath);
+        ModuleReference? moduleReference = await JsonSerializer.DeserializeAsync<ModuleReference>(stream, configurationContext, cancellationToken);
+        return moduleReference?.Module ?? throw new InvalidOperationException($"Failed to load module from configuration file '{configurationFilePath}'.");
+    }
+}

@@ -1,0 +1,14 @@
+﻿using System.Diagnostics.CodeAnalysis;
+
+namespace Cyborg.Core.Modules.Runtime;
+
+public interface IEnvironment
+{
+    string Name { get; }
+
+    bool TryResolveVariable<T>(string name, [NotNullWhen(true)] out T? value);
+
+    void SetVariable<T>(string name, T value);
+
+    bool TryRemoveVariable(string name);
+}

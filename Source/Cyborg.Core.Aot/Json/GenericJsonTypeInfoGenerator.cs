@@ -15,7 +15,7 @@ public class GenericJsonTypeInfoGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        context.RegisterPostInitializationOutput(EmitModelDiscoverySource);
+        context.RegisterPostInitializationOutput(EmitFrameworkSource);
 
         IncrementalValuesProvider<Model> pipeline = context.SyntaxProvider.ForAttributeWithMetadataName(
             fullyQualifiedMetadataName: typeof(JsonTypeInfoBindingsGeneratorAttribute).FullName,
@@ -94,7 +94,7 @@ public class GenericJsonTypeInfoGenerator : IIncrementalGenerator
         });
     }
 
-    private static void EmitModelDiscoverySource(IncrementalGeneratorPostInitializationContext context)
+    private static void EmitFrameworkSource(IncrementalGeneratorPostInitializationContext context)
     {
         context.AddEmbeddedSource<AotJsonSerializerContext>();
         context.AddEmbeddedSource<BindingsGenerationMode>();

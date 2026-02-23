@@ -4,7 +4,7 @@
     <File Path="Directory.Build.props" />
   </Folder>
   <Project Path="Cyborg.Cli/Cyborg.Cli.csproj" />
-  <Project Path="Cyborg.Core.Roslyn/Cyborg.Core.Aot.csproj" />
+  <Project Path="Cyborg.Core.Aot/Cyborg.Core.Aot.csproj" />
   <Project Path="Cyborg.Core/Cyborg.Core.csproj" />
-  <Project Path="Foo/Foo.csproj" Id="7d56489f-4530-4808-8f7f-f2b5b46f5c86" />
+  <Project Path="Cyborg.Modules/Cyborg.Modules.csproj" Id="abcd666f-abb6-46d2-90b5-e9f011fd9e6d" />
 </Solution>
