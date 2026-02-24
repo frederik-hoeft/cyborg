@@ -1,8 +1,10 @@
-﻿namespace Cyborg.Core.Modules;
+﻿using Cyborg.Core.Modules.Runtime;
+
+namespace Cyborg.Core.Modules;
 
 public interface IModuleWorker
 {
     string ModuleId { get; }
 
-    Task<bool> ExecuteAsync(CancellationToken cancellationToken);
+    internal Task<bool> ExecuteAsync(IModuleRuntime runtime, CancellationToken cancellationToken);
 }

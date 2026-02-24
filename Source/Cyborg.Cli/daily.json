@@ -2,15 +2,36 @@
   "cyborg.modules.sequence.v1": {
     "steps": [
       {
-        "cyborg.modules.subprocess.v1": {
-          "executable": "ls",
-          "arguments": [ "-la" ]
+        "environment": {
+          "name": "wol",
+          "scope": "inherit_parent"
+        },
+        "module": {
+          "cyborg.modules.subprocess.v1": {
+            "output": {
+              "namespace": "list_files",
+              "read_stdout": true,
+              "read_stderr": true
+            },
+            "command": {
+              "executable": "ls",
+              "arguments": [ "-la" ]
+            }
+          }
         }
       },
       {
-        "cyborg.modules.subprocess.v1": {
-          "executable": "cat",
-          "arguments": [ "config.json" ]
+        "environment": {
+          "name": "wol",
+          "scope": "reference"
+        },
+        "module": {
+          "cyborg.modules.subprocess.v1": {
+            "command": {
+              "executable": "cat",
+              "arguments": [ "config.json" ]
+            }
+          }
         }
       }
     ]

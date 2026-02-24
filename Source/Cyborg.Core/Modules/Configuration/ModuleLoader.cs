@@ -4,7 +4,7 @@ using System.Text.Json;
 
 namespace Cyborg.Core.Modules.Configuration;
 
-public abstract class ModuleLoader<TModuleWorker, TModule>(IServiceProvider serviceProvider) : IModuleLoader 
+public abstract class ModuleLoader<TModuleWorker, TModule>(IServiceProvider serviceProvider) : IModuleLoader<TModule>
     where TModuleWorker : class, IModuleWorker
     where TModule : class, IModule
 {
@@ -23,4 +23,6 @@ public abstract class ModuleLoader<TModuleWorker, TModule>(IServiceProvider serv
     }
 
     protected abstract TModuleWorker CreateWorker(TModule module, IServiceProvider ServiceProvider);
+
+    IModuleWorker IModuleLoader<TModule>.CreateWorker(TModule module, IServiceProvider ServiceProvider) => CreateWorker(module, ServiceProvider);
 }

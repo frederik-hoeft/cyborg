@@ -1,10 +1,12 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 
-namespace Cyborg.Core.Modules.Runtime;
+namespace Cyborg.Core.Modules.Runtime.Environements;
 
-public interface IEnvironment
+public interface IRuntimeEnvironment
 {
     string Name { get; }
+
+    bool IsTransient { get; }
 
     bool TryResolveVariable<T>(string name, [NotNullWhen(true)] out T? value);
 

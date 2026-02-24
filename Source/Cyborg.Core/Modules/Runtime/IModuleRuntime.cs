@@ -1,14 +1,21 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using Cyborg.Core.Modules.Runtime.Environements;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Core.Modules.Runtime;
 
 public interface IModuleRuntime
 {
-    IEnvironment DefaultEnvironment { get; }
+    IRuntimeEnvironment GlobalEnvironment { get; }
 
-    bool TryGetEnvironment(string name, [NotNullWhen(true)] out IEnvironment? environment);
+    IRuntimeEnvironment Environment { get; }
 
-    bool TryAddEnvironment(IEnvironment environment);
+    bool TryGetEnvironment(string name, [NotNullWhen(true)] out IRuntimeEnvironment? environment);
 
-    bool TryRemoveEnvironment(IEnvironment environment);
+    bool TryAddEnvironment(IRuntimeEnvironment environment);
+
+    bool TryRemoveEnvironment(IRuntimeEnvironment environment);
+
+    Task<bool> ExecuteAsync(IModuleWorker module, EnvironmentScope scope = EnvironmentScope.Global, string? name = null, CancellationToken cancellationToken = default);
+
+    Task<bool> ExecuteAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken = default);
 }

@@ -9,3 +9,8 @@ public interface IModuleLoader
 
     bool TryCreateModule(ref Utf8JsonReader reader, IModuleLoaderContext context, [NotNullWhen(true)] out IModuleWorker? worker);
 }
+
+public interface IModuleLoader<TModule> : IModuleLoader where TModule : class, IModule
+{
+    IModuleWorker CreateWorker(TModule module, IServiceProvider ServiceProvider);
+}

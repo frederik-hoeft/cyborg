@@ -1,6 +1,7 @@
 ﻿using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Runtime;
+using Cyborg.Core.Modules.Runtime.Environements;
 using System.Collections.Frozen;
 
 namespace Cyborg.Modules.Template;
@@ -8,14 +9,15 @@ namespace Cyborg.Modules.Template;
 public sealed class TemplateModuleWorker
 (
     TemplateModule module,
-    DefaultEnvironment defaultEnvironment,
+    GlobalRuntimeEnvironment defaultEnvironment,
     IModuleConfigurationLoader configurationLoader
 ) : ModuleWorker<TemplateModule>(module)
 {
     private readonly FrozenDictionary<string, string> _templateRegistry = module.Templates.ToFrozenDictionary(t => t.Name, t => t.Path);
 
-    public async override Task<bool> ExecuteAsync(CancellationToken cancellationToken)
+    protected async override Task<bool> ExecuteAsync(IModuleRuntime runtime, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(runtime);
         if (!defaultEnvironment.TryResolveVariable(TemplateModule.LoadTargetName, out string? templateName))
         {
             throw new InvalidOperationException("Failed to resolve template name from environment.");
@@ -26,6 +28,6 @@ public sealed class TemplateModuleWorker
         }
         // Load the template content from the specified path
         IModuleWorker module = await configurationLoader.LoadModuleAsync(templatePath, cancellationToken);
-        return await module.ExecuteAsync(cancellationToken);
+        return await runtime.ExecuteAsync(module, runtime.Environment, cancellationToken);
     }
 }
