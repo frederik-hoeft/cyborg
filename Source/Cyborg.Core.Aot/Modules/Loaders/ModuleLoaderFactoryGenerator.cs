@@ -74,7 +74,6 @@ public class ModuleLoaderFactoryGenerator : IIncrementalGenerator
                         {{model.ModuleType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Included))}} module, 
                         global::{{typeof(IServiceProvider).FullName}} serviceProvider)
                     {
-                        // use the constructor parameters to resolve dependencies from the service provider
                         return new {{model.ModuleWorkerType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Included))}}(
                 """);
             for (int i = 0; i < model.Constructor.Parameters.Length; ++i)
@@ -102,7 +101,7 @@ public class ModuleLoaderFactoryGenerator : IIncrementalGenerator
                     // using serviceProvider.GetRequiredService to resolve dependencies, this will throw an exception if the service is not registered, which is fine because it will be a configuration error that should be fixed by the user
                     sourceBuilder.Append(
                         $"""
-                                    serviceProvider.GetRequiredService<{parameter.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Omitted))}>()
+                                    serviceProvider.GetRequiredService<{parameter.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Included))}>()
                         """);
                 }
             }
