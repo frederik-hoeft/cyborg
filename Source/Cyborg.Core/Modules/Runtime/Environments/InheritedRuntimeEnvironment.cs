@@ -1,6 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 
-namespace Cyborg.Core.Modules.Runtime.Environements;
+namespace Cyborg.Core.Modules.Runtime.Environments;
 
 internal sealed class InheritedRuntimeEnvironment(string name, IRuntimeEnvironment parent, bool transient) : RuntimeEnvironment(name, transient)
 {

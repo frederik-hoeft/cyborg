@@ -1,0 +1,72 @@
+﻿using Cyborg.Core.Modules.Configuration.Model;
+using Cyborg.Core.Modules.Runtime.Environments;
+using System.Diagnostics.CodeAnalysis;
+using System.Xml.Linq;
+
+namespace Cyborg.Core.Modules.Runtime;
+
+public abstract class ModuleRuntimeBase : IModuleRuntime
+{
+    public abstract IRuntimeEnvironment GlobalEnvironment { get; }
+
+    public abstract IRuntimeEnvironment ParentEnvironment { get; }
+
+    public abstract IRuntimeEnvironment Environment { get; }
+
+    protected static IRuntimeEnvironment CreateScopedEnvironment(IModuleRuntime parent, EnvironmentScope scope, string? name)
+    {
+        ArgumentNullException.ThrowIfNull(parent);
+        bool transient = false;
+        if (string.IsNullOrEmpty(name))
+        {
+            transient = true;
+            name = Guid.CreateVersion7().ToString();
+        }
+        IRuntimeEnvironment environment = scope switch
+        {
+            EnvironmentScope.Isolated => new RuntimeEnvironment(name, transient),
+            EnvironmentScope.Global => parent.GlobalEnvironment,
+            EnvironmentScope.InheritParent => new InheritedRuntimeEnvironment(name, parent.Environment, transient),
+            EnvironmentScope.InheritGlobal => new InheritedRuntimeEnvironment(name, parent.GlobalEnvironment, transient),
+            EnvironmentScope.Parent => parent.Environment,
+            EnvironmentScope.Reference => throw new ArgumentException("Attempting to create an environment by reference without providing an environment reference.", nameof(scope)),
+            _ => throw new ArgumentOutOfRangeException(nameof(scope), scope, "Invalid environment scope.")
+        };
+        parent.TryAddEnvironment(environment);
+        return environment;
+    }
+
+    public virtual async Task<bool> ExecuteAsync(ModuleContext moduleContext, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(moduleContext);
+        IRuntimeEnvironment? environment = null;
+        if (moduleContext.Environment?.Scope is EnvironmentScope.Reference)
+        {
+            if (string.IsNullOrEmpty(moduleContext.Environment.Name))
+            {
+                throw new InvalidOperationException("Attempting to reference an environment without providing an environment name.");
+            }
+            if (!TryGetEnvironment(moduleContext.Environment.Name, out environment))
+            {
+                throw new InvalidOperationException($"Attempting to reference an environment that does not exist: {moduleContext.Environment.Name}");
+            }
+        }
+        EnvironmentScope scope = moduleContext.Environment?.Scope ?? EnvironmentScope.Parent;
+        environment ??= CreateScopedEnvironment(parent: this, scope, moduleContext.Environment?.Name);
+        if (moduleContext.Configuration is { } configuration)
+        {
+            await ExecuteAsync(configuration.Module, environment, cancellationToken);
+        }
+        return await ExecuteAsync(moduleContext.Module.Module, environment, cancellationToken);
+    }
+
+    public abstract Task<bool> ExecuteAsync(IModuleWorker module, EnvironmentScope scope = EnvironmentScope.Global, string? name = null, CancellationToken cancellationToken = default);
+
+    public abstract Task<bool> ExecuteAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken = default);
+
+    public abstract bool TryAddEnvironment(IRuntimeEnvironment environment);
+
+    public abstract bool TryGetEnvironment(string name, [NotNullWhen(true)] out IRuntimeEnvironment? environment);
+
+    public abstract bool TryRemoveEnvironment(IRuntimeEnvironment environment);
+}

@@ -1,6 +1,6 @@
 ﻿using Cyborg.Core.Modules.Runtime;
 
-namespace Cyborg.Modules.Shared.Model;
+namespace Cyborg.Core.Modules.Configuration.Model;
 
 public sealed record ModuleEnvironment
 (

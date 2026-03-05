@@ -6,6 +6,16 @@
           "name": "wol",
           "scope": "inherit_parent"
         },
+        "configuration": {
+          "cyborg.modules.config.map.v1": {
+            "entries": [
+              {
+                "key": "log_level",
+                "value": "warning"
+              }
+            ]
+          }
+        },
         "module": {
           "cyborg.modules.subprocess.v1": {
             "output": {

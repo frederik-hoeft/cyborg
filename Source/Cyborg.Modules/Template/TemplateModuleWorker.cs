@@ -1,7 +1,7 @@
 ﻿using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Runtime;
-using Cyborg.Core.Modules.Runtime.Environements;
+using Cyborg.Core.Modules.Runtime.Environments;
 using System.Collections.Frozen;
 
 namespace Cyborg.Modules.Template;

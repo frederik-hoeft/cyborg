@@ -1,7 +1,7 @@
 ﻿using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime;
-using Cyborg.Core.Modules.Runtime.Environements;
+using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Services;
 using Jab;
 using System.Text.Json;
