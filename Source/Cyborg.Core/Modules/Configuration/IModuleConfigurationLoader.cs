@@ -1,6 +1,8 @@
-﻿namespace Cyborg.Core.Modules.Configuration;
+﻿using Cyborg.Core.Modules.Configuration.Model;
+
+namespace Cyborg.Core.Modules.Configuration;
 
 public interface IModuleConfigurationLoader
 {
-    Task<IModuleWorker> LoadModuleAsync(string configurationFilePath, CancellationToken cancellationToken);
+    Task<ModuleContext> LoadModuleAsync(string configurationFilePath, CancellationToken cancellationToken);
 }

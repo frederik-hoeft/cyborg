@@ -6,7 +6,7 @@ internal sealed class InheritedRuntimeEnvironment(string name, IRuntimeEnvironme
 {
     public override bool TryResolveVariable<T>(string name, [NotNullWhen(true)] out T? value) where T : default
     {
-        if (base.TryResolveVariable<T>(name, out value))
+        if (base.TryResolveVariable(name, out value))
         {
             return true;
         }

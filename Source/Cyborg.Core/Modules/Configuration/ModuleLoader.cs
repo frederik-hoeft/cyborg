@@ -22,7 +22,7 @@ public abstract class ModuleLoader<TModuleWorker, TModule>(IServiceProvider serv
         return false;
     }
 
-    protected abstract TModuleWorker CreateWorker(TModule module, IServiceProvider ServiceProvider);
+    protected abstract TModuleWorker CreateWorker(TModule module, IServiceProvider serviceProvider);
 
-    IModuleWorker IModuleLoader<TModule>.CreateWorker(TModule module, IServiceProvider ServiceProvider) => CreateWorker(module, ServiceProvider);
+    IModuleWorker IModuleLoader<TModule>.CreateWorker(TModule module, IServiceProvider serviceProvider) => CreateWorker(module, serviceProvider);
 }

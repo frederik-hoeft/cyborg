@@ -2,4 +2,4 @@
 
 namespace Cyborg.Core.Modules.Configuration.Model;
 
-public sealed record ModuleReference([property: JsonIgnore] IModuleWorker Module);
+public sealed record DynamicValue([property: JsonIgnore] object Value);

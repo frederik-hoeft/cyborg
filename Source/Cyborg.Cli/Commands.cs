@@ -1,6 +1,7 @@
 ﻿using ConsoleAppFramework;
 using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Configuration;
+using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Modules.Template;
@@ -19,8 +20,12 @@ internal sealed class Commands
         GlobalRuntimeEnvironment defaultEnvironment = sp.GetRequiredService<GlobalRuntimeEnvironment>();
         defaultEnvironment.SetVariable(TemplateModule.LoadTargetName, template);
         IModuleConfigurationLoader configurationLoader = sp.GetService<IModuleConfigurationLoader>();
-        IModuleWorker module = await configurationLoader.LoadModuleAsync("config.json", cancellationToken);
+        ModuleContext module = await configurationLoader.LoadModuleAsync("config.json", cancellationToken);
+        module = module with 
+        {
+            Environment = module.Environment ?? new ModuleEnvironment()
+        };
         IModuleRuntime runtime = sp.GetRequiredService<IModuleRuntime>();
-        await runtime.ExecuteAsync(module, defaultEnvironment, cancellationToken);
+        await runtime.ExecuteAsync(module, cancellationToken);
     }
 }

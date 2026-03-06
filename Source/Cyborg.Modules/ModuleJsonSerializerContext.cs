@@ -1,6 +1,7 @@
 ﻿using Cyborg.Core.Aot.Json.Configuration;
 using Cyborg.Modules.Configuration.ConfigCollection;
 using Cyborg.Modules.Configuration.ConfigMap;
+using Cyborg.Modules.Named;
 using Cyborg.Modules.Sequence;
 using Cyborg.Modules.Subprocess;
 using Cyborg.Modules.Template;
@@ -16,4 +17,6 @@ namespace Cyborg.Modules;
 [JsonSerializable(typeof(TemplateModule))]
 [JsonSerializable(typeof(ConfigMapModule))]
 [JsonSerializable(typeof(ConfigCollectionModule))]
+[JsonSerializable(typeof(NamedModuleDefinitionModule))]
+[JsonSerializable(typeof(NamedModuleReferenceModule))]
 public sealed partial class ModuleJsonSerializerContext : AotJsonSerializerContext;

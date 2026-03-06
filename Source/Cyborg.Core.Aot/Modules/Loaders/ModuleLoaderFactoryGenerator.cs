@@ -47,30 +47,73 @@ public class ModuleLoaderFactoryGenerator : IIncrementalGenerator
                     {
                         throw new InvalidOperationException($"{nameof(ModuleLoaderFactoryGenerator)} requires the target class to have a single constructor");
                     }
+                    string? methodName = null;
+                    string? methodAccessibility = null;
+                    TypedConstant nameArg = generatedModuleLoaderFactoryAttribute.NamedArguments
+                        .FirstOrDefault(static kvp => kvp.Key == nameof(GeneratedModuleLoaderFactoryAttribute.Name)).Value;
+                    if (nameArg.Value is string name && !string.IsNullOrEmpty(name))
+                    {
+                        methodName = name;
+                        if (targetClass is not INamedTypeSymbol targetClassNamedType)
+                        {
+                            throw new InvalidOperationException($"{nameof(ModuleLoaderFactoryGenerator)} requires the target class to be a named type when Name is specified");
+                        }
+                        IMethodSymbol partialMethod = targetClassNamedType.GetMembers(name)
+                            .OfType<IMethodSymbol>()
+                            .FirstOrDefault(static m => m.IsPartialDefinition) 
+                            ?? throw new InvalidOperationException($"{nameof(ModuleLoaderFactoryGenerator)} requires a partial method declaration named '{name}' in class '{targetClass.Name}'");
+
+                        SymbolDisplayFormat qualifiedFormat = SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Included);
+                        if (partialMethod.ReturnType.ToDisplayString(qualifiedFormat) != moduleWorkerType.ToDisplayString(qualifiedFormat))
+                        {
+                            throw new InvalidOperationException($"{nameof(ModuleLoaderFactoryGenerator)} requires the partial method '{name}' to return '{moduleWorkerType.ToDisplayString()}'");
+                        }
+                        if (partialMethod.Parameters is not [IParameterSymbol param1, IParameterSymbol param2]
+                            || param1.Type.ToDisplayString(qualifiedFormat) != moduleType.ToDisplayString(qualifiedFormat)
+                            || param2.Type.ToDisplayString(qualifiedFormat) != $"global::{typeof(IServiceProvider).FullName}")
+                        {
+                            throw new InvalidOperationException($"{nameof(ModuleLoaderFactoryGenerator)} requires the partial method '{name}' to have parameters '({moduleType.ToDisplayString()} module, {typeof(IServiceProvider).FullName} serviceProvider)'");
+                        }
+                        methodAccessibility = partialMethod.DeclaredAccessibility switch
+                        {
+                            Accessibility.Public => "public",
+                            Accessibility.Protected => "protected",
+                            Accessibility.Internal => "internal",
+                            Accessibility.ProtectedOrInternal => "protected internal",
+                            Accessibility.ProtectedAndInternal => "private protected",
+                            Accessibility.Private => "private",
+                            _ => throw new InvalidOperationException($"{nameof(ModuleLoaderFactoryGenerator)} could not determine accessibility of partial method '{name}'")
+                        };
+                    }
                     return new Model(
                         Namespace: targetClass.ContainingNamespace.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Omitted)),
                         Class: targetClass,
                         GeneratorAttribute: generatedModuleLoaderFactoryAttribute,
                         Constructor: constructor,
                         ModuleWorkerType: moduleWorkerType,
-                        ModuleType: moduleType);
+                        ModuleType: moduleType,
+                        MethodName: methodName,
+                        MethodAccessibility: methodAccessibility);
                 }
                 throw new InvalidOperationException($"{nameof(ModuleLoaderFactoryGenerator)} requires the target class to inherit from {MODULE_LOADER_UNBOUND}");
             }
         );
         context.RegisterSourceOutput(pipeline, static (context, model) =>
         {
-            // implement: protected abstract TModuleWorker CreateWorker(TModule module, IServiceProvider ServiceProvider);
+            string methodModifiers = model.MethodName is not null
+                ? $"{model.MethodAccessibility} partial "
+                : "protected override ";
+            string methodName = model.MethodName ?? "CreateWorker";
             StringBuilder sourceBuilder = new(
                 $$"""
                 #nullable enable
                 using global::Microsoft.Extensions.DependencyInjection;
-  
+
                 namespace {{model.Namespace}};
- 
+
                 partial class {{model.Class.Name}}
                 {
-                    protected override {{model.ModuleWorkerType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Included))}} CreateWorker(
+                    {{methodModifiers}}{{model.ModuleWorkerType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Included))}} {{methodName}}(
                         {{model.ModuleType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Included))}} module, 
                         global::{{typeof(IServiceProvider).FullName}} serviceProvider)
                     {
@@ -121,5 +164,5 @@ public class ModuleLoaderFactoryGenerator : IIncrementalGenerator
     private static void EmitFrameworkSource(IncrementalGeneratorPostInitializationContext context) => 
         context.AddEmbeddedSource<GeneratedModuleLoaderFactoryAttribute>();
 
-    private sealed record Model(string Namespace, ISymbol Class, AttributeData GeneratorAttribute, IMethodSymbol Constructor, ITypeSymbol ModuleWorkerType, ITypeSymbol ModuleType);
+    private sealed record Model(string Namespace, ISymbol Class, AttributeData GeneratorAttribute, IMethodSymbol Constructor, ITypeSymbol ModuleWorkerType, ITypeSymbol ModuleType, string? MethodName, string? MethodAccessibility);
 }

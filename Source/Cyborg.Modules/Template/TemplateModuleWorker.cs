@@ -1,5 +1,6 @@
 ﻿using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Configuration;
+using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using System.Collections.Frozen;
@@ -27,7 +28,7 @@ public sealed class TemplateModuleWorker
             throw new InvalidOperationException($"Template '{templateName}' was not found in the module template registry.");
         }
         // Load the template content from the specified path
-        IModuleWorker module = await configurationLoader.LoadModuleAsync(templatePath, cancellationToken);
-        return await runtime.ExecuteAsync(module, runtime.Environment, cancellationToken);
+        ModuleContext module = await configurationLoader.LoadModuleAsync(templatePath, cancellationToken);
+        return await runtime.ExecuteAsync(module, cancellationToken);
     }
 }

@@ -12,5 +12,5 @@ public interface IModuleLoader
 
 public interface IModuleLoader<TModule> : IModuleLoader where TModule : class, IModule
 {
-    IModuleWorker CreateWorker(TModule module, IServiceProvider ServiceProvider);
+    IModuleWorker CreateWorker(TModule module, IServiceProvider serviceProvider);
 }
