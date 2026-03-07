@@ -238,6 +238,131 @@ This section documents the design for migrating the legacy bash-based backup scr
 5. **Observable** - Prometheus metrics for backup health, duration, and borg statistics
 6. **AOT-compatible** - All modules must work with native AOT compilation
 
+## Existing Runtime Infrastructure
+
+The POC already provides a sophisticated environment and scoping system that the migration design must leverage, not duplicate.
+
+### Environment Scoping (`Cyborg.Core.Modules.Runtime`)
+
+The `EnvironmentScope` enum defines how child modules inherit or share state:
+
+| Scope | Behavior | Use Case |
+|-------|----------|----------|
+| `Isolated` | Fresh environment, no variable inheritance | Sandboxed execution |
+| `Global` | Execute in global singleton environment | Cross-job shared state |
+| `InheritParent` | New environment inheriting from immediate parent | Typical module execution |
+| `InheritGlobal` | New environment inheriting only from global | Skip parent overrides |
+| `Parent` | Share parent's environment directly (no copy) | In-place variable mutation |
+| `Reference` | Reference an existing named environment by name | Reuse previously created scope |
+
+**Implementation classes:**
+- `RuntimeEnvironment` - Base environment with `Dictionary<string, object?>` storage
+- `InheritedRuntimeEnvironment` - Chains to parent for variable resolution fallback
+- `GlobalRuntimeEnvironment` - Singleton for global state
+- `ScopedRuntime` - Wraps `IModuleRuntime` with a specific environment
+
+### Variable Resolution
+
+`RuntimeEnvironment.TryResolveVariable<T>()` supports:
+1. **Direct lookup** - Variable name maps to stored value
+2. **Indirection** - String values starting with `$` or `${...}` resolve recursively
+3. **Type casting** - Generic `T` constraint ensures type-safe retrieval
+
+```csharp
+// Example: "${job_name}" in config resolves through indirection  
+if (objValue is string s && s is ['$', ..] && VariableRegex.Match(s) is { Success: true } match)
+{
+    string variableName = match.Groups["variable_name"].Value;
+    return TryResolveVariable(variableName, out value);
+}
+```
+
+### Named Environment Persistence
+
+Non-transient environments (those with explicit `Name` in JSON config) are registered with the root runtime via `TryAddEnvironment()` and can be retrieved later via `TryGetEnvironment()`. This enables:
+- **Cross-step state sharing** - Step 1 creates named environment, Step 3 references it
+- **Cleanup scopes** - Finally block references the same environment as try block
+
+### Configuration Loading (`ModuleContext`)
+
+Each module invocation is wrapped in `ModuleContext`:
+```csharp
+record ModuleContext(
+    ModuleReference Module,           // The actual module to execute
+    ModuleEnvironment? Environment,   // Scope configuration
+    ModuleReference? Configuration    // Optional: ConfigMap/ConfigCollection to populate environment
+);
+```
+
+The `Configuration` module executes first, populating the environment, before the main `Module` executes.
+
+### Dynamic Value Providers
+
+The `IDynamicValueProvider` system enables type-safe JSON deserialization for config values:
+- `string`, `bool`, `int`, `long`, `double`, `decimal`, etc.
+- Extensible via additional provider registrations
+
+**JSON syntax:**
+```json
+{ "key": "max_retries", "int": 3 }
+{ "key": "enable_compression", "bool": true }
+{ "key": "container_name", "string": "overleaf" }
+```
+
+---
+
+## Design Principles for New Modules
+
+### Leverage Existing Scoping
+
+New modules should use `ModuleContext.Environment` for scoping, not custom solutions:
+
+```json
+{
+  "environment": {
+    "scope": "inherit_parent",
+    "name": "borg_session"
+  },
+  "configuration": {
+    "cyborg.modules.config.map.v1": {
+      "entries": [
+        { "key": "repository_name", "string": "overleaf" }
+      ]
+    }
+  },
+  "module": { "cyborg.modules.borg.create.v1": { ... } }
+}
+```
+
+### Use `IModuleRuntime` for Child Execution
+
+Modules that execute children should use the runtime's execution methods:
+```csharp
+// Execute child with inherited environment
+await runtime.ExecuteAsync(childContext, cancellationToken);
+
+// Execute child with explicit scope
+await runtime.ExecuteAsync(childWorker, EnvironmentScope.InheritParent, "child_scope", cancellationToken);
+
+// Execute child in same environment (no scope change)
+await runtime.ExecuteAsync(childWorker, runtime.Environment, cancellationToken);
+```
+
+### Read Variables via Environment
+
+Modules read configuration from the environment rather than through constructor parameters:
+```csharp
+// In module worker:
+if (!runtime.Environment.TryResolveVariable("borg_passphrase", out string? passphrase))
+{
+    throw new InvalidOperationException("Missing required variable: borg_passphrase");
+}
+```
+
+This allows late-binding and indirection (`${variable}` syntax).
+
+---
+
 ## Legacy Workflow Analysis
 
 ### High-Level Execution Flow (from `borg-run.sh`)
@@ -327,7 +452,7 @@ public sealed record ForEachModule(
     string Collection,              // Environment variable name containing IEnumerable
     string ItemVariable,            // Variable name to bind current item
     string? IndexVariable,          // Optional: variable name for current index
-    ModuleContext Body,             // Module to execute for each item
+    ModuleContext Body,             // Module to execute for each item (includes its own environment config)
     bool ContinueOnError = false    // Continue iteration on body failure
 ) : IModule
 {
@@ -344,6 +469,10 @@ public sealed record ForEachModule(
     "index_variable": "host_index",
     "continue_on_error": false,
     "body": {
+      "environment": {
+        "scope": "inherit_parent",
+        "name": "host_iteration"
+      },
       "module": { "cyborg.modules.borg.create.v1": { ... } }
     }
   }
@@ -351,10 +480,51 @@ public sealed record ForEachModule(
 ```
 
 **Worker Behavior:**
-1. Resolve `collection` from runtime environment
-2. For each item: set `item_variable` (and `index_variable`), execute `body`
-3. If `continue_on_error` is false, stop on first failure
-4. Return true only if all iterations succeeded
+```csharp
+protected override async Task<bool> ExecuteAsync(IModuleRuntime runtime, CancellationToken cancellationToken)
+{
+    // Resolve collection from current environment
+    if (!runtime.Environment.TryResolveVariable<IEnumerable<object>>(Module.Collection, out var items))
+    {
+        throw new InvalidOperationException($"Collection '{Module.Collection}' not found in environment.");
+    }
+    
+    int index = 0;
+    foreach (object item in items)
+    {
+        // Create iteration scope that inherits from current environment
+        // Body's ModuleContext.Environment controls child scoping
+        // We inject item/index into the scope used by body
+        
+        // Resolve body's environment scope (default to InheritParent)
+        EnvironmentScope bodyScope = Module.Body.Environment?.Scope ?? EnvironmentScope.InheritParent;
+        string? bodyName = Module.Body.Environment?.Name;
+        
+        IRuntimeEnvironment iterationEnv = CreateIterationEnvironment(runtime, bodyScope, bodyName);
+        iterationEnv.SetVariable(Module.ItemVariable, item);
+        if (Module.IndexVariable is not null)
+        {
+            iterationEnv.SetVariable(Module.IndexVariable, index);
+        }
+        
+        // Execute body's configuration module (if any) then body module
+        bool success = await runtime.ExecuteAsync(Module.Body.Module.Module, iterationEnv, cancellationToken);
+        
+        if (!success && !Module.ContinueOnError)
+        {
+            return false;
+        }
+        index++;
+    }
+    return true;
+}
+```
+
+**Scoping Integration:**
+- For each iteration, creates a new environment based on `body.environment.scope`
+- Item and index variables are set in the iteration environment
+- Child module inherits from iteration environment for variable resolution
+- Named environments (`body.environment.name`) are registered for later `Reference` scope usage
 
 ---
 
@@ -376,11 +546,22 @@ public sealed record GuardModule(
 }
 ```
 
-**JSON Configuration:**
+**JSON Configuration (with scoping):**
 ```json
 {
   "cyborg.modules.guard.v1": {
     "body": {
+      "environment": {
+        "scope": "inherit_parent",
+        "name": "backup_session"
+      },
+      "configuration": {
+        "cyborg.modules.config.map.v1": {
+          "entries": [
+            { "key": "container_name", "string": "overleaf" }
+          ]
+        }
+      },
       "module": {
         "cyborg.modules.sequence.v1": {
           "steps": [
@@ -391,30 +572,52 @@ public sealed record GuardModule(
       }
     },
     "on_error": {
-      "module": { "cyborg.modules.log.error.v1": { "message": "Backup failed" } }
+      "environment": {
+        "scope": "reference",
+        "name": "backup_session"
+      },
+      "module": { "cyborg.modules.log.error.v1": { "message": "Backup failed for ${container_name}" } }
     },
     "finally": {
+      "environment": {
+        "scope": "reference",
+        "name": "backup_session"
+      },
       "module": { "cyborg.modules.docker.up.v1": { ... } }
     }
   }
 }
 ```
 
+**Key Scoping Pattern:**
+- `body` creates a named environment (`"backup_session"`) with `inherit_parent` scope
+- `on_error` and `finally` use `reference` scope to access the same environment
+- This allows `finally` to read variables set during `body` execution (e.g., `container_name`)
+
 **Worker Behavior:**
 ```csharp
-try
+protected override async Task<bool> ExecuteAsync(IModuleRuntime runtime, CancellationToken cancellationToken)
 {
-    bool bodyResult = await runtime.ExecuteAsync(Module.Body, cancellationToken);
-    if (!bodyResult && Module.OnError is not null)
+    bool bodyResult = false;
+    try
     {
-        await runtime.ExecuteAsync(Module.OnError, CancellationToken.None);
+        bodyResult = await runtime.ExecuteAsync(Module.Body, cancellationToken);
+        if (!bodyResult && Module.OnError is not null)
+        {
+            // OnError can reference body's named environment
+            await runtime.ExecuteAsync(Module.OnError, CancellationToken.None);
+        }
+        return bodyResult;
     }
-    return bodyResult;
-}
-finally
-{
-    // Always execute cleanup, even on cancellation
-    await runtime.ExecuteAsync(Module.Finally, CancellationToken.None);
+    finally
+    {
+        // Finally always executes, even on cancellation
+        // Uses CancellationToken.None to ensure cleanup completes
+        await runtime.ExecuteAsync(Module.Finally, CancellationToken.None);
+        
+        // Optionally clean up named environment if transient
+        // (handled automatically by runtime for transient envs)
+    }
 }
 ```
 
@@ -463,12 +666,48 @@ public enum ConditionalOperator
       "operator": "is_true"
     },
     "then": {
+      "environment": { "scope": "parent" },
       "module": { "cyborg.modules.borg.create.v1": { ... } }
     },
     "else": {
+      "environment": { "scope": "parent" },
       "module": { "cyborg.modules.log.warn.v1": { "message": "Skipping: directory not found" } }
     }
   }
+}
+```
+
+**Worker Behavior:**
+```csharp
+protected override async Task<bool> ExecuteAsync(IModuleRuntime runtime, CancellationToken cancellationToken)
+{
+    bool conditionMet = EvaluateCondition(runtime.Environment, Module.Condition);
+    
+    if (conditionMet)
+    {
+        return await runtime.ExecuteAsync(Module.Then, cancellationToken);
+    }
+    else if (Module.Else is not null)
+    {
+        return await runtime.ExecuteAsync(Module.Else, cancellationToken);
+    }
+    return true; // No else branch, condition not met = success
+}
+
+private static bool EvaluateCondition(IRuntimeEnvironment env, ConditionalExpression condition)
+{
+    bool exists = env.TryResolveVariable<object>(condition.Variable, out object? value);
+    
+    return condition.Operator switch
+    {
+        ConditionalOperator.Exists => exists,
+        ConditionalOperator.NotExists => !exists,
+        ConditionalOperator.IsTrue => exists && value is true or "true" or "1",
+        ConditionalOperator.IsFalse => !exists || value is false or "false" or "0",
+        ConditionalOperator.Equals => exists && value?.ToString() == condition.Value,
+        ConditionalOperator.NotEquals => !exists || value?.ToString() != condition.Value,
+        _ => throw new ArgumentOutOfRangeException()
+    };
 }
 ```
 
@@ -478,9 +717,9 @@ public enum ConditionalOperator
 
 ### Repository Configuration Module (`cyborg.modules.borg.repository.v1`)
 
-Defines borg repository connection parameters for use by child modules.
+Sets up borg repository environment variables for child modules. Uses standard environment scoping.
 
-**Purpose:** Centralize repository configuration, inject `BORG_REPO` and `BORG_RSH` environment variables.
+**Purpose:** Centralize repository configuration, inject `BORG_REPO` and `BORG_RSH` environment variables for child modules.
 
 **Module Record:**
 ```csharp
@@ -490,7 +729,7 @@ public sealed record BorgRepositoryModule(
     string RepositoryRoot,              // Base path on remote (e.g., "/var/backups/borg/nas1")
     string RepositoryName,              // Repository name (e.g., "overleaf")
     string? SshCommand,                 // Custom SSH command (for sshpass)
-    string? Passphrase,                 // Repository passphrase (from secrets)
+    string? PassphraseVariable,         // Environment variable containing passphrase
     ModuleContext Body                  // Child module(s) to execute with this repository
 ) : IModule
 {
@@ -498,24 +737,38 @@ public sealed record BorgRepositoryModule(
 }
 ```
 
-**JSON Configuration:**
+**JSON Configuration (leveraging scoping):**
 ```json
 {
-  "cyborg.modules.borg.repository.v1": {
-    "hostname": "${current_host.hostname}",
-    "port": "${current_host.port}",
-    "repository_root": "${current_host.borg_repo_root}",
-    "repository_name": "overleaf",
-    "ssh_command": "${current_host.borg_rsh}",
-    "passphrase": "${secrets.overleaf.passphrase}",
-    "body": {
-      "module": {
-        "cyborg.modules.sequence.v1": {
-          "steps": [
-            { "module": { "cyborg.modules.borg.create.v1": { ... } } },
-            { "module": { "cyborg.modules.borg.prune.v1": { ... } } },
-            { "module": { "cyborg.modules.borg.compact.v1": { ... } } }
-          ]
+  "environment": {
+    "scope": "inherit_parent",
+    "name": "borg_repo_session"
+  },
+  "configuration": {
+    "cyborg.modules.config.map.v1": {
+      "entries": [
+        { "key": "borg_passphrase", "string": "${secrets.overleaf.passphrase}" }
+      ]
+    }
+  },
+  "module": {
+    "cyborg.modules.borg.repository.v1": {
+      "hostname": "${current_host.hostname}",
+      "port": "${current_host.port}",
+      "repository_root": "${current_host.borg_repo_root}",
+      "repository_name": "${container_name}",
+      "ssh_command": "${current_host.borg_rsh}",
+      "passphrase_variable": "borg_passphrase",
+      "body": {
+        "environment": { "scope": "parent" },
+        "module": {
+          "cyborg.modules.sequence.v1": {
+            "steps": [
+              { "module": { "cyborg.modules.borg.create.v1": { ... } } },
+              { "module": { "cyborg.modules.borg.prune.v1": { ... } } },
+              { "module": { "cyborg.modules.borg.compact.v1": { ... } } }
+            ]
+          }
         }
       }
     }
@@ -524,11 +777,55 @@ public sealed record BorgRepositoryModule(
 ```
 
 **Worker Behavior:**
-1. Construct `BORG_REPO = ssh://borg@{hostname}:{port}{repository_root}/{repository_name}`
-2. Set `BORG_RSH` from `ssh_command`
-3. Set `BORG_PASSPHRASE` from `passphrase`
-4. Execute `body` in scoped environment with these variables
-5. Clear `BORG_PASSPHRASE` on exit (security)
+```csharp
+protected override async Task<bool> ExecuteAsync(IModuleRuntime runtime, CancellationToken cancellationToken)
+{
+    // Construct BORG_REPO from module properties (which may contain ${var} indirection)
+    string hostname = ResolveProperty(runtime.Environment, Module.Hostname);
+    int port = int.Parse(ResolveProperty(runtime.Environment, Module.Port.ToString()));
+    string repoRoot = ResolveProperty(runtime.Environment, Module.RepositoryRoot);
+    string repoName = ResolveProperty(runtime.Environment, Module.RepositoryName);
+    
+    string borgRepo = $"ssh://borg@{hostname}:{port}{repoRoot}/{repoName}";
+    
+    // Set borg environment variables in current scope
+    runtime.Environment.SetVariable("BORG_REPO", borgRepo);
+    
+    if (Module.SshCommand is not null)
+    {
+        string sshCommand = ResolveProperty(runtime.Environment, Module.SshCommand);
+        runtime.Environment.SetVariable("BORG_RSH", sshCommand);
+    }
+    
+    if (Module.PassphraseVariable is not null)
+    {
+        // Passphrase is read from environment, not stored in module
+        if (runtime.Environment.TryResolveVariable<string>(Module.PassphraseVariable, out string? passphrase))
+        {
+            runtime.Environment.SetVariable("BORG_PASSPHRASE", passphrase);
+        }
+    }
+    
+    try
+    {
+        // Body inherits these variables via environment scoping
+        return await runtime.ExecuteAsync(Module.Body, cancellationToken);
+    }
+    finally
+    {
+        // Security: clear passphrase from environment
+        runtime.Environment.TryRemoveVariable("BORG_PASSPHRASE");
+    }
+}
+```
+
+**Environment Flow:**
+1. Parent scope sets secrets via `ConfigMapModule` (e.g., `borg_passphrase`)
+2. `BorgRepositoryModule` reads passphrase from `passphrase_variable`
+3. Module sets `BORG_REPO`, `BORG_RSH`, `BORG_PASSPHRASE` in current environment
+4. Body's `scope: parent` shares the same environment
+5. Child borg modules (`create`, `prune`, `compact`) read from environment
+6. Cleanup removes `BORG_PASSPHRASE`
 
 ---
 
@@ -936,7 +1233,7 @@ public sealed record SecretsLoadModule(
     SecretsSourceType SourceType,                   // How to load secrets
     string EnvironmentPrefix,                       // Prefix for environment variables
     ImmutableArray<string>? Keys                    // Specific keys to load (null = all)
-) : IModule
+) : IModule, IConfigurationModule                   // Implements IConfigurationModule for use in configuration blocks
 {
     public static string ModuleId => "cyborg.modules.secrets.load.v1";
 }
@@ -949,22 +1246,64 @@ public enum SecretsSourceType
 }
 ```
 
-**JSON Configuration:**
+**JSON Configuration (as configuration module):**
+
+Secrets can be loaded via the `configuration` property of a `ModuleContext`, populating the environment before the main module executes:
+
 ```json
 {
-  "cyborg.modules.secrets.load.v1": {
-    "source": "overleaf-secrets",
-    "source_type": "systemd_credential",
-    "environment_prefix": "secrets.overleaf",
-    "keys": [ "passphrase" ]
-  }
+  "environment": {
+    "scope": "inherit_parent",
+    "name": "backup_session"
+  },
+  "configuration": {
+    "cyborg.modules.config.collection.v1": {
+      "sources": [
+        {
+          "cyborg.modules.secrets.load.v1": {
+            "source": "overleaf-secrets",
+            "source_type": "systemd_credential",
+            "environment_prefix": "secrets",
+            "keys": [ "passphrase" ]
+          }
+        },
+        {
+          "cyborg.modules.config.map.v1": {
+            "entries": [
+              { "key": "container_name", "string": "overleaf" }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "module": { "cyborg.modules.borg.repository.v1": { ... } }
 }
 ```
 
 **Worker Behavior:**
-1. Load secret(s) from specified source
-2. Set environment variables: `{prefix}.{key}` = value
-3. Register cleanup handler to clear secrets from environment on scope exit
+```csharp
+protected override Task<bool> ExecuteAsync(IModuleRuntime runtime, CancellationToken cancellationToken)
+{
+    IEnumerable<KeyValuePair<string, string>> secrets = LoadSecrets(Module.Source, Module.SourceType, Module.Keys);
+    
+    foreach (KeyValuePair<string, string> secret in secrets)
+    {
+        string variableName = string.IsNullOrEmpty(Module.EnvironmentPrefix) 
+            ? secret.Key 
+            : $"{Module.EnvironmentPrefix}.{secret.Key}";
+        runtime.Environment.SetVariable(variableName, secret.Value);
+    }
+    
+    return Task.FromResult(true);
+}
+```
+
+**Environment Integration:**
+- Secrets module implements `IConfigurationModule`, allowing use in `configuration` blocks
+- Variables are set in the current environment scope
+- Subsequent modules (and children via `inherit_parent`) can resolve secrets via `${secrets.passphrase}`
+- Transient environments automatically clean up secrets when scope exits
 
 **Supported Sources (extensible):**
 - `EnvironmentVariable` - Read from process environment (for Kubernetes/container secrets)
@@ -1048,136 +1387,129 @@ public sealed record LogModule(
 
 ---
 
-## Complete Job Configuration Examples
+## Environment Scoping Patterns for Backup Workflows
 
-### Example: Overleaf Daily Backup (`jobs/daily/overleaf.json`)
+This section describes common patterns for leveraging the environment scoping system in backup job configurations.
+
+### Pattern 1: Named Scope with Guard Cleanup
+
+The guard module's `finally` block needs access to variables set during the `body`. Use named environments with `reference` scope:
+
+```json
+{
+  "cyborg.modules.guard.v1": {
+    "body": {
+      "environment": {
+        "scope": "inherit_parent",
+        "name": "backup_session"          // Named, non-transient
+      },
+      "configuration": {
+        "cyborg.modules.config.map.v1": {
+          "entries": [
+            { "key": "compose_path", "string": "/opt/docker/containers/app/docker-compose.yml" }
+          ]
+        }
+      },
+      "module": { ... }
+    },
+    "finally": {
+      "environment": {
+        "scope": "reference",             // References existing named scope
+        "name": "backup_session"
+      },
+      "module": {
+        "cyborg.modules.docker.up.v1": {
+          "compose_path": "${compose_path}"   // Resolves from referenced env
+        }
+      }
+    }
+  }
+}
+```
+
+### Pattern 2: ForEach Iteration Variables
+
+ForEach sets `item_variable` in a child scope that inherits from parent. Child modules can read both iteration variables and parent variables:
+
+```json
+{
+  "cyborg.modules.foreach.v1": {
+    "collection": "backup_hosts",
+    "item_variable": "host",              // Set per iteration
+    "body": {
+      "environment": {
+        "scope": "inherit_parent"         // Inherits container_name from parent
+      },
+      "module": {
+        "cyborg.modules.borg.repository.v1": {
+          "hostname": "${host.hostname}",         // From iteration
+          "repository_name": "${container_name}"  // From parent
+        }
+      }
+    }
+  }
+}
+```
+
+### Pattern 3: Secrets via Configuration Block
+
+Load secrets before the main module executes using the `configuration` property:
 
 ```json
 {
   "environment": {
-    "scope": "inherit_parent"
+    "scope": "inherit_parent",
+    "name": "job_scope"
   },
   "configuration": {
-    "cyborg.modules.config.map.v1": {
-      "entries": [
-        { "key": "container_name", "string": "overleaf" },
-        { "key": "container_root", "string": "/opt/docker/containers/overleaf" },
-        { "key": "volume_root", "string": "/opt/docker/volumes/overleaf" }
+    "cyborg.modules.config.collection.v1": {
+      "sources": [
+        {
+          "cyborg.modules.secrets.load.v1": {
+            "source": "backup-secrets",
+            "source_type": "systemd_credential",
+            "environment_prefix": "secrets"
+          }
+        },
+        {
+          "cyborg.modules.config.map.v1": {
+            "entries": [
+              { "key": "container_name", "string": "overleaf" }
+            ]
+          }
+        }
       ]
     }
   },
   "module": {
-    "cyborg.modules.secrets.load.v1": {
-      "source": "overleaf-secrets",
-      "source_type": "systemd_credential",
-      "environment_prefix": "secrets",
-      "body": {
-        "module": {
-          "cyborg.modules.guard.v1": {
-            "body": {
-              "module": {
-                "cyborg.modules.sequence.v1": {
-                  "steps": [
-                    {
-                      "module": {
-                        "cyborg.modules.system.run_as.v1": {
-                          "user": "docker",
-                          "body": {
-                            "module": {
-                              "cyborg.modules.docker.down.v1": {
-                                "compose_path": "${container_root}/docker-compose.yml"
-                              }
-                            }
-                          }
-                        }
-                      }
-                    },
-                    {
-                      "module": {
-                        "cyborg.modules.log.v1": {
-                          "level": "info",
-                          "message": "Starting backup for ${container_name}"
-                        }
-                      }
-                    },
-                    {
-                      "module": {
-                        "cyborg.modules.foreach.v1": {
-                          "collection": "backup_hosts",
-                          "item_variable": "host",
-                          "body": {
-                            "module": {
-                              "cyborg.modules.borg.repository.v1": {
-                                "hostname": "${host.hostname}",
-                                "port": "${host.port}",
-                                "repository_root": "${host.borg_repo_root}",
-                                "repository_name": "${container_name}",
-                                "ssh_command": "${host.borg_rsh}",
-                                "passphrase": "${secrets.passphrase}",
-                                "body": {
-                                  "module": {
-                                    "cyborg.modules.sequence.v1": {
-                                      "steps": [
-                                        {
-                                          "module": {
-                                            "cyborg.modules.borg.create.v1": {
-                                              "archive_name_pattern": "${container_name}-{now}",
-                                              "paths": [ "${volume_root}" ],
-                                              "compression": { "algorithm": "zlib" },
-                                              "exclude_patterns": [
-                                                "*/mongo/diagnostic.data/*",
-                                                "*/sharelatex/tmp/*",
-                                                "*/sharelatex/data/cache/*",
-                                                "*/sharelatex/data/compiles/*",
-                                                "*/sharelatex/data/output/*"
-                                              ],
-                                              "exclude_caches": true
-                                            }
-                                          }
-                                        },
-                                        {
-                                          "module": {
-                                            "cyborg.modules.borg.prune.v1": {
-                                              "glob_archives": "${container_name}-*",
-                                              "retention": {
-                                                "keep_daily": 30,
-                                                "keep_weekly": 12,
-                                                "keep_monthly": 12
-                                              }
-                                            }
-                                          }
-                                        },
-                                        {
-                                          "module": {
-                                            "cyborg.modules.borg.compact.v1": {}
-                                          }
-                                        }
-                                      ]
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            },
-            "finally": {
-              "module": {
-                "cyborg.modules.system.run_as.v1": {
-                  "user": "docker",
-                  "body": {
-                    "module": {
-                      "cyborg.modules.docker.up.v1": {
-                        "compose_path": "${container_root}/docker-compose.yml"
-                      }
-                    }
-                  }
-                }
+    "cyborg.modules.borg.repository.v1": {
+      "passphrase_variable": "secrets.passphrase"   // Read from config-loaded secret
+    }
+  }
+}
+```
+
+### Pattern 4: Scope Isolation for Nested Loops
+
+When nesting foreach loops, use `inherit_parent` to create a scope chain:
+
+```json
+{
+  "cyborg.modules.foreach.v1": {
+    "collection": "smb_targets",
+    "item_variable": "target",
+    "body": {
+      "environment": { "scope": "inherit_parent" },
+      "module": {
+        "cyborg.modules.foreach.v1": {
+          "collection": "backup_hosts",
+          "item_variable": "host",
+          "body": {
+            "environment": { "scope": "inherit_parent" },
+            "module": {
+              "cyborg.modules.borg.create.v1": {
+                "archive_name_pattern": "${target.name}-{now}",  // From outer loop
+                "paths": [ "${target.root}" ]                     // From outer loop
               }
             }
           }
@@ -1188,116 +1520,167 @@ public sealed record LogModule(
 }
 ```
 
-### Example: SMB Data Daily Backup (`jobs/daily/smb-data.json`)
+Variable resolution chain: `inner iteration → outer iteration → parent → global`
+
+### Pattern 5: Parent Scope for In-Place Mutation
+
+Use `scope: parent` when a module should modify the calling scope directly:
 
 ```json
 {
+  "cyborg.modules.sequence.v1": {
+    "steps": [
+      {
+        "environment": { "scope": "parent" },
+        "module": {
+          "cyborg.modules.config.map.v1": {
+            "entries": [
+              { "key": "step1_result", "string": "computed_value" }
+            ]
+          }
+        }
+      },
+      {
+        "environment": { "scope": "parent" },
+        "module": {
+          "cyborg.modules.log.v1": {
+            "message": "Step 1 set: ${step1_result}"   // Visible because same scope
+          }
+        }
+      }
+    ]
+  }
+}
+```
+
+---
+
+## Complete Job Configuration Examples
+
+### Example: Overleaf Daily Backup (`jobs/daily/overleaf.json`)
+
+This example demonstrates:
+- Named guard scope for cleanup variable access
+- Configuration block for secrets + config loading
+- ForEach iteration with inherited scopes
+- Repository module setting borg environment variables
+
+```json
+{
+  "environment": {
+    "scope": "inherit_parent",
+    "name": "overleaf_job"
+  },
+  "configuration": {
+    "cyborg.modules.config.collection.v1": {
+      "sources": [
+        {
+          "cyborg.modules.secrets.load.v1": {
+            "source": "overleaf-secrets",
+            "source_type": "systemd_credential",
+            "environment_prefix": "secrets"
+          }
+        },
+        {
+          "cyborg.modules.config.map.v1": {
+            "entries": [
+              { "key": "container_name", "string": "overleaf" },
+              { "key": "container_root", "string": "/opt/docker/containers/overleaf" },
+              { "key": "volume_root", "string": "/opt/docker/volumes/overleaf" },
+              { "key": "docker_user", "string": "docker" }
+            ]
+          }
+        }
+      ]
+    }
+  },
   "module": {
     "cyborg.modules.guard.v1": {
       "body": {
+        "environment": { "scope": "parent" },
         "module": {
           "cyborg.modules.sequence.v1": {
             "steps": [
               {
+                "environment": { "scope": "parent" },
                 "module": {
-                  "cyborg.modules.systemd.stop.v1": {
-                    "service_name": "smbd.service"
+                  "cyborg.modules.docker.down.v1": {
+                    "compose_path": "${container_root}/docker-compose.yml",
+                    "user": "${docker_user}"
                   }
                 }
               },
               {
+                "environment": { "scope": "parent" },
+                "module": {
+                  "cyborg.modules.log.v1": {
+                    "level": "info",
+                    "message": "Starting backup for ${container_name}"
+                  }
+                }
+              },
+              {
+                "environment": { "scope": "parent" },
                 "module": {
                   "cyborg.modules.foreach.v1": {
-                    "collection": "smb_targets",
-                    "item_variable": "target",
-                    "continue_on_error": false,
+                    "collection": "backup_hosts",
+                    "item_variable": "host",
                     "body": {
+                      "environment": { "scope": "inherit_parent" },
                       "module": {
-                        "cyborg.modules.sequence.v1": {
-                          "steps": [
-                            {
-                              "module": {
-                                "cyborg.modules.secrets.load.v1": {
-                                  "source": "${target.secrets_file}",
-                                  "source_type": "json_file",
-                                  "environment_prefix": "secrets"
-                                }
-                              }
-                            },
-                            {
-                              "module": {
-                                "cyborg.modules.if.v1": {
-                                  "condition": {
-                                    "variable": "target.root",
-                                    "operator": "exists"
-                                  },
-                                  "then": {
+                        "cyborg.modules.borg.repository.v1": {
+                          "hostname": "${host.hostname}",
+                          "port": "${host.port}",
+                          "repository_root": "${host.borg_repo_root}",
+                          "repository_name": "${container_name}",
+                          "ssh_command": "${host.borg_rsh}",
+                          "passphrase_variable": "secrets.passphrase",
+                          "body": {
+                            "environment": { "scope": "parent" },
+                            "module": {
+                              "cyborg.modules.sequence.v1": {
+                                "steps": [
+                                  {
+                                    "environment": { "scope": "parent" },
                                     "module": {
-                                      "cyborg.modules.foreach.v1": {
-                                        "collection": "backup_hosts",
-                                        "item_variable": "host",
-                                        "body": {
-                                          "module": {
-                                            "cyborg.modules.borg.repository.v1": {
-                                              "hostname": "${host.hostname}",
-                                              "port": "${host.port}",
-                                              "repository_root": "${host.borg_repo_root}",
-                                              "repository_name": "${target.repository_name}",
-                                              "ssh_command": "${host.borg_rsh}",
-                                              "passphrase": "${secrets.passphrase}",
-                                              "body": {
-                                                "module": {
-                                                  "cyborg.modules.sequence.v1": {
-                                                    "steps": [
-                                                      {
-                                                        "module": {
-                                                          "cyborg.modules.borg.create.v1": {
-                                                            "archive_name_pattern": "${target.repository_name}-{now}",
-                                                            "paths": [ "${target.root}" ],
-                                                            "compression": { "algorithm": "zlib" },
-                                                            "exclude_caches": true
-                                                          }
-                                                        }
-                                                      },
-                                                      {
-                                                        "module": {
-                                                          "cyborg.modules.borg.prune.v1": {
-                                                            "glob_archives": "${target.repository_name}-*",
-                                                            "retention": {
-                                                              "keep_daily": 30,
-                                                              "keep_weekly": 24,
-                                                              "keep_monthly": 24
-                                                            }
-                                                          }
-                                                        }
-                                                      },
-                                                      {
-                                                        "module": {
-                                                          "cyborg.modules.borg.compact.v1": {}
-                                                        }
-                                                      }
-                                                    ]
-                                                  }
-                                                }
-                                              }
-                                            }
-                                          }
+                                      "cyborg.modules.borg.create.v1": {
+                                        "archive_name_pattern": "${container_name}-{now}",
+                                        "paths": [ "${volume_root}" ],
+                                        "compression": { "algorithm": "zlib" },
+                                        "exclude_patterns": [
+                                          "*/mongo/diagnostic.data/*",
+                                          "*/sharelatex/tmp/*",
+                                          "*/sharelatex/data/cache/*",
+                                          "*/sharelatex/data/compiles/*",
+                                          "*/sharelatex/data/output/*"
+                                        ],
+                                        "exclude_caches": true
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "environment": { "scope": "parent" },
+                                    "module": {
+                                      "cyborg.modules.borg.prune.v1": {
+                                        "glob_archives": "${container_name}-*",
+                                        "retention": {
+                                          "keep_daily": 30,
+                                          "keep_weekly": 12,
+                                          "keep_monthly": 12
                                         }
                                       }
                                     }
                                   },
-                                  "else": {
+                                  {
+                                    "environment": { "scope": "parent" },
                                     "module": {
-                                      "cyborg.modules.log.v1": {
-                                        "level": "warn",
-                                        "message": "SMB root '${target.root}' does not exist, skipping"
-                                      }
+                                      "cyborg.modules.borg.compact.v1": {}
                                     }
                                   }
-                                }
+                                ]
                               }
                             }
-                          ]
+                          }
                         }
                       }
                     }
@@ -1309,9 +1692,14 @@ public sealed record LogModule(
         }
       },
       "finally": {
+        "environment": {
+          "scope": "reference",
+          "name": "overleaf_job"
+        },
         "module": {
-          "cyborg.modules.systemd.start.v1": {
-            "service_name": "smbd.service"
+          "cyborg.modules.docker.up.v1": {
+            "compose_path": "${container_root}/docker-compose.yml",
+            "user": "${docker_user}"
           }
         }
       }
@@ -1320,12 +1708,204 @@ public sealed record LogModule(
 }
 ```
 
+**Environment Flow:**
+```
+1. "overleaf_job" scope created (inherit_parent from global)
+2. Configuration runs → sets secrets.passphrase, container_name, etc.
+3. Guard body uses "parent" → same "overleaf_job" scope
+4. Docker down reads ${container_root}, ${docker_user} from current scope
+5. ForEach creates iteration scopes (inherit from "overleaf_job")
+   → Each iteration has ${host} + all parent variables
+6. Repository module sets BORG_REPO, BORG_PASSPHRASE in iteration scope
+7. Borg create/prune/compact read BORG_* from environment
+8. On completion or error: finally references "overleaf_job" scope
+   → Reads ${container_root}, ${docker_user} to restart containers
+```
+
+### Example: SMB Data Daily Backup (`jobs/daily/smb-data.json`)
+
+This example demonstrates:
+- Nested foreach loops (smb_targets → backup_hosts)
+- Per-iteration secrets loading via configuration block
+- Conditional execution based on directory existence
+- Named guard scope for service restart
+
+```json
+{
+  "environment": {
+    "scope": "inherit_parent",
+    "name": "smb_job"
+  },
+  "configuration": {
+    "cyborg.modules.config.map.v1": {
+      "entries": [
+        { "key": "service_name", "string": "smbd.service" }
+      ]
+    }
+  },
+  "module": {
+    "cyborg.modules.guard.v1": {
+      "body": {
+        "environment": { "scope": "parent" },
+        "module": {
+          "cyborg.modules.sequence.v1": {
+            "steps": [
+              {
+                "environment": { "scope": "parent" },
+                "module": {
+                  "cyborg.modules.systemd.stop.v1": {
+                    "service_name": "${service_name}"
+                  }
+                }
+              },
+              {
+                "environment": { "scope": "parent" },
+                "module": {
+                  "cyborg.modules.foreach.v1": {
+                    "collection": "smb_targets",
+                    "item_variable": "target",
+                    "continue_on_error": false,
+                    "body": {
+                      "environment": {
+                        "scope": "inherit_parent",
+                        "name": "smb_target_iteration"
+                      },
+                      "configuration": {
+                        "cyborg.modules.secrets.load.v1": {
+                          "source": "${target.secrets_file}",
+                          "source_type": "json_file",
+                          "environment_prefix": "secrets"
+                        }
+                      },
+                      "module": {
+                        "cyborg.modules.if.v1": {
+                          "condition": {
+                            "variable": "target.root",
+                            "operator": "exists"
+                          },
+                          "then": {
+                            "environment": { "scope": "parent" },
+                            "module": {
+                              "cyborg.modules.foreach.v1": {
+                                "collection": "backup_hosts",
+                                "item_variable": "host",
+                                "body": {
+                                  "environment": { "scope": "inherit_parent" },
+                                  "module": {
+                                    "cyborg.modules.borg.repository.v1": {
+                                      "hostname": "${host.hostname}",
+                                      "port": "${host.port}",
+                                      "repository_root": "${host.borg_repo_root}",
+                                      "repository_name": "${target.repository_name}",
+                                      "ssh_command": "${host.borg_rsh}",
+                                      "passphrase_variable": "secrets.passphrase",
+                                      "body": {
+                                        "environment": { "scope": "parent" },
+                                        "module": {
+                                          "cyborg.modules.sequence.v1": {
+                                            "steps": [
+                                              {
+                                                "environment": { "scope": "parent" },
+                                                "module": {
+                                                  "cyborg.modules.borg.create.v1": {
+                                                    "archive_name_pattern": "${target.repository_name}-{now}",
+                                                    "paths": [ "${target.root}" ],
+                                                    "compression": { "algorithm": "zlib" },
+                                                    "exclude_caches": true
+                                                  }
+                                                }
+                                              },
+                                              {
+                                                "environment": { "scope": "parent" },
+                                                "module": {
+                                                  "cyborg.modules.borg.prune.v1": {
+                                                    "glob_archives": "${target.repository_name}-*",
+                                                    "retention": {
+                                                      "keep_daily": 30,
+                                                      "keep_weekly": 24,
+                                                      "keep_monthly": 24
+                                                    }
+                                                  }
+                                                }
+                                              },
+                                              {
+                                                "environment": { "scope": "parent" },
+                                                "module": {
+                                                  "cyborg.modules.borg.compact.v1": {}
+                                                }
+                                              }
+                                            ]
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "else": {
+                            "environment": { "scope": "parent" },
+                            "module": {
+                              "cyborg.modules.log.v1": {
+                                "level": "warn",
+                                "message": "SMB root '${target.root}' does not exist, skipping"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "finally": {
+        "environment": {
+          "scope": "reference",
+          "name": "smb_job"
+        },
+        "module": {
+          "cyborg.modules.systemd.start.v1": {
+            "service_name": "${service_name}"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+**Environment Flow:**
+```
+1. "smb_job" scope created (inherit_parent from global)
+2. Configuration sets service_name = "smbd.service"
+3. Guard body uses parent → same "smb_job" scope
+4. Systemd stop reads ${service_name}
+5. Outer foreach creates "smb_target_iteration" scopes for each target
+   → Configuration loads secrets.passphrase per-target
+6. If condition checks ${target.root} existence
+7. Inner foreach creates host iteration scopes (inherit from target scope)
+   → Each has ${host} + ${target} + ${secrets.passphrase}
+8. Repository sets BORG_* vars, borg modules execute
+9. Finally references "smb_job" to read ${service_name} for restart
+```
+
 ---
 
 ## Global Configuration (`config.json`)
 
+The root configuration establishes the global environment with backup hosts and orchestrates WoL → template execution → cleanup.
+
 ```json
 {
+  "environment": {
+    "scope": "global",
+    "name": "global"
+  },
   "configuration": {
     "cyborg.modules.config.map.v1": {
       "entries": [
@@ -1359,11 +1939,13 @@ public sealed record LogModule(
     "cyborg.modules.sequence.v1": {
       "steps": [
         {
+          "environment": { "scope": "global" },
           "module": {
             "cyborg.modules.foreach.v1": {
               "collection": "backup_hosts",
               "item_variable": "host",
               "body": {
+                "environment": { "scope": "inherit_global" },
                 "module": {
                   "cyborg.modules.wol.wake.v1": {
                     "hostname": "${host.hostname}",
@@ -1377,22 +1959,25 @@ public sealed record LogModule(
           }
         },
         {
+          "environment": { "scope": "global" },
           "module": {
             "cyborg.modules.template.v1": {
               "templates": [
-                { "name": "daily", "path": "daily.json" },
-                { "name": "weekly", "path": "weekly.json" },
-                { "name": "monthly", "path": "monthly.json" }
+                { "name": "daily", "path": "jobs/daily.json" },
+                { "name": "weekly", "path": "jobs/weekly.json" },
+                { "name": "monthly", "path": "jobs/monthly.json" }
               ]
             }
           }
         },
         {
+          "environment": { "scope": "global" },
           "module": {
             "cyborg.modules.foreach.v1": {
               "collection": "backup_hosts",
               "item_variable": "host",
               "body": {
+                "environment": { "scope": "inherit_global" },
                 "module": {
                   "cyborg.modules.ssh.shutdown.v1": {
                     "hostname": "${host.hostname}",
@@ -1409,6 +1994,17 @@ public sealed record LogModule(
     }
   }
 }
+```
+
+**Environment Flow:**
+```
+1. Global environment receives backup_hosts collection, allowed_run_as_users
+2. WoL module iterates hosts, sets wol_state.{hostname} in global scope
+   → Uses inherit_global so state variables persist
+3. Template module executes selected job (daily/weekly/monthly)
+   → Job inherits global environment (backup_hosts, wol_state.*, etc.)
+4. Shutdown module reads wol_state.{hostname} from global
+   → Only shuts down hosts that were woken by this run
 ```
 
 ---
