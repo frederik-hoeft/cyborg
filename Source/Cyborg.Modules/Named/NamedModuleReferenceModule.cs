@@ -2,7 +2,7 @@
 
 namespace Cyborg.Modules.Named;
 
-public sealed record NamedModuleReferenceModule(string Target) : IModule
+public sealed record NamedModuleReferenceModule(string Target) : ModuleBase, IModule
 {
     public static string ModuleId => "cyborg.modules.named.ref.v1";
 }

@@ -18,6 +18,8 @@
     </PropertyGroup>
     
     <ItemGroup>
+        <EmbeddedResource Include="Modules\Composition\DecomposeIgnoreAttribute.cs" />
+        <EmbeddedResource Include="Modules\Composition\GeneratedDecompositionAttribute.cs" />
         <EmbeddedResource Include="Modules\Loaders\Configuration\GeneratedModuleLoaderFactoryAttribute.cs" />
         <EmbeddedResource Include="Json\Configuration\AotJsonSerializerContext.cs" />
         <EmbeddedResource Include="Json\Configuration\BindingsGenerationMode.cs" />

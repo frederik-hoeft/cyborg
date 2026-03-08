@@ -4,6 +4,8 @@ using Cyborg.Core.Modules.Configuration.Serialization;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Services;
+using Cyborg.Core.Services.Network;
+using Cyborg.Core.Services.Subprocesses;
 using Jab;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -18,13 +20,18 @@ namespace Cyborg.Core;
 [Singleton<JsonConverter, DynamicValueJsonConverter>]
 [Singleton<JsonConverter, DynamicKeyValuePairJsonConverter>]
 [Singleton<JsonConverter>(Factory = nameof(CreateEnvironmentScopeConverter))]
+[Singleton<JsonConverter>(Factory = nameof(CreateEnvironmentScopeReferenceConverter))]
 [Singleton<IModuleLoaderRegistry, DefaultModuleLoaderRegistry>]
 [Singleton<IModuleWorkerFactory, DefaultModuleWorkerFactory>]
 [Singleton<IModuleConfigurationLoader, DefaultModuleConfigurationLoader>]
 [Singleton<IModuleRuntime, ModuleRuntime>]
 [Singleton<IModuleRegistry, DefaultModuleRegistry>]
+[Singleton<ISubprocessDispatcher, DefaultSubprocessDispatcher>]
+[Singleton<IPingService, DefaultPingService>]
 [Singleton<GlobalRuntimeEnvironment>]
 public interface ICyborgCoreServices
 {
-    static JsonConverter CreateEnvironmentScopeConverter() => new JsonStringEnumConverter<EnvironmentScope>(JsonNamingPolicy.SnakeCaseLower);
+    static JsonConverter CreateEnvironmentScopeConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<EnvironmentScope>(namingPolicy);
+
+    static JsonConverter CreateEnvironmentScopeReferenceConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<EnvironmentScopeReference>(namingPolicy);
 }

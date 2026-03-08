@@ -10,9 +10,12 @@ public sealed class NamedModuleReferenceModuleWorker(NamedModuleReferenceModule 
     protected override Task<bool> ExecuteAsync(IModuleRuntime runtime, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(runtime);
-        if (!moduleRegistry.TryGetModule(Module.Target, out ModuleContext? targetModule))
+
+        string target = runtime.Environment.Resolve(Module, Module.Target);
+
+        if (!moduleRegistry.TryGetModule(target, out ModuleContext? targetModule))
         {
-            throw new InvalidOperationException($"Failed to find target module with name '{Module.Target}'.");
+            throw new InvalidOperationException($"Failed to find target module with name '{target}'.");
         }
         return runtime.ExecuteAsync(targetModule, cancellationToken);
     }

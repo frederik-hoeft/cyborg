@@ -23,4 +23,10 @@ public interface IModuleRuntime
     Task<bool> ExecuteAsync(IModuleWorker module, EnvironmentScope scope = EnvironmentScope.Global, string? name = null, CancellationToken cancellationToken = default);
 
     Task<bool> ExecuteAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken = default);
+
+    Task<bool> ExecuteAsync(ModuleContext moduleContext, IRuntimeEnvironment environment, CancellationToken cancellationToken = default);
+
+    IRuntimeEnvironment PrepareEnvironment(ModuleContext moduleContext);
+
+    IRuntimeEnvironment? ResolveEnvironmentReference(ModuleEnvironmentReference environmentReference);
 }

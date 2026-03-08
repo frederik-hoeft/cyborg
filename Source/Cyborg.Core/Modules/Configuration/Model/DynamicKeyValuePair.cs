@@ -2,4 +2,4 @@
 
 namespace Cyborg.Core.Modules.Configuration.Model;
 
-public sealed record DynamicKeyValuePair(string Key, [property: JsonIgnore] object Value);
+public sealed record DynamicKeyValuePair(string Key, [property: JsonIgnore] object? Value);

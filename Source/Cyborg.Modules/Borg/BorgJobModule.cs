@@ -1,16 +1,39 @@
-﻿using Cyborg.Core.Modules;
+﻿using Cyborg.Core.Aot.Modules.Composition;
+using Cyborg.Core.Modules;
+using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
+using Cyborg.Core.Modules.Configuration.Serialization;
 using Cyborg.Core.Modules.Runtime;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
+using System.Text.Json;
 
 namespace Cyborg.Modules.Borg;
 
-public sealed record BorgBackupModule(ImmutableArray<BorgRemote> Remotes) : IModule
+public sealed record BorgBackupModule(ImmutableArray<BorgRemote> Remotes) : ModuleBase, IModule
 {
     public static string ModuleId => "cyborg.modules.borg.backup.v1";
 }
 
-public sealed record BorgRemote(string Hostname, int Port, string? WakeOnLanMac, string BorgRsh, string BorgRepoRoot);
+[GeneratedDecomposition]
+public sealed partial record BorgRemote(string Hostname, int Port, string? WakeOnLanMac, string BorgRsh, string BorgRepoRoot);
+
+public sealed class BorgRemoteValueProvider : IDynamicValueProvider
+{
+    public string TypeName => "cyborg.types.borg.remote.v1";
+
+    public bool TryCreateValue(ref Utf8JsonReader reader, IModuleLoaderContext context, [NotNullWhen(true)] out DynamicValue? value)
+    {
+        BorgRemote? remote = JsonSerializer.Deserialize<BorgRemote>(ref reader, context);
+        if (remote is null)
+        {
+            value = null;
+            return false;
+        }
+        value = new DynamicValue(remote);
+        return true;
+    }
+}
 
 public sealed record BorgJobModule
 (
@@ -18,7 +41,7 @@ public sealed record BorgJobModule
     ModuleContext? BeforeJob,
     ModuleContext? AfterJob,
     ModuleContext? OnError
-) : IModule
+) : ModuleBase, IModule
 {
     public static string ModuleId => "cyborg.modules.borg.job.v1";
 }

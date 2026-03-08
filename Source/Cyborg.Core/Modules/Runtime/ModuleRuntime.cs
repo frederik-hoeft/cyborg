@@ -1,9 +1,10 @@
 ﻿using Cyborg.Core.Modules.Runtime.Environments;
 using System.Diagnostics.CodeAnalysis;
+using System.Text.Json;
 
 namespace Cyborg.Core.Modules.Runtime;
 
-public sealed class ModuleRuntime(GlobalRuntimeEnvironment defaultEnvironment) : ModuleRuntimeBase
+public sealed class ModuleRuntime(GlobalRuntimeEnvironment defaultEnvironment, JsonNamingPolicy namingPolicy) : ModuleRuntimeBase(namingPolicy)
 {
     private readonly Dictionary<string, IRuntimeEnvironment> _environments = new()
     {
@@ -45,7 +46,7 @@ public sealed class ModuleRuntime(GlobalRuntimeEnvironment defaultEnvironment) :
     public override Task<bool> ExecuteAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(module);
-        IModuleRuntime runtime = new ScopedRuntime(root: this, parent: this, environment: environment);
+        IModuleRuntime runtime = new ScopedRuntime(root: this, parent: this, environment: environment, NamingPolicy);
         return module.ExecuteAsync(runtime, cancellationToken);
     }
 }

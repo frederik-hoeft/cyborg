@@ -3,7 +3,7 @@ using System.Collections.Immutable;
 
 namespace Cyborg.Modules.Template;
 
-public sealed record TemplateModule(ImmutableArray<TemplateReference> Templates) : IModule
+public sealed record TemplateModule(ImmutableArray<TemplateReference> Templates) : ModuleBase, IModule
 {
     public static string LoadTargetName => "template";
 

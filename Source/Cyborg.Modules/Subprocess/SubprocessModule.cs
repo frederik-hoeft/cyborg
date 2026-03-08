@@ -3,7 +3,7 @@ using System.Collections.Immutable;
 
 namespace Cyborg.Modules.Subprocess;
 
-public sealed record SubprocessModule(SubprocessCommand Command, SubprocessOutputOptions? Output) : IModule
+public sealed record SubprocessModule(SubprocessCommand Command, SubprocessOutputOptions? Output) : ModuleBase, IModule
 {
     public static string ModuleId => "cyborg.modules.subprocess.v1";
 

@@ -4,7 +4,7 @@ using System.Collections.Immutable;
 
 namespace Cyborg.Modules.Configuration.ConfigCollection;
 
-public sealed record ConfigCollectionModule(ImmutableArray<ModuleReference> Sources) : IModule
+public sealed record ConfigCollectionModule(ImmutableArray<ModuleReference> Sources) : ModuleBase, IModule
 {
     public static string ModuleId => "cyborg.modules.config.collection.v1";
 }

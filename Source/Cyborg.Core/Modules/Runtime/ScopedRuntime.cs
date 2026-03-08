@@ -1,9 +1,10 @@
 ﻿using Cyborg.Core.Modules.Runtime.Environments;
 using System.Diagnostics.CodeAnalysis;
+using System.Text.Json;
 
 namespace Cyborg.Core.Modules.Runtime;
 
-internal sealed class ScopedRuntime(IModuleRuntime root, IModuleRuntime parent, IRuntimeEnvironment environment) : ModuleRuntimeBase
+internal sealed class ScopedRuntime(IModuleRuntime root, IModuleRuntime parent, IRuntimeEnvironment environment, JsonNamingPolicy namingPolicy) : ModuleRuntimeBase(namingPolicy)
 {
     public override IRuntimeEnvironment GlobalEnvironment => root.GlobalEnvironment;
 
@@ -20,7 +21,7 @@ internal sealed class ScopedRuntime(IModuleRuntime root, IModuleRuntime parent, 
     public override Task<bool> ExecuteAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(module);
-        IModuleRuntime runtime = new ScopedRuntime(root, parent: this, environment);
+        IModuleRuntime runtime = new ScopedRuntime(root, parent: this, environment, NamingPolicy);
         return module.ExecuteAsync(runtime, cancellationToken);
     }
 

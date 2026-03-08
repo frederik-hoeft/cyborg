@@ -1,11 +1,12 @@
 ﻿using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime.Environments;
 using System.Diagnostics.CodeAnalysis;
+using System.Text.Json;
 using System.Xml.Linq;
 
 namespace Cyborg.Core.Modules.Runtime;
 
-public abstract class ModuleRuntimeBase : IModuleRuntime
+public abstract class ModuleRuntimeBase(JsonNamingPolicy namingPolicy) : IModuleRuntime
 {
     public abstract IRuntimeEnvironment GlobalEnvironment { get; }
 
@@ -13,7 +14,9 @@ public abstract class ModuleRuntimeBase : IModuleRuntime
 
     public abstract IRuntimeEnvironment Environment { get; }
 
-    protected static IRuntimeEnvironment CreateScopedEnvironment(IModuleRuntime parent, EnvironmentScope scope, string? name)
+    protected JsonNamingPolicy NamingPolicy => namingPolicy;
+
+    protected IRuntimeEnvironment CreateScopedEnvironment(IModuleRuntime parent, EnvironmentScope scope, string? name)
     {
         ArgumentNullException.ThrowIfNull(parent);
         bool transient = false;
@@ -24,10 +27,10 @@ public abstract class ModuleRuntimeBase : IModuleRuntime
         }
         IRuntimeEnvironment environment = scope switch
         {
-            EnvironmentScope.Isolated => new RuntimeEnvironment(name, transient),
+            EnvironmentScope.Isolated => new RuntimeEnvironment(name, transient, NamingPolicy),
             EnvironmentScope.Global => parent.GlobalEnvironment,
-            EnvironmentScope.InheritParent => new InheritedRuntimeEnvironment(name, parent.Environment, transient),
-            EnvironmentScope.InheritGlobal => new InheritedRuntimeEnvironment(name, parent.GlobalEnvironment, transient),
+            EnvironmentScope.InheritParent => new InheritedRuntimeEnvironment(name, parent.Environment, transient, NamingPolicy),
+            EnvironmentScope.InheritGlobal => new InheritedRuntimeEnvironment(name, parent.GlobalEnvironment, transient, NamingPolicy),
             EnvironmentScope.Parent => parent.Environment,
             EnvironmentScope.Reference => throw new ArgumentException("Attempting to create an environment by reference without providing an environment reference.", nameof(scope)),
             _ => throw new ArgumentOutOfRangeException(nameof(scope), scope, "Invalid environment scope.")
@@ -36,7 +39,7 @@ public abstract class ModuleRuntimeBase : IModuleRuntime
         return environment;
     }
 
-    public virtual async Task<bool> ExecuteAsync(ModuleContext moduleContext, CancellationToken cancellationToken = default)
+    public IRuntimeEnvironment PrepareEnvironment(ModuleContext moduleContext)
     {
         ArgumentNullException.ThrowIfNull(moduleContext);
         IRuntimeEnvironment? environment = null;
@@ -53,6 +56,18 @@ public abstract class ModuleRuntimeBase : IModuleRuntime
         }
         EnvironmentScope scope = moduleContext.Environment?.Scope ?? EnvironmentScope.Parent;
         environment ??= CreateScopedEnvironment(parent: this, scope, moduleContext.Environment?.Name);
+        return environment;
+    }
+
+    public virtual Task<bool> ExecuteAsync(ModuleContext moduleContext, CancellationToken cancellationToken = default)
+    {
+        IRuntimeEnvironment environment = PrepareEnvironment(moduleContext);
+        return ExecuteAsync(moduleContext, environment, cancellationToken);
+    }
+
+    public virtual async Task<bool> ExecuteAsync(ModuleContext moduleContext, IRuntimeEnvironment environment, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(moduleContext);
         if (moduleContext.Configuration is { } configuration)
         {
             await ExecuteAsync(configuration.Module, environment, cancellationToken);
@@ -69,4 +84,13 @@ public abstract class ModuleRuntimeBase : IModuleRuntime
     public abstract bool TryGetEnvironment(string name, [NotNullWhen(true)] out IRuntimeEnvironment? environment);
 
     public abstract bool TryRemoveEnvironment(IRuntimeEnvironment environment);
+
+    public IRuntimeEnvironment? ResolveEnvironmentReference(ModuleEnvironmentReference environmentReference) => environmentReference switch
+    {
+        (EnvironmentScopeReference.Current, _) => Environment,
+        (EnvironmentScopeReference.Global, _) => GlobalEnvironment,
+        (EnvironmentScopeReference.Parent, _) => ParentEnvironment,
+        (EnvironmentScopeReference.Reference, { Length: > 0 } name) when TryGetEnvironment(name, out IRuntimeEnvironment? env) => env,
+        _ => null
+    };
 }

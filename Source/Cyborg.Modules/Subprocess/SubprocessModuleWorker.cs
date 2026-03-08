@@ -1,11 +1,12 @@
 ﻿using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Runtime;
+using Cyborg.Core.Services.Subprocesses;
 using System.Diagnostics;
 
 namespace Cyborg.Modules.Subprocess;
 
 // sample subprocess module
-public sealed class SubprocessModuleWorker(SubprocessModule module) : ModuleWorker<SubprocessModule>(module)
+public sealed class SubprocessModuleWorker(SubprocessModule module, ISubprocessDispatcher dispatcher) : ModuleWorker<SubprocessModule>(module)
 {
     protected async override Task<bool> ExecuteAsync(IModuleRuntime runtime, CancellationToken cancellationToken)
     {
@@ -13,33 +14,22 @@ public sealed class SubprocessModuleWorker(SubprocessModule module) : ModuleWork
         SubprocessCommand? command = Module.Command
             ?? throw new InvalidOperationException("SubprocessModule requires a Command to be specified.");
         SubprocessOutputOptions output = Module.Output ?? new SubprocessOutputOptions();
-        using Process process = new()
+        ProcessStartInfo startInfo = new(command.Executable, command.Arguments)
         {
-            StartInfo = new ProcessStartInfo(command.Executable, command.Arguments)
-            {
-                RedirectStandardOutput = output.ReadStdout,
-                RedirectStandardError = output.ReadStderr,
-                UseShellExecute = false,
-            },
+            RedirectStandardOutput = output.ReadStdout,
+            RedirectStandardError = output.ReadStderr,
+            UseShellExecute = false,
         };
-        process.Start();
-        List<Task<CommandOutput>> ioTasks = [];
+        SubprocessResult result = await dispatcher.ExecuteAsync(startInfo, cancellationToken);
         if (output.ReadStdout)
         {
-            ioTasks.Add(ReadStreamAsync(process.StandardOutput, SubprocessModule.StandardOutputName, cancellationToken));
+            runtime.Environment.SetVariable(CreateVariableName(output, SubprocessModule.StandardOutputName), result.StandardOutput);
         }
         if (output.ReadStderr)
         {
-            ioTasks.Add(ReadStreamAsync(process.StandardError, SubprocessModule.StandardErrorName, cancellationToken));
+            runtime.Environment.SetVariable(CreateVariableName(output, SubprocessModule.StandardErrorName), result.StandardError);
         }
-        await process.WaitForExitAsync(cancellationToken);
-        await Task.WhenAll(ioTasks);
-        foreach (CommandOutput io in ioTasks.Select(t => t.Result))
-        {
-            string variable = CreateVariableName(output, io.Type);
-            runtime.Environment.SetVariable(variable, io.Data);
-        }
-        return process.ExitCode == 0;
+        return result.ExitCode == 0;
     }
 
     private static string CreateVariableName(SubprocessOutputOptions output, string type)
@@ -50,12 +40,4 @@ public sealed class SubprocessModuleWorker(SubprocessModule module) : ModuleWork
         }
         return $"{output.Namespace}.{type}";
     }
-
-    private static async Task<CommandOutput> ReadStreamAsync(StreamReader reader, string type, CancellationToken cancellationToken)
-    {
-        string data = await reader.ReadToEndAsync(cancellationToken);
-        return new CommandOutput(data, type);
-    }
-
-    private sealed record CommandOutput(string Data, string Type);
 }

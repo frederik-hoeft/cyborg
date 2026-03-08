@@ -4,7 +4,7 @@ using System.Collections.Immutable;
 
 namespace Cyborg.Modules.Configuration.ConfigMap;
 
-public sealed record ConfigMapModule(ImmutableArray<DynamicKeyValuePair> Entries) : IModule
+public sealed record ConfigMapModule(ImmutableArray<DynamicKeyValuePair> Entries) : ModuleBase, IModule
 {
     public static string ModuleId => "cyborg.modules.config.map.v1";
 }
