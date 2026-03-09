@@ -1,4 +1,5 @@
 ﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 
 namespace Cyborg.Core.Aot.Extensions;
@@ -20,6 +21,18 @@ internal static class IncrementalGeneratorPostInitializationContextExtensions
         {
             SourceText sourceText = SourceTextExtensions.FromEmbedded<T>(typeName);
             self.AddSource($"{typeof(T).Namespace}.{typeName}.cs", sourceText);
+        }
+
+        public void AddEmbeddedSource(Type type)
+        {
+            SourceText sourceText = SourceTextExtensions.FromEmbedded(type);
+            self.AddSource($"{type.FullName}.cs", sourceText);
+        }
+
+        public void AddEmbeddedSource(Type type, string typeName)
+        {
+            SourceText sourceText = SourceTextExtensions.FromEmbedded(type, typeName);
+            self.AddSource($"{type.Namespace}.{typeName}.cs", sourceText);
         }
     }
 }
