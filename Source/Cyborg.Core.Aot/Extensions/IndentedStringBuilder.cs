@@ -12,6 +12,8 @@ internal sealed class IndentedStringBuilder(StringBuilder builder, int indentSiz
 
     public IndentedStringBuilder DecreaseIndent(int levels = 1) => new(builder, indentSize, Math.Max(0, indentLevel - levels));
 
+    public void AppendLine(string line) => builder.Append(IndentString).AppendLine(line);
+
     public void AppendBlock(string block)
     {
         ReadOnlySpan<char> blockSpan = block.AsSpan();

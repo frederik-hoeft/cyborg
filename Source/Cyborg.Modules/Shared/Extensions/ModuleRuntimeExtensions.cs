@@ -11,7 +11,7 @@ public static class ModuleRuntimeExtensions
     extension (IModuleRuntime self)
     {
         [return: NotNullIfNotNull(nameof(defaultValue))]
-        public IRuntimeEnvironment? ResolveEnvironmentReference(ModuleEnvironmentReference environmentReference, IRuntimeEnvironment? defaultValue = null) => environmentReference switch
+        public IRuntimeEnvironment? ResolveEnvironmentReference(ModuleEnvironmentReference? environmentReference, IRuntimeEnvironment? defaultValue = null) => environmentReference switch
         {
             (EnvironmentScopeReference.Current, _) => self.Environment,
             (EnvironmentScopeReference.Global, _) => self.GlobalEnvironment,

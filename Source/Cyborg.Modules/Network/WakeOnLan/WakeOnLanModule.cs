@@ -15,7 +15,7 @@ public sealed partial record WakeOnLanModule
     [property: DefaultTimeSpan("00:05:00")] TimeSpan MaxWaitTime,
     [property: DefaultTimeSpan("00:00:30")] TimeSpan HostDiscoveryTimeout,
     ModuleEnvironmentReference? OutputEnvironment,
-    [property: Required][property: IgnoreOverrides] string Executable = "/usr/bin/wakeonlan"
+    [property: Required][property: IgnoreOverrides][property: DefaultValue<string>("/usr/bin/wakeonlan")] string Executable
 ) : ModuleBase, IModule
 {
     public static string ModuleId => "cyborg.modules.network.wol.v1";

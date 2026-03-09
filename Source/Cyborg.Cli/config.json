@@ -58,8 +58,6 @@
                     "target_host": "${host.hostname}",
                     "mac_address": "${host.wake_on_lan_mac}",
                     "state_variable": "wol_state.${host.hostname}",
-                    "max_wait_time": "00:05:00",
-                    "host_discovery_timeout": "00:00:30",
                     "output_environment": {
                       "scope": "global"
                     }

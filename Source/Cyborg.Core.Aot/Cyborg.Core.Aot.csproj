@@ -34,6 +34,7 @@
         <EmbeddedResource Include="Modules\Validation\Attributes\IgnoreOverridesAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\RangeAttribute`1.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\RequiredAttribute.cs" />
+        <EmbeddedResource Include="Modules\Validation\Attributes\ValidatableAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\GeneratedModuleValidationAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\IModule`1.core.cs" />
         <EmbeddedResource Include="Modules\Validation\IModule`1.cs" />

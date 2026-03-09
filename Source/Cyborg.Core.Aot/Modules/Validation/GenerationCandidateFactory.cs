@@ -256,6 +256,6 @@ internal static class GenerationCandidateFactory
             current = current.ContainingSymbol;
         }
 
-        return string.Join('.', parts);
+        return string.Join(".", parts);
     }
 }
