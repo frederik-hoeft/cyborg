@@ -2,6 +2,7 @@
 using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Serialization;
 using Cyborg.Modules.Borg;
+using Cyborg.Modules.Conditional;
 using Cyborg.Modules.Configuration.ConfigCollection;
 using Cyborg.Modules.Configuration.ConfigMap;
 using Cyborg.Modules.Foreach;
@@ -30,6 +31,7 @@ namespace Cyborg.Modules;
 [Singleton<IModuleLoader, NamedModuleReferenceModuleLoader>]
 [Singleton<IModuleLoader, ForeachModuleLoader>]
 [Singleton<IModuleLoader, WakeOnLanModuleLoader>]
+[Singleton<IModuleLoader, IfModuleLoader>]
 [Singleton<IDynamicValueProvider, BorgRemoteValueProvider>]
 public interface ICyborgModuleServices
 {

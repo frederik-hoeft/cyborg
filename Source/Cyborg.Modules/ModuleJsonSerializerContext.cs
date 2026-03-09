@@ -1,5 +1,6 @@
 ﻿using Cyborg.Core.Aot.Json.Configuration;
 using Cyborg.Modules.Borg;
+using Cyborg.Modules.Conditional;
 using Cyborg.Modules.Configuration.ConfigCollection;
 using Cyborg.Modules.Configuration.ConfigMap;
 using Cyborg.Modules.Foreach;
@@ -24,6 +25,7 @@ namespace Cyborg.Modules;
 [JsonSerializable(typeof(NamedModuleReferenceModule))]
 [JsonSerializable(typeof(ForeachModule))]
 [JsonSerializable(typeof(WakeOnLanModule))]
+[JsonSerializable(typeof(IfModule))]
 // TODO: temp
 [JsonSerializable(typeof(BorgRemote))]
 public sealed partial class ModuleJsonSerializerContext : AotJsonSerializerContext;

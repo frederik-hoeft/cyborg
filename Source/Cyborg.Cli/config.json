@@ -47,11 +47,8 @@
                 "configuration": {
                   "cyborg.modules.config.map.v1": {
                     "entries": [
-                      {
-                        // need to inject the port into the module via override since port is an integer
-                        "key": "@my_wol.liveness_probe_port",
-                        "string": "${host.port}"
-                      }
+                      // need to inject the port into the module via override since port is an integer
+                      { "key": "@my_wol.liveness_probe_port", "string": "${host.port}" }
                     ]
                   }
                 },
