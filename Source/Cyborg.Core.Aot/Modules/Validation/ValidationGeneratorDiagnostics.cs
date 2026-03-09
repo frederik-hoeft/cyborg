@@ -59,4 +59,28 @@ internal static class ValidationGeneratorDiagnostics
         category: "Cyborg.Aot.Validation",
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
+
+    public static DiagnosticDescriptor UnsupportedValidatableTypeShape { get; } = new(
+        id: "CYBORGVAL008",
+        title: "Unsupported validatable type shape",
+        messageFormat: "Type '{0}' is marked [Validatable] but must be a record to support immutable reconstruction",
+        category: "Cyborg.Aot.Validation",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    public static DiagnosticDescriptor ValidatableCycleDetected { get; } = new(
+        id: "CYBORGVAL009",
+        title: "Cycle detected in validatable graph",
+        messageFormat: "Type '{0}' creates a [Validatable] cycle and cannot be traversed safely",
+        category: "Cyborg.Aot.Validation",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    public static DiagnosticDescriptor UnsupportedNestedPropertyShape { get; } = new(
+        id: "CYBORGVAL010",
+        title: "Unsupported nested property shape",
+        messageFormat: "Property '{0}' on '{1}' cannot be used for nested [Validatable] generation because it is not settable",
+        category: "Cyborg.Aot.Validation",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
 }

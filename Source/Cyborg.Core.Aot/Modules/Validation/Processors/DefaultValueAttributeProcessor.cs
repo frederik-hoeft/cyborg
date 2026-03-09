@@ -58,27 +58,27 @@ internal sealed class DefaultValueAttributeProcessor : IPropertyAttributeProcess
 
     private sealed class DefaultValueValidationAspect(string valueExpression, ImmutableArray<string> whenPresentExpressions) : PropertyValidationAspect
     {
-        public override string? RewriteDefaultAssignmentExpression(PropertyModel property, string moduleVariable, string? currentExpression)
+        public override string? RewriteDefaultAssignmentExpression(PropertyModel property, string moduleVariable, string propertyAccessExpression, string? currentExpression)
         {
             string equalityComparer = LiteralExpressionFactory.GetDefaultEqualityComparer(property.TypeName);
             string triggerExpression;
 
             if (whenPresentExpressions.Length == 0)
             {
-                triggerExpression = $"{equalityComparer}.Equals({moduleVariable}.{property.Name}, default!)";
+                triggerExpression = $"{equalityComparer}.Equals({propertyAccessExpression}, default!)";
             }
             else
             {
                 List<string> checks = new(whenPresentExpressions.Length);
                 foreach (string whenPresentExpression in whenPresentExpressions)
                 {
-                    checks.Add($"{equalityComparer}.Equals({moduleVariable}.{property.Name}, {whenPresentExpression})");
+                    checks.Add($"{equalityComparer}.Equals({propertyAccessExpression}, {whenPresentExpression})");
                 }
 
                 triggerExpression = string.Join(" || ", checks);
             }
 
-            return $"{triggerExpression} ? {valueExpression} : {moduleVariable}.{property.Name}";
+            return $"{triggerExpression} ? {valueExpression} : {propertyAccessExpression}";
         }
     }
 }

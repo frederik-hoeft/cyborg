@@ -6,17 +6,17 @@ namespace Cyborg.Core.Aot.Modules.Validation;
 
 internal abstract class PropertyValidationAspect
 {
-    public virtual string? RewriteOverrideResolutionExpression(PropertyModel property, string moduleVariable, string? currentExpression) => currentExpression;
+    public virtual string? RewriteOverrideResolutionExpression(PropertyModel property, string moduleVariable, string propertyAccessExpression, string? currentExpression) => currentExpression;
 
-    public virtual string? RewriteDefaultAssignmentExpression(PropertyModel property, string moduleVariable, string? currentExpression) => currentExpression;
+    public virtual string? RewriteDefaultAssignmentExpression(PropertyModel property, string moduleVariable, string propertyAccessExpression, string? currentExpression) => currentExpression;
 
     protected virtual void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel property)
     {
     }
 
-    public void EmitValidation(IndentedStringBuilder builder, PropertyModel property, string moduleVariableName)
+    public void EmitValidation(IndentedStringBuilder builder, PropertyModel property, string moduleVariableName, string propertyAccessExpression)
     {
-        ModulePropertyModel model = new(property.Name, property.TypeName, property.Aspects, moduleVariableName);
+        ModulePropertyModel model = new(property.Name, property.TypeName, property.Aspects, moduleVariableName, propertyAccessExpression);
         EmitValidation(builder, model);
     }
 
@@ -25,8 +25,8 @@ internal abstract class PropertyValidationAspect
         new global::{typeof(ValidationError).FullName}(nameof({property.AccessExpression}), "{rule}", $"{message}")
         """;
 
-    protected sealed record ModulePropertyModel(string Name, string TypeName, ImmutableArray<PropertyValidationAspect> Aspects, string ModuleVariable)
+    protected sealed record ModulePropertyModel(string Name, string TypeName, ImmutableArray<PropertyValidationAspect> Aspects, string ModuleVariable, string? ExplicitAccessExpression)
     {
-        public string AccessExpression => field ??= $"{ModuleVariable}.{Name}";
+        public string AccessExpression => field ??= ExplicitAccessExpression ?? $"{ModuleVariable}.{Name}";
     }
 }

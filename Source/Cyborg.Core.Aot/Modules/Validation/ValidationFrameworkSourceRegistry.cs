@@ -13,6 +13,7 @@ internal static class ValidationFrameworkSourceRegistry
         static context => context.AddEmbeddedSource<RequiredAttribute>(),
         static context => context.AddEmbeddedSource<DefaultTimeSpanAttribute>(),
         static context => context.AddEmbeddedSource<IgnoreOverridesAttribute>(),
+        static context => context.AddEmbeddedSource<ValidatableAttribute>(),
         static context => context.AddEmbeddedSource(typeof(DefaultValueAttribute<>)),
         static context => context.AddEmbeddedSource(typeof(RangeAttribute<>)),
         static context => context.AddEmbeddedSource<ValidationError>(),

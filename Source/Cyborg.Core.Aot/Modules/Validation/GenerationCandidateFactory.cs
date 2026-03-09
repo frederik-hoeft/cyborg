@@ -9,6 +9,8 @@ namespace Cyborg.Core.Aot.Modules.Validation;
 
 internal static class GenerationCandidateFactory
 {
+    private static readonly string s_validatableMetadataName = typeof(Attributes.ValidatableAttribute).FullName!;
+
     public static readonly SymbolDisplayFormat s_fullyQualifiedNullableFormat =
         SymbolDisplayFormat.FullyQualifiedFormat
             .WithMiscellaneousOptions(
@@ -54,7 +56,7 @@ internal static class GenerationCandidateFactory
                 continue;
             }
 
-            if (!TryCreatePropertyModel(typeSymbol, property, diagnostics, out PropertyModel? propertyModel))
+            if (!TryCreatePropertyModel(typeSymbol, property, diagnostics, ImmutableHashSet<INamedTypeSymbol>.Empty.WithComparer(SymbolEqualityComparer.Default), out PropertyModel? propertyModel))
             {
                 continue;
             }
@@ -94,6 +96,7 @@ internal static class GenerationCandidateFactory
         INamedTypeSymbol containingType,
         IPropertySymbol property,
         List<Diagnostic> diagnostics,
+        ImmutableHashSet<INamedTypeSymbol> traversalPath,
         out PropertyModel? propertyModel)
     {
         PropertyAttributeProcessingContext processingContext = new(containingType, property, diagnostics);
@@ -118,10 +121,61 @@ internal static class GenerationCandidateFactory
             }
         }
 
+        INamedTypeSymbol? unwrappedType = UnwrapNullableNamedType(property.Type);
+        bool isNullable = property.Type.NullableAnnotation == NullableAnnotation.Annotated || property.Type.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T;
+        bool isValidatableType = IsValidatableType(unwrappedType);
+        ImmutableArray<PropertyModel> children = [];
+
+        if (isValidatableType && unwrappedType is not null)
+        {
+            if (!unwrappedType.IsRecord)
+            {
+                diagnostics.Add(Diagnostic.Create(ValidationGeneratorDiagnostics.UnsupportedValidatableTypeShape, property.Locations.FirstOrDefault(), unwrappedType.Name));
+            }
+            else if (traversalPath.Contains(unwrappedType))
+            {
+                diagnostics.Add(Diagnostic.Create(ValidationGeneratorDiagnostics.ValidatableCycleDetected, property.Locations.FirstOrDefault(), unwrappedType.Name));
+            }
+            else
+            {
+                ImmutableArray<PropertyModel>.Builder childBuilder = ImmutableArray.CreateBuilder<PropertyModel>();
+                ImmutableHashSet<INamedTypeSymbol> childPath = traversalPath.Add(unwrappedType);
+
+                foreach (IPropertySymbol child in unwrappedType.GetMembers().OfType<IPropertySymbol>())
+                {
+                    if (child.IsStatic || child.IsIndexer || child.IsImplicitlyDeclared)
+                    {
+                        continue;
+                    }
+
+                    if (!SymbolEqualityComparer.Default.Equals(child.ContainingType, unwrappedType))
+                    {
+                        continue;
+                    }
+
+                    if (child.SetMethod is null)
+                    {
+                        diagnostics.Add(Diagnostic.Create(ValidationGeneratorDiagnostics.UnsupportedNestedPropertyShape, child.Locations.FirstOrDefault(), child.Name, unwrappedType.Name));
+                        continue;
+                    }
+
+                    if (TryCreatePropertyModel(unwrappedType, child, diagnostics, childPath, out PropertyModel? childModel) && childModel is not null)
+                    {
+                        childBuilder.Add(childModel);
+                    }
+                }
+
+                children = childBuilder.ToImmutable();
+            }
+        }
+
         propertyModel = new PropertyModel(
             Name: property.Name,
             TypeName: property.Type.ToDisplayString(s_fullyQualifiedNullableFormat),
-            Aspects: aspects.ToImmutable());
+            IsNullable: isNullable,
+            IsValidatableType: isValidatableType,
+            Aspects: aspects.ToImmutable(),
+            Children: children);
 
         return true;
     }
@@ -145,4 +199,63 @@ internal static class GenerationCandidateFactory
         .Select(static reference => reference.GetSyntax())
         .OfType<TypeDeclarationSyntax>()
         .Any(static declaration => declaration.Modifiers.Any(SyntaxKind.PartialKeyword));
+
+    private static INamedTypeSymbol? UnwrapNullableNamedType(ITypeSymbol type)
+    {
+        if (type is not INamedTypeSymbol named)
+        {
+            return null;
+        }
+
+        if (named.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T)
+        {
+            return named.TypeArguments[0] as INamedTypeSymbol;
+        }
+
+        return named;
+    }
+
+    private static bool IsValidatableType(INamedTypeSymbol? type)
+    {
+        if (type is null)
+        {
+            return false;
+        }
+
+        return type.GetAttributes().Any(attribute =>
+        {
+            INamedTypeSymbol? attributeType = attribute.AttributeClass;
+            if (attributeType is null)
+            {
+                return false;
+            }
+
+            return GetFullMetadataName(attributeType).Equals(s_validatableMetadataName, StringComparison.Ordinal);
+        });
+    }
+
+    private static string GetFullMetadataName(INamedTypeSymbol type)
+    {
+        INamedTypeSymbol original = type.OriginalDefinition;
+
+        Stack<string> parts = [];
+        ISymbol? current = original;
+
+        while (current is not null)
+        {
+            switch (current)
+            {
+                case INamespaceSymbol ns when !ns.IsGlobalNamespace:
+                    parts.Push(ns.MetadataName);
+                    break;
+                case INamedTypeSymbol named:
+                    parts.Push(named.MetadataName);
+                    break;
+            }
+
+            current = current.ContainingSymbol;
+        }
+
+        return string.Join('.', parts);
+    }
 }
