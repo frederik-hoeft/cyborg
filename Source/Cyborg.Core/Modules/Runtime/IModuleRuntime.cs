@@ -28,5 +28,6 @@ public interface IModuleRuntime
 
     IRuntimeEnvironment PrepareEnvironment(ModuleContext moduleContext);
 
-    IRuntimeEnvironment? ResolveEnvironmentReference(ModuleEnvironmentReference environmentReference);
+    [return: NotNullIfNotNull(nameof(environmentReference))]
+    IRuntimeEnvironment? ResolveEnvironmentReference(ModuleEnvironmentReference environmentReference, IRuntimeEnvironment? defaultValue = null);
 }

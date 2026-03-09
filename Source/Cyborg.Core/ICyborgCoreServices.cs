@@ -4,7 +4,7 @@ using Cyborg.Core.Modules.Configuration.Serialization;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Services;
-using Cyborg.Core.Services.Network;
+using Cyborg.Core.Services.Network.Probe;
 using Cyborg.Core.Services.Subprocesses;
 using Jab;
 using System.Text.Json;

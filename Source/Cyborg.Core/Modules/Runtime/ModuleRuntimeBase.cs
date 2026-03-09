@@ -2,7 +2,6 @@
 using Cyborg.Core.Modules.Runtime.Environments;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
-using System.Xml.Linq;
 
 namespace Cyborg.Core.Modules.Runtime;
 
@@ -85,12 +84,13 @@ public abstract class ModuleRuntimeBase(JsonNamingPolicy namingPolicy) : IModule
 
     public abstract bool TryRemoveEnvironment(IRuntimeEnvironment environment);
 
-    public IRuntimeEnvironment? ResolveEnvironmentReference(ModuleEnvironmentReference environmentReference) => environmentReference switch
+    [return: NotNullIfNotNull(nameof(defaultValue))]
+    public IRuntimeEnvironment? ResolveEnvironmentReference(ModuleEnvironmentReference environmentReference, IRuntimeEnvironment? defaultValue = null) => environmentReference switch
     {
         (EnvironmentScopeReference.Current, _) => Environment,
         (EnvironmentScopeReference.Global, _) => GlobalEnvironment,
         (EnvironmentScopeReference.Parent, _) => ParentEnvironment,
         (EnvironmentScopeReference.Reference, { Length: > 0 } name) when TryGetEnvironment(name, out IRuntimeEnvironment? env) => env,
-        _ => null
+        _ => defaultValue
     };
 }

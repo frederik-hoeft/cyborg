@@ -1,6 +1,6 @@
 ﻿using System.Net.NetworkInformation;
 
-namespace Cyborg.Core.Services.Network;
+namespace Cyborg.Core.Services.Network.Probe;
 
 public sealed class DefaultPingService : IPingService, IDisposable
 {

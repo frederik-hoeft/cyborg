@@ -1,4 +1,4 @@
-﻿namespace Cyborg.Core.Services.Network;
+﻿namespace Cyborg.Core.Services.Network.Probe;
 
 public interface IPingService
 {
