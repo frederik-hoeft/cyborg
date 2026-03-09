@@ -83,14 +83,4 @@ public abstract class ModuleRuntimeBase(JsonNamingPolicy namingPolicy) : IModule
     public abstract bool TryGetEnvironment(string name, [NotNullWhen(true)] out IRuntimeEnvironment? environment);
 
     public abstract bool TryRemoveEnvironment(IRuntimeEnvironment environment);
-
-    [return: NotNullIfNotNull(nameof(defaultValue))]
-    public IRuntimeEnvironment? ResolveEnvironmentReference(ModuleEnvironmentReference environmentReference, IRuntimeEnvironment? defaultValue = null) => environmentReference switch
-    {
-        (EnvironmentScopeReference.Current, _) => Environment,
-        (EnvironmentScopeReference.Global, _) => GlobalEnvironment,
-        (EnvironmentScopeReference.Parent, _) => ParentEnvironment,
-        (EnvironmentScopeReference.Reference, { Length: > 0 } name) when TryGetEnvironment(name, out IRuntimeEnvironment? env) => env,
-        _ => defaultValue
-    };
 }

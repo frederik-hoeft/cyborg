@@ -20,7 +20,6 @@ namespace Cyborg.Core;
 [Singleton<JsonConverter, DynamicValueJsonConverter>]
 [Singleton<JsonConverter, DynamicKeyValuePairJsonConverter>]
 [Singleton<JsonConverter>(Factory = nameof(CreateEnvironmentScopeConverter))]
-[Singleton<JsonConverter>(Factory = nameof(CreateEnvironmentScopeReferenceConverter))]
 [Singleton<IModuleLoaderRegistry, DefaultModuleLoaderRegistry>]
 [Singleton<IModuleWorkerFactory, DefaultModuleWorkerFactory>]
 [Singleton<IModuleConfigurationLoader, DefaultModuleConfigurationLoader>]
@@ -32,6 +31,4 @@ namespace Cyborg.Core;
 public interface ICyborgCoreServices
 {
     static JsonConverter CreateEnvironmentScopeConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<EnvironmentScope>(namingPolicy);
-
-    static JsonConverter CreateEnvironmentScopeReferenceConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<EnvironmentScopeReference>(namingPolicy);
 }

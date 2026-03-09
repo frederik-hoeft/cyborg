@@ -23,7 +23,7 @@ internal sealed class RangeAttributeProcessor : IPropertyAttributeProcessor
         
         if (!SymbolEqualityComparer.Default.Equals(context.Property.Type, attributeClass.TypeArguments[0]))
         {
-            context.Report(ValidationGeneratorDiagnostics.TypeMismatch, context.Property.Name, context.ContainingType.Name, nameof(RangeAttribute<>));
+            context.Report(ValidationGeneratorDiagnostics.GenericTypeMismatch, context.Property.Name, context.ContainingType.Name, nameof(RangeAttribute<>));
             return false;
         }
 

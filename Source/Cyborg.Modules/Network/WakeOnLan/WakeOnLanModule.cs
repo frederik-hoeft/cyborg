@@ -1,7 +1,7 @@
 ﻿using Cyborg.Core.Aot.Modules.Validation;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Cyborg.Core.Modules;
-using Cyborg.Core.Modules.Configuration.Model;
+using Cyborg.Modules.Shared.Model;
 
 namespace Cyborg.Modules.Network.WakeOnLan;
 
@@ -12,8 +12,8 @@ public sealed partial record WakeOnLanModule
     [property: Required] string MacAddress,
     [property: Range<int>(Min = 1, Max = ushort.MaxValue)] int LivenessProbePort,
     [property: Required] string StateVariable,
-    TimeSpan MaxWaitTime,
-    TimeSpan HostDiscoveryTimeout,
+    [property: DefaultTimeSpan("00:05:00")] TimeSpan MaxWaitTime,
+    [property: DefaultTimeSpan("00:00:30")] TimeSpan HostDiscoveryTimeout,
     ModuleEnvironmentReference? OutputEnvironment,
     [property: Required][property: IgnoreOverrides] string Executable = "/usr/bin/wakeonlan"
 ) : ModuleBase, IModule

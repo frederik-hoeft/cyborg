@@ -1,3 +1,5 @@
+using System.Reflection.Metadata;
+
 namespace Cyborg.Core.Aot.Modules.Validation;
 
 internal static class KnownTypes
@@ -17,4 +19,6 @@ internal static class KnownTypes
     public static string IModuleOfT(string typeArgument) => $"global::{typeof(IModule<>).Namespace}.{nameof(IModule<>)}<{typeArgument}>";
 
     public static string ValidationError => field ??= $"global::{typeof(ValidationError).FullName}";
+
+    public static string TimeSpan => field ??= $"global::{typeof(TimeSpan).FullName}";
 }

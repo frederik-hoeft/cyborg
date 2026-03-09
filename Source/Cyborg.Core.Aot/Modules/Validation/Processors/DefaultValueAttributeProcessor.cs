@@ -21,13 +21,13 @@ internal sealed class DefaultValueAttributeProcessor : IPropertyAttributeProcess
 
         if (!SymbolEqualityComparer.Default.Equals(context.Property.Type, attributeClass.TypeArguments[0]))
         {
-            context.Report(ValidationGeneratorDiagnostics.TypeMismatch, context.Property.Name, context.ContainingType.Name);
+            context.Report(ValidationGeneratorDiagnostics.GenericTypeMismatch, context.Property.Name, context.ContainingType.Name);
             return false;
         }
 
         if (attribute.ConstructorArguments.Length == 0)
         {
-            context.Report(ValidationGeneratorDiagnostics.UnsupportedAttributeLiteral, context.Property.Name, context.ContainingType.Name);
+            context.Report(ValidationGeneratorDiagnostics.MissingArgument, context.Property.Name, context.ContainingType.Name, nameof(DefaultValueAttribute<>));
             return false;
         }
 
@@ -65,20 +65,20 @@ internal sealed class DefaultValueAttributeProcessor : IPropertyAttributeProcess
 
             if (whenPresentExpressions.Length == 0)
             {
-                triggerExpression = $"{equalityComparer}.Equals({currentExpression}, default!)";
+                triggerExpression = $"{equalityComparer}.Equals({moduleVariable}.{property.Name}, default!)";
             }
             else
             {
                 List<string> checks = new(whenPresentExpressions.Length);
                 foreach (string whenPresentExpression in whenPresentExpressions)
                 {
-                    checks.Add($"{equalityComparer}.Equals({currentExpression}, {whenPresentExpression})");
+                    checks.Add($"{equalityComparer}.Equals({moduleVariable}.{property.Name}, {whenPresentExpression})");
                 }
 
                 triggerExpression = string.Join(" || ", checks);
             }
 
-            return $"{triggerExpression} ? {valueExpression} : {currentExpression}";
+            return $"{triggerExpression} ? {valueExpression} : {moduleVariable}.{property.Name}";
         }
     }
 }

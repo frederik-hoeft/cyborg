@@ -29,6 +29,7 @@
         <EmbeddedResource Include="Json\Configuration\BindingsGenerationMode.cs" />
         <EmbeddedResource Include="Json\Configuration\IJsonTypeInfoProvider.cs" />
         <EmbeddedResource Include="Json\Configuration\JsonTypeInfoBindingsGeneratorAttribute.cs" />
+        <EmbeddedResource Include="Modules\Validation\Attributes\DefaultTimeSpanAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\DefaultValueAttribute`1.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\IgnoreOverridesAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\RangeAttribute`1.cs" />

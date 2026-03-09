@@ -28,9 +28,9 @@ internal static class ValidationGeneratorDiagnostics
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
 
-    public static DiagnosticDescriptor TypeMismatch { get; } = new(
+    public static DiagnosticDescriptor GenericTypeMismatch { get; } = new(
         id: "CYBORGVAL004",
-        title: "Attribute type mismatch",
+        title: "Generic attribute type mismatch",
         messageFormat: "Property '{0}' on '{1}' has a '{2}' whose generic type does not match the property type",
         category: "Cyborg.Aot.Validation",
         defaultSeverity: DiagnosticSeverity.Error,
@@ -52,4 +52,11 @@ internal static class ValidationGeneratorDiagnostics
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
 
+    public static DiagnosticDescriptor TypeMismatch { get; } = new(
+        id: "CYBORGVAL007",
+        title: "Attribute type mismatch",
+        messageFormat: "Property '{0}' on '{1}' has a '{2}' which is only valid on properties of type '{3}'",
+        category: "Cyborg.Aot.Validation",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
 }

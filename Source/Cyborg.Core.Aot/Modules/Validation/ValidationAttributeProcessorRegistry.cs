@@ -11,6 +11,7 @@ internal static class ValidationAttributeProcessorRegistry
     [
         new RequiredAttributeProcessor(),
         new DefaultValueAttributeProcessor(),
+        new DefaultTimeSpanAttributeProcessor(),
         new RangeAttributeProcessor(),
         new IgnoreOverridesAttributeProcessor(),
     ];

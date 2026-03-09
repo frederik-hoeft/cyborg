@@ -1,10 +1,11 @@
 ﻿using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Configuration.Extensions;
-using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Services.Network.Probe;
 using Cyborg.Core.Services.Subprocesses;
+using Cyborg.Modules.Shared.Extensions;
+using Cyborg.Modules.Shared.Model;
 using System.Diagnostics;
 
 namespace Cyborg.Modules.Network.WakeOnLan;
@@ -29,6 +30,7 @@ public sealed class WakeOnLanModuleWorker
         string? outputEnvironmentName = runtime.Environment.Resolve(Module, Module.OutputEnvironment?.Name);
         TimeSpan maxWaitTime = runtime.Environment.Resolve(Module, Module.MaxWaitTime).OnDefault(TimeSpan.FromMinutes(5));
         TimeSpan hostDiscoveryTimeout = runtime.Environment.Resolve(Module, Module.HostDiscoveryTimeout).OnDefault(TimeSpan.FromSeconds(30));
+
         EnvironmentScopeReference outputRuntimeScope = runtime.Environment.Resolve(Module, Module.OutputEnvironment?.Scope).GetValueOrDefault(EnvironmentScopeReference.Current);
 
         IRuntimeEnvironment outputEnvironment = runtime.ResolveEnvironmentReference(new ModuleEnvironmentReference(outputRuntimeScope, outputEnvironmentName), runtime.Environment);

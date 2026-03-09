@@ -27,7 +27,4 @@ public interface IModuleRuntime
     Task<bool> ExecuteAsync(ModuleContext moduleContext, IRuntimeEnvironment environment, CancellationToken cancellationToken = default);
 
     IRuntimeEnvironment PrepareEnvironment(ModuleContext moduleContext);
-
-    [return: NotNullIfNotNull(nameof(environmentReference))]
-    IRuntimeEnvironment? ResolveEnvironmentReference(ModuleEnvironmentReference environmentReference, IRuntimeEnvironment? defaultValue = null);
 }

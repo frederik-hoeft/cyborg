@@ -9,6 +9,7 @@ using Cyborg.Modules.Foreach;
 using Cyborg.Modules.Named;
 using Cyborg.Modules.Network.WakeOnLan;
 using Cyborg.Modules.Sequence;
+using Cyborg.Modules.Shared.Model;
 using Cyborg.Modules.Subprocess;
 using Cyborg.Modules.Template;
 using Jab;
@@ -33,9 +34,12 @@ namespace Cyborg.Modules;
 [Singleton<IModuleLoader, WakeOnLanModuleLoader>]
 [Singleton<IModuleLoader, IfModuleLoader>]
 [Singleton<IDynamicValueProvider, BorgRemoteValueProvider>]
+[Singleton<JsonConverter>(Factory = nameof(CreateEnvironmentScopeReferenceConverter))]
 public interface ICyborgModuleServices
 {
     static ModuleJsonSerializerContext GetModuleJsonSerializerContext() => ModuleJsonSerializerContext.Default;
 
     static JsonNamingPolicy GetModuleJsonNamingPolicy() => JsonNamingPolicy.SnakeCaseLower;
+
+    static JsonConverter CreateEnvironmentScopeReferenceConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<EnvironmentScopeReference>(namingPolicy);
 }

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -13,7 +14,7 @@ internal static class LiteralExpressionFactory
 
     public static string GetTypeNameBase(Type t) => $"global::{t.Namespace}.{t.Name}";
 
-    public static bool TryGetLiteralExpression(TypedConstant constant, ITypeSymbol targetType, out string? expression)
+    public static bool TryGetLiteralExpression(TypedConstant constant, ITypeSymbol targetType, [NotNullWhen(true)] out string? expression)
     {
         expression = null;
 
