@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
@@ -49,7 +50,7 @@ internal static class ModuleValidationRenderer
         string qualifiedType = model.FullyQualifiedTypeName;
         builder.AppendBlock(
             $$"""
-            public async {{KnownTypes.ValueTaskOfT(qualifiedType)}} ResolveOverridesAsync(
+            async {{KnownTypes.ValueTaskOfT(qualifiedType)}} {{contractInfo.IModuleT.RenderGlobalWithGenerics(qualifiedType)}}.ResolveOverridesAsync(
                 {{contractInfo.IModuleRuntime.RenderGlobal()}} runtime,
                 {{KnownTypes.IServiceProvider}} serviceProvider,
                 {{KnownTypes.CancellationToken}} cancellationToken)
@@ -62,10 +63,10 @@ internal static class ModuleValidationRenderer
 
         builder = builder.IncreaseIndent();
         AppendOverrideResolutionForObject(builder, model.Properties, MODULE_VARIABLE, MODULE_VARIABLE, MODULE_VARIABLE);
-        builder.AppendLine("await global::System.Threading.Tasks.Task.CompletedTask;");
         builder = builder.DecreaseIndent();
         builder.AppendBlock(
             """
+                await global::System.Threading.Tasks.Task.CompletedTask;
                 return self;
             }
             """);
@@ -76,7 +77,7 @@ internal static class ModuleValidationRenderer
         string qualifiedType = model.FullyQualifiedTypeName;
         builder.AppendBlock(
             $$"""
-            public async {{KnownTypes.ValueTaskOfT(qualifiedType)}} ApplyDefaultsAsync(
+            async {{KnownTypes.ValueTaskOfT(qualifiedType)}} {{contractInfo.IModuleT.RenderGlobalWithGenerics(qualifiedType)}}.ApplyDefaultsAsync(
                 {{contractInfo.IModuleRuntime.RenderGlobal()}} runtime,
                 {{KnownTypes.IServiceProvider}} serviceProvider,
                 {{KnownTypes.CancellationToken}} cancellationToken)
@@ -90,10 +91,10 @@ internal static class ModuleValidationRenderer
 
         builder = builder.IncreaseIndent();
         AppendDefaultApplicationForObject(builder, model.Properties, MODULE_VARIABLE, MODULE_VARIABLE);
-        builder.AppendLine("await global::System.Threading.Tasks.Task.CompletedTask;");
         builder = builder.DecreaseIndent();
         builder.AppendBlock(
             """
+                await global::System.Threading.Tasks.Task.CompletedTask;
                 return self;
             }
             """);
@@ -111,7 +112,8 @@ internal static class ModuleValidationRenderer
                 {{KnownTypes.CancellationToken}} cancellationToken)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                {{qualifiedType}} overridden = await ResolveOverridesAsync(runtime, serviceProvider, cancellationToken);
+                {{contractInfo.IModuleT.RenderGlobalWithGenerics(qualifiedType)}} self = this;
+                {{contractInfo.IModuleT.RenderGlobalWithGenerics(qualifiedType)}} overridden = await self.ResolveOverridesAsync(runtime, serviceProvider, cancellationToken);
                 {{qualifiedType}} module = await overridden.ApplyDefaultsAsync(runtime, serviceProvider, cancellationToken);
                 {{KnownTypes.ListOfT(contractInfo.ValidationError.RenderGlobal())}} errors = [];
 
@@ -134,7 +136,7 @@ internal static class ModuleValidationRenderer
 
     private static bool AppendOverrideResolutionForObject(
         IndentedStringBuilder builder,
-        System.Collections.Immutable.ImmutableArray<PropertyModel> properties,
+        ImmutableArray<PropertyModel> properties,
         string targetVariable,
         string rootModuleVariable,
         string rootPathPrefix)
@@ -183,29 +185,32 @@ internal static class ModuleValidationRenderer
         string rootPathExpression)
     {
         string nestedVariable = $"{localName}Current";
-        string nestedRootPathPrefix = $"{rootPathExpression}!";
 
         if (property.IsNullable)
         {
-            builder.AppendLine($"if ({localName} is not null)");
-            builder.AppendLine("{");
-            builder = builder.IncreaseIndent();
-            builder.AppendLine($"{property.NonNullableTypeName} {nestedVariable} = {localName};");
-            AppendOverrideResolutionForObject(builder, property.Children, nestedVariable, rootModuleVariable, nestedRootPathPrefix);
-            builder.AppendLine($"{localName} = {nestedVariable};");
-            builder = builder.DecreaseIndent();
-            builder.AppendLine("}");
+            builder.AppendBlock(
+                $$"""
+                if ({{localName}} is not null)
+                {
+                    {{property.NonNullableTypeName}} {{nestedVariable}} = {{localName}};
+                """);
+            AppendOverrideResolutionForObject(builder.IncreaseIndent(), property.Children, nestedVariable, rootModuleVariable, rootPathExpression);
+            builder.AppendBlock(
+                $$"""
+                    {{localName}} = {{nestedVariable}};
+                }
+                """);
             return;
         }
 
         builder.AppendLine($"{property.NonNullableTypeName} {nestedVariable} = {localName};");
-        AppendOverrideResolutionForObject(builder, property.Children, nestedVariable, rootModuleVariable, nestedRootPathPrefix);
+        AppendOverrideResolutionForObject(builder, property.Children, nestedVariable, rootModuleVariable, rootPathExpression);
         builder.AppendLine($"{localName} = {nestedVariable};");
     }
 
     private static bool AppendDefaultApplicationForObject(
         IndentedStringBuilder builder,
-        System.Collections.Immutable.ImmutableArray<PropertyModel> properties,
+        ImmutableArray<PropertyModel> properties,
         string targetVariable,
         string rootModuleVariable)
     {
@@ -254,14 +259,18 @@ internal static class ModuleValidationRenderer
 
         if (property.IsNullable)
         {
-            builder.AppendLine($"if ({localName} is not null)");
-            builder.AppendLine("{");
-            builder = builder.IncreaseIndent();
-            builder.AppendLine($"{property.NonNullableTypeName} {nestedVariable} = {localName};");
-            AppendDefaultApplicationForObject(builder, property.Children, nestedVariable, rootModuleVariable);
-            builder.AppendLine($"{localName} = {nestedVariable};");
-            builder = builder.DecreaseIndent();
-            builder.AppendLine("}");
+            builder.AppendBlock(
+                $$"""
+                if ({{localName}} is not null)
+                {
+                    {{property.NonNullableTypeName}} {{nestedVariable}} = {{localName}};
+                """);
+            AppendDefaultApplicationForObject(builder.IncreaseIndent(), property.Children, nestedVariable, rootModuleVariable);
+            builder.AppendBlock(
+                $$"""
+                    {{localName}} = {{nestedVariable}};
+                }
+                """);
             return;
         }
 
@@ -299,9 +308,11 @@ internal static class ModuleValidationRenderer
         {
             return;
         }
-
-        builder.AppendLine($"if ({propertyAccessExpression} is not null)");
-        builder.AppendLine("{");
+        builder.AppendBlock(
+            $$"""
+            if ({{propertyAccessExpression}} is not null)
+            {
+            """);
         builder.Raw.Append(nestedRawBuilder.ToString());
         builder.AppendLine("}");
     }
@@ -323,7 +334,7 @@ internal static class ModuleValidationRenderer
         string propertyAccessExpression,
         string rootPathExpression)
     {
-        string? expression = $"runtime.Environment.Resolve({moduleVariable}, {rootPathExpression})";
+        string? expression = $"runtime.Environment.Resolve({moduleVariable}, {propertyAccessExpression}, valueExpression: \"{rootPathExpression}\")";
         foreach (PropertyValidationAspect aspect in property.Aspects)
         {
             expression = aspect.RewriteOverrideResolutionExpression(property, moduleVariable, propertyAccessExpression, expression);
