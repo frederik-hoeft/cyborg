@@ -15,7 +15,7 @@ This document describes the system architecture and key design decisions for the
   - [DI Module Registration Flow](#di-module-registration-flow)
 - [Source Generator Architecture](#source-generator-architecture)
   - [ModuleLoaderFactoryGenerator](#moduleloaderfactorygenerator)
-  - [JsonTypeInfoBindingsGenerator](#jsontypeinfobindingsgenerator)
+  - [ModuleValidationGenerator](#modulevalidationgenerator)
 - [Dependency Injection Architecture](#dependency-injection-architecture)
 - [Parsing Infrastructure](#parsing-infrastructure)
   - [Architecture Overview](#architecture-overview)
@@ -219,14 +219,83 @@ partial class FooModuleLoader
 - Module type is passed directly; other parameters resolve from `IServiceProvider`
 - Less boilerplate for developers creating new modules (no manual calls to `GetRequiredService`)
 
-### JsonTypeInfoBindingsGenerator
+### ModuleValidationGenerator
 
-Generates `GetTypeInfoOrDefault<T>()` for AOT-compatible JSON serialization:
+Generates `IModule<TModule>` implementations providing a three-stage validation pipeline: override resolution, default application, and constraint validation.
+
+**Input (developer writes):**
 
 ```csharp
-// Enables type-safe JSON deserialization without reflection:
-JsonTypeInfo<FooModule>? info = context.GetTypeInfoOrDefault<FooModule>();
+[GeneratedModuleValidation]
+public sealed partial record WakeOnLanModule
+(
+    [property: Required] string TargetHost,
+    [property: Required][property: ExactLength(17)] string MacAddress,
+    [property: Required][property: Range<int>(Min = 1, Max = ushort.MaxValue)] int LivenessProbePort,
+    [property: Required] string StateVariable,
+    [property: DefaultTimeSpan("00:05:00")] TimeSpan MaxWaitTime,
+    [property: DefaultTimeSpan("00:00:30")] TimeSpan HostDiscoveryTimeout,
+    ModuleEnvironmentReference? OutputEnvironment,
+    [property: Required][property: IgnoreOverrides][property: DefaultValue<string>("/usr/bin/wakeonlan")] string Executable
+) : ModuleBase, IModule
+{
+    public static string ModuleId => "cyborg.modules.network.wol.v1";
+}
 ```
+
+**Output (generated):**
+
+```csharp
+partial record WakeOnLanModule : IModule<WakeOnLanModule>
+{
+    // Stage 1: Resolve environment variable overrides for each property
+    async ValueTask<WakeOnLanModule> IModule<WakeOnLanModule>.ResolveOverridesAsync(
+        IModuleRuntime runtime, IServiceProvider serviceProvider, CancellationToken cancellationToken);
+
+    // Stage 2: Apply default values for properties with default attributes
+    async ValueTask<WakeOnLanModule> IModule<WakeOnLanModule>.ApplyDefaultsAsync(
+        IModuleRuntime runtime, IServiceProvider serviceProvider, CancellationToken cancellationToken);
+
+    // Stage 3: Validate constraints and return ValidationResult<TModule>
+    public async ValueTask<ValidationResult<WakeOnLanModule>> ValidateAsync(
+        IModuleRuntime runtime, IServiceProvider serviceProvider, CancellationToken cancellationToken);
+}
+```
+
+**Validation Pipeline:**
+
+```
+JSON Deserialization
+        │
+        ▼
+ResolveOverridesAsync()    ← Substitute ${VAR} references from runtime environment
+        │                    (skips properties marked [IgnoreOverrides])
+        ▼
+ApplyDefaultsAsync()       ← Fill default! values with [DefaultValue<T>] / [DefaultTimeSpan]
+        │
+        ▼
+ValidateAsync()            ← Check [Required], [Range<T>], [ExactLength], etc.
+        │
+        ▼
+ValidationResult<TModule>  ← Valid(module) or Invalid(errors)
+```
+
+**Supported Attributes:**
+
+| Attribute | Purpose |
+|-----------|---------|
+| `[Required]` | Property must not be `default` after override resolution |
+| `[Range<T>(Min, Max)]` | Numeric value must be within inclusive bounds |
+| `[ExactLength(n)]` | String/collection length must equal `n` |
+| `[DefaultValue<T>(value)]` | Provides compile-time default if property is `default` |
+| `[DefaultTimeSpan("hh:mm:ss")]` | TimeSpan-specific default via parseable string |
+| `[IgnoreOverrides]` | Skip environment variable substitution for this property |
+
+**Why generate this?**
+- AOT-safe: no reflection-based validation frameworks
+- Recursive: nested record types (e.g., `ModuleEnvironmentReference`) are validated depth-first
+- Immutable: returns new record instances via `with` expressions
+- Fail-fast: collects all validation errors before returning
 
 ## Dependency Injection Architecture
 
@@ -2323,26 +2392,26 @@ The root configuration establishes the global environment with backup hosts and 
   "module": {
     "cyborg.modules.sequence.v1": {
       "steps": [
-        {
-          "environment": { "scope": "global" },
-          "module": {
-            "cyborg.modules.foreach.v1": {
-              "collection": "backup_hosts",
-              "item_variable": "host",
-              "body": {
-                "environment": { "scope": "inherit_global" },
-                "module": {
-                  "cyborg.modules.wol.wake.v1": {
-                    "hostname": "${host.hostname}",
-                    "mac_address": "${host.wake_on_lan_mac}",
-                    "ssh_port": "${host.port}",
-                    "state_variable": "wol_state.${host.hostname}"
+          {
+            "environment": { "scope": "global" },
+            "module": {
+              "cyborg.modules.foreach.v1": {
+                "collection": "backup_hosts",
+                "item_variable": "host",
+                "body": {
+                  "environment": { "scope": "inherit_global" },
+                  "module": {
+                    "cyborg.modules.wol.wake.v1": {
+                      "hostname": "${host.hostname}",
+                      "mac_address": "${host.wake_on_lan_mac}",
+                      "ssh_port": "${host.port}",
+                      "state_variable": "wol_state.${host.hostname}"
+                    }
                   }
                 }
               }
             }
-          }
-        },
+          },
         {
           "environment": { "scope": "global" },
           "module": {
