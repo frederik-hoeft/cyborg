@@ -11,6 +11,7 @@ public sealed class ContractRegistrationBootstrapGenerator : IIncrementalGenerat
     private static void EmitFrameworkSources(IncrementalGeneratorPostInitializationContext context)
     {
         context.AddEmbeddedSource<ModuleValidationGeneratorContract>();
+        context.AddEmbeddedSource<ModuleLoaderFactoryGeneratorContract>();
         context.AddEmbeddedSource(typeof(GeneratorContractRegistrationAttribute<>));
     }
 }

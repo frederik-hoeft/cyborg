@@ -1,42 +1,41 @@
-﻿using Microsoft.CodeAnalysis;
+﻿using Cyborg.Core.Aot.Modules.Loaders;
+using Microsoft.CodeAnalysis;
 using System.Collections.Frozen;
+using System.Collections.Immutable;
 
 namespace Cyborg.Core.Aot.Contracts;
 
 internal abstract class ContractInfoBase<TContract>(Dictionary<TContract, INamedTypeSymbol> contractTypes) where TContract : unmanaged, Enum
 {
-    public FrozenDictionary<TContract, INamedTypeSymbol> ContractTypes { get; } = contractTypes.ToFrozenDictionary(kv => kv.Key, kv => kv.Value, EqualityComparer<TContract>.Default);
+    protected FrozenDictionary<TContract, INamedTypeSymbol> ContractTypes { get; } = contractTypes.ToFrozenDictionary();
 
-    protected static Dictionary<TContract, INamedTypeSymbol>? FetchContracts(ContractExplorer contractExplorer, SourceProductionContext context, FrozenSet<TContract> knownContracts)
+    protected static Dictionary<TContract, INamedTypeSymbol>? FetchContracts(
+        ContractExplorer contractExplorer,
+        SourceProductionContext context,
+        ImmutableArray<TContract> requiredContracts)
     {
-        Dictionary<TContract, INamedTypeSymbol> contracts = contractExplorer.GetContracts<TContract>(context);
-        bool failed = false;
-        foreach (KeyValuePair<TContract, INamedTypeSymbol> kvp in contracts)
+        ContractDiscoveryResult<TContract> discovery = contractExplorer.DiscoverContracts<TContract>();
+
+        foreach (Diagnostic diagnostic in discovery.Diagnostics)
         {
-            if (!knownContracts.Contains(kvp.Key))
+            context.ReportDiagnostic(diagnostic);
+        }
+
+        bool hasErrors = discovery.Diagnostics.Any(static d => d.Severity == DiagnosticSeverity.Error);
+        foreach (TContract contract in requiredContracts)
+        {
+            if (discovery.Contracts.ContainsKey(contract))
             {
-                context.ReportDiagnostic(Diagnostic.Create(Diagnostics.UnknownContract,
-                    kvp.Value.Locations.FirstOrDefault(),
-                    kvp.Key.ToString(),
-                    kvp.Value.ToDisplayString()));
-                failed = true;
+                continue;
             }
+
+            hasErrors = true;
+            context.ReportDiagnostic(Diagnostic.Create(
+                Diagnostics.MissingContractRegistration,
+                Location.None,
+                contract));
         }
-        foreach (TContract contract in knownContracts)
-        {
-            if (!contracts.ContainsKey(contract))
-            {
-                context.ReportDiagnostic(Diagnostic.Create(Diagnostics.MissingContract,
-                    Location.None,
-                    contract.ToString(),
-                    typeof(TContract).Name));
-                failed = true;
-            }
-        }
-        if (failed)
-        {
-            return null;
-        }
-        return contracts;
+
+        return hasErrors ? null : discovery.Contracts;
     }
 }

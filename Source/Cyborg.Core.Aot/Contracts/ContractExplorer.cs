@@ -5,43 +5,54 @@ namespace Cyborg.Core.Aot.Contracts;
 
 internal sealed class ContractExplorer(Compilation compilation)
 {
-    public Dictionary<TContract, INamedTypeSymbol> GetContracts<TContract>(SourceProductionContext context) where TContract : unmanaged, Enum
+    public ContractDiscoveryResult<TContract> DiscoverContracts<TContract>() where TContract : unmanaged, Enum
     {
-        IEnumerable<INamedTypeSymbol> allTypes = compilation.References
+        List<Diagnostic> diagnostics = [];
+        Dictionary<TContract, INamedTypeSymbol> discoveredContracts = [];
+        IEnumerable<IAssemblySymbol> assemblies = compilation.References
             .Select(compilation.GetAssemblyOrModuleSymbol)
-            .Union([compilation.Assembly], SymbolEqualityComparer.Default)
-            .Distinct(SymbolEqualityComparer.Default)
             .OfType<IAssemblySymbol>()
-            .Where(asm => asm.Name.StartsWith(nameof(Cyborg)))
-            .SelectMany(asm => asm.GlobalNamespace.GetAllTypes());
+            .Append(compilation.Assembly)
+            .Distinct<IAssemblySymbol>(SymbolEqualityComparer.Default);
 
-        Dictionary<TContract, INamedTypeSymbol> contractTypes = [];
-        foreach (INamedTypeSymbol type in allTypes)
+        foreach (INamedTypeSymbol type in assemblies.SelectMany(static asm => asm.GlobalNamespace.GetAllTypes()))
         {
-            AttributeData? contractRegistration = type.GetAttributes().FirstOrDefault(a => a.AttributeClass is
+            foreach (AttributeData attribute in type.GetAttributes())
             {
-                IsGenericType: true,
-                IsUnboundGenericType: false
-            } attrClass && attrClass.ConstructUnboundGenericType().GetFullMetadataName().Equals(typeof(GeneratorContractRegistrationAttribute<>).FullName, StringComparison.Ordinal));
-            if (contractRegistration is not { AttributeClass.TypeArguments: [INamedTypeSymbol contractType] })
-            {
-                continue;
-            }
-            if (contractType.GetFullMetadataName().Equals(typeof(TContract).FullName, StringComparison.Ordinal))
-            {
-                TContract contractValue = (TContract)contractRegistration.ConstructorArguments[0].Value!;
-                if (contractTypes.ContainsKey(contractValue))
+                if (attribute.AttributeClass is not INamedTypeSymbol attributeClass || !attributeClass.IsGenericType)
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(Diagnostics.DuplicateContract,
-                        Location.None,
-                        contractValue,
-                        contractTypes[contractValue]?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.OmittedAsContaining)),
-                        type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.OmittedAsContaining))));
                     continue;
                 }
-                contractTypes[contractValue] = type;
+
+                if (!attributeClass.ConstructUnboundGenericType().GetFullMetadataName().Equals(typeof(GeneratorContractRegistrationAttribute<>).FullName, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (attribute.AttributeClass.TypeArguments is not [INamedTypeSymbol registeredContractEnum]
+                    || !registeredContractEnum.GetFullMetadataName().Equals(typeof(TContract).FullName, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (attribute.ConstructorArguments is not [TypedConstant enumValueConstant] || enumValueConstant.Value is null)
+                {
+                    continue;
+                }
+
+                TContract contractValue = (TContract)enumValueConstant.Value;
+                if (!discoveredContracts.TryAdd(contractValue, type))
+                {
+                    diagnostics.Add(Diagnostic.Create(
+                        Diagnostics.DuplicateContractRegistration,
+                        type.Locations.FirstOrDefault(),
+                        contractValue,
+                        discoveredContracts[contractValue].ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                        type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)));
+                }
             }
         }
-        return contractTypes;
+
+        return new ContractDiscoveryResult<TContract>(discoveredContracts, [.. diagnostics]);
     }
 }

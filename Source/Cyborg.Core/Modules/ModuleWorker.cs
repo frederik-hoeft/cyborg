@@ -1,4 +1,5 @@
-﻿using Cyborg.Core.Modules.Runtime;
+﻿using Cyborg.Core.Aot.Contracts;
+using Cyborg.Core.Modules.Runtime;
 
 namespace Cyborg.Core.Modules;
 

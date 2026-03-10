@@ -1,9 +1,11 @@
-﻿using Cyborg.Core.Modules.Configuration.Serialization;
+﻿using Cyborg.Core.Aot.Contracts;
+using Cyborg.Core.Modules.Configuration.Serialization;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 
 namespace Cyborg.Core.Modules.Configuration;
 
+[GeneratorContractRegistration<ModuleLoaderFactoryGeneratorContract>(ModuleLoaderFactoryGeneratorContract.ModuleLoaderT)]
 public abstract class ModuleLoader<TModuleWorker, TModule>(IServiceProvider serviceProvider) : IModuleLoader<TModule>
     where TModuleWorker : class, IModuleWorker
     where TModule : class, IModule

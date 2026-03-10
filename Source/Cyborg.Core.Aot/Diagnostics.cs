@@ -4,27 +4,21 @@ namespace Cyborg.Core.Aot;
 
 internal static class Diagnostics
 {
-    public static DiagnosticDescriptor DuplicateContract { get; } = new(
+    private const string CATEGORY = "Cyborg.Core.Aot";
+
+    public static DiagnosticDescriptor MissingContractRegistration { get; } = new(
         id: "CYBORG001",
-        title: "Duplicate Contract Registration",
-        messageFormat: "The contract value '{0}' is registered by multiple types: '{1}' and '{2}'.",
-        category: "CyborgCoreAot",
-        DiagnosticSeverity.Error,
+        title: "Missing generator contract registration",
+        messageFormat: "The required contract '{0}' is not registered for the module loader factory generator.",
+        category: CATEGORY,
+        defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
 
-    public static DiagnosticDescriptor UnknownContract { get; } = new(
+    public static DiagnosticDescriptor DuplicateContractRegistration { get; } = new(
         id: "CYBORG002",
-        title: "Unknown Contract Reference",
-        messageFormat: "The contract value '{0}' is referenced by '{1}' but is not known by the generator",
-        category: "CyborgCoreAot",
-        DiagnosticSeverity.Error,
-        isEnabledByDefault: true);
-
-    public static DiagnosticDescriptor MissingContract { get; } = new(
-        id: "CYBORG003",
-        title: "Missing Contract Registration",
-        messageFormat: "Missing required contract registration for '{0}' of type '{1}'",
-        category: "CyborgCoreAot",
-        DiagnosticSeverity.Error,
+        title: "Duplicate generator contract registration",
+        messageFormat: "The contract '{0}' is registered more than once. Existing registration: '{1}'. Duplicate: '{2}'.",
+        category: CATEGORY,
+        defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
 }

@@ -15,5 +15,15 @@ internal static class DictionaryExtensions
             }
             return defaultValue;
         }
+
+        public bool TryAdd(TKey key, TValue value)
+        {
+            if (dictionary.ContainsKey(key))
+            {
+                return false;
+            }
+            dictionary.Add(key, value);
+            return true;
+        }
     }
 }
