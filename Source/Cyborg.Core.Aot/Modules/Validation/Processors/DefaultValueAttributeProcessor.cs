@@ -60,7 +60,7 @@ internal sealed class DefaultValueAttributeProcessor : IPropertyAttributeProcess
     {
         public override string? RewriteDefaultAssignmentExpression(PropertyModel property, string moduleVariable, string propertyAccessExpression, string? currentExpression)
         {
-            string equalityComparer = LiteralExpressionFactory.GetDefaultEqualityComparer(property.NullableTypeName);
+            string equalityComparer = KnownTypes.DefaultEqualityComparerOfT(property.NullableTypeName);
             string triggerExpression;
 
             if (whenPresentExpressions.Length == 0)

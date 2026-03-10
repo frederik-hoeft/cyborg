@@ -43,7 +43,7 @@ internal sealed class DefaultTimeSpanAttributeProcessor : IPropertyAttributeProc
     {
         public override string? RewriteDefaultAssignmentExpression(PropertyModel property, string moduleVariable, string propertyAccessExpression, string? currentExpression)
         {
-            string equalityComparer = LiteralExpressionFactory.GetDefaultEqualityComparer(property.NullableTypeName);
+            string equalityComparer = KnownTypes.DefaultEqualityComparerOfT(property.NullableTypeName);
             string triggerExpression = $"{equalityComparer}.Equals({propertyAccessExpression}, default!)";
             return $"{triggerExpression} ? {KnownTypes.TimeSpan}.{nameof(TimeSpan.Parse)}({valueExpression}) : {propertyAccessExpression}";
         }

@@ -1,7 +1,6 @@
 using System.Text;
 using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
-using Microsoft.CodeAnalysis.CSharp;
 
 namespace Cyborg.Core.Aot.Modules.Validation;
 
@@ -37,7 +36,7 @@ internal static class ModuleValidationRenderer
         AppendValidate(indentedBuilder, model, contractInfo);
         builder.AppendLine("}");
 
-        for (int index = model.ContainingTypes.Length - 1; index >= 0; index--)
+        for (int index = model.ContainingTypes.Length - 1; index >= 0; --index)
         {
             builder.AppendLine("}");
         }
@@ -136,8 +135,6 @@ internal static class ModuleValidationRenderer
             }
             """);
     }
-
-    public static string Quote(string value) => SymbolDisplay.FormatLiteral(value, quote: true);
 
     private static void AppendOverrideResolutionForProperty(
         IndentedStringBuilder builder,

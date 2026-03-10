@@ -1,3 +1,4 @@
+using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using Cyborg.Core.Aot.Modules.Validation.Processors;
@@ -229,36 +230,11 @@ internal static class GenerationCandidateFactory
         foreach (AttributeData attribute in typeSymbol.GetAttributes())
         {
             if (attribute.AttributeClass is { } attributeClass 
-                && GetFullMetadataName(attributeClass).Equals(typeof(ValidatableAttribute).FullName, StringComparison.Ordinal))
+                && attributeClass.GetFullMetadataName().Equals(typeof(ValidatableAttribute).FullName, StringComparison.Ordinal))
             {
                 return true;
             }
         }
         return false;
-    }
-
-    private static string GetFullMetadataName(INamedTypeSymbol type)
-    {
-        INamedTypeSymbol original = type.OriginalDefinition;
-
-        Stack<string> parts = [];
-        ISymbol? current = original;
-
-        while (current is not null)
-        {
-            switch (current)
-            {
-                case INamespaceSymbol ns when !ns.IsGlobalNamespace:
-                    parts.Push(ns.MetadataName);
-                    break;
-                case INamedTypeSymbol named:
-                    parts.Push(named.MetadataName);
-                    break;
-            }
-
-            current = current.ContainingSymbol;
-        }
-
-        return string.Join(".", parts);
     }
 }

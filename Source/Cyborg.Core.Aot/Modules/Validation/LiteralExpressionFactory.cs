@@ -7,13 +7,6 @@ namespace Cyborg.Core.Aot.Modules.Validation;
 
 internal static class LiteralExpressionFactory
 {
-    public static string GetDefaultEqualityComparer(string typeName) =>
-        $"""
-        global::{typeof(EqualityComparer<>).Namespace}.{nameof(EqualityComparer<>)}<{typeName}>.{nameof(EqualityComparer<>.Default)}
-        """;
-
-    public static string GetTypeNameBase(Type t) => $"global::{t.Namespace}.{t.Name}";
-
     public static bool TryGetLiteralExpression(TypedConstant constant, ITypeSymbol targetType, [NotNullWhen(true)] out string? expression)
     {
         expression = null;

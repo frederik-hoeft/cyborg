@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Aot.Modules.Validation;
+namespace Cyborg.Core.Aot;
 
 internal static class KnownTypes
 {
@@ -11,4 +11,6 @@ internal static class KnownTypes
     public static string ListOfT(string typeArgument) => $"global::{typeof(List<>).Namespace}.{nameof(List<>)}<{typeArgument}>";
 
     public static string TimeSpan => field ??= $"global::{typeof(TimeSpan).FullName}";
+
+    public static string DefaultEqualityComparerOfT(string typeArgument) => $"global::{typeof(EqualityComparer<>).Namespace}.{nameof(EqualityComparer<>)}<{typeArgument}>.{nameof(EqualityComparer<>.Default)}";
 }
