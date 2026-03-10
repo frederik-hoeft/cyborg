@@ -169,7 +169,7 @@ internal static class ModuleValidationRenderer
         foreach (PropertyModel child in property.Children)
         {
             string childAccess = $"{nestedVariable}.{child.Name}";
-            string childRootPath = $"{rootPathExpression}! .{child.Name}".Replace("! .", "!.");
+            string childRootPath = $"{rootPathExpression}!.{child.Name}";
             AppendOverrideResolutionForProperty(builder, child, nestedVariable, rootModuleVariable, childAccess, childRootPath, child.Name);
         }
         builder.AppendLine($"{targetVariable} = {targetVariable} with {{ {assignmentName} = {nestedVariable} }};");
