@@ -49,7 +49,7 @@ internal static class ModuleValidationRenderer
         string qualifiedType = model.FullyQualifiedTypeName;
         builder.AppendBlock(
             $$"""
-            public {{KnownTypes.ValueTaskOfT(qualifiedType)}} ResolveOverridesAsync(
+            public async {{KnownTypes.ValueTaskOfT(qualifiedType)}} ResolveOverridesAsync(
                 {{contractInfo.IModuleRuntime.RenderGlobal()}} runtime,
                 {{KnownTypes.IServiceProvider}} serviceProvider,
                 {{KnownTypes.CancellationToken}} cancellationToken)
@@ -62,10 +62,11 @@ internal static class ModuleValidationRenderer
 
         builder = builder.IncreaseIndent();
         AppendOverrideResolutionForObject(builder, model.Properties, MODULE_VARIABLE, MODULE_VARIABLE, MODULE_VARIABLE);
+        builder.AppendLine("await global::System.Threading.Tasks.Task.CompletedTask;");
         builder = builder.DecreaseIndent();
         builder.AppendBlock(
-            $$"""
-                return new {{KnownTypes.ValueTaskOfT(qualifiedType)}}({{MODULE_VARIABLE}});
+            """
+                return self;
             }
             """);
     }
@@ -75,7 +76,7 @@ internal static class ModuleValidationRenderer
         string qualifiedType = model.FullyQualifiedTypeName;
         builder.AppendBlock(
             $$"""
-            public {{KnownTypes.ValueTaskOfT(qualifiedType)}} ApplyDefaultsAsync(
+            public async {{KnownTypes.ValueTaskOfT(qualifiedType)}} ApplyDefaultsAsync(
                 {{contractInfo.IModuleRuntime.RenderGlobal()}} runtime,
                 {{KnownTypes.IServiceProvider}} serviceProvider,
                 {{KnownTypes.CancellationToken}} cancellationToken)
@@ -89,10 +90,11 @@ internal static class ModuleValidationRenderer
 
         builder = builder.IncreaseIndent();
         AppendDefaultApplicationForObject(builder, model.Properties, MODULE_VARIABLE, MODULE_VARIABLE);
+        builder.AppendLine("await global::System.Threading.Tasks.Task.CompletedTask;");
         builder = builder.DecreaseIndent();
         builder.AppendBlock(
-            $$"""
-                return new {{KnownTypes.ValueTaskOfT(qualifiedType)}}({{MODULE_VARIABLE}});
+            """
+                return self;
             }
             """);
     }
@@ -268,7 +270,12 @@ internal static class ModuleValidationRenderer
         builder.AppendLine($"{localName} = {nestedVariable};");
     }
 
-    private static void AppendValidationForProperty(IndentedStringBuilder builder, ValidationContractInfo contractInfo, PropertyModel property, string moduleVariableName, string propertyAccessExpression)
+    private static void AppendValidationForProperty(
+        IndentedStringBuilder builder,
+        ValidationContractInfo contractInfo,
+        PropertyModel property,
+        string moduleVariableName,
+        string propertyAccessExpression)
     {
         foreach (PropertyValidationAspect aspect in property.Aspects)
         {
@@ -280,14 +287,22 @@ internal static class ModuleValidationRenderer
             return;
         }
 
-        builder.AppendLine($"if ({propertyAccessExpression} is not null)");
-        builder.AppendLine("{");
-        builder = builder.IncreaseIndent();
+        StringBuilder nestedRawBuilder = new();
+        IndentedStringBuilder nestedBuilder = new(nestedRawBuilder, indentLevel: builder.IndentLevel + 1);
+
         foreach (PropertyModel child in property.Children)
         {
-            AppendValidationForProperty(builder, contractInfo, child, moduleVariableName, $"{propertyAccessExpression}.{child.Name}");
+            AppendValidationForProperty(nestedBuilder, contractInfo, child, moduleVariableName, $"{propertyAccessExpression}.{child.Name}");
         }
-        builder = builder.DecreaseIndent();
+
+        if (nestedRawBuilder.Length == 0)
+        {
+            return;
+        }
+
+        builder.AppendLine($"if ({propertyAccessExpression} is not null)");
+        builder.AppendLine("{");
+        builder.Raw.Append(nestedRawBuilder.ToString());
         builder.AppendLine("}");
     }
 
@@ -298,12 +313,9 @@ internal static class ModuleValidationRenderer
             || (property.IsValidatableType && property.Children.Any(HasOverrideWork));
     }
 
-    private static bool HasDefaultWork(PropertyModel property)
-    {
-        string? expression = CreateDefaultAssignmentExpression(property, moduleVariable: "module", propertyAccessExpression: "property");
-        return !string.IsNullOrEmpty(expression)
-            || (property.IsValidatableType && property.Children.Any(HasDefaultWork));
-    }
+    private static bool HasDefaultWork(PropertyModel property) => property.Aspects.Length > 0
+        && !string.IsNullOrEmpty(CreateDefaultAssignmentExpression(property, moduleVariable: "module", propertyAccessExpression: "property"))
+        || (property is { IsValidatableType: true, Children.IsDefaultOrEmpty: false } && property.Children.Any(HasDefaultWork));
 
     private static string? CreateOverrideResolutionExpression(
         PropertyModel property,

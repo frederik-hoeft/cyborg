@@ -2,15 +2,19 @@ using System.Text;
 
 namespace Cyborg.Core.Aot.Extensions;
 
-internal sealed class IndentedStringBuilder(StringBuilder builder, int indentSize = 4, int indentLevel = 0)
+internal sealed class IndentedStringBuilder(StringBuilder builder, int indentLevel = 0, int indentSize = 4)
 {
     public StringBuilder Raw => builder;
 
+    public int IndentSize => indentSize;
+
+    public int IndentLevel => indentLevel;
+
     public string IndentString { get; } = new(' ', indentSize * indentLevel);
 
-    public IndentedStringBuilder IncreaseIndent(int levels = 1) => new(builder, indentSize, indentLevel + levels);
+    public IndentedStringBuilder IncreaseIndent(int levels = 1) => new(builder, indentLevel + levels, indentSize);
 
-    public IndentedStringBuilder DecreaseIndent(int levels = 1) => new(builder, indentSize, Math.Max(0, indentLevel - levels));
+    public IndentedStringBuilder DecreaseIndent(int levels = 1) => new(builder, Math.Max(0, indentLevel - levels), indentSize);
 
     public void Append(string text)
     {
