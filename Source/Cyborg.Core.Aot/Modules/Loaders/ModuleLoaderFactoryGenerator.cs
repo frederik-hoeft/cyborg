@@ -9,7 +9,7 @@ using System.Text;
 namespace Cyborg.Core.Aot.Modules.Loaders;
 
 [Generator(LanguageNames.CSharp)]
-public class ModuleLoaderFactoryGenerator : IIncrementalGenerator
+public sealed class ModuleLoaderFactoryGenerator : IIncrementalGenerator
 {
     private const string I_MODULE_WORKER_INTERFACE_FULL_NAME = "Cyborg.Core.Modules.IModuleWorker";
     private const string MODULE_LOADER_UNBOUND = "Cyborg.Core.Modules.Configuration.ModuleLoader<,>";

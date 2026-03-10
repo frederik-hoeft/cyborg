@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis;
 namespace Cyborg.Core.Aot.Contracts;
 
 [Generator(LanguageNames.CSharp)]
-public sealed class ContractDiscoveryGenerator : IIncrementalGenerator
+public sealed class ContractRegistrationBootstrapGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context) => context.RegisterPostInitializationOutput(EmitFrameworkSources);
 
