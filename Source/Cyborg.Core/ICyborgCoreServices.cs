@@ -27,6 +27,7 @@ namespace Cyborg.Core;
 [Singleton<IModuleRegistry, DefaultModuleRegistry>]
 [Singleton<ISubprocessDispatcher, DefaultSubprocessDispatcher>]
 [Singleton<IPingService, DefaultPingService>]
+[Singleton<IPortProbeService, TcpPortProbeService>]
 [Singleton<GlobalRuntimeEnvironment>]
 public interface ICyborgCoreServices
 {

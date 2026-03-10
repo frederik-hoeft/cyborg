@@ -1,9 +1,10 @@
-﻿using Cyborg.Core.Modules;
+﻿using Cyborg.Core.Aot.Contracts;
 using Cyborg.Core.Modules.Runtime;
 
-namespace Cyborg.Core.Aot.Modules.Validation;
+namespace Cyborg.Core.Modules.Validation;
 
-public partial interface IModule<TSelf> : IModule where TSelf : class, IModule<TSelf>
+[GeneratorContractRegistration<ModuleValidationGeneratorContract>(ModuleValidationGeneratorContract.IModuleT)]
+public interface IModule<TSelf> : IModule where TSelf : class, IModule<TSelf>
 {
     /// <summary>
     /// Resolves any applicable overrides for the current module instance asynchronously using the specified runtime

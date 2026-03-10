@@ -1,8 +1,6 @@
 using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
-using Cyborg.Core.Aot.Modules.Validation.Models;
 using Microsoft.CodeAnalysis;
-using System.Text;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
@@ -20,15 +18,15 @@ internal sealed class RequiredAttributeProcessor : IPropertyAttributeProcessor
 
     private sealed class RequiredValidationAspect : PropertyValidationAspect
     {
-        protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel property)
+        protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
         {
-            string comparer = LiteralExpressionFactory.GetDefaultEqualityComparer(property.TypeName);
+            string comparer = KnownTypes.DefaultEqualityComparerOfT(model.Property.NullableTypeName);
 
             builder.AppendBlock(
             $$"""
-            if ({{comparer}}.Equals({{property.AccessExpression}}, default!))
+            if ({{comparer}}.Equals({{model.AccessExpression}}, default!))
             {
-                errors.Add({{CreateValidationError(property, "required", $"Property '{{nameof({property.AccessExpression})}}' is required.")}});
+                errors.Add({{CreateValidationError(model, "required", $"Property '{{nameof({model.AccessExpression})}}' is required.")}});
             }
             """);
         }

@@ -2,6 +2,7 @@ borg.hosts.json
 *.secrets
 *.log
 *.tmp
+*.stackdump
 
 # .NET build artifacts
 Source/**/bin/

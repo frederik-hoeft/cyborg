@@ -1,5 +1,4 @@
-﻿using Cyborg.Core.Aot.Json.Configuration;
-using Cyborg.Core.Modules.Configuration;
+﻿using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Serialization;
 using Cyborg.Modules.Borg;
 using Cyborg.Modules.Conditional;
@@ -21,7 +20,6 @@ namespace Cyborg.Modules;
 [ServiceProviderModule]
 [Singleton<ModuleJsonSerializerContext>(Factory = nameof(GetModuleJsonSerializerContext))]
 [Singleton<JsonSerializerContext>(Factory = nameof(GetModuleJsonSerializerContext))]
-[Singleton<IJsonTypeInfoProvider>(Factory = nameof(GetModuleJsonSerializerContext))]
 [Singleton<JsonNamingPolicy>(Factory = nameof(GetModuleJsonNamingPolicy))]
 [Singleton<IModuleLoader, SequenceModuleLoader>]
 [Singleton<IModuleLoader, SubprocessModuleLoader>]

@@ -41,11 +41,11 @@ internal sealed class DefaultTimeSpanAttributeProcessor : IPropertyAttributeProc
 
     private sealed class DefaultValueValidationAspect(string valueExpression) : PropertyValidationAspect
     {
-        public override string? RewriteDefaultAssignmentExpression(PropertyModel property, string moduleVariable, string? currentExpression)
+        public override string? RewriteDefaultAssignmentExpression(PropertyModel property, string moduleVariable, string propertyAccessExpression, string? currentExpression)
         {
-            string equalityComparer = LiteralExpressionFactory.GetDefaultEqualityComparer(property.TypeName);
-            string triggerExpression = $"{equalityComparer}.Equals({moduleVariable}.{property.Name}, default!)";
-            return $"{triggerExpression} ? {KnownTypes.TimeSpan}.{nameof(TimeSpan.Parse)}({valueExpression}) : {moduleVariable}.{property.Name}";
+            string equalityComparer = KnownTypes.DefaultEqualityComparerOfT(property.NullableTypeName);
+            string triggerExpression = $"{equalityComparer}.Equals({propertyAccessExpression}, default!)";
+            return $"{triggerExpression} ? {KnownTypes.TimeSpan}.{nameof(TimeSpan.Parse)}({valueExpression}) : {propertyAccessExpression}";
         }
     }
 }

@@ -9,7 +9,7 @@ using System.Text;
 namespace Cyborg.Core.Aot.Modules.Loaders;
 
 [Generator(LanguageNames.CSharp)]
-public class ModuleLoaderFactoryGenerator : IIncrementalGenerator
+public sealed class ModuleLoaderFactoryGenerator : IIncrementalGenerator
 {
     private const string I_MODULE_WORKER_INTERFACE_FULL_NAME = "Cyborg.Core.Modules.IModuleWorker";
     private const string MODULE_LOADER_UNBOUND = "Cyborg.Core.Modules.Configuration.ModuleLoader<,>";
@@ -70,7 +70,7 @@ public class ModuleLoaderFactoryGenerator : IIncrementalGenerator
                         }
                         if (partialMethod.Parameters is not [IParameterSymbol param1, IParameterSymbol param2]
                             || param1.Type.ToDisplayString(qualifiedFormat) != moduleType.ToDisplayString(qualifiedFormat)
-                            || param2.Type.ToDisplayString(qualifiedFormat) != $"global::{typeof(IServiceProvider).FullName}")
+                            || param2.Type.ToDisplayString(qualifiedFormat) != KnownTypes.IServiceProvider)
                         {
                             throw new InvalidOperationException($"{nameof(ModuleLoaderFactoryGenerator)} requires the partial method '{name}' to have parameters '({moduleType.ToDisplayString()} module, {typeof(IServiceProvider).FullName} serviceProvider)'");
                         }
@@ -98,66 +98,72 @@ public class ModuleLoaderFactoryGenerator : IIncrementalGenerator
                 throw new InvalidOperationException($"{nameof(ModuleLoaderFactoryGenerator)} requires the target class to inherit from {MODULE_LOADER_UNBOUND}");
             }
         );
-        context.RegisterSourceOutput(pipeline, static (context, model) =>
+        IncrementalValueProvider<(Compilation, ImmutableArray<Model>)> compilationAndPipeline =
+            context.CompilationProvider.Combine(pipeline.Collect());
+        context.RegisterSourceOutput(compilationAndPipeline, static (context, compilationModel) =>
         {
-            string methodModifiers = model.MethodName is not null
-                ? $"{model.MethodAccessibility} partial "
-                : "protected override ";
-            string methodName = model.MethodName ?? "CreateWorker";
-            StringBuilder sourceBuilder = new(
-                $$"""
-                #nullable enable
-                using global::Microsoft.Extensions.DependencyInjection;
-
-                namespace {{model.Namespace}};
-
-                partial class {{model.Class.Name}}
-                {
-                    {{methodModifiers}}{{model.ModuleWorkerType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Included))}} {{methodName}}(
-                        {{model.ModuleType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Included))}} module, 
-                        global::{{typeof(IServiceProvider).FullName}} serviceProvider)
-                    {
-                        return new {{model.ModuleWorkerType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Included))}}(
-                """);
-            for (int i = 0; i < model.Constructor.Parameters.Length; ++i)
+            (Compilation compilation, ImmutableArray<Model> models) = compilationModel;
+            foreach (Model model in models)
             {
-                IParameterSymbol parameter = model.Constructor.Parameters[i];
-                if (i == 0)
+                string methodModifiers = model.MethodName is not null
+                    ? $"{model.MethodAccessibility} partial "
+                    : "protected override ";
+                string methodName = model.MethodName ?? "CreateWorker";
+                StringBuilder sourceBuilder = new(
+                    $$"""
+                    #nullable enable
+                    using global::Microsoft.Extensions.DependencyInjection;
+
+                    namespace {{model.Namespace}};
+
+                    partial class {{model.Class.Name}}
+                    {
+                        {{methodModifiers}}{{model.ModuleWorkerType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Included))}} {{methodName}}(
+                            {{model.ModuleType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Included))}} module, 
+                            {{KnownTypes.IServiceProvider}} serviceProvider)
+                        {
+                            return new {{model.ModuleWorkerType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Included))}}(
+                    """);
+                for (int i = 0; i < model.Constructor.Parameters.Length; ++i)
                 {
-                    sourceBuilder.AppendLine();
-                }
-                else
-                {
-                    sourceBuilder.AppendLine(",");
-                }
-                // check if the parameter is the module type, if so pass the module parameter, otherwise resolve from the service provider
-                if (parameter.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Included)) 
-                    == model.ModuleType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Included)))
-                {
-                    sourceBuilder.Append(
-                        """
-                                    module
-                        """);
-                }
-                else
-                {
-                    // using serviceProvider.GetRequiredService to resolve dependencies, this will throw an exception if the service is not registered, which is fine because it will be a configuration error that should be fixed by the user
-                    sourceBuilder.Append(
-                        $"""
-                                    serviceProvider.GetRequiredService<{parameter.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Included))}>()
-                        """);
-                }
-            }
-            sourceBuilder.Append(
-                """
-                );
+                    IParameterSymbol parameter = model.Constructor.Parameters[i];
+                    if (i == 0)
+                    {
+                        sourceBuilder.AppendLine();
+                    }
+                    else
+                    {
+                        sourceBuilder.AppendLine(",");
+                    }
+                    // check if the parameter is the module type, if so pass the module parameter, otherwise resolve from the service provider
+                    if (parameter.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Included)) 
+                        == model.ModuleType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Included)))
+                    {
+                        sourceBuilder.Append(
+                            """
+                                        module
+                            """);
+                    }
+                    else
+                    {
+                        // using serviceProvider.GetRequiredService to resolve dependencies, this will throw an exception if the service is not registered, which is fine because it will be a configuration error that should be fixed by the user
+                        sourceBuilder.Append(
+                            $"""
+                                        serviceProvider.GetRequiredService<{parameter.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Included))}>()
+                            """);
                     }
                 }
-                """);
+                sourceBuilder.Append(
+                    """
+                    );
+                        }
+                    }
+                    """);
 
-            SourceText sourceText = SourceText.From(sourceBuilder.ToString(), Encoding.UTF8);
+                SourceText sourceText = SourceText.From(sourceBuilder.ToString(), Encoding.UTF8);
 
-            context.AddSource($"{model.Class.Name}.ModuleLoaderFactory.g.cs", sourceText);
+                context.AddSource($"{model.Class.Name}.ModuleLoaderFactory.g.cs", sourceText);
+            }
         });
     }
 

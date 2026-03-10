@@ -18,6 +18,6 @@ internal sealed class IgnoreOverridesAttributeProcessor : IPropertyAttributeProc
 
     private sealed class IgnoreOverridesAspect : PropertyValidationAspect
     {
-        public override string? RewriteOverrideResolutionExpression(PropertyModel property, string moduleVariable, string? currentExpression) => null;
+        public override string? RewriteOverrideResolutionExpression(PropertyModel property, string moduleVariable, string propertyAccessExpression, string? currentExpression) => null;
     }
 }

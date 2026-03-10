@@ -7,6 +7,6 @@ internal readonly record struct PropertyAttributeProcessingContext(
     IPropertySymbol Property,
     List<Diagnostic> Diagnostics)
 {
-    public void Report(DiagnosticDescriptor descriptor, params object[] messageArgs)
-        => Diagnostics.Add(Diagnostic.Create(descriptor, Property.Locations.FirstOrDefault(), messageArgs));
+    public void Report(DiagnosticDescriptor descriptor, params object[] messageArgs) =>
+        Diagnostics.Add(Diagnostic.Create(descriptor, Property.Locations.FirstOrDefault(), messageArgs));
 }

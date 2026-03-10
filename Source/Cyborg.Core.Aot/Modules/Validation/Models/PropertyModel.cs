@@ -4,5 +4,9 @@ namespace Cyborg.Core.Aot.Modules.Validation.Models;
 
 internal sealed record PropertyModel(
     string Name,
-    string TypeName,
-    ImmutableArray<PropertyValidationAspect> Aspects);
+    string NullableTypeName,
+    string NonNullableTypeName,
+    bool IsNullable,
+    bool IsValidatableType,
+    ImmutableArray<PropertyValidationAspect> Aspects,
+    ImmutableArray<PropertyModel> Children);

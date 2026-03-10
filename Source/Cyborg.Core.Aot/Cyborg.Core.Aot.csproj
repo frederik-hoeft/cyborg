@@ -18,27 +18,19 @@
     </PropertyGroup>
     
     <ItemGroup>
-        <Compile Remove="Modules\Validation\IModule`1.core.cs" />
-    </ItemGroup>
-    
-    <ItemGroup>
+        <EmbeddedResource Include="Contracts\ModuleLoaderFactoryGeneratorContract.cs" />
+        <EmbeddedResource Include="Contracts\ModuleValidationGeneratorContract.cs" />
         <EmbeddedResource Include="Modules\Composition\DecomposeIgnoreAttribute.cs" />
         <EmbeddedResource Include="Modules\Composition\GeneratedDecompositionAttribute.cs" />
         <EmbeddedResource Include="Modules\Loaders\Configuration\GeneratedModuleLoaderFactoryAttribute.cs" />
-        <EmbeddedResource Include="Json\Configuration\AotJsonSerializerContext.cs" />
-        <EmbeddedResource Include="Json\Configuration\BindingsGenerationMode.cs" />
-        <EmbeddedResource Include="Json\Configuration\IJsonTypeInfoProvider.cs" />
-        <EmbeddedResource Include="Json\Configuration\JsonTypeInfoBindingsGeneratorAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\DefaultTimeSpanAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\DefaultValueAttribute`1.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\IgnoreOverridesAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\RangeAttribute`1.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\RequiredAttribute.cs" />
+        <EmbeddedResource Include="Modules\Validation\Attributes\ValidatableAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\GeneratedModuleValidationAttribute.cs" />
-        <EmbeddedResource Include="Modules\Validation\IModule`1.core.cs" />
-        <EmbeddedResource Include="Modules\Validation\IModule`1.cs" />
-        <EmbeddedResource Include="Modules\Validation\ValidationError.cs" />
-        <EmbeddedResource Include="Modules\Validation\ValidationResult`1.cs" />
+        <EmbeddedResource Include="Contracts\GeneratorContractRegistrationAttribute`1.cs" />
     </ItemGroup>
 
     <ItemGroup>
