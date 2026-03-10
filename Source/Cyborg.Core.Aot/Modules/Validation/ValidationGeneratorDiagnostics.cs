@@ -63,7 +63,7 @@ internal static class ValidationGeneratorDiagnostics
     public static DiagnosticDescriptor UnsupportedValidatableTypeShape { get; } = new(
         id: "CYBORGVAL008",
         title: "Unsupported validatable type shape",
-        messageFormat: "Type '{0}' is marked [Validatable] but must be a record to support immutable reconstruction",
+        messageFormat: "Property '{0}' uses [Validatable] type '{1}' that cannot be reconstructed by the generator (records with settable properties are required)",
         category: "Cyborg.Aot.Validation",
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
@@ -71,7 +71,7 @@ internal static class ValidationGeneratorDiagnostics
     public static DiagnosticDescriptor ValidatableCycleDetected { get; } = new(
         id: "CYBORGVAL009",
         title: "Cycle detected in validatable graph",
-        messageFormat: "Type '{0}' creates a [Validatable] cycle and cannot be traversed safely",
+        messageFormat: "[Validatable] traversal detected a recursive cycle on type '{0}'",
         category: "Cyborg.Aot.Validation",
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);

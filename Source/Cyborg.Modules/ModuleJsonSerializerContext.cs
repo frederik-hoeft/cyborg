@@ -1,5 +1,4 @@
-﻿using Cyborg.Core.Aot.Json.Configuration;
-using Cyborg.Modules.Borg;
+﻿using Cyborg.Modules.Borg;
 using Cyborg.Modules.Conditional;
 using Cyborg.Modules.Configuration.ConfigCollection;
 using Cyborg.Modules.Configuration.ConfigMap;
@@ -14,7 +13,6 @@ using System.Text.Json.Serialization;
 
 namespace Cyborg.Modules;
 
-[JsonTypeInfoBindingsGenerator(GenerationMode = BindingsGenerationMode.Optimized)]
 [JsonSourceGenerationOptions(ReadCommentHandling = JsonCommentHandling.Skip, UseStringEnumConverter = true, PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower, IncludeFields = true)]
 [JsonSerializable(typeof(SequenceModule))]
 [JsonSerializable(typeof(SubprocessModule))]
@@ -28,4 +26,4 @@ namespace Cyborg.Modules;
 [JsonSerializable(typeof(IfModule))]
 // TODO: temp
 [JsonSerializable(typeof(BorgRemote))]
-public sealed partial class ModuleJsonSerializerContext : AotJsonSerializerContext;
+public sealed partial class ModuleJsonSerializerContext : JsonSerializerContext;

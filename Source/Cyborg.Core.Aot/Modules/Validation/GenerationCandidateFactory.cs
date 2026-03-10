@@ -1,16 +1,15 @@
-using System.Collections.Immutable;
+using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using Cyborg.Core.Aot.Modules.Validation.Processors;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using System.Collections.Immutable;
 
 namespace Cyborg.Core.Aot.Modules.Validation;
 
 internal static class GenerationCandidateFactory
 {
-    private static readonly string s_validatableMetadataName = typeof(Attributes.ValidatableAttribute).FullName!;
-
     public static readonly SymbolDisplayFormat s_fullyQualifiedNullableFormat =
         SymbolDisplayFormat.FullyQualifiedFormat
             .WithMiscellaneousOptions(
@@ -18,7 +17,13 @@ internal static class GenerationCandidateFactory
                 SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier |
                 SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers);
 
-    public static GenerationCandidate? Create(GeneratorAttributeSyntaxContext context, CancellationToken cancellationToken)
+    private static readonly SymbolDisplayFormat s_fullyQualifiedNonNullableFormat =
+        SymbolDisplayFormat.FullyQualifiedFormat
+            .WithMiscellaneousOptions(
+                SymbolDisplayMiscellaneousOptions.UseSpecialTypes |
+                SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers);
+
+    public static GenerationCandidate? Create(GeneratorAttributeSyntaxContext context)
     {
         if (context.TargetSymbol is not INamedTypeSymbol typeSymbol)
         {
@@ -121,16 +126,16 @@ internal static class GenerationCandidateFactory
             }
         }
 
-        INamedTypeSymbol? unwrappedType = UnwrapNullableNamedType(property.Type);
-        bool isNullable = property.Type.NullableAnnotation == NullableAnnotation.Annotated || property.Type.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T;
-        bool isValidatableType = IsValidatableType(unwrappedType);
+        ITypeSymbol nonNullableType = UnwrapNullableType(property.Type, out bool isNullable);
+        bool isValidatableType = false;
         ImmutableArray<PropertyModel> children = [];
 
-        if (isValidatableType && unwrappedType is not null)
+        if (nonNullableType is INamedTypeSymbol unwrappedType && IsValidatableType(unwrappedType))
         {
+            isValidatableType = true;
             if (!unwrappedType.IsRecord)
             {
-                diagnostics.Add(Diagnostic.Create(ValidationGeneratorDiagnostics.UnsupportedValidatableTypeShape, property.Locations.FirstOrDefault(), unwrappedType.Name));
+                diagnostics.Add(Diagnostic.Create(ValidationGeneratorDiagnostics.UnsupportedValidatableTypeShape, property.Locations.FirstOrDefault(), property.Name, unwrappedType.Name));
             }
             else if (traversalPath.Contains(unwrappedType))
             {
@@ -171,7 +176,8 @@ internal static class GenerationCandidateFactory
 
         propertyModel = new PropertyModel(
             Name: property.Name,
-            TypeName: property.Type.ToDisplayString(s_fullyQualifiedNullableFormat),
+            NullableTypeName: property.Type.ToDisplayString(s_fullyQualifiedNullableFormat),
+            NonNullableTypeName: nonNullableType.ToDisplayString(s_fullyQualifiedNonNullableFormat),
             IsNullable: isNullable,
             IsValidatableType: isValidatableType,
             Aspects: aspects.ToImmutable(),
@@ -200,38 +206,35 @@ internal static class GenerationCandidateFactory
         .OfType<TypeDeclarationSyntax>()
         .Any(static declaration => declaration.Modifiers.Any(SyntaxKind.PartialKeyword));
 
-    private static INamedTypeSymbol? UnwrapNullableNamedType(ITypeSymbol type)
+    private static ITypeSymbol UnwrapNullableType(ITypeSymbol typeSymbol, out bool isNullable)
     {
-        if (type is not INamedTypeSymbol named)
+        if (typeSymbol.NullableAnnotation == NullableAnnotation.Annotated)
         {
-            return null;
+            isNullable = true;
+            return typeSymbol.WithNullableAnnotation(NullableAnnotation.NotAnnotated);
         }
 
-        if (named.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T)
+        if (typeSymbol is INamedTypeSymbol namedType && namedType.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T)
         {
-            return named.TypeArguments[0] as INamedTypeSymbol;
+            isNullable = true;
+            return namedType.TypeArguments[0];
         }
 
-        return named;
+        isNullable = false;
+        return typeSymbol;
     }
 
-    private static bool IsValidatableType(INamedTypeSymbol? type)
+    private static bool IsValidatableType(INamedTypeSymbol typeSymbol)
     {
-        if (type is null)
+        foreach (AttributeData attribute in typeSymbol.GetAttributes())
         {
-            return false;
-        }
-
-        return type.GetAttributes().Any(attribute =>
-        {
-            INamedTypeSymbol? attributeType = attribute.AttributeClass;
-            if (attributeType is null)
+            if (attribute.AttributeClass is { } attributeClass 
+                && GetFullMetadataName(attributeClass).Equals(typeof(ValidatableAttribute).FullName, StringComparison.Ordinal))
             {
-                return false;
+                return true;
             }
-
-            return GetFullMetadataName(attributeType).Equals(s_validatableMetadataName, StringComparison.Ordinal);
-        });
+        }
+        return false;
     }
 
     private static string GetFullMetadataName(INamedTypeSymbol type)

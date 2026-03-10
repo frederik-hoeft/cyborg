@@ -11,5 +11,9 @@
         <PackageReference Include="Jab" Version="0.12.0" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.3" />
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.3" />
+        <ProjectReference Include="..\Cyborg.Core.Aot\Cyborg.Core.Aot.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </ProjectReference>
     </ItemGroup>
 </Project>

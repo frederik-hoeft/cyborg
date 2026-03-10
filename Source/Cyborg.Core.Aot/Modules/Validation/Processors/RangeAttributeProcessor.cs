@@ -60,15 +60,15 @@ internal sealed class RangeAttributeProcessor : IPropertyAttributeProcessor
 
     private sealed class RangeValidationAspect(string? minExpression, string? maxExpression) : PropertyValidationAspect
     {
-        protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel property)
+        protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
         {
             if (minExpression is not null)
             {
                 builder.AppendBlock(
                 $$"""
-                if ({{property.AccessExpression}} < {{minExpression}})
+                if ({{model.AccessExpression}} < {{minExpression}})
                 {
-                    errors.Add({{CreateValidationError(property, "range", $"Property '{{nameof({property.AccessExpression})}}' must be greater than or equal to the configured minimum.")}});
+                    errors.Add({{CreateValidationError(model, "range", $"Property '{{nameof({model.AccessExpression})}}' must be greater than or equal to the configured minimum.")}});
                 }
                 """);
             }
@@ -77,9 +77,9 @@ internal sealed class RangeAttributeProcessor : IPropertyAttributeProcessor
             {
                 builder.AppendBlock(
                 $$"""
-                if ({{property.AccessExpression}} > {{maxExpression}})
+                if ({{model.AccessExpression}} > {{maxExpression}})
                 {
-                    errors.Add({{CreateValidationError(property, "range", $"Property '{{nameof({property.AccessExpression})}}' must be less than or equal to the configured maximum.")}});
+                    errors.Add({{CreateValidationError(model, "range", $"Property '{{nameof({model.AccessExpression})}}' must be less than or equal to the configured maximum.")}});
                 }
                 """);
             }

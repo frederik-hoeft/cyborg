@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
+using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Processors;
 using Microsoft.CodeAnalysis;
 
@@ -28,33 +29,7 @@ internal static class ValidationAttributeProcessorRegistry
             return false;
         }
 
-        string metadataName = GetFullMetadataName(attributeClass);
+        string metadataName = attributeClass.GetFullMetadataName();
         return ByMetadataName.TryGetValue(metadataName, out processor);
-    }
-
-    private static string GetFullMetadataName(INamedTypeSymbol type)
-    {
-        INamedTypeSymbol original = type.OriginalDefinition;
-
-        Stack<string> parts = [];
-        ISymbol? current = original;
-
-        while (current is not null)
-        {
-            switch (current)
-            {
-                case INamespaceSymbol ns when !ns.IsGlobalNamespace:
-                    parts.Push(ns.MetadataName);
-                    break;
-
-                case INamedTypeSymbol named:
-                    parts.Push(named.MetadataName); // includes `1, `2, etc.
-                    break;
-            }
-
-            current = current.ContainingSymbol;
-        }
-
-        return string.Join(".", parts);
     }
 }

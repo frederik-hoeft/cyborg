@@ -1,7 +1,7 @@
 ﻿namespace Cyborg.Core.Aot.Modules.Composition;
 
 [AttributeUsage(AttributeTargets.Class)]
-public sealed class GeneratedDecompositionAttribute : Attribute
+internal sealed class GeneratedDecompositionAttribute : Attribute
 {
     public Type? NamingPolicyProvider { get; set; }
 
