@@ -15,6 +15,10 @@ internal static class ValidationAttributeProcessorRegistry
         new DefaultTimeSpanAttributeProcessor(),
         new RangeAttributeProcessor(),
         new IgnoreOverridesAttributeProcessor(),
+        new LengthAttributeProcessor(),
+        new MinLengthAttributeProcessor(),
+        new MaxLengthAttributeProcessor(),
+        new ExactLengthAttributeProcessor(),
     ];
 
     internal static FrozenDictionary<string, IPropertyAttributeProcessor> ByMetadataName => 

@@ -23,11 +23,9 @@ public sealed class WakeOnLanModuleWorker
         ArgumentNullException.ThrowIfNull(runtime);
 
         ValidationResult<WakeOnLanModule> moduleValidation = await Module.ValidateAsync(runtime, serviceProvider, cancellationToken);
-        if (moduleValidation is not { IsValid: true, Module: { } module })
-        {
-            return false;
-        }
+        moduleValidation.EnsureValid();
 
+        WakeOnLanModule module = moduleValidation.Module;
         IRuntimeEnvironment outputEnvironment = runtime.ResolveEnvironmentReference(module.OutputEnvironment, runtime.Environment);
         bool isUp = await pingService.PingAsync(module.TargetHost, module.HostDiscoveryTimeout, cancellationToken);
         if (isUp)

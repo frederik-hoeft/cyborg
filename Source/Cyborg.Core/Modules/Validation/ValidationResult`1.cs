@@ -1,4 +1,5 @@
 using Cyborg.Core.Aot.Contracts;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Core.Modules.Validation;
 
@@ -16,7 +17,17 @@ namespace Cyborg.Core.Modules.Validation;
 [GeneratorContractRegistration<ModuleValidationGeneratorContract>(ModuleValidationGeneratorContract.ValidationResultT)]
 public sealed record ValidationResult<TSelf>(TSelf? Module, IReadOnlyList<ValidationError> Errors)
 {
+    [MemberNotNullWhen(true, nameof(Module))]
     public bool IsValid => Errors is not { Count: > 0 } && Module is not null;
+
+    [MemberNotNull(nameof(Module))]
+    public void EnsureValid()
+    {
+        if (!IsValid)
+        {
+            throw new ValidationException(Errors);
+        }
+    }
 
     public static ValidationResult<TSelf> Valid(TSelf module) => new(module, Array.Empty<ValidationError>());
     

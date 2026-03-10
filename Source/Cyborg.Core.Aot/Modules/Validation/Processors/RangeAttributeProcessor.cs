@@ -65,7 +65,7 @@ internal sealed class RangeAttributeProcessor : IPropertyAttributeProcessor
                 $$"""
                 if ({{model.AccessExpression}} < {{minExpression}})
                 {
-                    errors.Add({{CreateValidationError(model, "range", $"Property '{{nameof({model.AccessExpression})}}' must be greater than or equal to the configured minimum.")}});
+                    errors.Add({{CreateValidationError(model, "range", $"Property '{{nameof({model.AccessExpression})}}' must not be greater than the configured minimum '{minExpression}', was '{{{model.AccessExpression}}}'.")}});
                 }
                 """);
             }
@@ -76,7 +76,7 @@ internal sealed class RangeAttributeProcessor : IPropertyAttributeProcessor
                 $$"""
                 if ({{model.AccessExpression}} > {{maxExpression}})
                 {
-                    errors.Add({{CreateValidationError(model, "range", $"Property '{{nameof({model.AccessExpression})}}' must be less than or equal to the configured maximum.")}});
+                    errors.Add({{CreateValidationError(model, "range", $"Property '{{nameof({model.AccessExpression})}}' must not be greater than the configured maximum '{maxExpression}', was '{{{model.AccessExpression}}}'.")}});
                 }
                 """);
             }

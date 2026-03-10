@@ -85,4 +85,28 @@ internal static class ValidationGeneratorDiagnostics
         category: CATEGORY,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
+
+    public static DiagnosticDescriptor UnsupportedLengthTargetType { get; } = new(
+        id: "CYBORGVAL011",
+        title: "Unsupported LengthAttribute target type",
+        messageFormat: "Property '{0}' on '{1}' uses LengthAttribute, but type '{2}' is neither string nor an implementation of ICollection<T>",
+        category: CATEGORY,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    public static DiagnosticDescriptor LengthArgumentMustBeNonNegative { get; } = new(
+        id: "CYBORGVAL012",
+        title: "LengthAttribute bound must be non-negative",
+        messageFormat: "Property '{0}' on '{1}' uses LengthAttribute with invalid value '{3}' for '{2}'. Length bounds must be non-negative",
+        category: CATEGORY,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    public static DiagnosticDescriptor InvalidRangeBounds { get; } = new(
+        id: "CYBORGVAL013",
+        title: "Attribute bounds are invalid",
+        messageFormat: "Property '{0}' on '{1}' uses {2} with Min '{3}' greater than Max '{4}'",
+        category: CATEGORY,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
 }

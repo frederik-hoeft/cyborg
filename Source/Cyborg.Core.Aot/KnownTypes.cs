@@ -4,6 +4,8 @@ internal static class KnownTypes
 {
     public static string IServiceProvider => field ??= $"global::{typeof(IServiceProvider).FullName}";
 
+    public static string IReadOnlyCollectionT => field ??= $"global::{typeof(IReadOnlyCollection<>).FullName}";
+
     public static string CancellationToken => field ??= $"global::{typeof(CancellationToken).FullName}";
 
     public static string ValueTaskOfT(string typeArgument) => $"global::{typeof(ValueTask<>).Namespace}.{nameof(ValueTask<>)}<{typeArgument}>";

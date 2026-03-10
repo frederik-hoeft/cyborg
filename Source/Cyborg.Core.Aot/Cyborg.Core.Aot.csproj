@@ -25,7 +25,11 @@
         <EmbeddedResource Include="Modules\Loaders\Configuration\GeneratedModuleLoaderFactoryAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\DefaultTimeSpanAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\DefaultValueAttribute`1.cs" />
+        <EmbeddedResource Include="Modules\Validation\Attributes\ExactLengthAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\IgnoreOverridesAttribute.cs" />
+        <EmbeddedResource Include="Modules\Validation\Attributes\LengthAttribute.cs" />
+        <EmbeddedResource Include="Modules\Validation\Attributes\MaxLengthAttribute.cs" />
+        <EmbeddedResource Include="Modules\Validation\Attributes\MinLengthAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\RangeAttribute`1.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\RequiredAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\ValidatableAttribute.cs" />

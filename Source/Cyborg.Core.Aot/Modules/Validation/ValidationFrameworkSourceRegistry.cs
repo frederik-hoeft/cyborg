@@ -16,6 +16,10 @@ internal static class ValidationFrameworkSourceRegistry
         static context => context.AddEmbeddedSource<ValidatableAttribute>(),
         static context => context.AddEmbeddedSource(typeof(DefaultValueAttribute<>)),
         static context => context.AddEmbeddedSource(typeof(RangeAttribute<>)),
+        static context => context.AddEmbeddedSource(typeof(LengthAttribute)),
+        static context => context.AddEmbeddedSource(typeof(MinLengthAttribute)),
+        static context => context.AddEmbeddedSource(typeof(MaxLengthAttribute)),
+        static context => context.AddEmbeddedSource(typeof(ExactLengthAttribute)),
     ];
 
     public static void Emit(IncrementalGeneratorPostInitializationContext context)
