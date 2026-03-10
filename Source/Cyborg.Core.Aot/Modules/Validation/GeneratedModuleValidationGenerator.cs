@@ -45,7 +45,7 @@ public sealed class GeneratedModuleValidationGenerator : IIncrementalGenerator
 
                 if (candidate.Model is null)
                 {
-                    return;
+                    continue;
                 }
                 string source = ModuleValidationRenderer.Render(candidate.Model, contractInfo);
                 sourceProductionContext.AddSource($"{candidate.Model.HintName}.g.cs", SourceText.From(source, Encoding.UTF8));

@@ -29,7 +29,7 @@ internal abstract class ContractInfoBase<TContract>(Dictionary<TContract, INamed
                 context.ReportDiagnostic(Diagnostic.Create(Diagnostics.MissingContract,
                     Location.None,
                     contract.ToString(),
-                    nameof(ModuleValidationGeneratorContract)));
+                    typeof(TContract).Name));
                 failed = true;
             }
         }
