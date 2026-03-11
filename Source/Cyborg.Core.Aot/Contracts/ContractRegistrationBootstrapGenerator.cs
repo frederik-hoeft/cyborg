@@ -12,6 +12,7 @@ public sealed class ContractRegistrationBootstrapGenerator : IIncrementalGenerat
     {
         context.AddEmbeddedSource<ModuleValidationGeneratorContract>();
         context.AddEmbeddedSource<ModuleLoaderFactoryGeneratorContract>();
+        context.AddEmbeddedSource<ModelDecompositionGeneratorContract>();
         context.AddEmbeddedSource(typeof(GeneratorContractRegistrationAttribute<>));
     }
 }

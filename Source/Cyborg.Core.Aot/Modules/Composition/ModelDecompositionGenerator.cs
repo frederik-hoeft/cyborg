@@ -1,92 +1,55 @@
-﻿using Cyborg.Core.Aot.Extensions;
+﻿using Cyborg.Core.Aot.Contracts;
+using Cyborg.Core.Aot.Extensions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
 using System.Text;
-using System.Text.Json;
 
 namespace Cyborg.Core.Aot.Modules.Composition;
 
 [Generator(LanguageNames.CSharp)]
-public class ModelDecompositionGenerator : IIncrementalGenerator
+public sealed class ModelDecompositionGenerator : IIncrementalGenerator
 {
-    private const string I_DECOMPOSABLE_INTERFACE_FULL_NAME = "Cyborg.Core.Modules.Configuration.Model.IDecomposable";
-    private const string DYNAMIC_KEY_VALUE_PAIR_FULL_NAME = "Cyborg.Core.Modules.Configuration.Model.DynamicKeyValuePair";
-    private const string DECOMPOSE_METHOD_NAME = "Decompose";
-
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         context.RegisterPostInitializationOutput(EmitFrameworkSource);
 
-        IncrementalValuesProvider<Model> pipeline = context.SyntaxProvider.ForAttributeWithMetadataName(
-            fullyQualifiedMetadataName: typeof(GeneratedDecompositionAttribute).FullName,
-            predicate: static (syntaxNode, _) => syntaxNode is RecordDeclarationSyntax or ClassDeclarationSyntax,
-            transform: static (context, _) =>
-            {
-                ISymbol targetClass = context.TargetSymbol;
-                ImmutableArray<AttributeData> attributes = targetClass.GetAttributes();
-                AttributeData generatedDecompositionAttribute = attributes.FirstOrDefault(static attr => 
-                    attr.AttributeClass is { } attributeClass && attributeClass.ToDisplayString() == typeof(GeneratedDecompositionAttribute).FullName)
-                    ?? throw new InvalidOperationException($"{nameof(ModelDecompositionGenerator)} requires {nameof(GeneratedDecompositionAttribute)} to be applied to the class");
-                if (targetClass is not INamedTypeSymbol namedTypeSymbol)
-                {
-                    throw new InvalidOperationException($"{nameof(ModelDecompositionGenerator)} can only be applied to classes");
-                }
-                // enumerate all public properties of the class that are not decorated with the [DecomposeIgnore] attribute
-                ImmutableArray<IPropertySymbol> decomposableProperties = 
-                [
-                    .. namedTypeSymbol.GetMembers()
-                    .OfType<IPropertySymbol>()
-                    .Where(property => property.DeclaredAccessibility is Accessibility.Public
-                        && !property.GetAttributes().Any(attr => 
-                            attr.AttributeClass is { } attributeClass 
-                            && attributeClass.ToDisplayString() == typeof(DecomposeIgnoreAttribute).FullName))
-                ];
+        IncrementalValuesProvider<DecompositionAnnotatedTarget> targets = context.SyntaxProvider.ForAttributeWithMetadataName(
+            fullyQualifiedMetadataName: typeof(GeneratedDecompositionAttribute).FullName!,
+            predicate: static (node, _) => node is RecordDeclarationSyntax or ClassDeclarationSyntax,
+            transform: static (attributeContext, _) => DecompositionAnnotatedTarget.Create(attributeContext));
 
-                return new Model(
-                    Namespace: targetClass.ContainingNamespace.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Omitted)),
-                    Class: namedTypeSymbol,
-                    GeneratorAttribute: generatedDecompositionAttribute,
-                    decomposableProperties);
-            }
-        );
-        context.RegisterSourceOutput(pipeline, static (context, model) =>
+        IncrementalValueProvider<(Compilation Compilation, ImmutableArray<DecompositionAnnotatedTarget> Targets)> pipeline =
+            context.CompilationProvider.Combine(targets.Collect());
+
+        context.RegisterSourceOutput(pipeline, static (sourceProductionContext, state) =>
         {
-            // get the naming policy from the attribute, if specified (type + static property name) and apply it to the property names
-            string namingPolicyProviderFullName = (model.GeneratorAttribute.NamedArguments.FirstOrDefault(kv => kv.Key == nameof(GeneratedDecompositionAttribute.NamingPolicyProvider)).Value.Value as INamedTypeSymbol)
-                ?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Included))
-                ?? $"global::{typeof(JsonNamingPolicy).FullName}";
-            string namingPolicyStaticPropertyName = model.GeneratorAttribute.NamedArguments.FirstOrDefault(kv => kv.Key == nameof(GeneratedDecompositionAttribute.NamingPolicy)).Value.Value as string
-                ?? nameof(JsonNamingPolicy.SnakeCaseLower);
-            StringBuilder sourceBuilder = new(
-                $$"""
-                #nullable enable
+            (Compilation compilation, ImmutableArray<DecompositionAnnotatedTarget> discoveredTargets) = state;
 
-                namespace {{model.Namespace}};
-
-                partial record {{model.Class.Name}} : global::{{I_DECOMPOSABLE_INTERFACE_FULL_NAME}}
-                {
-                    public global::{{typeof(IEnumerable<>).Namespace}}.{{nameof(IEnumerable<>)}}<global::{{DYNAMIC_KEY_VALUE_PAIR_FULL_NAME}}> {{DECOMPOSE_METHOD_NAME}}() =>
-                    [
-
-                """);
-            foreach (IPropertySymbol property in model.DecomposableProperties)
+            DecompositionContractInfo? contractInfo = DecompositionContractInfo.Create(new ContractExplorer(compilation), sourceProductionContext);
+            if (contractInfo is null)
             {
-                sourceBuilder.AppendLine(
-                    $$"""
-                            new({{namingPolicyProviderFullName}}.{{namingPolicyStaticPropertyName}}.{{nameof(JsonNamingPolicy.ConvertName)}}(nameof({{property.Name}})), {{property.Name}}),
-                    """);
+                return;
             }
-            sourceBuilder.Append(
-                """
-                    ];
+
+            foreach (DecompositionAnnotatedTarget target in discoveredTargets)
+            {
+                DecompositionGenerationCandidate candidate = DecompositionGenerationCandidateFactory.Create(target, contractInfo, compilation);
+
+                foreach (Diagnostic diagnostic in candidate.Diagnostics)
+                {
+                    sourceProductionContext.ReportDiagnostic(diagnostic);
                 }
-                """);
 
-            SourceText sourceText = SourceText.From(sourceBuilder.ToString(), Encoding.UTF8);
+                if (candidate.Model is null)
+                {
+                    continue;
+                }
 
-            context.AddSource($"{model.Class.Name}.Decomposition.g.cs", sourceText);
+                string source = ModelDecompositionRenderer.Render(candidate.Model, contractInfo);
+                sourceProductionContext.AddSource($"{candidate.Model.TypeSymbol.Name}.Decomposition.g.cs", SourceText.From(source, Encoding.UTF8));
+            }
         });
     }
 
@@ -95,12 +58,4 @@ public class ModelDecompositionGenerator : IIncrementalGenerator
         context.AddEmbeddedSource<DecomposeIgnoreAttribute>();
         context.AddEmbeddedSource<GeneratedDecompositionAttribute>();
     }
-
-    private sealed record Model
-    (
-        string Namespace,
-        INamedTypeSymbol Class,
-        AttributeData GeneratorAttribute,
-        ImmutableArray<IPropertySymbol> DecomposableProperties
-    );
 }
