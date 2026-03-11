@@ -1,4 +1,5 @@
-﻿using Microsoft.CodeAnalysis;
+﻿using Cyborg.Core.Aot.Extensions;
+using Microsoft.CodeAnalysis;
 using System.Text;
 using System.Text.Json;
 
@@ -25,12 +26,10 @@ internal static class ModelDecompositionRenderer
 
             """);
 
+        IndentedStringBuilder indentedBuilder = new(sourceBuilder, indentLevel: 2);
         foreach (IPropertySymbol property in model.DecomposableProperties)
         {
-            sourceBuilder.AppendLine(
-                $$"""
-                        new({{model.NamingPolicyProviderType.ToDisplayString(s_fullyQualifiedFormat)}}.{{model.NamingPolicyPropertyName}}.{{nameof(JsonNamingPolicy.ConvertName)}}(nameof({{property.Name}})), {{property.Name}}),
-                """);
+            indentedBuilder.AppendLine($"new({model.NamingPolicyProviderType.ToDisplayString(s_fullyQualifiedFormat)}.{model.NamingPolicyPropertyName}.{nameof(JsonNamingPolicy.ConvertName)}(nameof({property.Name})), {property.Name}),");
         }
 
         sourceBuilder.Append(
