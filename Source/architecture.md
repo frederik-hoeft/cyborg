@@ -14,6 +14,7 @@ This document describes the system architecture and key design decisions for the
   - [Module Composition via ModuleReference](#module-composition-via-modulereference)
   - [DI Module Registration Flow](#di-module-registration-flow)
 - [Source Generator Architecture](#source-generator-architecture)
+  - [Generator Contract Registrations](#generator-contract-registrations)
   - [ModuleLoaderFactoryGenerator](#moduleloaderfactorygenerator)
   - [ModuleValidationGenerator](#modulevalidationgenerator)
 - [Dependency Injection Architecture](#dependency-injection-architecture)
@@ -188,6 +189,43 @@ Jab ServiceProvider
 ```
 
 ## Source Generator Architecture
+
+### Generator Contract Registrations
+
+Source generators in `Cyborg.Core.Aot` need to reference runtime types from `Cyborg.Core` (e.g., `IModuleRuntime`, `ValidationResult<T>`) when emitting code. Since generators target `netstandard2.0` and cannot directly reference `net10.0` assemblies, a contract registration system bridges this gap.
+
+**Problem**: Generators cannot hardcode fully-qualified type names because:
+- Types may be renamed, moved, or refactored
+- Generic arity and namespace changes would break generated code
+- No compile-time verification that referenced types exist
+
+**Solution**: Runtime types register themselves with contract enums; generators discover registrations at compile time.
+
+```
+Cyborg.Core.Aot                          Cyborg.Core
+┌────────────────────────────┐           ┌─────────────────────────────────────────────┐
+│ enum ModuleValidation-     │           │ [GeneratorContractRegistration<             │
+│   GeneratorContract {      │◄──────────│   ModuleValidationGeneratorContract>(       │
+│   IModuleRuntime,          │           │   ModuleValidationGeneratorContract         │
+│   IModuleT,                │           │     .IModuleRuntime)]                       │
+│   ValidationResultT,       │           │ public interface IModuleRuntime { ... }     │
+│   ValidationError,         │           └─────────────────────────────────────────────┘
+│   IDefaultValueT           │
+│ }                          │
+│                            │
+│ ContractExplorer           │──────────► Scans all assemblies for
+│   .DiscoverContracts<T>()  │            [GeneratorContractRegistration<T>]
+│                            │            attributes and builds
+│                            │            Dictionary<TContract, INamedTypeSymbol>
+└────────────────────────────┘
+```
+
+**Bootstrap**: `ContractRegistrationBootstrapGenerator` emits the contract enum definitions and attribute into the compilation via `RegisterPostInitializationOutput`, making them available to consuming assemblies without direct project references.
+
+**Why this pattern?**
+- Compile-time discovery: generators fail fast if a contract registration is missing
+- Refactor-safe: renaming types in `Cyborg.Core` automatically updates generated code
+- Single source of truth: each type self-declares its contract role
 
 ### ModuleLoaderFactoryGenerator
 
