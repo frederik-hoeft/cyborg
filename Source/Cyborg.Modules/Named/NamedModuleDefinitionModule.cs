@@ -1,11 +1,14 @@
-﻿using Cyborg.Core.Modules;
+﻿using Cyborg.Core.Aot.Modules.Validation;
+using Cyborg.Core.Aot.Modules.Validation.Model;
+using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Configuration.Model;
 
 namespace Cyborg.Modules.Named;
 
-public sealed record NamedModuleDefinitionModule
+[GeneratedModuleValidation]
+public sealed partial record NamedModuleDefinitionModule
 (
-    string Name,
+    [property: Required][property: MinLength(1)] string Name,
     ModuleReference Module,
     ModuleEnvironment? Environment,
     ModuleReference? Configuration

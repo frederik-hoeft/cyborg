@@ -82,6 +82,11 @@ internal sealed class DefaultsSectionRenderer(ValidationContractInfo contractInf
                     {{localName}} = {{nestedVariable}};
                 }
                 """);
+            if (!property.IsNullable)
+            {
+                // relax nullability since we added the null check even if there weren't any annotations
+                builder.AppendLine($"{ModuleValidationRenderer.Helpers}.{ModuleValidationRenderer.HelperMembers.NullableRelax}({localName});");
+            }
             return;
         }
 

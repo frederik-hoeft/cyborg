@@ -10,11 +10,17 @@ internal static class KnownTypes
 
     public static string ValueTaskOfT(string typeArgument) => $"global::{typeof(ValueTask<>).Namespace}.{nameof(ValueTask<>)}<{typeArgument}>";
 
+    public static string IEnumerableOfT(string typeArgument) => $"global::{typeof(IEnumerable<>).Namespace}.{nameof(IEnumerable<>)}<{typeArgument}>";
+
     public static string ListOfT(string typeArgument) => $"global::{typeof(List<>).Namespace}.{nameof(List<>)}<{typeArgument}>";
 
     public static string TimeSpan => field ??= $"global::{typeof(TimeSpan).FullName}";
 
     public static string Enum => field ??= $"global::{typeof(Enum).FullName}";
+
+    public static string JsonNamingPolicy => "global::System.Text.Json.JsonNamingPolicy";
+
+    public static string NotNullAttribute => "global::System.Diagnostics.CodeAnalysis.NotNullAttribute";
 
     public static string DefaultEqualityComparerOfT(string typeArgument) => $"global::{typeof(EqualityComparer<>).Namespace}.{nameof(EqualityComparer<>)}<{typeArgument}>.{nameof(EqualityComparer<>.Default)}";
 }

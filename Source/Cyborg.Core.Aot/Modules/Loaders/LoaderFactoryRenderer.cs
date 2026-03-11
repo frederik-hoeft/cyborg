@@ -1,5 +1,6 @@
 ﻿using Cyborg.Core.Aot.Extensions;
 using Microsoft.CodeAnalysis;
+using System.Reflection;
 using System.Text;
 
 namespace Cyborg.Core.Aot.Modules.Loaders;
@@ -27,27 +28,7 @@ internal static class LoaderFactoryRenderer
             """);
 
         IndentedStringBuilder indentedBuilder = new(sourceBuilder, indentLevel: 3);
-        for (int i = 0; i < model.WorkerConstructor.Parameters.Length; i++)
-        {
-            IParameterSymbol parameter = model.WorkerConstructor.Parameters[i];
-            if (i > 0)
-            {
-                sourceBuilder.AppendLine(",");
-            }
-            else
-            {
-                sourceBuilder.AppendLine();
-            }
-
-            if (SymbolEqualityComparer.Default.Equals(parameter.Type, model.ModuleType))
-            {
-                indentedBuilder.Append("module");
-            }
-            else
-            {
-                indentedBuilder.Append($"serviceProvider.GetRequiredService<{parameter.Type.ToDisplayString(s_fullyQualifiedFormat)}>()");
-            }
-        }
+        BuildConstructorArguments(model, indentedBuilder, model.WorkerConstructor);
         sourceBuilder.AppendLine();
         sourceBuilder.Append(
             """
@@ -57,6 +38,41 @@ internal static class LoaderFactoryRenderer
             """);
 
         return sourceBuilder.ToString();
+    }
+
+    private static void BuildConstructorArguments(LoaderGenerationModel model, IndentedStringBuilder builder, IMethodSymbol constructor)
+    {
+        for (int i = 0; i < constructor.Parameters.Length; i++)
+        {
+            IParameterSymbol parameter = constructor.Parameters[i];
+            if (i > 0)
+            {
+                builder.AppendLine(",");
+            }
+            else
+            {
+                builder.Raw.AppendLine();
+            }
+
+            if (SymbolEqualityComparer.Default.Equals(parameter.Type, model.ModuleType))
+            {
+                builder.Append("module");
+            }
+            else if (parameter.Type is INamedTypeSymbol { IsGenericType: true, TypeArguments: [{ } typeArg] } namedType 
+                && SymbolEqualityComparer.Default.Equals(namedType.OriginalDefinition, model.ContractInfo.IModuleWorkerContextT)
+                && SymbolEqualityComparer.Default.Equals(typeArg, model.ModuleType))
+            {
+                // we need to explicitly construct the worker context here
+                INamedTypeSymbol boundModelContextType = model.ContractInfo.ModuleWorkerContextImplementationT.Construct(model.ModuleType);
+                builder.AppendLine($"new {boundModelContextType.ToDisplayString(s_fullyQualifiedFormat)}(");
+                BuildConstructorArguments(model, builder.IncreaseIndent(), boundModelContextType.InstanceConstructors[0]);
+                builder.Append(")");
+            }
+            else
+            {
+                builder.Append($"serviceProvider.GetRequiredService<{parameter.Type.ToDisplayString(s_fullyQualifiedFormat)}>()");
+            }
+        }
     }
 
     private static string RenderNamespace(string namespaceName) =>

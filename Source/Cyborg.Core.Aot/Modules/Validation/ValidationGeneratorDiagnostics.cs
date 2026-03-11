@@ -89,7 +89,7 @@ internal static class ValidationGeneratorDiagnostics
     public static DiagnosticDescriptor UnsupportedLengthTargetType { get; } = new(
         id: "CYBORGVAL011",
         title: "Unsupported LengthAttribute target type",
-        messageFormat: "Property '{0}' on '{1}' uses LengthAttribute, but type '{2}' is neither string nor an implementation of ICollection<T>",
+        messageFormat: "Property '{0}' on '{1}' uses LengthAttribute, but type '{2}' is neither string nor an implementation of IReadOnlyCollection<T>",
         category: CATEGORY,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);

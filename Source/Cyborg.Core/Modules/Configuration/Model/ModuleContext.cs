@@ -1,8 +1,11 @@
-﻿namespace Cyborg.Core.Modules.Configuration.Model;
+﻿using Cyborg.Core.Aot.Modules.Validation.Model;
 
+namespace Cyborg.Core.Modules.Configuration.Model;
+
+[Validatable]
 public record ModuleContext
 (
-    ModuleReference Module,
-    ModuleEnvironment? Environment,
+    [property: Required] ModuleReference Module,
+    [property: DefaultInstance] ModuleEnvironment? Environment,
     ModuleReference? Configuration
 );

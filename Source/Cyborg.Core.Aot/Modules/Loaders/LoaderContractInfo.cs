@@ -12,11 +12,17 @@ internal sealed class LoaderContractInfo(Dictionary<ModuleLoaderFactoryGenerator
     [
         ModuleLoaderFactoryGeneratorContract.IModuleWorker,
         ModuleLoaderFactoryGeneratorContract.ModuleLoaderT,
+        ModuleLoaderFactoryGeneratorContract.IModuleWorkerContextT,
+        ModuleLoaderFactoryGeneratorContract.ModuleWorkerContextImplementationT,
     ];
 
     public INamedTypeSymbol IModuleWorker => ContractTypes[ModuleLoaderFactoryGeneratorContract.IModuleWorker];
 
     public INamedTypeSymbol ModuleLoaderT => ContractTypes[ModuleLoaderFactoryGeneratorContract.ModuleLoaderT];
+
+    public INamedTypeSymbol IModuleWorkerContextT => ContractTypes[ModuleLoaderFactoryGeneratorContract.IModuleWorkerContextT];
+
+    public INamedTypeSymbol ModuleWorkerContextImplementationT => ContractTypes[ModuleLoaderFactoryGeneratorContract.ModuleWorkerContextImplementationT];
 
     public static LoaderContractInfo? Create(ContractExplorer contractExplorer, SourceProductionContext context)
     {

@@ -8,6 +8,15 @@ internal static class ModuleValidationRenderer
 {
     private const string MODULE_VARIABLE = "self";
 
+    public static string Helpers => "__Helpers";
+
+    public static class HelperMembers
+    {
+        public static string GetDefaultInstance => "__GetDefaultInstance";
+
+        public static string NullableRelax => "__NullableRelax";
+    }
+
     public static string Render(ModuleModel model, ValidationContractInfo contractInfo, DiagnosticsReporter diagnosticsReporter)
     {
         ReadOnlySpan<ISectionRenderer> renderPipeline =
@@ -53,9 +62,13 @@ internal static class ModuleValidationRenderer
         builder.AppendLine();
         builder.AppendLine(
             $$"""
-            file static class __DefaultInstanceHelper
+            file static class {{Helpers}}
             {
-                public static T __GetDefaultInstance<T>() where T : class, {{contractInfo.IDefaultValueT.RenderGlobalWithGenerics("T")}} => T.Default;
+                public static T {{HelperMembers.GetDefaultInstance}}<T>() where T : class, {{contractInfo.IDefaultValueT.RenderGlobalWithGenerics("T")}} => T.Default;
+
+            #pragma warning disable CS8777 // Parameter must have a non-null value when exiting.
+                public static void {{HelperMembers.NullableRelax}}<T>([{{KnownTypes.NotNullAttribute}}] T? value) { }
+            #pragma warning restore CS8777 // Parameter must have a non-null value when exiting.
             }
             """);
 

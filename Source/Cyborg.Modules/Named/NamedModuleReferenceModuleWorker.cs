@@ -2,20 +2,17 @@
 using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Modules.Named;
 
-public sealed class NamedModuleReferenceModuleWorker(NamedModuleReferenceModule module, IModuleRegistry moduleRegistry) : ModuleWorker<NamedModuleReferenceModule>(module)
+public sealed class NamedModuleReferenceModuleWorker(IWorkerContext<NamedModuleReferenceModule> context, IModuleRegistry moduleRegistry) : ModuleWorker<NamedModuleReferenceModule>(context)
 {
-    protected override Task<bool> ExecuteAsync(IModuleRuntime runtime, CancellationToken cancellationToken)
+    protected override Task<bool> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(runtime);
-
-        string target = runtime.Environment.Resolve(Module, Module.Target);
-
-        if (!moduleRegistry.TryGetModule(target, out ModuleContext? targetModule))
+        if (!moduleRegistry.TryGetModule(Module.Target, out ModuleContext? targetModule))
         {
-            throw new InvalidOperationException($"Failed to find target module with name '{target}'.");
+            throw new InvalidOperationException($"Failed to find target module with name '{Module.Target}'.");
         }
         return runtime.ExecuteAsync(targetModule, cancellationToken);
     }

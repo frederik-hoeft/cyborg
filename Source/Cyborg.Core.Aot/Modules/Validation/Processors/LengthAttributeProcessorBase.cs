@@ -12,7 +12,7 @@ internal abstract class LengthAttributeProcessorBase : IPropertyAttributeProcess
     {
         aspect = null;
 
-        LengthTargetKind targetKind = GetTargetKind(context.Property.Type);
+        LengthTargetKind targetKind = GetTargetKind(context.Property.Type, out INamedTypeSymbol? collectionInterface);
         if (targetKind == LengthTargetKind.None)
         {
             context.Report(
@@ -67,6 +67,7 @@ internal abstract class LengthAttributeProcessorBase : IPropertyAttributeProcess
 
         aspect = new LengthValidationAspect(
             targetKind,
+            collectionInterface,
             min?.ToString(CultureInfo.InvariantCulture),
             max?.ToString(CultureInfo.InvariantCulture),
             requiresNullGuard: RequiresNullGuard(context.Property.Type));
@@ -157,14 +158,15 @@ internal abstract class LengthAttributeProcessorBase : IPropertyAttributeProcess
     private static bool RequiresNullGuard(ITypeSymbol propertyType) =>
         propertyType.IsReferenceType || propertyType.NullableAnnotation == NullableAnnotation.Annotated;
 
-    private static LengthTargetKind GetTargetKind(ITypeSymbol propertyType)
+    private static LengthTargetKind GetTargetKind(ITypeSymbol propertyType, out INamedTypeSymbol? collectionInterface)
     {
+        collectionInterface = null;
         if (propertyType.SpecialType == SpecialType.System_String)
         {
             return LengthTargetKind.String;
         }
 
-        if (ImplementsIReadOnlyCollection(propertyType))
+        if (ImplementsIReadOnlyCollection(propertyType, out collectionInterface))
         {
             return LengthTargetKind.Collection;
         }
@@ -172,8 +174,9 @@ internal abstract class LengthAttributeProcessorBase : IPropertyAttributeProcess
         return LengthTargetKind.None;
     }
 
-    private static bool ImplementsIReadOnlyCollection(ITypeSymbol type)
+    private static bool ImplementsIReadOnlyCollection(ITypeSymbol type, out INamedTypeSymbol? collectionInterface)
     {
+        collectionInterface = null;
         if (type is not INamedTypeSymbol namedType)
         {
             return false;
@@ -188,6 +191,7 @@ internal abstract class LengthAttributeProcessorBase : IPropertyAttributeProcess
         {
             if (IsReadOnlyCollection(iface))
             {
+                collectionInterface = iface;
                 return true;
             }
         }
@@ -196,7 +200,7 @@ internal abstract class LengthAttributeProcessorBase : IPropertyAttributeProcess
     }
 
     private static bool IsReadOnlyCollection(INamedTypeSymbol type) =>
-        type.GetFullMetadataName().Equals(KnownTypes.IReadOnlyCollectionT, StringComparison.Ordinal);
+        type.GetFullMetadataName(includeGlobalNamespacePrefix: true).Equals(KnownTypes.IReadOnlyCollectionT, StringComparison.Ordinal);
 
     private enum LengthTargetKind
     {
@@ -207,6 +211,7 @@ internal abstract class LengthAttributeProcessorBase : IPropertyAttributeProcess
 
     private sealed class LengthValidationAspect(
         LengthTargetKind targetKind,
+        INamedTypeSymbol? collectionInterface,
         string? minExpression,
         string? maxExpression,
         bool requiresNullGuard) : PropertyValidationAspect
@@ -215,10 +220,20 @@ internal abstract class LengthAttributeProcessorBase : IPropertyAttributeProcess
 
         protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
         {
+            string accessExpression;
+            if (collectionInterface is null)
+            {
+                accessExpression = model.AccessExpression;
+            }
+            else
+            {
+                accessExpression = $"{model.AccessExpression.Replace('.', '_')}__collection";
+                builder.AppendLine($"{collectionInterface.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Included))} {accessExpression} = {model.AccessExpression};");
+            }
             string sizeExpression = targetKind switch
             {
-                LengthTargetKind.String => $"{model.AccessExpression}.Length",
-                LengthTargetKind.Collection => $"{model.AccessExpression}.Count",
+                LengthTargetKind.String => $"{accessExpression}.Length",
+                LengthTargetKind.Collection => $"{accessExpression}.Count",
                 _ => throw new InvalidOperationException("Unsupported length target kind.")
             };
 

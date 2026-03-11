@@ -29,4 +29,12 @@ public interface IModuleRuntime
     Task<bool> ExecuteAsync(ModuleContext moduleContext, IRuntimeEnvironment environment, CancellationToken cancellationToken = default);
 
     IRuntimeEnvironment PrepareEnvironment(ModuleContext moduleContext);
+
+    IRuntimeEnvironment? ResolveEnvironmentReference(ModuleEnvironmentReference environmentReference);
+
+    void PublishArtifacts<TModule>(TModule module, IModuleArtifacts artifacts) where TModule : ModuleBase, IModule;
+
+    bool Success<TModule>(TModule module, IModuleArtifacts? artifacts = null) where TModule : ModuleBase, IModule;
+
+    bool Failure<TModule>(TModule module, IModuleArtifacts? artifacts = null) where TModule : ModuleBase, IModule;
 }

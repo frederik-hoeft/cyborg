@@ -137,6 +137,7 @@ internal static class LoaderGenerationCandidateFactory
         return new LoaderGenerationCandidate(
             new LoaderGenerationModel(
                 Namespace: namespaceName,
+                ContractInfo: contractInfo,
                 ClassSymbol: typeSymbol,
                 WorkerConstructor: constructor,
                 ModuleWorkerType: moduleWorkerType,

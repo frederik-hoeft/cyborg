@@ -1,7 +1,7 @@
 ﻿using Cyborg.Core.Aot.Modules.Validation;
-using Cyborg.Core.Aot.Modules.Validation.Attributes;
+using Cyborg.Core.Aot.Modules.Validation.Model;
 using Cyborg.Core.Modules;
-using Cyborg.Modules.Shared.Model;
+using Cyborg.Core.Modules.Configuration.Model;
 
 namespace Cyborg.Modules.Network.WakeOnLan;
 
@@ -14,8 +14,7 @@ public sealed partial record WakeOnLanModule
     [property: Required] string StateVariable,
     [property: DefaultTimeSpan("00:05:00")] TimeSpan MaxWaitTime,
     [property: DefaultTimeSpan("00:00:30")] TimeSpan HostDiscoveryTimeout,
-    ModuleEnvironmentReference? OutputEnvironment,
-    [property: Required][property: IgnoreOverrides][property: DefaultValue<string>("/usr/bin/wakeonlan")] string Executable
+    [property: Required][property: DefaultValue<string>("/usr/bin/wakeonlan")] string Executable
 ) : ModuleBase, IModule
 {
     public static string ModuleId => "cyborg.modules.network.wol.v1";

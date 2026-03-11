@@ -35,7 +35,7 @@ public sealed class ModelDecompositionGenerator : IIncrementalGenerator
 
             foreach (DecompositionAnnotatedTarget target in discoveredTargets)
             {
-                DecompositionGenerationCandidate candidate = DecompositionGenerationCandidateFactory.Create(target, contractInfo, compilation);
+                DecompositionGenerationCandidate candidate = DecompositionGenerationCandidateFactory.Create(target);
 
                 foreach (Diagnostic diagnostic in candidate.Diagnostics)
                 {

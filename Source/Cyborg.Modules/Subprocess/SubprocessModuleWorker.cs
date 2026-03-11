@@ -2,42 +2,32 @@
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Services.Subprocesses;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Modules.Subprocess;
 
 // sample subprocess module
-public sealed class SubprocessModuleWorker(SubprocessModule module, ISubprocessDispatcher dispatcher) : ModuleWorker<SubprocessModule>(module)
+public sealed class SubprocessModuleWorker(IWorkerContext<SubprocessModule> context, ISubprocessDispatcher dispatcher) : ModuleWorker<SubprocessModule>(context)
 {
-    protected async override Task<bool> ExecuteAsync(IModuleRuntime runtime, CancellationToken cancellationToken)
+    protected async override Task<bool> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(runtime);
-        SubprocessCommand? command = Module.Command
-            ?? throw new InvalidOperationException("SubprocessModule requires a Command to be specified.");
-        SubprocessOutputOptions output = Module.Output ?? new SubprocessOutputOptions();
-        ProcessStartInfo startInfo = new(command.Executable, command.Arguments)
+        ProcessStartInfo startInfo = new(Module.Command.Executable, Module.Command.Arguments)
         {
-            RedirectStandardOutput = output.ReadStdout,
-            RedirectStandardError = output.ReadStderr,
+            RedirectStandardOutput = Module.Output.ReadStdout,
+            RedirectStandardError = Module.Output.ReadStderr,
             UseShellExecute = false,
         };
         SubprocessResult result = await dispatcher.ExecuteAsync(startInfo, cancellationToken);
-        if (output.ReadStdout)
+        if (Module.Output.ReadStdout)
         {
-            runtime.Environment.SetVariable(CreateVariableName(output, SubprocessModule.StandardOutputName), result.StandardOutput);
+            Artifacts.Expose(Module.Output.StdoutVariableName, result.StandardOutput);
         }
-        if (output.ReadStderr)
+        if (Module.Output.ReadStderr)
         {
-            runtime.Environment.SetVariable(CreateVariableName(output, SubprocessModule.StandardErrorName), result.StandardError);
+            Artifacts.Expose(Module.Output.StderrVariableName, result.StandardError);
         }
-        return result.ExitCode == 0;
-    }
-
-    private static string CreateVariableName(SubprocessOutputOptions output, string type)
-    {
-        if (string.IsNullOrWhiteSpace(output.Namespace))
-        {
-            return type;
-        }
-        return $"{output.Namespace}.{type}";
+        return result.ExitCode == 0
+            ? runtime.Success(Module, Artifacts)
+            : runtime.Failure(Module, Artifacts);
     }
 }

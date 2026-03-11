@@ -1,14 +1,14 @@
 ﻿using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Modules.Configuration.ConfigCollection;
 
-public sealed class ConfigCollectionModuleWorker(ConfigCollectionModule module) : ModuleWorker<ConfigCollectionModule>(module)
+public sealed class ConfigCollectionModuleWorker(IWorkerContext<ConfigCollectionModule> context) : ModuleWorker<ConfigCollectionModule>(context)
 {
-    protected async override Task<bool> ExecuteAsync(IModuleRuntime runtime, CancellationToken cancellationToken)
+    protected async override Task<bool> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(runtime);
         foreach (ModuleReference source in Module.Sources)
         {
             if (source.Module is not IConfigurationModule)
@@ -18,9 +18,9 @@ public sealed class ConfigCollectionModuleWorker(ConfigCollectionModule module) 
             bool success = await runtime.ExecuteAsync(source.Module, runtime.Environment, cancellationToken);
             if (!success)
             {
-                return false;
+                return runtime.Failure(Module);
             }
         }
-        return true;
+        return runtime.Success(Module);
     }
 }

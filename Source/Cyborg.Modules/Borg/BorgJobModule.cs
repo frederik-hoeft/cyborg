@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Aot.Modules.Composition;
+using Cyborg.Core.Aot.Modules.Validation;
 using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
@@ -35,7 +36,8 @@ public sealed class BorgRemoteValueProvider : IDynamicValueProvider
     }
 }
 
-public sealed record BorgJobModule
+[GeneratedModuleValidation]
+public sealed partial record BorgJobModule
 (
     ModuleContext Job,
     ModuleContext? BeforeJob,
@@ -46,9 +48,9 @@ public sealed record BorgJobModule
     public static string ModuleId => "cyborg.modules.borg.job.v1";
 }
 
-public sealed class JobModuleWorker(BorgJobModule module) : ModuleWorker<BorgJobModule>(module)
+public sealed class JobModuleWorker(IWorkerContext<BorgJobModule> context) : ModuleWorker<BorgJobModule>(context)
 {
-    protected async override Task<bool> ExecuteAsync(IModuleRuntime runtime, CancellationToken cancellationToken)
+    protected async override Task<bool> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(runtime);
         try

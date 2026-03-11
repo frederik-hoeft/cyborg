@@ -22,7 +22,7 @@ internal sealed class Commands
         ModuleContext module = await configurationLoader.LoadModuleAsync("config.json", cancellationToken);
         module = module with 
         {
-            Environment = module.Environment ?? new ModuleEnvironment()
+            Environment = module.Environment ?? ModuleEnvironment.Default,
         };
         IModuleRuntime runtime = sp.GetRequiredService<IModuleRuntime>();
         await runtime.ExecuteAsync(module, cancellationToken);

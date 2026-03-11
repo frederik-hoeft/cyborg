@@ -3,5 +3,7 @@
 internal enum ModuleLoaderFactoryGeneratorContract
 {
     IModuleWorker,
-    ModuleLoaderT
+    ModuleLoaderT,
+    IModuleWorkerContextT,
+    ModuleWorkerContextImplementationT,
 }

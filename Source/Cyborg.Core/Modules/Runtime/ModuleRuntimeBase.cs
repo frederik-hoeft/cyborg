@@ -83,4 +83,36 @@ public abstract class ModuleRuntimeBase(JsonNamingPolicy namingPolicy) : IModule
     public abstract bool TryGetEnvironment(string name, [NotNullWhen(true)] out IRuntimeEnvironment? environment);
 
     public abstract bool TryRemoveEnvironment(IRuntimeEnvironment environment);
+
+    public virtual void PublishArtifacts<TModule>(TModule module, IModuleArtifacts artifacts) where TModule : ModuleBase, IModule
+    {
+        ArgumentNullException.ThrowIfNull(module);
+        ArgumentNullException.ThrowIfNull(artifacts);
+        ModuleEnvironmentReference deploymentTarget = module.Artifacts.Environment;
+        IRuntimeEnvironment environment = ResolveEnvironmentReference(deploymentTarget)
+            ?? throw new InvalidOperationException($"Unable to resolve environment reference for module {module.Name}: {deploymentTarget}");
+        artifacts.PublishToEnvironment(environment);
+    }
+
+    protected virtual bool Exit<TModule>(TModule module, bool success, IModuleArtifacts? artifacts) where TModule : ModuleBase, IModule
+    {
+        if (artifacts is not null)
+        {
+            PublishArtifacts(module, artifacts);
+        }
+        return success;
+    }
+
+    public bool Success<TModule>(TModule module, IModuleArtifacts? artifacts = null) where TModule : ModuleBase, IModule => Exit(module, success: true, artifacts);
+
+    public bool Failure<TModule>(TModule module, IModuleArtifacts? artifacts = null) where TModule : ModuleBase, IModule => Exit(module, success: false, artifacts);
+
+    public virtual IRuntimeEnvironment? ResolveEnvironmentReference(ModuleEnvironmentReference environmentReference) => environmentReference switch
+    {
+        { Scope: EnvironmentScopeReference.Current } => Environment,
+        { Scope: EnvironmentScopeReference.Global } => GlobalEnvironment,
+        { Scope: EnvironmentScopeReference.Parent } => ParentEnvironment,
+        { Scope: EnvironmentScopeReference.Reference, Name: { } name } when TryGetEnvironment(name, out IRuntimeEnvironment? environment) => environment,
+        _ => null
+    };
 }

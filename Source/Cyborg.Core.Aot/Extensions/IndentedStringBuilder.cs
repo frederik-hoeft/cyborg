@@ -16,18 +16,23 @@ internal sealed class IndentedStringBuilder(StringBuilder builder, int indentLev
 
     public IndentedStringBuilder DecreaseIndent(int levels = 1) => new(builder, Math.Max(0, indentLevel - levels), indentSize);
 
-    public void Append(string text)
+    public IndentedStringBuilder Append(string text)
     {
         if (builder.Length == 0 || builder[^1] == '\n')
         {
             builder.Append(IndentString);
         }
         builder.Append(text);
+        return this;
     }
 
-    public void AppendLine(string line) => builder.Append(IndentString).AppendLine(line);
+    public IndentedStringBuilder AppendLine(string line)
+    {
+        Append(line).Raw.AppendLine();
+        return this;
+    }
 
-    public void AppendBlock(string block)
+    public IndentedStringBuilder AppendBlock(string block)
     {
         ReadOnlySpan<char> blockSpan = block.AsSpan();
         int startIndex = 0;
@@ -43,5 +48,6 @@ internal sealed class IndentedStringBuilder(StringBuilder builder, int indentLev
         {
             builder.Append(IndentString).AppendLine(blockSpan[startIndex..].TrimEnd('\r').ToString());
         }
+        return this;
     }
 }

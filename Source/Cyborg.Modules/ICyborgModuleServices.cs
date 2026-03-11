@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Modules.Configuration;
+using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Configuration.Serialization;
 using Cyborg.Modules.Borg;
 using Cyborg.Modules.Conditional;
@@ -8,7 +9,6 @@ using Cyborg.Modules.Foreach;
 using Cyborg.Modules.Named;
 using Cyborg.Modules.Network.WakeOnLan;
 using Cyborg.Modules.Sequence;
-using Cyborg.Modules.Shared.Model;
 using Cyborg.Modules.Subprocess;
 using Cyborg.Modules.Template;
 using Jab;

@@ -1,13 +1,12 @@
 ﻿using Cyborg.Core.Aot.Extensions;
 using Microsoft.CodeAnalysis;
 using System.Text;
-using System.Text.Json;
 
 namespace Cyborg.Core.Aot.Modules.Composition;
 
 internal static class ModelDecompositionRenderer
 {
-    private const string DecomposeMethodName = "Decompose";
+    private const string DECOMPOSE_METHOD_NAME = "Decompose";
 
     private static readonly SymbolDisplayFormat s_fullyQualifiedFormat =
         SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Included);
@@ -21,7 +20,7 @@ internal static class ModelDecompositionRenderer
             {{RenderNamespace(model.Namespace)}}
             partial {{model.TypeKeyword}} {{model.TypeSymbol.Name}} : {{contractInfo.IDecomposable.ToDisplayString(s_fullyQualifiedFormat)}}
             {
-                public global::System.Collections.Generic.IEnumerable<{{contractInfo.DynamicKeyValuePair.ToDisplayString(s_fullyQualifiedFormat)}}> {{DecomposeMethodName}}() =>
+                public {{KnownTypes.IEnumerableOfT(contractInfo.DynamicKeyValuePair.ToDisplayString(s_fullyQualifiedFormat))}} {{DECOMPOSE_METHOD_NAME}}() =>
                 [
 
             """);
@@ -29,7 +28,7 @@ internal static class ModelDecompositionRenderer
         IndentedStringBuilder indentedBuilder = new(sourceBuilder, indentLevel: 2);
         foreach (IPropertySymbol property in model.DecomposableProperties)
         {
-            indentedBuilder.AppendLine($"new({model.NamingPolicyProviderType.ToDisplayString(s_fullyQualifiedFormat)}.{model.NamingPolicyPropertyName}.{nameof(JsonNamingPolicy.ConvertName)}(nameof({property.Name})), {property.Name}),");
+            indentedBuilder.AppendLine($"new({model.NamingPolicyProviderTypeName}.{model.NamingPolicyPropertyName}.ConvertName(nameof({property.Name})), {property.Name}),");
         }
 
         sourceBuilder.Append(
@@ -44,5 +43,10 @@ internal static class ModelDecompositionRenderer
     private static string RenderNamespace(string namespaceName) =>
         string.IsNullOrWhiteSpace(namespaceName)
             ? string.Empty
-            : $"namespace {namespaceName};\n\n";
+            : $"""
+              namespace {namespaceName};
+
+
+              """;
+
 }

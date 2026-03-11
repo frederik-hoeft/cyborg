@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Aot.Modules.Validation.Model;
+using Cyborg.Core.Aot.Modules.Validation.Rendering;
 using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
@@ -52,7 +53,7 @@ internal sealed class DefaultInstanceAttributeProcessor : IPropertyAttributeProc
 
             string nonNullableTypeName = propertyType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             _ = currentExpression;
-            return $"{context.PropertyAccessExpression} is null ? __DefaultInstanceHelper.__GetDefaultInstance<{nonNullableTypeName}>() : {context.PropertyAccessExpression}";
+            return $"{context.PropertyAccessExpression} is null ? {ModuleValidationRenderer.Helpers}.{ModuleValidationRenderer.HelperMembers.GetDefaultInstance}<{nonNullableTypeName}>() : {context.PropertyAccessExpression}";
         }
 
         private static bool ImplementsMatchingDefaultInstanceInterface(INamedTypeSymbol propertyType, ValidationContractInfo contractInfo)

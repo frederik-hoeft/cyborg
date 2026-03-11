@@ -113,7 +113,7 @@ internal static class NamedTypeSymbolExtensions
         /// relevant.</remarks>
         /// <returns>A string representing the complete metadata name of the type, formatted as a dot-separated list of
         /// namespaces and type names. Generic type parameters are included in the name if applicable.</returns>
-        public string GetFullMetadataName()
+        public string GetFullMetadataName(bool includeGlobalNamespacePrefix = false)
         {
             INamedTypeSymbol original = self.OriginalDefinition;
 
@@ -134,8 +134,12 @@ internal static class NamedTypeSymbolExtensions
 
                 current = current.ContainingSymbol;
             }
-
-            return string.Join(".", parts);
+            string result = string.Join(".", parts);
+            if (includeGlobalNamespacePrefix)
+            {
+                result = $"global::{result}";
+            }
+            return result;
         }
     }
 }

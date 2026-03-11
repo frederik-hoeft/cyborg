@@ -7,6 +7,6 @@ internal sealed record DecompositionGenerationModel(
     string Namespace,
     INamedTypeSymbol TypeSymbol,
     string TypeKeyword,
-    INamedTypeSymbol NamingPolicyProviderType,
+    string NamingPolicyProviderTypeName,
     string NamingPolicyPropertyName,
     ImmutableArray<IPropertySymbol> DecomposableProperties);
