@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Aot.Modules.Validation.Model;
+namespace Cyborg.Core.Aot.Modules.Validation.Attributes;
 
 [AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
 internal sealed class DefaultValueAttribute<T>(T value, params T[] whenPresent) : Attribute

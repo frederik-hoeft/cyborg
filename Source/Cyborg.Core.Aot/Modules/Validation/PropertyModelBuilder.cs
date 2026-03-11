@@ -1,6 +1,6 @@
 using Cyborg.Core.Aot.Extensions;
-using Cyborg.Core.Aot.Modules.Validation.Model;
-using Cyborg.Core.Aot.Modules.Validation.Models;
+using Cyborg.Core.Aot.Modules.Validation.Attributes;
+using Cyborg.Core.Aot.Modules.Validation.Attributess;
 using Cyborg.Core.Aot.Modules.Validation.Processors;
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;

@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Aot.Modules.Validation.Model;
+﻿using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Cyborg.Core.Aot.Modules.Validation.Rendering;
 using Microsoft.CodeAnalysis;
 

@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
 
-namespace Cyborg.Core.Aot.Modules.Validation.Models;
+namespace Cyborg.Core.Aot.Modules.Validation.Attributess;
 
 internal sealed record PropertyModel(
     string Name,
