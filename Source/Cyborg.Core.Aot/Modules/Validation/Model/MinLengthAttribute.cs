@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Aot.Modules.Validation.Attributes;
+namespace Cyborg.Core.Aot.Modules.Validation.Model;
 
 [AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
 internal sealed class MinLengthAttribute(int min) : Attribute

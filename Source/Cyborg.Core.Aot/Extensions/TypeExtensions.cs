@@ -4,16 +4,18 @@ namespace Cyborg.Core.Aot.Extensions;
 
 internal static class TypeExtensions
 {
+    private const string GLOBAL = "global::";
+
     extension(Type self)
     {
         public string ConstructFullyQualifiedGenericName(params ReadOnlySpan<Type> genericArguments)
         {
             if (!self.IsGenericTypeDefinition)
             {
-                throw new InvalidOperationException("The type must be a generic type definition (i.e., it must have unassigned generic parameters).");
+                return $"{GLOBAL}{self.Namespace}.{self.Name}";
             }
             StringBuilder builder = new();
-            builder.Append("global::").Append(self.Namespace).Append('.').Append(self.Name);
+            builder.Append(GLOBAL).Append(self.Namespace).Append('.').Append(self.Name);
             if (genericArguments.Length > 0)
             {
                 builder.Append('<');
@@ -28,6 +30,15 @@ internal static class TypeExtensions
                 builder.Append('>');
             }
             return builder.ToString();
+        }
+
+        public string GetFullyQualifiedBaseTypeName()
+        {
+            if (self.IsGenericType)
+            {
+                return $"{GLOBAL}{self.Namespace}.{self.Name[..self.Name.IndexOf('`')]}";
+            }
+            return $"{GLOBAL}{self.Namespace}.{self.Name}";
         }
     }
 }

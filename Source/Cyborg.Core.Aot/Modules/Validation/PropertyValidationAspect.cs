@@ -5,9 +5,11 @@ namespace Cyborg.Core.Aot.Modules.Validation;
 
 internal abstract class PropertyValidationAspect
 {
-    public virtual string? RewriteOverrideResolutionExpression(PropertyModel property, string moduleVariable, string propertyAccessExpression, string? currentExpression) => currentExpression;
+    public abstract bool EnsuresDefault { get; }
 
-    public virtual string? RewriteDefaultAssignmentExpression(PropertyModel property, string moduleVariable, string propertyAccessExpression, string? currentExpression) => currentExpression;
+    public virtual string? RewriteOverrideResolutionExpression(PropertyRewriteContext context, string? currentExpression) => currentExpression;
+
+    public virtual string? RewriteDefaultAssignmentExpression(PropertyRewriteContext context, string? currentExpression) => currentExpression;
 
     protected virtual void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
     {

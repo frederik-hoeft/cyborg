@@ -9,4 +9,7 @@ internal sealed record PropertyModel(
     bool IsNullable,
     bool IsValidatableType,
     ImmutableArray<PropertyValidationAspect> Aspects,
-    ImmutableArray<PropertyModel> Children);
+    ImmutableArray<PropertyModel> Children)
+{
+    public bool HasDefault => Aspects.Any(static a => a.EnsuresDefault);
+}

@@ -1,5 +1,5 @@
 using Cyborg.Core.Aot.Extensions;
-using Cyborg.Core.Aot.Modules.Validation.Attributes;
+using Cyborg.Core.Aot.Modules.Validation.Model;
 using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
@@ -18,6 +18,8 @@ internal sealed class RequiredAttributeProcessor : IPropertyAttributeProcessor
 
     private sealed class RequiredValidationAspect : PropertyValidationAspect
     {
+        public override bool EnsuresDefault => false;
+
         protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
         {
             string comparer = KnownTypes.DefaultEqualityComparerOfT(model.Property.NullableTypeName);

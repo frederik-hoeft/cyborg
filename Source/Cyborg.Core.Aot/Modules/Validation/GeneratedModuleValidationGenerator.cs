@@ -1,5 +1,6 @@
 using Cyborg.Core.Aot.Contracts;
 using Cyborg.Core.Aot.Modules.Validation.Models;
+using Cyborg.Core.Aot.Modules.Validation.Rendering;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
@@ -47,7 +48,12 @@ public sealed class GeneratedModuleValidationGenerator : IIncrementalGenerator
                 {
                     continue;
                 }
-                string source = ModuleValidationRenderer.Render(candidate.Model, contractInfo);
+                DiagnosticsReporter diagnosticsReporter = new([]);
+                string source = ModuleValidationRenderer.Render(candidate.Model, contractInfo, diagnosticsReporter);
+                foreach (Diagnostic diagnostic in diagnosticsReporter.Diagnostics)
+                {
+                    sourceProductionContext.ReportDiagnostic(diagnostic);
+                }
                 sourceProductionContext.AddSource($"{candidate.Model.HintName}.g.cs", SourceText.From(source, Encoding.UTF8));
             }
         });

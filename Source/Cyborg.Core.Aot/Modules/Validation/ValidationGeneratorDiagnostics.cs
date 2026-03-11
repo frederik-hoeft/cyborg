@@ -81,7 +81,7 @@ internal static class ValidationGeneratorDiagnostics
     public static DiagnosticDescriptor UnsupportedNestedPropertyShape { get; } = new(
         id: "CYBORGVAL010",
         title: "Unsupported nested property shape",
-        messageFormat: "Property '{0}' on '{1}' cannot be used for nested [Validatable] generation because it is not settable",
+        messageFormat: "Property '{0}' on '{1}' cannot be used for nested [Validatable] generation because it is not settable or the setter is not accessible to the generator",
         category: CATEGORY,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
@@ -106,6 +106,22 @@ internal static class ValidationGeneratorDiagnostics
         id: "CYBORGVAL013",
         title: "Attribute bounds are invalid",
         messageFormat: "Property '{0}' on '{1}' uses {2} with Min '{3}' greater than Max '{4}'",
+        category: CATEGORY,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    public static DiagnosticDescriptor UnsupportedDefinedEnumValueTargetType { get; } = new(
+        id: "CYBORGVAL014",
+        title: "Unsupported DefinedEnumValueAttribute target type",
+        messageFormat: "Property '{0}' on '{1}' uses DefinedEnumValueAttribute, but type '{2}' is neither an enum nor a nullable enum",
+        category: CATEGORY,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    public static DiagnosticDescriptor UnsupportedDefaultInstanceTargetType { get; } = new(
+        id: "CYBORGVAL015",
+        title: "Unsupported DefaultInstanceAttribute target type",
+        messageFormat: "Property '{0}' on '{1}' uses DefaultInstanceAttribute, but type '{2}' must be a non-interface reference type implementing IDefaultInstance<TSelf> for itself",
         category: CATEGORY,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);

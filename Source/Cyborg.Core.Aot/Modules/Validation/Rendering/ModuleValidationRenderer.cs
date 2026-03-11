@@ -1,0 +1,64 @@
+using System.Text;
+using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Models;
+
+namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
+
+internal static class ModuleValidationRenderer
+{
+    private const string MODULE_VARIABLE = "self";
+
+    public static string Render(ModuleModel model, ValidationContractInfo contractInfo, DiagnosticsReporter diagnosticsReporter)
+    {
+        ReadOnlySpan<ISectionRenderer> renderPipeline =
+        [
+            new DefaultsSectionRenderer(contractInfo, MODULE_VARIABLE, diagnosticsReporter),
+            new OverrideSectionRenderer(contractInfo, MODULE_VARIABLE, diagnosticsReporter),
+            new ValidationSectionRenderer(contractInfo),
+        ];
+
+        StringBuilder builder = new();
+        builder.AppendLine("#nullable enable");
+        builder.AppendLine();
+
+        if (!string.IsNullOrWhiteSpace(model.Namespace))
+        {
+            builder.Append("namespace ").Append(model.Namespace).AppendLine(";");
+            builder.AppendLine();
+        }
+
+        foreach (ContainingTypeModel containingType in model.ContainingTypes)
+        {
+            builder.Append(containingType.Declaration).AppendLine();
+            builder.AppendLine("{");
+        }
+
+        builder.Append("partial record ").Append(model.TypeName).Append(" : ").Append(contractInfo.IModuleT.RenderGlobalWithGenerics(model.TypeName)).AppendLine();
+        builder.AppendLine("{");
+        IndentedStringBuilder indentedBuilder = new(builder, indentLevel: 1);
+        for (int i = 0; i < renderPipeline.Length; ++i)
+        {
+            if (i > 0)
+            {
+                builder.AppendLine();
+            }
+            renderPipeline[i].RenderSection(indentedBuilder, model);
+        }
+        builder.AppendLine("}");
+
+        for (int index = model.ContainingTypes.Length - 1; index >= 0; --index)
+        {
+            builder.AppendLine("}");
+        }
+        builder.AppendLine();
+        builder.AppendLine(
+            $$"""
+            file static class __DefaultInstanceHelper
+            {
+                public static T __GetDefaultInstance<T>() where T : class, {{contractInfo.IDefaultValueT.RenderGlobalWithGenerics("T")}} => T.Default;
+            }
+            """);
+
+        return builder.ToString();
+    }
+}

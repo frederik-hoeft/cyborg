@@ -1,5 +1,5 @@
 using Cyborg.Core.Aot.Extensions;
-using Cyborg.Core.Aot.Modules.Validation.Attributes;
+using Cyborg.Core.Aot.Modules.Validation.Model;
 using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
@@ -57,6 +57,8 @@ internal sealed class RangeAttributeProcessor : IPropertyAttributeProcessor
 
     private sealed class RangeValidationAspect(string? minExpression, string? maxExpression) : PropertyValidationAspect
     {
+        public override bool EnsuresDefault => false;
+
         protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
         {
             if (minExpression is not null)

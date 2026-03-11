@@ -1,5 +1,5 @@
 using Cyborg.Core.Aot.Extensions;
-using Cyborg.Core.Aot.Modules.Validation.Attributes;
+using Cyborg.Core.Aot.Modules.Validation.Model;
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
 
@@ -16,10 +16,12 @@ internal static class ValidationFrameworkSourceRegistry
         static context => context.AddEmbeddedSource<ValidatableAttribute>(),
         static context => context.AddEmbeddedSource(typeof(DefaultValueAttribute<>)),
         static context => context.AddEmbeddedSource(typeof(RangeAttribute<>)),
-        static context => context.AddEmbeddedSource(typeof(LengthAttribute)),
-        static context => context.AddEmbeddedSource(typeof(MinLengthAttribute)),
-        static context => context.AddEmbeddedSource(typeof(MaxLengthAttribute)),
-        static context => context.AddEmbeddedSource(typeof(ExactLengthAttribute)),
+        static context => context.AddEmbeddedSource<LengthAttribute>(),
+        static context => context.AddEmbeddedSource<MinLengthAttribute>(),
+        static context => context.AddEmbeddedSource<MaxLengthAttribute>(),
+        static context => context.AddEmbeddedSource<ExactLengthAttribute>(),
+        static context => context.AddEmbeddedSource<DefinedEnumValueAttribute>(),
+        static context => context.AddEmbeddedSource<DefaultInstanceAttribute>(),
     ];
 
     public static void Emit(IncrementalGeneratorPostInitializationContext context)

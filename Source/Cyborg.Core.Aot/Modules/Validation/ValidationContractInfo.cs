@@ -1,6 +1,5 @@
 ﻿using Cyborg.Core.Aot.Contracts;
 using Microsoft.CodeAnalysis;
-using System.Collections.Frozen;
 using System.Collections.Immutable;
 
 namespace Cyborg.Core.Aot.Modules.Validation;
@@ -14,6 +13,7 @@ internal sealed class ValidationContractInfo(Dictionary<ModuleValidationGenerato
         ModuleValidationGeneratorContract.IModuleT,
         ModuleValidationGeneratorContract.ValidationResultT,
         ModuleValidationGeneratorContract.ValidationError,
+        ModuleValidationGeneratorContract.IDefaultValueT,
     ];
 
     public INamedTypeSymbol IModuleRuntime => ContractTypes[ModuleValidationGeneratorContract.IModuleRuntime];
@@ -23,6 +23,8 @@ internal sealed class ValidationContractInfo(Dictionary<ModuleValidationGenerato
     public INamedTypeSymbol ValidationResultT => ContractTypes[ModuleValidationGeneratorContract.ValidationResultT];
 
     public INamedTypeSymbol ValidationError => ContractTypes[ModuleValidationGeneratorContract.ValidationError];
+
+    public INamedTypeSymbol IDefaultValueT => ContractTypes[ModuleValidationGeneratorContract.IDefaultValueT];
 
     public static ValidationContractInfo? Create(ContractExplorer contractExplorer, SourceProductionContext context)
     {

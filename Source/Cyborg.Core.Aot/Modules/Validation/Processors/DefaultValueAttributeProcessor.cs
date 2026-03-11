@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
-using Cyborg.Core.Aot.Modules.Validation.Attributes;
-using Cyborg.Core.Aot.Modules.Validation.Models;
+using Cyborg.Core.Aot.Modules.Validation.Model;
 using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
@@ -58,9 +57,12 @@ internal sealed class DefaultValueAttributeProcessor : IPropertyAttributeProcess
 
     private sealed class DefaultValueValidationAspect(string valueExpression, ImmutableArray<string> whenPresentExpressions) : PropertyValidationAspect
     {
-        public override string? RewriteDefaultAssignmentExpression(PropertyModel property, string moduleVariable, string propertyAccessExpression, string? currentExpression)
+        public override bool EnsuresDefault => true;
+
+        public override string? RewriteDefaultAssignmentExpression(PropertyRewriteContext rewriteContext, string? currentExpression)
         {
-            string equalityComparer = KnownTypes.DefaultEqualityComparerOfT(property.NullableTypeName);
+            string propertyAccessExpression = rewriteContext.PropertyAccessExpression;
+            string equalityComparer = KnownTypes.DefaultEqualityComparerOfT(rewriteContext.Property.NullableTypeName);
             string triggerExpression;
 
             if (whenPresentExpressions.Length == 0)

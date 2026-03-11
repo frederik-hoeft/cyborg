@@ -1,196 +1,54 @@
 using Cyborg.Core.Aot.Extensions;
-using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Cyborg.Core.Aot.Modules.Validation.Models;
-using Cyborg.Core.Aot.Modules.Validation.Processors;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Collections.Immutable;
 
 namespace Cyborg.Core.Aot.Modules.Validation;
 
-internal static class GenerationCandidateFactory
+internal sealed class GenerationCandidateFactory
 {
-    public static readonly SymbolDisplayFormat s_fullyQualifiedNullableFormat =
-        SymbolDisplayFormat.FullyQualifiedFormat
-            .WithMiscellaneousOptions(
-                SymbolDisplayMiscellaneousOptions.UseSpecialTypes |
-                SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier |
-                SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers);
+    public GeneratorAttributeSyntaxContext Context { get; }
 
-    private static readonly SymbolDisplayFormat s_fullyQualifiedNonNullableFormat =
-        SymbolDisplayFormat.FullyQualifiedFormat
-            .WithMiscellaneousOptions(
-                SymbolDisplayMiscellaneousOptions.UseSpecialTypes |
-                SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers);
+    public INamedTypeSymbol TypeSymbol { get; }
 
-    public static GenerationCandidate? Create(GeneratorAttributeSyntaxContext context)
+    private GenerationCandidateFactory(GeneratorAttributeSyntaxContext context, INamedTypeSymbol typeSymbol)
     {
-        if (context.TargetSymbol is not INamedTypeSymbol typeSymbol)
-        {
-            return null;
-        }
+        Context = context;
+        TypeSymbol = typeSymbol;
+    }
 
-        if (!typeSymbol.IsRecord)
-        {
-            return CreateFailureCandidate(typeSymbol, ValidationGeneratorDiagnostics.TypeMustBeRecord);
-        }
-
-        if (!HasPartialDeclaration(typeSymbol))
-        {
-            return CreateFailureCandidate(typeSymbol, ValidationGeneratorDiagnostics.TypeMustBePartial);
-        }
-
-        ImmutableArray<PropertyModel>.Builder properties = ImmutableArray.CreateBuilder<PropertyModel>();
+    private GenerationCandidate? Create()
+    {
         List<Diagnostic> diagnostics = [];
+        PropertyModelBuilder builder = new(this, diagnostics);
+        ImmutableArray<PropertyModel> properties = builder.Build();
 
-        foreach (IPropertySymbol property in typeSymbol.GetMembers().OfType<IPropertySymbol>())
-        {
-            if (property.IsStatic || property.IsIndexer || property.IsImplicitlyDeclared)
-            {
-                continue;
-            }
-
-            if (!SymbolEqualityComparer.Default.Equals(property.ContainingType, typeSymbol))
-            {
-                continue;
-            }
-
-            if (property.SetMethod is null)
-            {
-                diagnostics.Add(Diagnostic.Create(ValidationGeneratorDiagnostics.PropertyMustBeSettable, property.Locations.FirstOrDefault(), property.Name, typeSymbol.Name));
-                continue;
-            }
-
-            if (!TryCreatePropertyModel(typeSymbol, property, diagnostics, ImmutableHashSet<INamedTypeSymbol>.Empty.WithComparer(SymbolEqualityComparer.Default), out PropertyModel? propertyModel))
-            {
-                continue;
-            }
-
-            properties.Add(propertyModel!);
-        }
-
-        string ns = typeSymbol.ContainingNamespace.IsGlobalNamespace
+        string ns = TypeSymbol.ContainingNamespace.IsGlobalNamespace
             ? string.Empty
-            : typeSymbol.ContainingNamespace.ToDisplayString();
+            : TypeSymbol.ContainingNamespace.ToDisplayString();
 
-        ImmutableArray<ContainingTypeModel> containingTypes = BuildContainingTypes(typeSymbol);
-        string fullyQualifiedTypeName = typeSymbol.ToDisplayString(s_fullyQualifiedNullableFormat);
-        string hintName = typeSymbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)
+        ImmutableArray<ContainingTypeModel> containingTypes = BuildContainingTypes();
+        string fullyQualifiedTypeName = TypeSymbol.ToDisplayString(KnownSymbolFormats.Nullable);
+        string hintName = TypeSymbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)
             .Replace('<', '_')
             .Replace('>', '_')
             .Replace('.', '_');
 
         ModuleModel model = new(
             Namespace: ns,
-            TypeName: typeSymbol.Name,
+            TypeName: TypeSymbol.Name,
             FullyQualifiedTypeName: fullyQualifiedTypeName,
             HintName: hintName + ".ModuleValidation",
             ContainingTypes: containingTypes,
-            Properties: properties.ToImmutable());
+            Properties: properties);
 
         return new GenerationCandidate(model.HintName, model, [.. diagnostics]);
     }
 
-    private static GenerationCandidate CreateFailureCandidate(INamedTypeSymbol symbol, DiagnosticDescriptor descriptor)
-        => new(
-            symbol.ToDisplayString(),
-            null,
-            [Diagnostic.Create(descriptor, symbol.Locations.FirstOrDefault(), symbol.Name)]);
-
-    private static bool TryCreatePropertyModel(
-        INamedTypeSymbol containingType,
-        IPropertySymbol property,
-        List<Diagnostic> diagnostics,
-        ImmutableHashSet<INamedTypeSymbol> traversalPath,
-        out PropertyModel? propertyModel)
-    {
-        PropertyAttributeProcessingContext processingContext = new(containingType, property, diagnostics);
-        ImmutableArray<PropertyValidationAspect>.Builder aspects = ImmutableArray.CreateBuilder<PropertyValidationAspect>();
-
-        foreach (AttributeData attribute in property.GetAttributes())
-        {
-            if (!ValidationAttributeProcessorRegistry.TryGetProcessor(attribute, out IPropertyAttributeProcessor? processor) || processor is null)
-            {
-                continue;
-            }
-
-            if (!processor.TryProcess(processingContext, attribute, out PropertyValidationAspect? aspect))
-            {
-                propertyModel = null;
-                return false;
-            }
-
-            if (aspect is not null)
-            {
-                aspects.Add(aspect);
-            }
-        }
-
-        ITypeSymbol nonNullableType = UnwrapNullableType(property.Type, out bool isNullable);
-        bool isValidatableType = false;
-        ImmutableArray<PropertyModel> children = [];
-
-        if (nonNullableType is INamedTypeSymbol unwrappedType && IsValidatableType(unwrappedType))
-        {
-            isValidatableType = true;
-            if (!unwrappedType.IsRecord)
-            {
-                diagnostics.Add(Diagnostic.Create(ValidationGeneratorDiagnostics.UnsupportedValidatableTypeShape, property.Locations.FirstOrDefault(), property.Name, unwrappedType.Name));
-            }
-            else if (traversalPath.Contains(unwrappedType))
-            {
-                diagnostics.Add(Diagnostic.Create(ValidationGeneratorDiagnostics.ValidatableCycleDetected, property.Locations.FirstOrDefault(), unwrappedType.Name));
-            }
-            else
-            {
-                ImmutableArray<PropertyModel>.Builder childBuilder = ImmutableArray.CreateBuilder<PropertyModel>();
-                ImmutableHashSet<INamedTypeSymbol> childPath = traversalPath.Add(unwrappedType);
-
-                foreach (IPropertySymbol child in unwrappedType.GetMembers().OfType<IPropertySymbol>())
-                {
-                    if (child.IsStatic || child.IsIndexer || child.IsImplicitlyDeclared)
-                    {
-                        continue;
-                    }
-
-                    if (!SymbolEqualityComparer.Default.Equals(child.ContainingType, unwrappedType))
-                    {
-                        continue;
-                    }
-
-                    if (child.SetMethod is null)
-                    {
-                        diagnostics.Add(Diagnostic.Create(ValidationGeneratorDiagnostics.UnsupportedNestedPropertyShape, child.Locations.FirstOrDefault(), child.Name, unwrappedType.Name));
-                        continue;
-                    }
-
-                    if (TryCreatePropertyModel(unwrappedType, child, diagnostics, childPath, out PropertyModel? childModel) && childModel is not null)
-                    {
-                        childBuilder.Add(childModel);
-                    }
-                }
-
-                children = childBuilder.ToImmutable();
-            }
-        }
-
-        propertyModel = new PropertyModel(
-            Name: property.Name,
-            NullableTypeName: property.Type.ToDisplayString(s_fullyQualifiedNullableFormat),
-            NonNullableTypeName: nonNullableType.ToDisplayString(s_fullyQualifiedNonNullableFormat),
-            IsNullable: isNullable,
-            IsValidatableType: isValidatableType,
-            Aspects: aspects.ToImmutable(),
-            Children: children);
-
-        return true;
-    }
-
-    private static ImmutableArray<ContainingTypeModel> BuildContainingTypes(INamedTypeSymbol typeSymbol)
+    private ImmutableArray<ContainingTypeModel> BuildContainingTypes()
     {
         Stack<ContainingTypeModel> stack = new();
-        INamedTypeSymbol? current = typeSymbol.ContainingType;
+        INamedTypeSymbol? current = TypeSymbol.ContainingType;
 
         while (current is not null)
         {
@@ -202,39 +60,24 @@ internal static class GenerationCandidateFactory
         return [.. stack];
     }
 
-    private static bool HasPartialDeclaration(INamedTypeSymbol typeSymbol) => typeSymbol.DeclaringSyntaxReferences
-        .Select(static reference => reference.GetSyntax())
-        .OfType<TypeDeclarationSyntax>()
-        .Any(static declaration => declaration.Modifiers.Any(SyntaxKind.PartialKeyword));
-
-    private static ITypeSymbol UnwrapNullableType(ITypeSymbol typeSymbol, out bool isNullable)
+    public static GenerationCandidate? Create(GeneratorAttributeSyntaxContext context)
     {
-        if (typeSymbol.NullableAnnotation == NullableAnnotation.Annotated)
+        if (context.TargetSymbol is not INamedTypeSymbol typeSymbol)
         {
-            isNullable = true;
-            return typeSymbol.WithNullableAnnotation(NullableAnnotation.NotAnnotated);
+            return null;
         }
-
-        if (typeSymbol is INamedTypeSymbol namedType && namedType.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T)
+        if (!typeSymbol.IsRecord)
         {
-            isNullable = true;
-            return namedType.TypeArguments[0];
+            return CreateFailureCandidate(typeSymbol, ValidationGeneratorDiagnostics.TypeMustBeRecord);
         }
-
-        isNullable = false;
-        return typeSymbol;
+        if (!typeSymbol.HasPartialDeclaration())
+        {
+            return CreateFailureCandidate(typeSymbol, ValidationGeneratorDiagnostics.TypeMustBePartial);
+        }
+        GenerationCandidateFactory factory = new(context, typeSymbol);
+        return factory.Create();
     }
 
-    private static bool IsValidatableType(INamedTypeSymbol typeSymbol)
-    {
-        foreach (AttributeData attribute in typeSymbol.GetAttributes())
-        {
-            if (attribute.AttributeClass is { } attributeClass 
-                && attributeClass.GetFullMetadataName().Equals(typeof(ValidatableAttribute).FullName, StringComparison.Ordinal))
-            {
-                return true;
-            }
-        }
-        return false;
-    }
+    private static GenerationCandidate CreateFailureCandidate(INamedTypeSymbol symbol, DiagnosticDescriptor descriptor)
+        => new(symbol.ToDisplayString(), Model: null, [Diagnostic.Create(descriptor, symbol.Locations.FirstOrDefault(), symbol.Name)]);
 }

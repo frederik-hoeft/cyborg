@@ -14,5 +14,7 @@ internal static class KnownTypes
 
     public static string TimeSpan => field ??= $"global::{typeof(TimeSpan).FullName}";
 
+    public static string Enum => field ??= $"global::{typeof(Enum).FullName}";
+
     public static string DefaultEqualityComparerOfT(string typeArgument) => $"global::{typeof(EqualityComparer<>).Namespace}.{nameof(EqualityComparer<>)}<{typeArgument}>.{nameof(EqualityComparer<>.Default)}";
 }

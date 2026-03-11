@@ -1,4 +1,5 @@
-using Cyborg.Core.Aot.Modules.Validation.Attributes;
+using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Model;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -41,9 +42,12 @@ internal sealed class DefaultTimeSpanAttributeProcessor : IPropertyAttributeProc
 
     private sealed class DefaultValueValidationAspect(string valueExpression) : PropertyValidationAspect
     {
-        public override string? RewriteDefaultAssignmentExpression(PropertyModel property, string moduleVariable, string propertyAccessExpression, string? currentExpression)
+        public override bool EnsuresDefault => true;
+
+        public override string? RewriteDefaultAssignmentExpression(PropertyRewriteContext context, string? currentExpression)
         {
-            string equalityComparer = KnownTypes.DefaultEqualityComparerOfT(property.NullableTypeName);
+            string propertyAccessExpression = context.PropertyAccessExpression;
+            string equalityComparer = KnownTypes.DefaultEqualityComparerOfT(context.Property.NullableTypeName);
             string triggerExpression = $"{equalityComparer}.Equals({propertyAccessExpression}, default!)";
             return $"{triggerExpression} ? {KnownTypes.TimeSpan}.{nameof(TimeSpan.Parse)}({valueExpression}) : {propertyAccessExpression}";
         }

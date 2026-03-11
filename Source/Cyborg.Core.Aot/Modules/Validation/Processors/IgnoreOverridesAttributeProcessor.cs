@@ -1,4 +1,4 @@
-using Cyborg.Core.Aot.Modules.Validation.Attributes;
+using Cyborg.Core.Aot.Modules.Validation.Model;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using Microsoft.CodeAnalysis;
 
@@ -18,6 +18,8 @@ internal sealed class IgnoreOverridesAttributeProcessor : IPropertyAttributeProc
 
     private sealed class IgnoreOverridesAspect : PropertyValidationAspect
     {
-        public override string? RewriteOverrideResolutionExpression(PropertyModel property, string moduleVariable, string propertyAccessExpression, string? currentExpression) => null;
+        public override bool EnsuresDefault => false;
+
+        public override string? RewriteOverrideResolutionExpression(PropertyRewriteContext context, string? currentExpression) => null;
     }
 }

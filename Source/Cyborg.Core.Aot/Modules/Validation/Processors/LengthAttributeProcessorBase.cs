@@ -211,6 +211,8 @@ internal abstract class LengthAttributeProcessorBase : IPropertyAttributeProcess
         string? maxExpression,
         bool requiresNullGuard) : PropertyValidationAspect
     {
+        public override bool EnsuresDefault => false;
+
         protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
         {
             string sizeExpression = targetKind switch

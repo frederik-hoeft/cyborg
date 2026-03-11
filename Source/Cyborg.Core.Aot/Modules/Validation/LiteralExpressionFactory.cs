@@ -9,76 +9,29 @@ internal static class LiteralExpressionFactory
 {
     public static bool TryGetLiteralExpression(TypedConstant constant, ITypeSymbol targetType, [NotNullWhen(true)] out string? expression)
     {
-        expression = null;
-
-        if (constant.IsNull)
+        expression = constant switch
         {
-            expression = "null";
-            return true;
-        }
-
-        object? value = constant.Value;
-        if (value is null)
-        {
-            expression = "null";
-            return true;
-        }
-
-        SpecialType specialType = targetType.SpecialType;
-        string targetTypeName = targetType.ToDisplayString(GenerationCandidateFactory.s_fullyQualifiedNullableFormat);
-
-        switch (specialType)
-        {
-            case SpecialType.System_String:
-                expression = SymbolDisplay.FormatLiteral((string)value, quote: true);
-                return true;
-            case SpecialType.System_Char:
-                expression = SymbolDisplay.FormatLiteral((char)value, quote: true);
-                return true;
-            case SpecialType.System_Boolean:
-                expression = (bool)value ? "true" : "false";
-                return true;
-            case SpecialType.System_Byte:
-                expression = "(byte)" + ((byte)value).ToString(CultureInfo.InvariantCulture);
-                return true;
-            case SpecialType.System_SByte:
-                expression = "(sbyte)" + ((sbyte)value).ToString(CultureInfo.InvariantCulture);
-                return true;
-            case SpecialType.System_Int16:
-                expression = "(short)" + ((short)value).ToString(CultureInfo.InvariantCulture);
-                return true;
-            case SpecialType.System_UInt16:
-                expression = "(ushort)" + ((ushort)value).ToString(CultureInfo.InvariantCulture);
-                return true;
-            case SpecialType.System_Int32:
-                expression = ((int)value).ToString(CultureInfo.InvariantCulture);
-                return true;
-            case SpecialType.System_UInt32:
-                expression = ((uint)value).ToString(CultureInfo.InvariantCulture) + "U";
-                return true;
-            case SpecialType.System_Int64:
-                expression = ((long)value).ToString(CultureInfo.InvariantCulture) + "L";
-                return true;
-            case SpecialType.System_UInt64:
-                expression = ((ulong)value).ToString(CultureInfo.InvariantCulture) + "UL";
-                return true;
-            case SpecialType.System_Single:
-                expression = ((float)value).ToString("R", CultureInfo.InvariantCulture) + "F";
-                return true;
-            case SpecialType.System_Double:
-                expression = ((double)value).ToString("R", CultureInfo.InvariantCulture) + "D";
-                return true;
-            case SpecialType.System_Decimal:
-                expression = ((decimal)value).ToString(CultureInfo.InvariantCulture) + "M";
-                return true;
-        }
-
-        if (targetType.TypeKind == TypeKind.Enum)
-        {
-            expression = $"({targetTypeName}){Convert.ToString(value, CultureInfo.InvariantCulture)}";
-            return true;
-        }
-
-        return false;
+            { IsNull: true } or { Value: null } => "null",
+            { Value: { } value } => targetType switch
+            {
+                { SpecialType: SpecialType.System_String } => SymbolDisplay.FormatLiteral((string)value, quote: true),
+                { SpecialType: SpecialType.System_Char } => SymbolDisplay.FormatLiteral((char)value, quote: true),
+                { SpecialType: SpecialType.System_Boolean } => (bool)value ? "true" : "false",
+                { SpecialType: SpecialType.System_Byte } => $"(byte){((byte)value).ToString(CultureInfo.InvariantCulture)}",
+                { SpecialType: SpecialType.System_SByte } => $"(sbyte){((sbyte)value).ToString(CultureInfo.InvariantCulture)}",
+                { SpecialType: SpecialType.System_Int16 } => $"(short){((short)value).ToString(CultureInfo.InvariantCulture)}",
+                { SpecialType: SpecialType.System_UInt16 } => $"(ushort){((ushort)value).ToString(CultureInfo.InvariantCulture)}",
+                { SpecialType: SpecialType.System_Int32 } => ((int)value).ToString(CultureInfo.InvariantCulture),
+                { SpecialType: SpecialType.System_UInt32 } => $"{((uint)value).ToString(CultureInfo.InvariantCulture)}U",
+                { SpecialType: SpecialType.System_Int64 } => $"{((long)value).ToString(CultureInfo.InvariantCulture)}L",
+                { SpecialType: SpecialType.System_UInt64 } => $"{((ulong)value).ToString(CultureInfo.InvariantCulture)}UL",
+                { SpecialType: SpecialType.System_Single } => $"{((float)value).ToString("R", CultureInfo.InvariantCulture)}F",
+                { SpecialType: SpecialType.System_Double } => $"{((double)value).ToString("R", CultureInfo.InvariantCulture)}D",
+                { SpecialType: SpecialType.System_Decimal } => $"{((decimal)value).ToString(CultureInfo.InvariantCulture)}M",
+                { TypeKind: TypeKind.Enum } => $"({targetType.ToDisplayString(KnownSymbolFormats.Nullable)}){Convert.ToString(value, CultureInfo.InvariantCulture)}",
+                _ => null,
+            }
+        };
+        return expression is not null;
     }
 }
