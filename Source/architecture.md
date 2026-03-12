@@ -11,6 +11,7 @@ This document describes the system architecture and key design decisions for the
 - [Project Structure](#project-structure)
 - [Module System Architecture](#module-system-architecture)
   - [Three-Part Module Pattern](#three-part-module-pattern)
+  - [Module Execution Lifecycle](#module-execution-lifecycle)
   - [Module Composition via ModuleReference](#module-composition-via-modulereference)
   - [DI Module Registration Flow](#di-module-registration-flow)
 - [Source Generator Architecture](#source-generator-architecture)
@@ -150,6 +151,77 @@ Each module consists of three types serving distinct responsibilities:
 - **Testability**: Workers can be unit tested with constructed modules
 - **DI integration**: Workers receive injected services; modules hold only configuration
 
+### Module Execution Lifecycle
+
+The `ModuleWorker<TModule>` base class orchestrates the complete lifecycle from raw configuration through validation to execution and artifact publishing:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        ModuleWorker<TModule>                                │
+│                                                                             │
+│  IModuleWorker.ExecuteAsync(runtime, ct)                                    │
+│         │                                                                   │
+│         ▼                                                                   │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  1. VALIDATION PIPELINE  (IModule<TModule>)                         │    │
+│  │     ┌────────────────────────────────────────────────────────────┐  │    │
+│  │     │  ApplyDefaultsAsync()                                      │  │    │
+│  │     │    └─ Fill null/default properties from [DefaultValue<T>]  │  │    │
+│  │     │       annotations, recursively for nested records          │  │    │
+│  │     ├────────────────────────────────────────────────────────────┤  │    │
+│  │     │  ResolveOverridesAsync()                                   │  │    │
+│  │     │    └─ Substitute ${VAR} references from runtime env        │  │    │
+│  │     │    └─ Apply @module.property overrides                     │  │    │
+│  │     ├────────────────────────────────────────────────────────────┤  │    │
+│  │     │  ValidateAsync()                                           │  │    │
+│  │     │    └─ Check [Required], [Range<T>], [ExactLength], etc.    │  │    │
+│  │     │    └─ Returns ValidationResult<TModule>                    │  │    │
+│  │     └────────────────────────────────────────────────────────────┘  │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│         │                                                                   │
+│         ▼                                                                   │
+│  ┌──────────────────────────────────────┐                                   │
+│  │  2. VALIDATION CALLBACK (optional)   │                                   │
+│  │     ModuleValidationCallbackAsync()  │ ← Override for custom validation  │
+│  └──────────────────────────────────────┘                                   │
+│         │                                                                   │
+│         ▼                                                                   │
+│     EnsureValid() ─── throws if errors ──→ ValidationException              │
+│         │                                                                   │
+│         ▼                                                                   │
+│     Module = validatedModule  ← Protected property now available            │
+│         │                                                                   │
+│         ▼                                                                   │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  3. EXECUTION  (abstract, implemented by concrete worker)           │    │
+│  │     ExecuteAsync(runtime, ct)                                       │    │
+│  │       └─ Access Module property (validated, with defaults/overrides)│    │
+│  │       └─ Build Artifacts via Artifacts.Expose("name", value)        │    │
+│  │       └─ Return runtime.Success(Module, Artifacts)                  │    │
+│  │              or runtime.Failure(Module, Artifacts)                  │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│         │                                                                   │
+│         ▼                                                                   │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │  4. ARTIFACT PUBLISHING  (handled by runtime on Success/Failure)     │   │
+│  │     PublishArtifacts(module, artifacts)                              │   │
+│  │       └─ Resolve target environment from module.Artifacts.Environment│   │
+│  │       └─ Call artifacts.PublishToEnvironment(targetEnv)              │   │
+│  │       └─ Each exposed artifact becomes a variable in target scope    │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key Concepts:**
+
+1. **Validation Before Execution** — The worker never accesses `Module` until validation succeeds. The generated `IModule<TModule>` implementation handles the three-stage pipeline (defaults → overrides → constraints).
+
+2. **Immutable Transformation** — Each validation stage returns a new record instance via `with` expressions. The original deserialized module is never mutated.
+
+3. **Artifact Publishing** — Workers expose outputs via `Artifacts.Expose("name", value)`. On success/failure, artifacts are published to the environment scope specified by `module.Artifacts.Environment` (defaults to current scope).
+
+4. **Environment-Driven Overrides** — The override resolution stage enables late-binding of module properties from runtime variables, supporting patterns like `${host.port}` interpolation and `@module_name.property` typed overrides.
+
 ### Module Composition via ModuleReference
 
 The `ModuleReference` type enables modules to contain other modules, creating arbitrarily nested execution trees:
@@ -260,81 +332,33 @@ partial class FooModuleLoader
 
 ### ModuleValidationGenerator
 
-Generates `IModule<TModule>` implementations providing a three-stage validation pipeline: override resolution, default application, and constraint validation.
+Generates `IModule<TModule>` implementations that integrate with the [Module Execution Lifecycle](#module-execution-lifecycle). The generator analyzes module record definitions and emits the three validation pipeline methods.
 
-**Input (developer writes):**
+**Developer Input:**
 
 ```csharp
 [GeneratedModuleValidation]
-public sealed partial record WakeOnLanModule
-(
+public sealed partial record WakeOnLanModule(
     [property: Required] string TargetHost,
     [property: Required][property: ExactLength(17)] string MacAddress,
-    [property: Required][property: Range<int>(Min = 1, Max = ushort.MaxValue)] int LivenessProbePort,
-    [property: Required] string StateVariable,
+    [property: Range<int>(Min = 1, Max = 65535)] int LivenessProbePort,
     [property: DefaultTimeSpan("00:05:00")] TimeSpan MaxWaitTime,
-    [property: DefaultTimeSpan("00:00:30")] TimeSpan HostDiscoveryTimeout,
-    ModuleEnvironmentReference? OutputEnvironment,
-    [property: Required][property: IgnoreOverrides][property: DefaultValue<string>("/usr/bin/wakeonlan")] string Executable
-) : ModuleBase, IModule
-{
-    public static string ModuleId => "cyborg.modules.network.wol.v1";
-}
+    ModuleArtifacts Artifacts   // Inherited from ModuleBase, validated recursively
+) : ModuleBase, IModule;
 ```
 
-**Output (generated):**
+**Generated Contract:**
 
-```csharp
-partial record WakeOnLanModule : IModule<WakeOnLanModule>
-{
-    // Stage 1: Resolve environment variable overrides for each property
-    async ValueTask<WakeOnLanModule> IModule<WakeOnLanModule>.ResolveOverridesAsync(
-        IModuleRuntime runtime, IServiceProvider serviceProvider, CancellationToken cancellationToken);
+The generator emits a partial record implementing `IModule<WakeOnLanModule>` with:
+- `ApplyDefaultsAsync()` — Fills `default!` values from `[DefaultValue<T>]` / `[DefaultTimeSpan]` annotations
+- `ResolveOverridesAsync()` — Substitutes `${VAR}` references and `@module.property` overrides from runtime environment
+- `ValidateAsync()` — Checks `[Required]`, `[Range<T>]`, `[ExactLength]`, enum validity; returns `ValidationResult<T>`
 
-    // Stage 2: Apply default values for properties with default attributes
-    async ValueTask<WakeOnLanModule> IModule<WakeOnLanModule>.ApplyDefaultsAsync(
-        IModuleRuntime runtime, IServiceProvider serviceProvider, CancellationToken cancellationToken);
-
-    // Stage 3: Validate constraints and return ValidationResult<TModule>
-    public async ValueTask<ValidationResult<WakeOnLanModule>> ValidateAsync(
-        IModuleRuntime runtime, IServiceProvider serviceProvider, CancellationToken cancellationToken);
-}
-```
-
-**Validation Pipeline:**
-
-```
-JSON Deserialization
-        │
-        ▼
-ResolveOverridesAsync()    ← Substitute ${VAR} references from runtime environment
-        │                    (skips properties marked [IgnoreOverrides])
-        ▼
-ApplyDefaultsAsync()       ← Fill default! values with [DefaultValue<T>] / [DefaultTimeSpan]
-        │
-        ▼
-ValidateAsync()            ← Check [Required], [Range<T>], [ExactLength], etc.
-        │
-        ▼
-ValidationResult<TModule>  ← Valid(module) or Invalid(errors)
-```
-
-**Supported Attributes:**
-
-| Attribute | Purpose |
-|-----------|---------|
-| `[Required]` | Property must not be `default` after override resolution |
-| `[Range<T>(Min, Max)]` | Numeric value must be within inclusive bounds |
-| `[ExactLength(n)]` | String/collection length must equal `n` |
-| `[DefaultValue<T>(value)]` | Provides compile-time default if property is `default` |
-| `[DefaultTimeSpan("hh:mm:ss")]` | TimeSpan-specific default via parseable string |
-| `[IgnoreOverrides]` | Skip environment variable substitution for this property |
-
-**Why generate this?**
-- AOT-safe: no reflection-based validation frameworks
-- Recursive: nested record types (e.g., `ModuleEnvironmentReference`) are validated depth-first
-- Immutable: returns new record instances via `with` expressions
-- Fail-fast: collects all validation errors before returning
+**Design Characteristics:**
+- **Recursive** — Nested records (e.g., `ModuleArtifacts.Environment`) are processed depth-first
+- **Immutable** — Returns new instances via `with` expressions
+- **AOT-safe** — No reflection; all validation logic is compile-time generated
+- **Fail-fast** — Collects all errors before returning `Invalid(errors)`
 
 ## Dependency Injection Architecture
 
@@ -1073,41 +1097,14 @@ public sealed partial record ForeachModule
 ```
 
 **Worker Behavior:**
-```csharp
-protected async override Task<bool> ExecuteAsync(IModuleRuntime runtime, CancellationToken cancellationToken)
-{
-    if (!runtime.Environment.TryResolveVariable(Module.Collection, out IEnumerable<object>? collection))
-    {
-        throw new InvalidOperationException($"Collection variable '{Module.Collection}' not found in the current environment.");
-    }
-    IRuntimeEnvironment loopEnvironment = runtime.PrepareEnvironment(Module.Body);
-    bool result = true;
-    foreach (object item in collection)
-    {
-        DecomposeItem(loopEnvironment, Module.ItemVariable, item);
-        bool success = await runtime.ExecuteAsync(Module.Body, loopEnvironment, cancellationToken).ConfigureAwait(false);
-        if (!success && !Module.ContinueOnError)
-        {
-            return runtime.Failure(Module);
-        }
-        result &= success;
-    }
-    return runtime.Success(Module);
-}
-
-private static void DecomposeItem(IRuntimeEnvironment environment, string prefix, object item)
-{
-    environment.SetVariable(prefix, item);
-    if (item is IDecomposable decomposable)
-    {
-        foreach ((string key, object? value) in decomposable.Decompose())
-        {
-            string childPrefix = $"{prefix}.{key}";
-            DecomposeItem(environment, childPrefix, value!);
-        }
-    }
-}
-```
+1. Resolve collection variable from environment (fail if not found)
+2. Prepare loop environment using `runtime.PrepareEnvironment(Module.Body)`
+3. For each item in collection:
+   - Set `item_variable` in environment
+   - Recursively decompose `IDecomposable` items to dot-notation vars (e.g., `host.hostname`)
+   - Execute body module
+   - If failure and `continue_on_error` is false, abort
+4. Return aggregate result
 
 **Key Features:**
 - Uses `runtime.PrepareEnvironment()` to create iteration scope based on `body.environment`
@@ -1185,31 +1182,12 @@ public sealed record GuardModule(
 - This allows `finally` to read variables set during `body` execution (e.g., `container_name`)
 
 **Worker Behavior:**
-```csharp
-protected override async Task<bool> ExecuteAsync(IModuleRuntime runtime, CancellationToken cancellationToken)
-{
-    bool bodyResult = false;
-    try
-    {
-        bodyResult = await runtime.ExecuteAsync(Module.Body, cancellationToken);
-        if (!bodyResult && Module.OnError is not null)
-        {
-            // OnError can reference body's named environment
-            await runtime.ExecuteAsync(Module.OnError, CancellationToken.None);
-        }
-        return bodyResult;
-    }
-    finally
-    {
-        // Finally always executes, even on cancellation
-        // Uses CancellationToken.None to ensure cleanup completes
-        await runtime.ExecuteAsync(Module.Finally, CancellationToken.None);
-        
-        // Optionally clean up named environment if transient
-        // (handled automatically by runtime for transient envs)
-    }
-}
-```
+1. Execute `body` module, capture result
+2. If body failed and `on_error` is defined, execute it (can reference body's named environment)
+3. In `finally` block (always runs, even on cancellation):
+   - Execute `finally` module with `CancellationToken.None` to ensure cleanup
+   - Runtime automatically cleans up transient environments
+4. Return body result
 
 ---
 
@@ -1258,15 +1236,9 @@ public sealed partial record IfModule
 ```
 
 **Worker Behavior:**
-```csharp
-protected async override Task<bool> ExecuteAsync(IModuleRuntime runtime, CancellationToken cancellationToken)
-{
-    // Condition runs in current environment, result determines branch
-    bool conditionResult = await runtime.ExecuteAsync(Module.Condition.Module, runtime.Environment, cancellationToken);
-    ModuleContext branchToExecute = conditionResult ? Module.Then : Module.Else ?? Module.Then;
-    return await runtime.ExecuteAsync(branchToExecute, cancellationToken);
-}
-```
+1. Execute condition module in current environment
+2. If condition succeeded, execute `then` branch; otherwise execute `else` branch (or `then` if no `else`)
+3. Return branch execution result
 
 **Key Features:**
 - Condition is any module that returns success (true) or failure (false)
@@ -1343,47 +1315,13 @@ public sealed record BorgRepositoryModule(
 ```
 
 **Worker Behavior:**
-```csharp
-protected override async Task<bool> ExecuteAsync(IModuleRuntime runtime, CancellationToken cancellationToken)
-{
-    // Construct BORG_REPO from module properties (which may contain ${var} indirection)
-    string hostname = ResolveProperty(runtime.Environment, Module.Hostname);
-    int port = int.Parse(ResolveProperty(runtime.Environment, Module.Port.ToString()));
-    string repoRoot = ResolveProperty(runtime.Environment, Module.RepositoryRoot);
-    string repoName = ResolveProperty(runtime.Environment, Module.RepositoryName);
-    
-    string borgRepo = $"ssh://borg@{hostname}:{port}{repoRoot}/{repoName}";
-    
-    // Set borg environment variables in current scope
-    runtime.Environment.SetVariable("BORG_REPO", borgRepo);
-    
-    if (Module.SshCommand is not null)
-    {
-        string sshCommand = ResolveProperty(runtime.Environment, Module.SshCommand);
-        runtime.Environment.SetVariable("BORG_RSH", sshCommand);
-    }
-    
-    if (Module.PassphraseVariable is not null)
-    {
-        // Passphrase is read from environment, not stored in module
-        if (runtime.Environment.TryResolveVariable<string>(Module.PassphraseVariable, out string? passphrase))
-        {
-            runtime.Environment.SetVariable("BORG_PASSPHRASE", passphrase);
-        }
-    }
-    
-    try
-    {
-        // Body inherits these variables via environment scoping
-        return await runtime.ExecuteAsync(Module.Body, cancellationToken);
-    }
-    finally
-    {
-        // Security: clear passphrase from environment
-        runtime.Environment.TryRemoveVariable("BORG_PASSPHRASE");
-    }
-}
-```
+1. Resolve hostname, port, repository root/name from module properties (may contain `${var}` indirection)
+2. Construct `BORG_REPO` URL: `ssh://borg@{hostname}:{port}{repoRoot}/{repoName}`
+3. Set `BORG_REPO` in current environment scope
+4. If `ssh_command` specified, set `BORG_RSH`
+5. If `passphrase_variable` specified, resolve passphrase from environment and set `BORG_PASSPHRASE`
+6. Execute body module (inherits borg vars via scoping)
+7. In `finally`: clear `BORG_PASSPHRASE` for security
 
 **Environment Flow:**
 1. Parent scope sets secrets via `ConfigMapModule` (e.g., `borg_passphrase`)
@@ -1449,26 +1387,10 @@ public enum BorgCompressionAlgorithm { None, Lz4, Zstd, Zlib, Lzma }
 
 **Worker Behavior:**
 1. Resolve `BORG_REPO`, `BORG_RSH`, `BORG_PASSPHRASE` from environment (set by repository module)
-2. Build argument list programmatically (no string interpolation):
-   ```csharp
-   ImmutableArray<string>.Builder args = ImmutableArray.CreateBuilder<string>();
-   args.Add("create");
-   if (Module.ShowRc) args.Add("--show-rc");
-   if (Module.ShowStats) args.Add("--stats");
-   if (Module.Compression is { } c)
-   {
-       args.Add("--compression");
-       args.Add(c.Level.HasValue ? $"{c.Algorithm.ToLower()},{c.Level}" : c.Algorithm.ToLower());
-   }
-   // ... add excludes, paths
-   args.Add($"::{Module.ArchiveNamePattern}");
-   args.AddRange(Module.Paths);
-   ```
-3. Execute subprocess with environment variables
-4. Parse stdout for metrics (via grammar-based parser)
-5. Record metrics: `cyborg_borg_create_duration_seconds`, `cyborg_borg_archive_size_bytes`, etc.
-
-**Security:** No shell expansion occurs. Arguments are passed directly to `Process.StartInfo.Arguments` as an array, preventing injection.
+2. Build argument list programmatically: `create`, flags (`--show-rc`, `--stats`), compression, excludes, archive pattern, paths
+3. Execute subprocess with environment variables (array-based args, no shell expansion = injection-safe)
+4. Parse stdout via grammar-based parser
+5. Record Prometheus metrics
 
 ---
 
@@ -1873,22 +1795,10 @@ Secrets can be loaded via the `configuration` property of a `ModuleContext`, pop
 ```
 
 **Worker Behavior:**
-```csharp
-protected override Task<bool> ExecuteAsync(IModuleRuntime runtime, CancellationToken cancellationToken)
-{
-    IEnumerable<KeyValuePair<string, string>> secrets = LoadSecrets(Module.Source, Module.SourceType, Module.Keys);
-    
-    foreach (KeyValuePair<string, string> secret in secrets)
-    {
-        string variableName = string.IsNullOrEmpty(Module.EnvironmentPrefix) 
-            ? secret.Key 
-            : $"{Module.EnvironmentPrefix}.{secret.Key}";
-        runtime.Environment.SetVariable(variableName, secret.Value);
-    }
-    
-    return Task.FromResult(true);
-}
-```
+1. Load secrets from source using specified `source_type`
+2. Filter to requested keys (if specified)
+3. Set each secret as `{prefix}.{key}` in current environment scope
+4. Return success
 
 **Environment Integration:**
 - Secrets module implements `IConfigurationModule`, allowing use in `configuration` blocks
