@@ -4,8 +4,6 @@ internal static class KnownTypes
 {
     public static string IServiceProvider => field ??= $"global::{typeof(IServiceProvider).FullName}";
 
-    public static string IReadOnlyCollectionT => field ??= $"global::{typeof(IReadOnlyCollection<>).FullName}";
-
     public static string CancellationToken => field ??= $"global::{typeof(CancellationToken).FullName}";
 
     public static string ValueTaskOfT(string typeArgument) => $"global::{typeof(ValueTask<>).Namespace}.{nameof(ValueTask<>)}<{typeArgument}>";
@@ -21,6 +19,8 @@ internal static class KnownTypes
     public static string JsonNamingPolicy => "global::System.Text.Json.JsonNamingPolicy";
 
     public static string NotNullAttribute => "global::System.Diagnostics.CodeAnalysis.NotNullAttribute";
+
+    public static string GeneratedRegexAttribute => "global::System.Text.RegularExpressions.GeneratedRegexAttribute";
 
     public static string DefaultEqualityComparerOfT(string typeArgument) => $"global::{typeof(EqualityComparer<>).Namespace}.{nameof(EqualityComparer<>)}<{typeArgument}>.{nameof(EqualityComparer<>.Default)}";
 }

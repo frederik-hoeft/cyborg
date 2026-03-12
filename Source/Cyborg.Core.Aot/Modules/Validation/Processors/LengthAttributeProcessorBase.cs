@@ -200,7 +200,7 @@ internal abstract class LengthAttributeProcessorBase : IPropertyAttributeProcess
     }
 
     private static bool IsReadOnlyCollection(INamedTypeSymbol type) =>
-        type.GetFullMetadataName(includeGlobalNamespacePrefix: true).Equals(KnownTypes.IReadOnlyCollectionT, StringComparison.Ordinal);
+        type.OriginalDefinition.SpecialType is SpecialType.System_Collections_Generic_IReadOnlyCollection_T;
 
     private enum LengthTargetKind
     {

@@ -11,7 +11,8 @@ namespace Cyborg.Modules.Subprocess;
 public sealed partial record SubprocessModule
 (
     [property: Required] SubprocessCommand Command,
-    [property: Required][property: DefaultInstance] SubprocessOutputOptions Output
+    [property: Required][property: DefaultInstance] SubprocessOutputOptions Output,
+    [property: DefaultValue<bool>(true)] bool CheckExitCode
 ) : ModuleBase, IModule
 {
     public static string ModuleId => "cyborg.modules.subprocess.v1";
@@ -27,15 +28,9 @@ public sealed record SubprocessCommand
 [Validatable]
 public sealed record SubprocessOutputOptions
 (
-    [property: Required][property: DefaultValue<string>(SubprocessOutputOptions.STDOUT_VARIABLE_NAME_DEFAULT)] string StdoutVariableName,
-    [property: Required][property: DefaultValue<string>(SubprocessOutputOptions.STDERR_VARIABLE_NAME_DEFAULT)] string StderrVariableName,
     bool ReadStdout,
     bool ReadStderr
 ) : IDefaultInstance<SubprocessOutputOptions>
 {
-    public static SubprocessOutputOptions Default => new(STDOUT_VARIABLE_NAME_DEFAULT, STDERR_VARIABLE_NAME_DEFAULT, ReadStdout: false, ReadStderr: false);
-
-    private const string STDOUT_VARIABLE_NAME_DEFAULT = "cyborg.modules.subprocess.v1.stdout";
-
-    private const string STDERR_VARIABLE_NAME_DEFAULT = "cyborg.modules.subprocess.v1.stderr";
+    public static SubprocessOutputOptions Default => new(ReadStdout: false, ReadStderr: false);
 }

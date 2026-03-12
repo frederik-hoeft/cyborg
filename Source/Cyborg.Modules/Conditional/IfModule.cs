@@ -14,4 +14,6 @@ public sealed partial record IfModule
 ) : ModuleBase, IModule
 {
     public static string ModuleId => "cyborg.modules.if.v1";
+
+    public static string Target => "cyborg.modules.if.v1.result";
 }

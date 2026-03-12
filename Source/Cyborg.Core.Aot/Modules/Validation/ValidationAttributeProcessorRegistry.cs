@@ -21,6 +21,7 @@ internal static class ValidationAttributeProcessorRegistry
         new ExactLengthAttributeProcessor(),
         new DefinedEnumValueAttributeProcessor(),
         new DefaultInstanceAttributeProcessor(),
+        new MustMatchAttributeProcessor(),
     ];
 
     internal static FrozenDictionary<string, IPropertyAttributeProcessor> ByMetadataName => 

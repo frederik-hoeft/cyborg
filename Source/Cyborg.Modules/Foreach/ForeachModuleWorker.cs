@@ -1,6 +1,7 @@
 ﻿using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime;
+using Cyborg.Core.Modules.Runtime.Artifacts;
 using Cyborg.Core.Modules.Runtime.Environments;
 using System.Diagnostics.CodeAnalysis;
 
@@ -8,37 +9,48 @@ namespace Cyborg.Modules.Foreach;
 
 public sealed class ForeachModuleWorker(IWorkerContext<ForeachModule> context) : ModuleWorker<ForeachModule>(context)
 {
-    protected async override Task<bool> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
+    protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
         if (!runtime.Environment.TryResolveVariable(Module.Collection, out IEnumerable<object>? collection))
         {
+            // TODO: proper failure result once we have logging
             throw new InvalidOperationException($"Collection variable '{Module.Collection}' not found in the current environment.");
         }
-        IRuntimeEnvironment loopEnvironment = runtime.PrepareEnvironment(Module.Body);
-        bool result = true;
+        ModuleExitStatus exitCode = ModuleExitStatus.Skipped;
         foreach (object item in collection)
         {
-            DecomposeItem(loopEnvironment, Module.ItemVariable, item);
-            bool success = await runtime.ExecuteAsync(Module.Body, loopEnvironment, cancellationToken).ConfigureAwait(false);
-            if (!success && !Module.ContinueOnError)
+            if (cancellationToken.IsCancellationRequested)
             {
-                return runtime.Failure(Module);
+                // TODO: logging
+                return runtime.Exit(Canceled());
             }
-            result &= success;
-        }
-        return runtime.Success(Module);
-    }
-
-    private static void DecomposeItem(IRuntimeEnvironment environment, string prefix, object item)
-    {
-        environment.SetVariable(prefix, item);
-        if (item is IDecomposable decomposable)
-        {
-            foreach ((string key, object? value) in decomposable.Decompose())
+            IRuntimeEnvironment loopEnvironment = runtime.PrepareEnvironment(Module.Body);
+            if (item is IDecomposable decomposable)
             {
-                string childPrefix = $"{prefix}.{key}";
-                DecomposeItem(environment, childPrefix, value!);
+                loopEnvironment.Publish(Module.ItemVariable, decomposable, DecompositionStrategy.FullHierarchy, publishNullValues: true);
+            }
+            else
+            {
+                loopEnvironment.SetVariable(Module.ItemVariable, item);
+            }
+            IModuleExecutionResult result = await runtime.ExecuteAsync(Module.Body, loopEnvironment, cancellationToken);
+            if (result.Status is ModuleExitStatus.Canceled)
+            {
+                return runtime.Exit(Canceled());
+            }
+            if (result.Status is ModuleExitStatus.Failed)
+            {
+                if (!Module.ContinueOnError)
+                {
+                    return runtime.Exit(Failed());
+                }
+                exitCode = ModuleExitStatus.Failed;
+            }
+            else if (result.Status is ModuleExitStatus.Success && exitCode is ModuleExitStatus.Skipped)
+            {
+                exitCode = ModuleExitStatus.Success;
             }
         }
+        return runtime.Exit(WithStatus(exitCode));
     }
 }

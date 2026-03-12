@@ -8,16 +8,25 @@ namespace Cyborg.Modules.Sequence;
 // sample sequence module worker that executes each step in order and returns false if any step fails
 public sealed class SequenceModuleWorker(IWorkerContext<SequenceModule> context) : ModuleWorker<SequenceModule>(context)
 {
-    protected async override Task<bool> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
+    protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
+        ModuleExitStatus status = ModuleExitStatus.Skipped;
         foreach (ModuleContext step in Module.Steps)
         {
-            bool success = await runtime.ExecuteAsync(step, cancellationToken);
-            if (!success)
+            if (cancellationToken.IsCancellationRequested)
             {
-                return runtime.Failure(Module);
+                return runtime.Exit(Canceled());
+            }
+            IModuleExecutionResult result = await runtime.ExecuteAsync(step, cancellationToken);
+            if (result.Status is ModuleExitStatus.Canceled or ModuleExitStatus.Failed)
+            {
+                return runtime.Exit(WithStatus(result.Status));
+            }
+            if (result.Status is ModuleExitStatus.Success)
+            {
+                status = ModuleExitStatus.Success;
             }
         }
-        return runtime.Success(Module);
+        return runtime.Exit(WithStatus(status));
     }
 }

@@ -12,13 +12,13 @@ internal sealed class ScopedRuntime(IModuleRuntime root, IModuleRuntime parent, 
 
     public override IRuntimeEnvironment Environment => environment;
 
-    public override Task<bool> ExecuteAsync(IModuleWorker module, EnvironmentScope scope = EnvironmentScope.Global, string? name = null, CancellationToken cancellationToken = default)
+    public override Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker module, EnvironmentScope scope = EnvironmentScope.Global, string? name = null, CancellationToken cancellationToken = default)
     {
         IRuntimeEnvironment environment = CreateScopedEnvironment(parent: this, scope, name);
         return ExecuteAsync(module, environment, cancellationToken);
     }
 
-    public override Task<bool> ExecuteAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken = default)
+    public override Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(module);
         IModuleRuntime runtime = new ScopedRuntime(root, parent: this, environment, NamingPolicy);

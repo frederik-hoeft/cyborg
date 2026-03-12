@@ -58,13 +58,13 @@ public abstract class ModuleRuntimeBase(JsonNamingPolicy namingPolicy) : IModule
         return environment;
     }
 
-    public virtual Task<bool> ExecuteAsync(ModuleContext moduleContext, CancellationToken cancellationToken = default)
+    public virtual Task<IModuleExecutionResult> ExecuteAsync(ModuleContext moduleContext, CancellationToken cancellationToken = default)
     {
         IRuntimeEnvironment environment = PrepareEnvironment(moduleContext);
         return ExecuteAsync(moduleContext, environment, cancellationToken);
     }
 
-    public virtual async Task<bool> ExecuteAsync(ModuleContext moduleContext, IRuntimeEnvironment environment, CancellationToken cancellationToken = default)
+    public virtual async Task<IModuleExecutionResult> ExecuteAsync(ModuleContext moduleContext, IRuntimeEnvironment environment, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(moduleContext);
         if (moduleContext.Configuration is { } configuration)
@@ -74,9 +74,9 @@ public abstract class ModuleRuntimeBase(JsonNamingPolicy namingPolicy) : IModule
         return await ExecuteAsync(moduleContext.Module.Module, environment, cancellationToken);
     }
 
-    public abstract Task<bool> ExecuteAsync(IModuleWorker module, EnvironmentScope scope = EnvironmentScope.Global, string? name = null, CancellationToken cancellationToken = default);
+    public abstract Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker module, EnvironmentScope scope = EnvironmentScope.Global, string? name = null, CancellationToken cancellationToken = default);
 
-    public abstract Task<bool> ExecuteAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken = default);
+    public abstract Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken = default);
 
     public abstract bool TryAddEnvironment(IRuntimeEnvironment environment);
 
@@ -84,28 +84,19 @@ public abstract class ModuleRuntimeBase(JsonNamingPolicy namingPolicy) : IModule
 
     public abstract bool TryRemoveEnvironment(IRuntimeEnvironment environment);
 
-    public virtual void PublishArtifacts<TModule>(TModule module, IModuleArtifacts artifacts) where TModule : ModuleBase, IModule
+    public virtual IModuleExecutionResult Exit<TModule>(IModuleExecutionResult<TModule> result) where TModule : ModuleBase, IModule
     {
-        ArgumentNullException.ThrowIfNull(module);
-        ArgumentNullException.ThrowIfNull(artifacts);
-        ModuleEnvironmentReference deploymentTarget = module.Artifacts.Environment;
-        IRuntimeEnvironment environment = ResolveEnvironmentReference(deploymentTarget)
-            ?? throw new InvalidOperationException($"Unable to resolve environment reference for module {module.Name}: {deploymentTarget}");
-        artifacts.PublishToEnvironment(environment);
-    }
+        ArgumentNullException.ThrowIfNull(result);
 
-    protected virtual bool Exit<TModule>(TModule module, bool success, IModuleArtifacts? artifacts) where TModule : ModuleBase, IModule
-    {
-        if (artifacts is not null)
+        if (result.Artifacts is { } artifacts)
         {
-            PublishArtifacts(module, artifacts);
+            ModuleEnvironmentReference deploymentTarget = result.Module.Artifacts.Environment;
+            IRuntimeEnvironment environment = ResolveEnvironmentReference(deploymentTarget)
+                ?? throw new InvalidOperationException($"Unable to resolve environment reference for module {result.Module.Name}: {deploymentTarget}");
+            artifacts.PublishToEnvironment(environment, result.Status);
         }
-        return success;
+        return result;
     }
-
-    public bool Success<TModule>(TModule module, IModuleArtifacts? artifacts = null) where TModule : ModuleBase, IModule => Exit(module, success: true, artifacts);
-
-    public bool Failure<TModule>(TModule module, IModuleArtifacts? artifacts = null) where TModule : ModuleBase, IModule => Exit(module, success: false, artifacts);
 
     public virtual IRuntimeEnvironment? ResolveEnvironmentReference(ModuleEnvironmentReference environmentReference) => environmentReference switch
     {

@@ -8,7 +8,7 @@ namespace Cyborg.Modules.Named;
 
 public sealed class NamedModuleReferenceModuleWorker(IWorkerContext<NamedModuleReferenceModule> context, IModuleRegistry moduleRegistry) : ModuleWorker<NamedModuleReferenceModule>(context)
 {
-    protected override Task<bool> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
+    protected override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
         if (!moduleRegistry.TryGetModule(Module.Target, out ModuleContext? targetModule))
         {

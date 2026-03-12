@@ -125,4 +125,20 @@ internal static class ValidationGeneratorDiagnostics
         category: CATEGORY,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
+
+    public static DiagnosticDescriptor MemberTypeMismatch { get; } = new(
+        id: "CYBORGVAL016",
+        title: "Attribute member type mismatch",
+        messageFormat: "Property '{0}' on '{1}' has a '{2}' referencing member '{3}' whose type does not match the expected type '{4}' for the attribute",
+        category: CATEGORY,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    public static DiagnosticDescriptor PropertyAttributePreconditionNotMet { get; } = new(
+        id: "CYBORGVAL017",
+        title: "Property attribute precondition not met",
+        messageFormat: "Property '{0}' on '{1}' has a '{2}' whose precondition is not met: '{3}'",
+        category: CATEGORY,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault : true);
 }

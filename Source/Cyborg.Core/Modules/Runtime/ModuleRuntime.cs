@@ -37,13 +37,13 @@ public sealed class ModuleRuntime(GlobalRuntimeEnvironment defaultEnvironment, J
         return _environments.Remove(environment.Name);
     }
 
-    public override Task<bool> ExecuteAsync(IModuleWorker module, EnvironmentScope scope = EnvironmentScope.Global, string? name = null, CancellationToken cancellationToken = default)
+    public override Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker module, EnvironmentScope scope = EnvironmentScope.Global, string? name = null, CancellationToken cancellationToken = default)
     {
         IRuntimeEnvironment environment = CreateScopedEnvironment(parent: this, scope, name);
         return ExecuteAsync(module, environment, cancellationToken);
     }
 
-    public override Task<bool> ExecuteAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken = default)
+    public override Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(module);
         IModuleRuntime runtime = new ScopedRuntime(root: this, parent: this, environment: environment, NamingPolicy);

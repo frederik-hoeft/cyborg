@@ -22,6 +22,7 @@ internal static class ValidationFrameworkSourceRegistry
         static context => context.AddEmbeddedSource<ExactLengthAttribute>(),
         static context => context.AddEmbeddedSource<DefinedEnumValueAttribute>(),
         static context => context.AddEmbeddedSource<DefaultInstanceAttribute>(),
+        static context => context.AddEmbeddedSource<MustMatchAttribute>(),
     ];
 
     public static void Emit(IncrementalGeneratorPostInitializationContext context)

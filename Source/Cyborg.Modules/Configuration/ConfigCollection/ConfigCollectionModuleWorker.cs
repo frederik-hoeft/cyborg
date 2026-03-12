@@ -7,20 +7,29 @@ namespace Cyborg.Modules.Configuration.ConfigCollection;
 
 public sealed class ConfigCollectionModuleWorker(IWorkerContext<ConfigCollectionModule> context) : ModuleWorker<ConfigCollectionModule>(context)
 {
-    protected async override Task<bool> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
+    protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
+        ModuleExitStatus status = ModuleExitStatus.Skipped;
         foreach (ModuleReference source in Module.Sources)
         {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return runtime.Exit(Canceled());
+            }
             if (source.Module is not IConfigurationModule)
             {
                 throw new InvalidOperationException($"Module {source.Module.ModuleId} is not a valid configuration source.");
             }
-            bool success = await runtime.ExecuteAsync(source.Module, runtime.Environment, cancellationToken);
-            if (!success)
+            IModuleExecutionResult result = await runtime.ExecuteAsync(source.Module, runtime.Environment, cancellationToken);
+            if (result.Status is ModuleExitStatus.Canceled or ModuleExitStatus.Failed)
             {
-                return runtime.Failure(Module);
+                return runtime.Exit(WithStatus(result.Status));
+            }
+            if (result.Status is ModuleExitStatus.Success)
+            {
+                status = ModuleExitStatus.Success;
             }
         }
-        return runtime.Success(Module);
+        return runtime.Exit(WithStatus(status));
     }
 }

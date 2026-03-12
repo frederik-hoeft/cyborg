@@ -7,14 +7,9 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Modules.Template;
 
-public sealed class TemplateModuleWorker
-(
-    IWorkerContext<TemplateModule> context,
-    GlobalRuntimeEnvironment defaultEnvironment,
-    IModuleConfigurationLoader configurationLoader
-) : ModuleWorker<TemplateModule>(context)
+public sealed class TemplateModuleWorker(IWorkerContext<TemplateModule> context, GlobalRuntimeEnvironment defaultEnvironment, IModuleConfigurationLoader configurationLoader) : ModuleWorker<TemplateModule>(context)
 {
-    protected async override Task<bool> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
+    protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
         if (!defaultEnvironment.TryResolveVariable(TemplateModule.LoadTargetName, out string? templateName))
         {
@@ -26,6 +21,7 @@ public sealed class TemplateModuleWorker
         }
         // Load the template content from the specified path
         ModuleContext module = await configurationLoader.LoadModuleAsync(templatePath, cancellationToken);
-        return await runtime.ExecuteAsync(module, cancellationToken);
+        IModuleExecutionResult result = await runtime.ExecuteAsync(module, cancellationToken);
+        return runtime.Exit(WithStatus(result.Status));
     }
 }

@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis;
 namespace Cyborg.Core.Aot.Modules.Validation;
 
 internal readonly record struct PropertyAttributeProcessingContext(
+    Compilation Compilation,
     INamedTypeSymbol ContainingType,
     IPropertySymbol Property,
     List<Diagnostic> Diagnostics)

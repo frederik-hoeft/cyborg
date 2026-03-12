@@ -1,4 +1,7 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using Cyborg.Core.Modules.Configuration.Model;
+using Cyborg.Core.Modules.Runtime.Artifacts;
+using Cyborg.Core.Modules.Validation;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
@@ -145,4 +148,41 @@ public partial class RuntimeEnvironment(string name, bool isTransient, JsonNamin
 
     T? IRuntimeEnvironment.Resolve<TModule, T>(TModule module, T? value, string? moduleExpression, string? valueExpression) where T : default => 
         Resolve(module, value, moduleExpression, valueExpression);
+
+    void IRuntimeEnvironment.Publish<TModule, T>(TModule module, string root, T decomposable)
+    {
+        ArgumentNullException.ThrowIfNull(module);
+        Publish(root, decomposable, module.Artifacts.DecompositionStrategy, module.Artifacts.PublishNullValues);
+    }
+
+    public virtual void Publish(string root, IDecomposable decomposable, DecompositionStrategy strategy, bool publishNullValues)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(root);
+        ArgumentNullException.ThrowIfNull(decomposable);
+
+        if (strategy is DecompositionStrategy.FullHierarchy)
+        {
+            SetVariable(root, decomposable);
+        }
+        foreach ((string key, object? value) in decomposable.Decompose())
+        {
+            if (value is IDecomposable nested)
+            {
+                // inner node
+                if (strategy is not DecompositionStrategy.LeavesOnly)
+                {
+                    SetVariable($"{root}.{key}", nested);
+                }
+                if (strategy is not DecompositionStrategy.Shallow)
+                {
+                    Publish($"{root}.{key}", nested, strategy, publishNullValues);
+                }
+            }
+            else if (value is not null || publishNullValues)
+            {
+                // leaf node
+                SetVariable($"{root}.{key}", value);
+            }
+        }
+    }
 }

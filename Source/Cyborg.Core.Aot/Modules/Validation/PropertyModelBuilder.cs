@@ -42,7 +42,7 @@ internal sealed class PropertyModelBuilder(GenerationCandidateFactory factory, L
 
     private bool TryCreatePropertyModel(INamedTypeSymbol containingType, IPropertySymbol property, ImmutableHashSet<INamedTypeSymbol> traversalPath, [NotNullWhen(true)] out PropertyModel? propertyModel)
     {
-        PropertyAttributeProcessingContext processingContext = new(containingType, property, diagnostics);
+        PropertyAttributeProcessingContext processingContext = new(factory.Context.SemanticModel.Compilation, containingType, property, diagnostics);
         ImmutableArray<PropertyValidationAspect>.Builder aspects = ImmutableArray.CreateBuilder<PropertyValidationAspect>();
 
         foreach (AttributeData attribute in property.GetAttributes())

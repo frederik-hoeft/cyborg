@@ -2,6 +2,7 @@
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Configuration.Model;
+using System.Text.RegularExpressions;
 
 namespace Cyborg.Modules.Network.WakeOnLan;
 
@@ -9,7 +10,7 @@ namespace Cyborg.Modules.Network.WakeOnLan;
 public sealed partial record WakeOnLanModule
 (
     [property: Required] string TargetHost,
-    [property: Required][property: ExactLength(17)] string MacAddress,
+    [property: Required][property: MustMatch(nameof(WakeOnLanModule.MacAddressRegex))] string MacAddress,
     [property: Required][property: Range<int>(Min = 1, Max = ushort.MaxValue)] int LivenessProbePort,
     [property: Required] string StateVariable,
     [property: DefaultTimeSpan("00:05:00")] TimeSpan MaxWaitTime,
@@ -18,4 +19,7 @@ public sealed partial record WakeOnLanModule
 ) : ModuleBase, IModule
 {
     public static string ModuleId => "cyborg.modules.network.wol.v1";
+
+    [GeneratedRegex(@"^([0-9A-Fa-f]{2}[:\-]){5}([0-9A-Fa-f]{2})$")]
+    private static partial Regex MacAddressRegex { get; }
 }

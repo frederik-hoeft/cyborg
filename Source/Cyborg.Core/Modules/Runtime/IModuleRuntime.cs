@@ -20,21 +20,17 @@ public interface IModuleRuntime
 
     bool TryRemoveEnvironment(IRuntimeEnvironment environment);
 
-    Task<bool> ExecuteAsync(ModuleContext moduleContext, CancellationToken cancellationToken = default);
+    Task<IModuleExecutionResult> ExecuteAsync(ModuleContext moduleContext, CancellationToken cancellationToken = default);
 
-    Task<bool> ExecuteAsync(IModuleWorker module, EnvironmentScope scope = EnvironmentScope.Global, string? name = null, CancellationToken cancellationToken = default);
+    Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker module, EnvironmentScope scope = EnvironmentScope.Global, string? name = null, CancellationToken cancellationToken = default);
 
-    Task<bool> ExecuteAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken = default);
+    Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken = default);
 
-    Task<bool> ExecuteAsync(ModuleContext moduleContext, IRuntimeEnvironment environment, CancellationToken cancellationToken = default);
+    Task<IModuleExecutionResult> ExecuteAsync(ModuleContext moduleContext, IRuntimeEnvironment environment, CancellationToken cancellationToken = default);
 
     IRuntimeEnvironment PrepareEnvironment(ModuleContext moduleContext);
 
     IRuntimeEnvironment? ResolveEnvironmentReference(ModuleEnvironmentReference environmentReference);
 
-    void PublishArtifacts<TModule>(TModule module, IModuleArtifacts artifacts) where TModule : ModuleBase, IModule;
-
-    bool Success<TModule>(TModule module, IModuleArtifacts? artifacts = null) where TModule : ModuleBase, IModule;
-
-    bool Failure<TModule>(TModule module, IModuleArtifacts? artifacts = null) where TModule : ModuleBase, IModule;
+    IModuleExecutionResult Exit<TModule>(IModuleExecutionResult<TModule> result) where TModule : ModuleBase, IModule;
 }

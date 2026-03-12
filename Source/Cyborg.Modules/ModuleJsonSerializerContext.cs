@@ -1,4 +1,5 @@
-﻿using Cyborg.Modules.Borg;
+﻿using Cyborg.Core.Modules.Configuration.Model;
+using Cyborg.Modules.Borg;
 using Cyborg.Modules.Conditional;
 using Cyborg.Modules.Configuration.ConfigCollection;
 using Cyborg.Modules.Configuration.ConfigMap;
@@ -19,11 +20,11 @@ namespace Cyborg.Modules;
 [JsonSerializable(typeof(TemplateModule))]
 [JsonSerializable(typeof(ConfigMapModule))]
 [JsonSerializable(typeof(ConfigCollectionModule))]
-[JsonSerializable(typeof(NamedModuleDefinitionModule))]
 [JsonSerializable(typeof(NamedModuleReferenceModule))]
 [JsonSerializable(typeof(ForeachModule))]
 [JsonSerializable(typeof(WakeOnLanModule))]
 [JsonSerializable(typeof(IfModule))]
 // TODO: temp
 [JsonSerializable(typeof(BorgRemote))]
+[JsonSerializable(typeof(ModuleContextDeserializationDummy))]
 public sealed partial class ModuleJsonSerializerContext : JsonSerializerContext;

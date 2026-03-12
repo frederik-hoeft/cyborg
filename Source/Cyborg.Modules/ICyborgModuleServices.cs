@@ -26,7 +26,6 @@ namespace Cyborg.Modules;
 [Singleton<IModuleLoader, TemplateModuleLoader>]
 [Singleton<IModuleLoader, ConfigMapModuleLoader>]
 [Singleton<IModuleLoader, ConfigCollectionModuleLoader>]
-[Singleton<IModuleLoader, NamedModuleDefinitionModuleLoader>]
 [Singleton<IModuleLoader, NamedModuleReferenceModuleLoader>]
 [Singleton<IModuleLoader, ForeachModuleLoader>]
 [Singleton<IModuleLoader, WakeOnLanModuleLoader>]
