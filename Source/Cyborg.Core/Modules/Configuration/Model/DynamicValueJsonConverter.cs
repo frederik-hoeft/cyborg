@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 
 namespace Cyborg.Core.Modules.Configuration.Model;
 
-public sealed partial class DynamicValueJsonConverter(IDynamicValueProviderRegistry registry) : ModuleJsonConverter<DynamicValue>
+public sealed partial class DynamicValueJsonConverter(IDynamicValueProviderRegistry registry, IModuleLoaderContextProvider provider) : ModuleJsonConverter<DynamicValue>(provider)
 {
     [GeneratedRegex(@"^collection<(?<provider>.*?)>$")]
     private static partial Regex CollectionRegex { get; }
@@ -43,7 +43,4 @@ public sealed partial class DynamicValueJsonConverter(IDynamicValueProviderRegis
         }
         return value;
     }
-
-    public override void Write(Utf8JsonWriter writer, DynamicValue value, JsonSerializerOptions options) =>
-        throw new NotSupportedException("Serialization of DynamicValue is not supported.");
 }

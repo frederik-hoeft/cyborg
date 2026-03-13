@@ -1,6 +1,6 @@
 using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
-using Cyborg.Core.Aot.Modules.Validation.Attributess;
+using Cyborg.Core.Aot.Modules.Validation.Models;
 using Cyborg.Core.Aot.Modules.Validation.Processors;
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
@@ -51,13 +51,11 @@ internal sealed class PropertyModelBuilder(GenerationCandidateFactory factory, L
             {
                 continue;
             }
-
             if (!processor.TryProcess(processingContext, attribute, out PropertyValidationAspect? aspect))
             {
                 propertyModel = null;
                 return false;
             }
-
             if (aspect is not null)
             {
                 aspects.Add(aspect);
@@ -108,6 +106,7 @@ internal sealed class PropertyModelBuilder(GenerationCandidateFactory factory, L
         }
 
         propertyModel = new PropertyModel(
+            Symbol: property,
             Name: property.Name,
             NullableTypeName: property.Type.ToDisplayString(KnownSymbolFormats.Nullable),
             NonNullableTypeName: nonNullableType.ToDisplayString(KnownSymbolFormats.NonNullable),

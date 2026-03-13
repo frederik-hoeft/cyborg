@@ -10,7 +10,7 @@ internal sealed class DefaultModuleArtifacts<TModule>(TModule module) : IModuleA
     private readonly Dictionary<string, object?> _artifacts = [];
     private readonly string _defaultNamespace = module switch
     {
-        { Artifacts.CustomNamespace: { Length: > 0 } customNamespace } => customNamespace,
+        { Artifacts.Namespace: { Length: > 0 } customNamespace } => customNamespace,
          _ when module.Name is { } name && !string.IsNullOrWhiteSpace(name) => name,
          _ => TModule.ModuleId
     };
@@ -33,7 +33,11 @@ internal sealed class DefaultModuleArtifacts<TModule>(TModule module) : IModuleA
         return this;
     }
 
-    IModuleArtifactsBuilder IModuleArtifactsBuilder.Expose<T>(T artifact) => Expose(_defaultNamespace, artifact);
+    IModuleArtifactsBuilder IModuleArtifactsBuilder.Expose<T>(T artifact)
+    {
+        AddArtifact(_defaultNamespace, artifact);
+        return this;
+    }
 
     IModuleArtifactsBuilder IModuleArtifactsBuilder.Expose<T>(string ns, T artifact) => Expose(ns, DEFAULT_ARTIFACT_NAME, artifact);
 
@@ -66,7 +70,7 @@ internal sealed class DefaultModuleArtifacts<TModule>(TModule module) : IModuleA
     private string CreateArtifactPath(string name, string? ns = null)
     {
         string effectiveNamespace = string.IsNullOrWhiteSpace(ns) ? _defaultNamespace : ns;
-        return $"@{effectiveNamespace}.{name}";
+        return $"{effectiveNamespace}.{name}";
     }
 
     bool IReadOnlyDictionary<string, object?>.ContainsKey(string key) => _artifacts.ContainsKey(key);

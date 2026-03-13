@@ -43,10 +43,12 @@ public sealed class ModuleRuntime(GlobalRuntimeEnvironment defaultEnvironment, J
         return ExecuteAsync(module, environment, cancellationToken);
     }
 
-    public override Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken = default)
+    public async override Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(module);
+        using SelfReferenceScope scope = environment.EnterSelfReferenceScope(module);
         IModuleRuntime runtime = new ScopedRuntime(root: this, parent: this, environment: environment, NamingPolicy);
-        return module.ExecuteAsync(runtime, cancellationToken);
+        IModuleExecutionResult result = await module.ExecuteAsync(runtime, cancellationToken);
+        return result;
     }
 }

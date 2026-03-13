@@ -2,10 +2,11 @@
 
 public enum EnvironmentScope
 {
+    InheritParent,
     Isolated,
     Global,
-    InheritParent,
     InheritGlobal,
     Parent,
-    Reference
+    Reference,
+    Current,
 }

@@ -3,7 +3,7 @@ using System.Text.Json;
 
 namespace Cyborg.Core.Modules.Configuration.Model;
 
-public sealed class ModuleReferenceJsonConverter(IModuleLoaderRegistry registry) : ModuleJsonConverter<ModuleReference>
+public sealed class ModuleReferenceJsonConverter(IModuleLoaderRegistry registry, IModuleLoaderContextProvider provider) : ModuleJsonConverter<ModuleReference>(provider)
 {
     public override ModuleReference Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
@@ -27,7 +27,4 @@ public sealed class ModuleReferenceJsonConverter(IModuleLoaderRegistry registry)
         }
         return new ModuleReference(module);
     }
-
-    public override void Write(Utf8JsonWriter writer, ModuleReference value, JsonSerializerOptions options) =>
-        throw new NotSupportedException("Serialization of ModuleReference is not supported.");
 }

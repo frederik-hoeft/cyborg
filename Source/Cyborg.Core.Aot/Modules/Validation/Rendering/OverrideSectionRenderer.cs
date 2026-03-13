@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
 using Cyborg.Core.Aot.Extensions;
-using Cyborg.Core.Aot.Modules.Validation.Attributess;
+using Cyborg.Core.Aot.Modules.Validation.Models;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
 

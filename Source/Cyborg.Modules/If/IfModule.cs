@@ -3,7 +3,7 @@ using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Configuration.Model;
 
-namespace Cyborg.Modules.Conditional;
+namespace Cyborg.Modules.If;
 
 [GeneratedModuleValidation]
 public sealed partial record IfModule
@@ -14,6 +14,4 @@ public sealed partial record IfModule
 ) : ModuleBase, IModule
 {
     public static string ModuleId => "cyborg.modules.if.v1";
-
-    public static string Target => "cyborg.modules.if.v1.result";
 }

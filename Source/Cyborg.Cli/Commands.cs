@@ -19,7 +19,7 @@ internal sealed class Commands
         GlobalRuntimeEnvironment defaultEnvironment = sp.GetRequiredService<GlobalRuntimeEnvironment>();
         defaultEnvironment.SetVariable(TemplateModule.LoadTargetName, template);
         IModuleConfigurationLoader configurationLoader = sp.GetService<IModuleConfigurationLoader>();
-        ModuleContext module = await configurationLoader.LoadModuleAsync("config.json", cancellationToken);
+        ModuleContext module = await configurationLoader.LoadModuleAsync("test.json", cancellationToken);
         module = module with 
         {
             Environment = module.Environment ?? ModuleEnvironment.Default,

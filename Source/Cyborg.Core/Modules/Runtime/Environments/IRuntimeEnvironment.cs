@@ -1,5 +1,6 @@
 ﻿using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime.Artifacts;
+using Cyborg.Core.Modules.Runtime.Environments.Syntax;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
@@ -14,6 +15,12 @@ public interface IRuntimeEnvironment
     void SetVariable<T>(string name, T value);
 
     bool TryRemoveVariable(string name);
+
+    string Self { get; }
+
+    string Interpolate(string template);
+
+    VariableSyntaxFactory SyntaxFactory { get; }
 
     bool TryResolveVariable<T>(string name, [NotNullWhen(true)] out T? value);
 
@@ -56,4 +63,12 @@ public interface IRuntimeEnvironment
     /// <param name="publishNullValues">Specifies whether null values should be published. Set to <see langword="true"/> to include null values;
     /// otherwise, they will be omitted.</param>
     void Publish(string root, IDecomposable decomposable, DecompositionStrategy strategy, bool publishNullValues);
+
+    string GetEffectiveNamespace<TModule>(TModule module) where TModule : class, IModule;
+
+    string GetEffectiveNamespace(IModuleWorker module);
+
+    string? EffectiveNamespace { get; }
+
+    internal SelfReferenceScope EnterSelfReferenceScope(IModuleWorker module);
 }

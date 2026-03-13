@@ -30,6 +30,8 @@ public interface IModuleRuntime
 
     IRuntimeEnvironment PrepareEnvironment(ModuleContext moduleContext);
 
+    IRuntimeEnvironment PrepareEnvironment(ModuleEnvironment moduleEnvironment);
+
     IRuntimeEnvironment? ResolveEnvironmentReference(ModuleEnvironmentReference environmentReference);
 
     IModuleExecutionResult Exit<TModule>(IModuleExecutionResult<TModule> result) where TModule : ModuleBase, IModule;

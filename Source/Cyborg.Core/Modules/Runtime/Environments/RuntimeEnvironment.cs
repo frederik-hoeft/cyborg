@@ -1,6 +1,6 @@
 ﻿using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime.Artifacts;
-using Cyborg.Core.Modules.Validation;
+using Cyborg.Core.Modules.Runtime.Environments.Syntax;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -17,11 +17,23 @@ public partial class RuntimeEnvironment(string name, bool isTransient, JsonNamin
 
     public bool IsTransient => isTransient;
 
-    [GeneratedRegex(@"^\$\{(?<variable_name>[A-Za-z_][A-Za-z_0-9\-\.]*)\}$")]
+    [GeneratedRegex(@"^\$\{(?<variable_name>([A-Za-z_][A-Za-z_0-9\-\.]*)|@)\}$")]
     private static partial Regex VariableRegex { get; }
 
-    [GeneratedRegex(@"\$\{(?<variable_name>[A-Za-z_][A-Za-z_0-9\-\.]*)\}")]
+    [GeneratedRegex(@"\$\{(?<variable_name>([A-Za-z_][A-Za-z_0-9\-\.]*)|@)\}")]
     private static partial Regex InterpolationRegex { get; }
+
+    public string Self => "@";
+
+    public virtual string? EffectiveNamespace => TryResolveVariable(Self, out string? selfReference) ? selfReference : null;
+
+    public VariableSyntaxFactory SyntaxFactory => field ??= new VariableSyntaxFactory(this, namingPolicy);
+
+    public virtual string Interpolate(string template)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+        return InterpolateString(template);
+    }
 
     protected virtual string InterpolateString(string stringValue)
     {
@@ -132,8 +144,8 @@ public partial class RuntimeEnvironment(string name, bool isTransient, JsonNamin
             cleanedSpan[i - skippedChars] = c;
         }
         string valuePath = namingPolicy.ConvertName(valueSpan.Slice(1, valueSpan.Length - skippedChars).ToString());
-        if (!string.IsNullOrEmpty(module.Name) && TryResolveVariable($"@{module.Name}.{valuePath}", out T? resolvedValue)
-            || TryResolveVariable($"@{TModule.ModuleId}.{valuePath}", out resolvedValue))
+        if (!string.IsNullOrEmpty(module.Name) && TryResolveVariable(SyntaxFactory.Override(SyntaxFactory.Variable(module.Name, valuePath)).Render(), out T? resolvedValue)
+            || TryResolveVariable(SyntaxFactory.Override(SyntaxFactory.Variable(TModule.ModuleId,valuePath)).Render(), out resolvedValue))
         {
             value = resolvedValue;
         }
@@ -144,6 +156,28 @@ public partial class RuntimeEnvironment(string name, bool isTransient, JsonNamin
             value = Unsafe.As<string, T>(ref resolvedString);
         }
         return value;
+    }
+
+    public virtual string GetEffectiveNamespace<TModule>(TModule module) where TModule : class, IModule
+    {
+        ArgumentNullException.ThrowIfNull(module);
+        return GetEffectiveNamespace(module.Name, TModule.ModuleId);
+    }
+
+    public virtual string GetEffectiveNamespace(IModuleWorker module)
+    {
+        ArgumentNullException.ThrowIfNull(module);
+        return GetEffectiveNamespace(module.Module.Name, module.ModuleId);
+    }
+
+    private static string GetEffectiveNamespace(string? name, string moduleId) => !string.IsNullOrEmpty(name) ? name : moduleId;
+
+    SelfReferenceScope IRuntimeEnvironment.EnterSelfReferenceScope(IModuleWorker module)
+    {
+        _ = TryResolveVariable(Self, out string? selfReference);
+        SelfReferenceScope scope = new(this, selfReference);
+        SetVariable(Self, GetEffectiveNamespace(module.Module.Name, module.ModuleId));
+        return scope;
     }
 
     T? IRuntimeEnvironment.Resolve<TModule, T>(TModule module, T? value, string? moduleExpression, string? valueExpression) where T : default => 
@@ -171,17 +205,17 @@ public partial class RuntimeEnvironment(string name, bool isTransient, JsonNamin
                 // inner node
                 if (strategy is not DecompositionStrategy.LeavesOnly)
                 {
-                    SetVariable($"{root}.{key}", nested);
+                    SetVariable(SyntaxFactory.Variable(root, key).Render(), nested);
                 }
                 if (strategy is not DecompositionStrategy.Shallow)
                 {
-                    Publish($"{root}.{key}", nested, strategy, publishNullValues);
+                    Publish(SyntaxFactory.Variable(root, key).Render(), nested, strategy, publishNullValues);
                 }
             }
             else if (value is not null || publishNullValues)
             {
                 // leaf node
-                SetVariable($"{root}.{key}", value);
+                SetVariable(SyntaxFactory.Variable(root, key).Render(), value);
             }
         }
     }

@@ -1,6 +1,5 @@
 ﻿using Cyborg.Core.Aot.Contracts;
 using Microsoft.CodeAnalysis;
-using System.Collections.Frozen;
 using System.Collections.Immutable;
 
 namespace Cyborg.Core.Aot.Modules.Loaders;

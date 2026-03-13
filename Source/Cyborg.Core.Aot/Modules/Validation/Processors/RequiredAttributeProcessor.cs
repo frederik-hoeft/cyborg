@@ -24,9 +24,16 @@ internal sealed class RequiredAttributeProcessor : IPropertyAttributeProcessor
         {
             string comparer = KnownTypes.DefaultEqualityComparerOfT(model.Property.NullableTypeName);
 
+            if (model.Property.Symbol.Type.SpecialType is SpecialType.System_String)
+            {
+                builder.AppendLine($"if (string.{nameof(string.IsNullOrWhiteSpace)}({model.AccessExpression}))");
+            }
+            else
+            {
+                builder.AppendLine($"if ({comparer}.Equals({model.AccessExpression}, default!))");
+            }
             builder.AppendBlock(
             $$"""
-            if ({{comparer}}.Equals({{model.AccessExpression}}, default!))
             {
                 errors.Add({{CreateValidationError(model, "required", $"Property '{{nameof({model.AccessExpression})}}' is required.")}});
             }

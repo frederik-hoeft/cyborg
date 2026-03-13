@@ -30,7 +30,7 @@ public abstract class ModuleRuntimeBase(JsonNamingPolicy namingPolicy) : IModule
             EnvironmentScope.Global => parent.GlobalEnvironment,
             EnvironmentScope.InheritParent => new InheritedRuntimeEnvironment(name, parent.Environment, transient, NamingPolicy),
             EnvironmentScope.InheritGlobal => new InheritedRuntimeEnvironment(name, parent.GlobalEnvironment, transient, NamingPolicy),
-            EnvironmentScope.Parent => parent.Environment,
+            EnvironmentScope.Parent or EnvironmentScope.Current => parent.Environment,
             EnvironmentScope.Reference => throw new ArgumentException("Attempting to create an environment by reference without providing an environment reference.", nameof(scope)),
             _ => throw new ArgumentOutOfRangeException(nameof(scope), scope, "Invalid environment scope.")
         };
@@ -38,23 +38,24 @@ public abstract class ModuleRuntimeBase(JsonNamingPolicy namingPolicy) : IModule
         return environment;
     }
 
-    public IRuntimeEnvironment PrepareEnvironment(ModuleContext moduleContext)
+    public IRuntimeEnvironment PrepareEnvironment(ModuleContext moduleContext) => PrepareEnvironment(moduleContext?.Environment ?? ModuleEnvironment.Default);
+
+    public IRuntimeEnvironment PrepareEnvironment(ModuleEnvironment moduleEnvironment)
     {
-        ArgumentNullException.ThrowIfNull(moduleContext);
+        ArgumentNullException.ThrowIfNull(moduleEnvironment);
         IRuntimeEnvironment? environment = null;
-        if (moduleContext.Environment?.Scope is EnvironmentScope.Reference)
+        if (moduleEnvironment.Scope is EnvironmentScope.Reference)
         {
-            if (string.IsNullOrEmpty(moduleContext.Environment.Name))
+            if (string.IsNullOrEmpty(moduleEnvironment.Name))
             {
                 throw new InvalidOperationException("Attempting to reference an environment without providing an environment name.");
             }
-            if (!TryGetEnvironment(moduleContext.Environment.Name, out environment))
+            if (!TryGetEnvironment(moduleEnvironment.Name, out environment))
             {
-                throw new InvalidOperationException($"Attempting to reference an environment that does not exist: {moduleContext.Environment.Name}");
+                throw new InvalidOperationException($"Attempting to reference an environment that does not exist: {moduleEnvironment.Name}");
             }
         }
-        EnvironmentScope scope = moduleContext.Environment?.Scope ?? EnvironmentScope.Parent;
-        environment ??= CreateScopedEnvironment(parent: this, scope, moduleContext.Environment?.Name);
+        environment ??= CreateScopedEnvironment(parent: this, moduleEnvironment.Scope, moduleEnvironment.Name);
         return environment;
     }
 
@@ -90,9 +91,8 @@ public abstract class ModuleRuntimeBase(JsonNamingPolicy namingPolicy) : IModule
 
         if (result.Artifacts is { } artifacts)
         {
-            ModuleEnvironmentReference deploymentTarget = result.Module.Artifacts.Environment;
-            IRuntimeEnvironment environment = ResolveEnvironmentReference(deploymentTarget)
-                ?? throw new InvalidOperationException($"Unable to resolve environment reference for module {result.Module.Name}: {deploymentTarget}");
+            ModuleEnvironment deploymentTarget = result.Module.Artifacts.Environment;
+            IRuntimeEnvironment environment = PrepareEnvironment(deploymentTarget);
             artifacts.PublishToEnvironment(environment, result.Status);
         }
         return result;

@@ -5,8 +5,8 @@ using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Artifacts;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Services;
+using Cyborg.Core.Services.Dispatch;
 using Cyborg.Core.Services.Network.Probe;
-using Cyborg.Core.Services.Subprocesses;
 using Jab;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -17,6 +17,7 @@ namespace Cyborg.Core;
 [Import<IDynamicValueProviderServices>]
 [Singleton<INamedServiceProvider, NamedServiceProvider>]
 [Singleton<IModuleLoaderContext, DefaultModuleLoaderContext>]
+[Singleton<IModuleLoaderContextProvider, DefaultModuleLoaderContextProvider>]
 [Singleton<JsonConverter, ModuleReferenceJsonConverter>]
 [Singleton<JsonConverter, DynamicValueJsonConverter>]
 [Singleton<JsonConverter, DynamicKeyValuePairJsonConverter>]
@@ -29,12 +30,15 @@ namespace Cyborg.Core;
 [Singleton<IModuleRuntime, ModuleRuntime>]
 [Singleton<IModuleRegistry, DefaultModuleRegistry>]
 [Singleton<IModuleArtifactsFactory, DefaultModuleArtifactsFactory>]
-[Singleton<ISubprocessDispatcher, DefaultSubprocessDispatcher>]
+[Singleton<IChildProcessDispatcher, DefaultChildProcessDispatcher>]
 [Singleton<IPingService, DefaultPingService>]
 [Singleton<IPortProbeService, TcpPortProbeService>]
+[Singleton<JsonSerializerContext>(Factory = nameof(GetCoreJsonSerializerContext))]
 [Singleton<GlobalRuntimeEnvironment>]
 public interface ICyborgCoreServices
 {
+    static CoreJsonSerializerContext GetCoreJsonSerializerContext() => CoreJsonSerializerContext.Default;
+
     static JsonConverter CreateEnvironmentScopeConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<EnvironmentScope>(namingPolicy);
 
     static JsonConverter CreateDecompositionStrategyConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<DecompositionStrategy>(namingPolicy);

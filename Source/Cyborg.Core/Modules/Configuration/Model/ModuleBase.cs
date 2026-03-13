@@ -4,6 +4,7 @@ namespace Cyborg.Core.Modules.Configuration.Model;
 
 public abstract record ModuleBase
 {
+    [IgnoreOverrides]
     public virtual string? Name { get; init; }
 
     [Required]

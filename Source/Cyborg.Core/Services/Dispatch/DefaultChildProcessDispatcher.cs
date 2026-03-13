@@ -1,11 +1,12 @@
 ﻿using System.Diagnostics;
 
-namespace Cyborg.Core.Services.Subprocesses;
+namespace Cyborg.Core.Services.Dispatch;
 
-public sealed class DefaultSubprocessDispatcher : ISubprocessDispatcher
+public sealed class DefaultChildProcessDispatcher : IChildProcessDispatcher
 {
-    public async Task<SubprocessResult> ExecuteAsync(ProcessStartInfo processStartInfo, CancellationToken cancellationToken)
+    public async Task<ChildProcessResult> ExecuteAsync(ProcessStartInfo processStartInfo, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(processStartInfo);
         using Process process = new()
         {
             StartInfo = processStartInfo,
@@ -62,7 +63,7 @@ public sealed class DefaultSubprocessDispatcher : ISubprocessDispatcher
 
         public string? StandardError { get; set; }
 
-        public SubprocessResult Build(int exitCode) => new(exitCode, StandardOutput, StandardError);
+        public ChildProcessResult Build(int exitCode) => new(exitCode, StandardOutput, StandardError);
     }
 
     private sealed class CommandOutput(string data, Action<SubprocessResultBuilder, string> setResult)

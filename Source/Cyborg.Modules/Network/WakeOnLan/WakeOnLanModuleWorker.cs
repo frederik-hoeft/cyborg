@@ -1,13 +1,13 @@
 ﻿using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Runtime;
+using Cyborg.Core.Services.Dispatch;
 using Cyborg.Core.Services.Network.Probe;
-using Cyborg.Core.Services.Subprocesses;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Modules.Network.WakeOnLan;
 
-public sealed class WakeOnLanModuleWorker(IWorkerContext<WakeOnLanModule> context, ISubprocessDispatcher dispatcher, IPingService pingService, IPortProbeService portProbeService) : ModuleWorker<WakeOnLanModule>(context)
+public sealed class WakeOnLanModuleWorker(IWorkerContext<WakeOnLanModule> context, IChildProcessDispatcher dispatcher, IPingService pingService, IPortProbeService portProbeService) : ModuleWorker<WakeOnLanModule>(context)
 {
     protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
@@ -18,7 +18,7 @@ public sealed class WakeOnLanModuleWorker(IWorkerContext<WakeOnLanModule> contex
             return runtime.Exit(Success(new WakeOnLanModuleResult(WokeUp: false)));
         }
         ProcessStartInfo startInfo = new(Module.Executable, ["-i", Module.TargetHost, Module.MacAddress]);
-        SubprocessResult result = await dispatcher.ExecuteAsync(startInfo, cancellationToken).ConfigureAwait(false);
+        ChildProcessResult result = await dispatcher.ExecuteAsync(startInfo, cancellationToken).ConfigureAwait(false);
         if (result.ExitCode != 0)
         {
             throw new InvalidOperationException($"Failed to execute wakeonlan command. Exit code: {result.ExitCode}, Standard Error: {result.StandardError}");

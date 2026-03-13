@@ -25,7 +25,16 @@
     </ItemGroup>
     
     <ItemGroup>
+      <None Update="test.json">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+      <None Update="cyborg.jconf">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
       <None Update="config.json">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+      <None Update="daily.jconf">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
       <None Update="daily.json">

@@ -28,7 +28,9 @@
         <EmbeddedResource Include="Modules\Validation\Attributes\DefaultTimeSpanAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\DefaultValueAttribute`1.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\DefinedEnumValueAttribute.cs" />
+        <EmbeddedResource Include="Modules\Validation\Attributes\DirectoryExistsAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\ExactLengthAttribute.cs" />
+        <EmbeddedResource Include="Modules\Validation\Attributes\FileExistsAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\IgnoreOverridesAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\LengthAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\MaxLengthAttribute.cs" />

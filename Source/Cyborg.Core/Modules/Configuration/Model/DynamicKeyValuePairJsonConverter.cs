@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 
 namespace Cyborg.Core.Modules.Configuration.Model;
 
-public sealed partial class DynamicKeyValuePairJsonConverter(IDynamicValueProviderRegistry registry) : ModuleJsonConverter<DynamicKeyValuePair>
+public sealed partial class DynamicKeyValuePairJsonConverter(IDynamicValueProviderRegistry registry, IModuleLoaderContextProvider provider) : ModuleJsonConverter<DynamicKeyValuePair>(provider)
 {
     [GeneratedRegex(@"^collection<(?<provider>.*?)>$")]
     private static partial Regex CollectionRegex { get; }
@@ -61,7 +61,4 @@ public sealed partial class DynamicKeyValuePairJsonConverter(IDynamicValueProvid
         _ = value ?? throw new JsonException("Missing dynamic value in dynamic key-value pair.");
         return new DynamicKeyValuePair(key, value);
     }
-
-    public override void Write(Utf8JsonWriter writer, DynamicKeyValuePair value, JsonSerializerOptions options) =>
-        throw new NotSupportedException("Serialization of DynamicKeyValuePair is not supported.");
 }

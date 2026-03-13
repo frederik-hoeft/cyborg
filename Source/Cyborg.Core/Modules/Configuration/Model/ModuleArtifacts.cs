@@ -7,14 +7,15 @@ namespace Cyborg.Core.Modules.Configuration.Model;
 [Validatable]
 public sealed record ModuleArtifacts
 (
-    string? CustomNamespace,
+    string? Namespace,
     [property: Required][property: DefaultValue<string>(Constants.DEFAULT_STATUS_CODE_NAME)] string ExitStatusName,
-    [property: DefaultInstance] ModuleEnvironmentReference Environment,
+    // TODO: this must not be inherit parent but always parent by default
+    [property: DefaultInstance] ModuleEnvironment Environment,
     [property: DefaultValue<DecompositionStrategy>(DecompositionStrategy.LeavesOnly)] DecompositionStrategy DecompositionStrategy,
     bool PublishNullValues
 ) : IDefaultInstance<ModuleArtifacts>
 {
-    public static ModuleArtifacts Default => new(CustomNamespace: null, ExitStatusName: Constants.DEFAULT_STATUS_CODE_NAME, Environment: default!, DecompositionStrategy.LeavesOnly, PublishNullValues: false);
+    public static ModuleArtifacts Default => new(Namespace: null, ExitStatusName: Constants.DEFAULT_STATUS_CODE_NAME, Environment: default!, DecompositionStrategy.LeavesOnly, PublishNullValues: false);
 }
 
 file static class Constants

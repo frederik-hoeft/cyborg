@@ -1,10 +1,14 @@
-﻿using Cyborg.Core.Modules.Configuration.Model;
-using Cyborg.Modules.Borg;
-using Cyborg.Modules.Conditional;
+﻿using Cyborg.Modules.Borg;
 using Cyborg.Modules.Configuration.ConfigCollection;
 using Cyborg.Modules.Configuration.ConfigMap;
+using Cyborg.Modules.EnvironmentDefinitions;
+using Cyborg.Modules.External;
 using Cyborg.Modules.Foreach;
+using Cyborg.Modules.Glob;
+using Cyborg.Modules.If;
+using Cyborg.Modules.If.Conditions.IsTrue;
 using Cyborg.Modules.Named;
+using Cyborg.Modules.Network.SshShutdown;
 using Cyborg.Modules.Network.WakeOnLan;
 using Cyborg.Modules.Sequence;
 using Cyborg.Modules.Subprocess;
@@ -24,7 +28,11 @@ namespace Cyborg.Modules;
 [JsonSerializable(typeof(ForeachModule))]
 [JsonSerializable(typeof(WakeOnLanModule))]
 [JsonSerializable(typeof(IfModule))]
+[JsonSerializable(typeof(IsTrueModule))]
+[JsonSerializable(typeof(GlobModule))]
+[JsonSerializable(typeof(ExternalModule))]
+[JsonSerializable(typeof(EnvironmentDefinitionsModule))]
+[JsonSerializable(typeof(SshShutdownModule))]
 // TODO: temp
 [JsonSerializable(typeof(BorgRemote))]
-[JsonSerializable(typeof(ModuleContextDeserializationDummy))]
 public sealed partial class ModuleJsonSerializerContext : JsonSerializerContext;
