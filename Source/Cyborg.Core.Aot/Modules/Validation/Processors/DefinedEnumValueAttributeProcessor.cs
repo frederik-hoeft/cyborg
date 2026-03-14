@@ -9,7 +9,7 @@ internal sealed class DefinedEnumValueAttributeProcessor : IPropertyAttributePro
 {
     public string AttributeMetadataName => typeof(DefinedEnumValueAttribute).FullName!;
 
-    public bool TryProcess(PropertyAttributeProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
     {
         _ = attribute;
         aspect = null;

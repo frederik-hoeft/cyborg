@@ -136,7 +136,7 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
         string? expression = $"runtime.Environment.Resolve({context.ModuleVariable}, {context.PropertyAccessExpression}, valueExpression: \"{rootPathExpression}\")";
         foreach (PropertyValidationAspect aspect in context.Property.Aspects)
         {
-            expression = aspect.RewriteOverrideResolutionExpression(context, expression);
+            expression = aspect.RewriteOverrideResolutionExpression(context, expression, rootPathExpression);
         }
         return expression;
     }

@@ -1,3 +1,3 @@
 ﻿namespace Cyborg.Core.Modules.Configuration.Serialization.DynamicValueProviders;
 
-public sealed class DynamicUInt16Provider() : DynamicValueProviderBuiltIn<ushort>("ushort");
+public sealed class DynamicUInt16Provider() : DynamicValueProviderPrimitives<ushort>("ushort");

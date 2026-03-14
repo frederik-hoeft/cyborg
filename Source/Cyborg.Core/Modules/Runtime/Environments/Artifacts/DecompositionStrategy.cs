@@ -1,4 +1,4 @@
-﻿namespace Cyborg.Core.Modules.Runtime.Artifacts;
+﻿namespace Cyborg.Core.Modules.Runtime.Environments.Artifacts;
 
 public enum DecompositionStrategy
 {

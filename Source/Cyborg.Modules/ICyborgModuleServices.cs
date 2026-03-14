@@ -1,7 +1,6 @@
 ﻿using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Configuration.Serialization;
-using Cyborg.Modules.Borg;
 using Cyborg.Modules.If;
 using Cyborg.Modules.Configuration.ConfigCollection;
 using Cyborg.Modules.Configuration.ConfigMap;
@@ -19,6 +18,7 @@ using Cyborg.Modules.Glob;
 using Cyborg.Modules.External;
 using Cyborg.Modules.EnvironmentDefinitions;
 using Cyborg.Modules.Network.SshShutdown;
+using Cyborg.Modules.Dynamic;
 
 namespace Cyborg.Modules;
 
@@ -40,7 +40,7 @@ namespace Cyborg.Modules;
 [Singleton<IModuleLoader, ExternalModuleLoader>]
 [Singleton<IModuleLoader, EnvironmentDefinitionsModuleLoader>]
 [Singleton<IModuleLoader, SshShutdownModuleLoader>]
-[Singleton<IDynamicValueProvider, BorgRemoteValueProvider>]
+[Singleton<IModuleLoader, DynamicModuleLoader>]
 [Singleton<JsonConverter>(Factory = nameof(CreateEnvironmentScopeReferenceConverter))]
 public interface ICyborgModuleServices
 {

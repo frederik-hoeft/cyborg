@@ -1,125 +1,57 @@
 ﻿using Cyborg.Core.Modules.Configuration.Model;
-using Cyborg.Core.Modules.Runtime.Artifacts;
 using Cyborg.Core.Modules.Runtime.Environments.Syntax;
+using System.Collections;
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace Cyborg.Core.Modules.Runtime.Environments;
 
-public partial class RuntimeEnvironment(string name, bool isTransient, JsonNamingPolicy namingPolicy) : IRuntimeEnvironment
+public partial record RuntimeEnvironment(string Name, bool IsTransient, VariableSyntaxBuilder SyntaxFactory, string Namespace) : EnvironmentLike(SyntaxFactory, Namespace), IRuntimeEnvironment
 {
-    private readonly Dictionary<string, object?> _variables = [];
-
-    public string Name => name;
-
-    public bool IsTransient => isTransient;
-
-    [GeneratedRegex(@"^\$\{(?<variable_name>([A-Za-z_][A-Za-z_0-9\-\.]*)|@)\}$")]
-    private static partial Regex VariableRegex { get; }
-
-    [GeneratedRegex(@"\$\{(?<variable_name>([A-Za-z_][A-Za-z_0-9\-\.]*)|@)\}")]
-    private static partial Regex InterpolationRegex { get; }
-
-    public string Self => "@";
-
-    public virtual string? EffectiveNamespace => TryResolveVariable(Self, out string? selfReference) ? selfReference : null;
-
-    public VariableSyntaxFactory SyntaxFactory => field ??= new VariableSyntaxFactory(this, namingPolicy);
-
-    public virtual string Interpolate(string template)
+    [return: NotNullIfNotNull(nameof(value))]
+    public virtual IReadOnlyCollection<T>? ResolveCollection<TModule, T>(TModule module, IReadOnlyCollection<T>? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
+        where TModule : ModuleBase, IModule
     {
-        ArgumentNullException.ThrowIfNull(template);
-        return InterpolateString(template);
-    }
-
-    protected virtual string InterpolateString(string stringValue)
-    {
-        if (!InterpolationRegex.IsMatch(stringValue))
+        ArgumentNullException.ThrowIfNull(module);
+        string valuePath = ConstructValueResolutionPath(value, moduleExpression, valueExpression);
+        string overridePath = SyntaxFactory.Path(NamespaceOf(module), valuePath).Override();
+        if (TryResolveVariable(overridePath, out IEnumerable? resolvedValue))
         {
-            return stringValue;
-        }
-        StringBuilder sb = new();
-        int currentIndex = 0;
-        ReadOnlySpan<char> valueSpan = stringValue.AsSpan();
-        foreach (ValueMatch match in InterpolationRegex.EnumerateMatches(stringValue))
-        {
-            sb.Append(valueSpan[currentIndex..match.Index]);
-            ReadOnlySpan<char> variableSlice = valueSpan.Slice(match.Index, match.Length);
-            string variableName = variableSlice[2..^1].ToString();
-            if (TryResolveVariableCore(variableName, out object? resolvedValue))
+            if (resolvedValue is IReadOnlyCollection<T> typedCollection)
             {
-                sb.Append(resolvedValue);
+                value = typedCollection;
             }
             else
             {
-                // If the variable cannot be resolved, keep the original placeholder in the string
-                sb.Append(variableSlice);
+                value = resolvedValue.Cast<T>().ToImmutableArray();
             }
-            currentIndex = match.Index + match.Length;
         }
-        sb.Append(valueSpan[currentIndex..]);
-        return sb.ToString();
+        return value;
     }
-
-    protected virtual bool TryResolveVariableCandidate<T>(string name, [NotNullWhen(true)] out T? value)
-    {
-        ArgumentNullException.ThrowIfNull(name);
-        if (name.StartsWith('$') && VariableRegex.Match(name) is { Success: true } match)
-        {
-            string variableName = match.Groups["variable_name"].Value;
-            return TryResolveVariable(variableName, out value);
-        }
-        value = default;
-        return false;
-    }
-
-    protected virtual bool TryResolveVariableCore(string name, [NotNullWhen(true)] out object? value)
-    {
-        if (_variables.TryGetValue(name, out object? objValue))
-        {
-            if (objValue is string s && TryResolveVariableCandidate(s, out value))
-            {
-                return true;
-            }
-            if (objValue is string stringValue)
-            {
-                value = InterpolateString(stringValue);
-                return true;
-            }
-            value = objValue;
-            return value is not null;
-        }
-        value = default;
-        return false;
-    }
-
-    public virtual bool TryResolveVariable<T>(string name, [NotNullWhen(true)] out T? value)
-    {
-        if (TryResolveVariableCore(name, out object? objValue))
-        {
-            if (objValue is T typedValue)
-            {
-                value = typedValue;
-                return true;
-            }
-            throw new InvalidCastException($"Attempted to resolve variable '{name}' as type {typeof(T).FullName}, but it is of type {objValue?.GetType().FullName}.");
-        }
-        value = default;
-        return false;
-    }
-
-    public virtual void SetVariable<T>(string name, T value) => _variables[name] = value;
-
-    public virtual bool TryRemoveVariable(string name) => _variables.Remove(name);
 
     [return: NotNullIfNotNull(nameof(value))]
-    protected virtual T? Resolve<TModule, T>(TModule module, T? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
-        where TModule : class, IModule
+    public virtual T? Resolve<TModule, T>(TModule module, T? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
+        where TModule : ModuleBase, IModule
     {
         ArgumentNullException.ThrowIfNull(module);
+        string valuePath = ConstructValueResolutionPath(value, moduleExpression, valueExpression);
+        string overridePath = SyntaxFactory.Path(NamespaceOf(module), valuePath).Override();
+        if (TryResolveVariable(overridePath, out T? resolvedValue))
+        {
+            value = resolvedValue;
+        }
+        else if (value is string stringValue)
+        {
+            // Handle indirection via string variables
+            string resolvedString = Interpolate(stringValue);
+            value = Unsafe.As<string, T>(ref resolvedString);
+        }
+        return value;
+    }
+
+    private string ConstructValueResolutionPath<T>(T? value, string? moduleExpression, string? valueExpression)
+    {
         ArgumentException.ThrowIfNullOrWhiteSpace(moduleExpression);
         ArgumentException.ThrowIfNullOrWhiteSpace(valueExpression);
         if (!valueExpression.StartsWith(moduleExpression, StringComparison.Ordinal))
@@ -143,28 +75,17 @@ public partial class RuntimeEnvironment(string name, bool isTransient, JsonNamin
             }
             cleanedSpan[i - skippedChars] = c;
         }
-        string valuePath = namingPolicy.ConvertName(valueSpan.Slice(1, valueSpan.Length - skippedChars).ToString());
-        if (!string.IsNullOrEmpty(module.Name) && TryResolveVariable(SyntaxFactory.Override(SyntaxFactory.Variable(module.Name, valuePath)).Render(), out T? resolvedValue)
-            || TryResolveVariable(SyntaxFactory.Override(SyntaxFactory.Variable(TModule.ModuleId,valuePath)).Render(), out resolvedValue))
-        {
-            value = resolvedValue;
-        }
-        else if (value is string stringValue)
-        {
-            // Handle indirection via string variables
-            string resolvedString = InterpolateString(stringValue);
-            value = Unsafe.As<string, T>(ref resolvedString);
-        }
-        return value;
+        string valuePath = NamingPolicy.ConvertName(valueSpan.Slice(1, valueSpan.Length - skippedChars).ToString());
+        return valuePath;
     }
 
-    public virtual string GetEffectiveNamespace<TModule>(TModule module) where TModule : class, IModule
+    public virtual string NamespaceOf<TModule>(TModule module) where TModule : ModuleBase, IModule
     {
         ArgumentNullException.ThrowIfNull(module);
         return GetEffectiveNamespace(module.Name, TModule.ModuleId);
     }
 
-    public virtual string GetEffectiveNamespace(IModuleWorker module)
+    public virtual string NamespaceOf(IModuleWorker module)
     {
         ArgumentNullException.ThrowIfNull(module);
         return GetEffectiveNamespace(module.Module.Name, module.ModuleId);
@@ -172,51 +93,39 @@ public partial class RuntimeEnvironment(string name, bool isTransient, JsonNamin
 
     private static string GetEffectiveNamespace(string? name, string moduleId) => !string.IsNullOrEmpty(name) ? name : moduleId;
 
-    SelfReferenceScope IRuntimeEnvironment.EnterSelfReferenceScope(IModuleWorker module)
-    {
-        _ = TryResolveVariable(Self, out string? selfReference);
-        SelfReferenceScope scope = new(this, selfReference);
-        SetVariable(Self, GetEffectiveNamespace(module.Module.Name, module.ModuleId));
-        return scope;
-    }
-
-    T? IRuntimeEnvironment.Resolve<TModule, T>(TModule module, T? value, string? moduleExpression, string? valueExpression) where T : default => 
-        Resolve(module, value, moduleExpression, valueExpression);
-
     void IRuntimeEnvironment.Publish<TModule, T>(TModule module, string root, T decomposable)
     {
         ArgumentNullException.ThrowIfNull(module);
         Publish(root, decomposable, module.Artifacts.DecompositionStrategy, module.Artifacts.PublishNullValues);
     }
 
-    public virtual void Publish(string root, IDecomposable decomposable, DecompositionStrategy strategy, bool publishNullValues)
+    public void Publish(IEnvironmentLike other)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(root);
-        ArgumentNullException.ThrowIfNull(decomposable);
+        ArgumentNullException.ThrowIfNull(other);
+        foreach ((string key, object? value) in other)
+        {
+            SetVariable(key, value);
+        }
+    }
 
-        if (strategy is DecompositionStrategy.FullHierarchy)
+    public IRuntimeEnvironment Bind(IModuleWorker module)
+    {
+        ArgumentNullException.ThrowIfNull(module);
+        return Bind(NamespaceOf(module));
+    }
+
+    public IRuntimeEnvironment Bind(string ns)
+    {
+        ArgumentNullException.ThrowIfNull(ns);
+        return this with
         {
-            SetVariable(root, decomposable);
-        }
-        foreach ((string key, object? value) in decomposable.Decompose())
-        {
-            if (value is IDecomposable nested)
-            {
-                // inner node
-                if (strategy is not DecompositionStrategy.LeavesOnly)
-                {
-                    SetVariable(SyntaxFactory.Variable(root, key).Render(), nested);
-                }
-                if (strategy is not DecompositionStrategy.Shallow)
-                {
-                    Publish(SyntaxFactory.Variable(root, key).Render(), nested, strategy, publishNullValues);
-                }
-            }
-            else if (value is not null || publishNullValues)
-            {
-                // leaf node
-                SetVariable(SyntaxFactory.Variable(root, key).Render(), value);
-            }
-        }
+            Namespace = ns
+        };
+    }
+
+    public IEnvironmentLike CreateArtifactCollection(ModuleArtifacts artifacts)
+    {
+        ArgumentNullException.ThrowIfNull(artifacts);
+        return new EnvironmentLike(SyntaxFactory, artifacts.Namespace ?? Namespace);
     }
 }

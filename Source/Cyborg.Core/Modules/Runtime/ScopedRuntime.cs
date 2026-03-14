@@ -1,16 +1,19 @@
 ﻿using Cyborg.Core.Modules.Runtime.Environments;
+using Cyborg.Core.Modules.Runtime.Environments.Syntax;
 using System.Diagnostics.CodeAnalysis;
-using System.Text.Json;
 
 namespace Cyborg.Core.Modules.Runtime;
 
-internal sealed class ScopedRuntime(IModuleRuntime root, IModuleRuntime parent, IRuntimeEnvironment environment, JsonNamingPolicy namingPolicy) : ModuleRuntimeBase(namingPolicy)
+internal sealed class ScopedRuntime(IModuleRuntime root, IModuleRuntime parent, IRuntimeEnvironment environment, VariableSyntaxBuilder syntaxFactory) : ModuleRuntimeBase(syntaxFactory)
 {
     public override IRuntimeEnvironment GlobalEnvironment => root.GlobalEnvironment;
 
     public override IRuntimeEnvironment ParentEnvironment => parent.Environment;
 
     public override IRuntimeEnvironment Environment => environment;
+
+    [NotNull]
+    protected override IModuleRuntime? Parent => parent;
 
     public override Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker module, EnvironmentScope scope = EnvironmentScope.Global, string? name = null, CancellationToken cancellationToken = default)
     {
@@ -21,8 +24,8 @@ internal sealed class ScopedRuntime(IModuleRuntime root, IModuleRuntime parent, 
     public async override Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(module);
-        using SelfReferenceScope _ = environment.EnterSelfReferenceScope(module);
-        IModuleRuntime runtime = new ScopedRuntime(root, parent: this, environment, NamingPolicy);
+        IRuntimeEnvironment boundEnvironment = environment.Bind(module);
+        IModuleRuntime runtime = new ScopedRuntime(root, parent: this, boundEnvironment, SyntaxFactory);
         IModuleExecutionResult result = await module.ExecuteAsync(runtime, cancellationToken);
         return result;
     }

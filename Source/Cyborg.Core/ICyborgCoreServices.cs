@@ -2,8 +2,8 @@
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Configuration.Serialization;
 using Cyborg.Core.Modules.Runtime;
-using Cyborg.Core.Modules.Runtime.Artifacts;
 using Cyborg.Core.Modules.Runtime.Environments;
+using Cyborg.Core.Modules.Runtime.Environments.Artifacts;
 using Cyborg.Core.Services;
 using Cyborg.Core.Services.Dispatch;
 using Cyborg.Core.Services.Network.Probe;
@@ -27,7 +27,7 @@ namespace Cyborg.Core;
 [Singleton<IModuleLoaderRegistry, DefaultModuleLoaderRegistry>]
 [Singleton<IModuleWorkerFactory, DefaultModuleWorkerFactory>]
 [Singleton<IModuleConfigurationLoader, DefaultModuleConfigurationLoader>]
-[Singleton<IModuleRuntime, ModuleRuntime>]
+[Singleton<IModuleRuntime, RootModuleRuntime>]
 [Singleton<IModuleRegistry, DefaultModuleRegistry>]
 [Singleton<IModuleArtifactsFactory, DefaultModuleArtifactsFactory>]
 [Singleton<IChildProcessDispatcher, DefaultChildProcessDispatcher>]

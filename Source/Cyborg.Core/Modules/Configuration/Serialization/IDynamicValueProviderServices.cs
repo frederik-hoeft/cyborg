@@ -18,4 +18,7 @@ namespace Cyborg.Core.Modules.Configuration.Serialization;
 [Singleton<IDynamicValueProvider, DynamicDecimalProvider>]
 [Singleton<IDynamicValueProvider, DynamicBooleanProvider>]
 [Singleton<IDynamicValueProvider, DynamicStringProvider>]
+[Singleton<IDynamicValueProvider, DynamicModuleContextProvider>]
+[Singleton<IDynamicValueProvider, DynamicModuleEnvironmentProvider>]
+[Singleton<IDynamicValueProvider, DynamicModuleReferenceProvider>]
 public interface IDynamicValueProviderServices;

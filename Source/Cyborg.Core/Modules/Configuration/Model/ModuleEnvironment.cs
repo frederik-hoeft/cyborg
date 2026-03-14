@@ -5,11 +5,13 @@ using Cyborg.Core.Modules.Validation;
 namespace Cyborg.Core.Modules.Configuration.Model;
 
 [Validatable]
-public record ModuleEnvironment
-(
-    [property: DefaultValue<EnvironmentScope>(EnvironmentScope.InheritParent)][property: DefinedEnumValue] EnvironmentScope Scope,
-    string? Name
-) : IDefaultInstance<ModuleEnvironment>
+public record ModuleEnvironment : IDefaultInstance<ModuleEnvironment>
 {
-    public static ModuleEnvironment Default => new(EnvironmentScope.InheritParent, Name: null);
+    [DefinedEnumValue]
+    [DefaultValue<EnvironmentScope>(EnvironmentScope.InheritParent)]
+    public virtual EnvironmentScope Scope { get; init; }
+
+    public virtual string? Name { get; init; }
+
+    public static ModuleEnvironment Default => new() { Scope = EnvironmentScope.InheritParent, };
 }

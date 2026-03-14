@@ -8,7 +8,7 @@ internal sealed class DefaultInstanceAttributeProcessor : IPropertyAttributeProc
 {
     public string AttributeMetadataName => typeof(DefaultInstanceAttribute).FullName;
 
-    public bool TryProcess(PropertyAttributeProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
     {
         _ = attribute;
         aspect = null;

@@ -10,7 +10,7 @@ internal sealed class MustMatchAttributeProcessor : IPropertyAttributeProcessor
 {
     public string AttributeMetadataName => typeof(MustMatchAttribute).FullName;
 
-    public bool TryProcess(PropertyAttributeProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
     {
         aspect = null;
 

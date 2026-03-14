@@ -8,7 +8,7 @@ internal sealed class RangeAttributeProcessor : IPropertyAttributeProcessor
 {
     public string AttributeMetadataName => typeof(RangeAttribute<>).FullName;
 
-    public bool TryProcess(PropertyAttributeProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
     {
         aspect = null;
 

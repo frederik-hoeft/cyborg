@@ -15,7 +15,7 @@ internal abstract class FilesystemPathAttributeProcessor<TAttribute> : IProperty
 
     protected abstract string BuildExistsExpression();
 
-    public bool TryProcess(PropertyAttributeProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
     {
         aspect = null;
         if (attribute.AttributeClass is null)

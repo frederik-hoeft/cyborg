@@ -7,7 +7,7 @@ internal abstract class PropertyValidationAspect
 {
     public abstract bool EnsuresDefault { get; }
 
-    public virtual string? RewriteOverrideResolutionExpression(PropertyRewriteContext context, string? currentExpression) => currentExpression;
+    public virtual string? RewriteOverrideResolutionExpression(PropertyRewriteContext context, string? currentExpression, string rootPathExpression) => currentExpression;
 
     public virtual string? RewriteDefaultAssignmentExpression(PropertyRewriteContext context, string? currentExpression) => currentExpression;
 

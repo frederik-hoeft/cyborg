@@ -42,26 +42,12 @@ internal sealed class PropertyModelBuilder(GenerationCandidateFactory factory, L
 
     private bool TryCreatePropertyModel(INamedTypeSymbol containingType, IPropertySymbol property, ImmutableHashSet<INamedTypeSymbol> traversalPath, [NotNullWhen(true)] out PropertyModel? propertyModel)
     {
-        PropertyAttributeProcessingContext processingContext = new(factory.Context.SemanticModel.Compilation, containingType, property, diagnostics);
-        ImmutableArray<PropertyValidationAspect>.Builder aspects = ImmutableArray.CreateBuilder<PropertyValidationAspect>();
-
-        foreach (AttributeData attribute in property.GetAttributes())
+        PropertyProcessingContext processingContext = new(factory.Context.SemanticModel.Compilation, containingType, property, diagnostics);
+        if (!ValidationProcessorRegistry.TryProcess(processingContext, out ImmutableArray<PropertyValidationAspect> aspects))
         {
-            if (!ValidationAttributeProcessorRegistry.TryGetProcessor(attribute, out IPropertyAttributeProcessor? processor) || processor is null)
-            {
-                continue;
-            }
-            if (!processor.TryProcess(processingContext, attribute, out PropertyValidationAspect? aspect))
-            {
-                propertyModel = null;
-                return false;
-            }
-            if (aspect is not null)
-            {
-                aspects.Add(aspect);
-            }
+            propertyModel = null;
+            return false;
         }
-
         bool isNullable = property.Type.TryUnwrapNullableType(out ITypeSymbol nonNullableType);
         bool isValidatableType = false;
         ImmutableArray<PropertyModel> children = [];
@@ -112,7 +98,7 @@ internal sealed class PropertyModelBuilder(GenerationCandidateFactory factory, L
             NonNullableTypeName: nonNullableType.ToDisplayString(KnownSymbolFormats.NonNullable),
             IsNullable: isNullable,
             IsValidatableType: isValidatableType,
-            Aspects: aspects.ToImmutable(),
+            Aspects: aspects,
             Children: children);
 
         return true;

@@ -8,7 +8,7 @@ internal sealed class DefaultTimeSpanAttributeProcessor : IPropertyAttributeProc
 {
     public string AttributeMetadataName => typeof(DefaultTimeSpanAttribute).FullName;
 
-    public bool TryProcess(PropertyAttributeProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
     {
         aspect = null;
 

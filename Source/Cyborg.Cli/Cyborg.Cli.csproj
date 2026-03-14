@@ -22,6 +22,7 @@
     <ItemGroup>
         <ProjectReference Include="..\Cyborg.Core\Cyborg.Core.csproj" />
         <ProjectReference Include="..\Cyborg.Modules\Cyborg.Modules.csproj" />
+        <ProjectReference Include="..\Cyborg.Modules.Borg\Cyborg.Modules.Borg.csproj" />
     </ItemGroup>
     
     <ItemGroup>
@@ -34,7 +35,7 @@
       <None Update="config.json">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
-      <None Update="daily.jconf">
+      <None Update="jobs\daily\daily.jconf">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
       <None Update="daily.json">

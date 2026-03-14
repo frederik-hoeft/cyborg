@@ -8,7 +8,7 @@ internal sealed class MaxLengthAttributeProcessor : LengthAttributeProcessorBase
     public override string AttributeMetadataName => typeof(MaxLengthAttribute).FullName!;
 
     protected override bool TryGetBounds(
-        PropertyAttributeProcessingContext context,
+        PropertyProcessingContext context,
         AttributeData attribute,
         out int? min,
         out int? max)

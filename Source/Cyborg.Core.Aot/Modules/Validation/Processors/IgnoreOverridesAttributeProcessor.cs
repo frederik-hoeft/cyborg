@@ -7,7 +7,7 @@ internal sealed class IgnoreOverridesAttributeProcessor : IPropertyAttributeProc
 {
     public string AttributeMetadataName => typeof(IgnoreOverridesAttribute).FullName;
 
-    public bool TryProcess(PropertyAttributeProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
     {
         _ = context;
         _ = attribute;
@@ -19,6 +19,6 @@ internal sealed class IgnoreOverridesAttributeProcessor : IPropertyAttributeProc
     {
         public override bool EnsuresDefault => false;
 
-        public override string? RewriteOverrideResolutionExpression(PropertyRewriteContext context, string? currentExpression) => null;
+        public override string? RewriteOverrideResolutionExpression(PropertyRewriteContext context, string? currentExpression, string rootPathExpression) => null;
     }
 }

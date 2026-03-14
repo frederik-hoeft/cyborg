@@ -4,7 +4,7 @@ using System.Text.Json;
 
 namespace Cyborg.Core.Modules.Configuration.Serialization.DynamicValueProviders;
 
-public abstract class DynamicValueProviderBuiltIn<T>(string typeName) : IDynamicValueProvider
+public abstract class DynamicValueProviderPrimitives<T>(string typeName) : IDynamicValueProvider
 {
     public string TypeName => typeName;
 

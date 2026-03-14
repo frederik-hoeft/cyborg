@@ -8,7 +8,7 @@ internal abstract class LengthAttributeProcessorBase : IPropertyAttributeProcess
 {
     public abstract string AttributeMetadataName { get; }
 
-    public bool TryProcess(PropertyAttributeProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
     {
         aspect = null;
 
@@ -76,13 +76,13 @@ internal abstract class LengthAttributeProcessorBase : IPropertyAttributeProcess
     }
 
     protected abstract bool TryGetBounds(
-        PropertyAttributeProcessingContext context,
+        PropertyProcessingContext context,
         AttributeData attribute,
         out int? min,
         out int? max);
 
     protected static bool TryGetSingleIntConstructorArgument(
-        PropertyAttributeProcessingContext context,
+        PropertyProcessingContext context,
         AttributeData attribute,
         string attributeDisplayName,
         out int value)
@@ -116,7 +116,7 @@ internal abstract class LengthAttributeProcessorBase : IPropertyAttributeProcess
     }
 
     protected static bool TryGetTwoIntConstructorArguments(
-        PropertyAttributeProcessingContext context,
+        PropertyProcessingContext context,
         AttributeData attribute,
         string attributeDisplayName,
         out int min,

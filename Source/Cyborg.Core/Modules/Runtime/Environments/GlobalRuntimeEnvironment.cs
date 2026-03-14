@@ -1,5 +1,6 @@
-﻿using System.Text.Json;
+﻿using Cyborg.Core.Modules.Runtime.Environments.Syntax;
+using System.Text.Json;
 
 namespace Cyborg.Core.Modules.Runtime.Environments;
 
-public sealed class GlobalRuntimeEnvironment(JsonNamingPolicy namingPolicy) : RuntimeEnvironment(name: "global", isTransient: false, namingPolicy);
+public sealed record GlobalRuntimeEnvironment(JsonNamingPolicy NamingPolicy) : RuntimeEnvironment(Name: "global", IsTransient: false, new VariableSyntaxBuilder(NamingPolicy), Namespace: string.Empty);

@@ -1,8 +1,8 @@
 ﻿using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime;
-using Cyborg.Core.Modules.Runtime.Artifacts;
 using Cyborg.Core.Modules.Runtime.Environments;
+using Cyborg.Core.Modules.Runtime.Environments.Artifacts;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Modules.Foreach;

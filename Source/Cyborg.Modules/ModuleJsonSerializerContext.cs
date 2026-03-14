@@ -1,6 +1,6 @@
-﻿using Cyborg.Modules.Borg;
-using Cyborg.Modules.Configuration.ConfigCollection;
+﻿using Cyborg.Modules.Configuration.ConfigCollection;
 using Cyborg.Modules.Configuration.ConfigMap;
+using Cyborg.Modules.Dynamic;
 using Cyborg.Modules.EnvironmentDefinitions;
 using Cyborg.Modules.External;
 using Cyborg.Modules.Foreach;
@@ -33,6 +33,5 @@ namespace Cyborg.Modules;
 [JsonSerializable(typeof(ExternalModule))]
 [JsonSerializable(typeof(EnvironmentDefinitionsModule))]
 [JsonSerializable(typeof(SshShutdownModule))]
-// TODO: temp
-[JsonSerializable(typeof(BorgRemote))]
+[JsonSerializable(typeof(DynamicModule))]
 public sealed partial class ModuleJsonSerializerContext : JsonSerializerContext;

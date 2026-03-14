@@ -141,9 +141,11 @@
                         "cyborg.modules.network.ssh_shutdown.v1": {
                           "hostname": "${host.hostname}",
                           "username": "root",
+                          "executable": "C:\\Windows\\system32\\calc.exe",
                           "ssh_pass": {
                             "file_path": "/root/.ssh/pass",
-                            "match_prompt": "assphrase"
+                            "match_prompt": "assphrase",
+                            "executable": "C:\\Windows\\system32\\calc.exe"
                           }
                         }
                       }

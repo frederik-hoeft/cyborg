@@ -1,19 +1,23 @@
 ﻿using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime.Environments;
+using Cyborg.Core.Modules.Runtime.Environments.Syntax;
 using System.Diagnostics.CodeAnalysis;
-using System.Text.Json;
 
 namespace Cyborg.Core.Modules.Runtime;
 
-public abstract class ModuleRuntimeBase(JsonNamingPolicy namingPolicy) : IModuleRuntime
+public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory) : IModuleRuntime
 {
+    private const string UNBOUND_ENVIRONMENT = "__UNBOUND";
+
     public abstract IRuntimeEnvironment GlobalEnvironment { get; }
 
     public abstract IRuntimeEnvironment ParentEnvironment { get; }
 
     public abstract IRuntimeEnvironment Environment { get; }
 
-    protected JsonNamingPolicy NamingPolicy => namingPolicy;
+    protected abstract IModuleRuntime? Parent { get; }
+
+    protected VariableSyntaxBuilder SyntaxFactory => syntaxFactory;
 
     protected IRuntimeEnvironment CreateScopedEnvironment(IModuleRuntime parent, EnvironmentScope scope, string? name)
     {
@@ -26,11 +30,11 @@ public abstract class ModuleRuntimeBase(JsonNamingPolicy namingPolicy) : IModule
         }
         IRuntimeEnvironment environment = scope switch
         {
-            EnvironmentScope.Isolated => new RuntimeEnvironment(name, transient, NamingPolicy),
+            EnvironmentScope.Isolated => new RuntimeEnvironment(name, transient, SyntaxFactory, UNBOUND_ENVIRONMENT),
             EnvironmentScope.Global => parent.GlobalEnvironment,
-            EnvironmentScope.InheritParent => new InheritedRuntimeEnvironment(name, parent.Environment, transient, NamingPolicy),
-            EnvironmentScope.InheritGlobal => new InheritedRuntimeEnvironment(name, parent.GlobalEnvironment, transient, NamingPolicy),
-            EnvironmentScope.Parent or EnvironmentScope.Current => parent.Environment,
+            EnvironmentScope.InheritParent => new InheritedRuntimeEnvironment(name, parent.Environment, transient, SyntaxFactory, UNBOUND_ENVIRONMENT),
+            EnvironmentScope.InheritGlobal => new InheritedRuntimeEnvironment(name, parent.GlobalEnvironment, transient, SyntaxFactory, UNBOUND_ENVIRONMENT),
+            EnvironmentScope.Parent or EnvironmentScope.Current => parent.Environment.Bind(UNBOUND_ENVIRONMENT),
             EnvironmentScope.Reference => throw new ArgumentException("Attempting to create an environment by reference without providing an environment reference.", nameof(scope)),
             _ => throw new ArgumentOutOfRangeException(nameof(scope), scope, "Invalid environment scope.")
         };
@@ -88,14 +92,14 @@ public abstract class ModuleRuntimeBase(JsonNamingPolicy namingPolicy) : IModule
     public virtual IModuleExecutionResult Exit<TModule>(IModuleExecutionResult<TModule> result) where TModule : ModuleBase, IModule
     {
         ArgumentNullException.ThrowIfNull(result);
-
-        if (result.Artifacts is { } artifacts)
-        {
-            ModuleEnvironment deploymentTarget = result.Module.Artifacts.Environment;
-            IRuntimeEnvironment environment = PrepareEnvironment(deploymentTarget);
-            artifacts.PublishToEnvironment(environment, result.Status);
-        }
-        return result;
+        // When specifying scopes during configuration, the caller expects those scopes to be relative to the actual parent module,
+        // since this internal runtime nesting for artifact publication is an implementation detail that should not affect configuration.
+        IEnvironmentLike artifacts = result.Artifacts.Build(result.Status);
+        IModuleRuntime responsibleRuntime = Parent ?? this;
+        ModuleEnvironment deploymentTarget = result.Module.Artifacts.Environment;
+        IRuntimeEnvironment targetEnvironment = responsibleRuntime.PrepareEnvironment(deploymentTarget);
+        targetEnvironment.Publish(artifacts);
+        return new ModuleExecutionResult(result.Module, result.Status, artifacts);
     }
 
     public virtual IRuntimeEnvironment? ResolveEnvironmentReference(ModuleEnvironmentReference environmentReference) => environmentReference switch

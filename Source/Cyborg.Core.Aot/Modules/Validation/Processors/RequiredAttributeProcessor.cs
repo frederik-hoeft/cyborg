@@ -8,7 +8,7 @@ internal sealed class RequiredAttributeProcessor : IPropertyAttributeProcessor
 {
     public string AttributeMetadataName => typeof(RequiredAttribute).FullName;
 
-    public bool TryProcess(PropertyAttributeProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
     {
         _ = context;
         _ = attribute;

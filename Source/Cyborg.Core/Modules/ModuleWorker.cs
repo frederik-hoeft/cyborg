@@ -1,6 +1,6 @@
 ﻿using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime;
-using Cyborg.Core.Modules.Runtime.Artifacts;
+using Cyborg.Core.Modules.Runtime.Environments.Artifacts;
 using Cyborg.Core.Modules.Validation;
 using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics.CodeAnalysis;
@@ -41,13 +41,13 @@ public abstract class ModuleWorker<TModule>(IWorkerContext<TModule> context) : I
 
     protected IModuleExecutionResult<TModule> WithStatus(ModuleExitStatus status) => CreateResult(status, null);
 
-    private ModuleExecutionResultImpl<TModule> CreateResult(ModuleExitStatus status, IDecomposable? result)
+    private ModuleExecutionResult<TModule> CreateResult(ModuleExitStatus status, IDecomposable? result)
     {
         if (result is not null)
         {
             Artifacts.Expose(result);
         }
-        return new(Module, status, Artifacts);
+        return new ModuleExecutionResult<TModule>(Module, status, Artifacts);
     }
 
     async Task<IModuleExecutionResult> IModuleWorker.ExecuteAsync(IModuleRuntime runtime, CancellationToken cancellationToken)
@@ -58,7 +58,7 @@ public abstract class ModuleWorker<TModule>(IWorkerContext<TModule> context) : I
         IModuleArtifactsFactory artifactsFactory = ServiceProvider.GetRequiredService<IModuleArtifactsFactory>();
         overriddenResult.EnsureValid();
         Module = overriddenResult.Module;
-        Artifacts = artifactsFactory.CreateArtifacts(Module);
+        Artifacts = artifactsFactory.CreateArtifacts(runtime, Module);
         return await ExecuteAsync(runtime, cancellationToken);
     }
 
