@@ -13,5 +13,7 @@ public record ModuleEnvironment : IDefaultInstance<ModuleEnvironment>
 
     public virtual string? Name { get; init; }
 
+    public virtual bool Transient { get; init; }
+
     public static ModuleEnvironment Default => new() { Scope = EnvironmentScope.InheritParent, };
 }

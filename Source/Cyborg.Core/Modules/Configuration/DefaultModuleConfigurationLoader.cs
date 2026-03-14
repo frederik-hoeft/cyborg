@@ -10,6 +10,6 @@ public sealed class DefaultModuleConfigurationLoader(IModuleLoaderContext config
     {
         await using FileStream stream = File.OpenRead(configurationFilePath);
         ModuleContext? moduleReference = await JsonSerializer.DeserializeAsync<ModuleContext>(stream, configurationContext, cancellationToken);
-        return moduleReference ?? throw new InvalidOperationException($"Failed to load module from configuration file '{configurationFilePath}'.");
+        return moduleReference ?? throw new InvalidOperationException($"Failed to load module context from configuration file '{configurationFilePath}'.");
     }
 }

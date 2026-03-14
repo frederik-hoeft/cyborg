@@ -5,10 +5,7 @@ namespace Cyborg.Core.Modules.Runtime;
 
 public sealed class RootModuleRuntime(GlobalRuntimeEnvironment defaultEnvironment) : ModuleRuntimeBase(defaultEnvironment.SyntaxFactory)
 {
-    private readonly Dictionary<string, IRuntimeEnvironment> _environments = new()
-    {
-        { defaultEnvironment.Name, defaultEnvironment }
-    };
+    private readonly Dictionary<string, IRuntimeEnvironment> _environments = [];
 
     public override IRuntimeEnvironment GlobalEnvironment { get; } = defaultEnvironment;
 
@@ -18,8 +15,15 @@ public sealed class RootModuleRuntime(GlobalRuntimeEnvironment defaultEnvironmen
 
     protected override IModuleRuntime? Parent => null;
 
-    public override bool TryGetEnvironment(string name, [NotNullWhen(true)] out IRuntimeEnvironment? environment) =>
-        _environments.TryGetValue(name, out environment);
+    public override bool TryGetEnvironment(string name, [NotNullWhen(true)] out IRuntimeEnvironment? environment)
+    {
+        if (Environment.Name.Equals(name, StringComparison.Ordinal))
+        {
+            environment = Environment;
+            return true;
+        }
+        return _environments.TryGetValue(name, out environment);
+    }
 
     public override bool TryAddEnvironment(IRuntimeEnvironment environment)
     {

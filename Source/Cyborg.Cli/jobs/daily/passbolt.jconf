@@ -1,0 +1,85 @@
+{
+  "environment": { "name": "passbolt", "scope": "inherit_parent", "transient": true },
+  "configuration": {
+    "cyborg.modules.config.collection.v1": {
+      "sources": [
+        {
+          "cyborg.modules.config.map.v1": {
+            "entries": [
+              { "key": "container_name", "string": "passbolt" },
+              { "key": "container_root", "string": "${docker_root}/containers/${container_name}" },
+              { "key": "volume_root", "string": "${docker_root}/volumes/${container_name}" }
+            ]
+          }
+        },
+        {
+          "cyborg.modules.config.external.v1": {
+            "path": "${job_directory}/${container_name}.jsecrets"
+          }
+        }
+      ]
+    }
+  },
+  "module": {
+    "cyborg.modules.sequence.v1": {
+      "steps": [
+        {
+          "module": {
+            "cyborg.modules.template.v1": {
+              "namespace": "cyborg.templates.check_variables.v1",
+              "path": "check_variables.jconf",
+              "arguments": {
+                "variables": [ "docker_root", "borg_passphrase", "docker_user", "backup_hosts" ]
+              }
+            }
+          }
+        },
+        {
+          "module": {
+            "cyborg.modules.subprocess.v1": {
+              "command": {
+                "executable": "/usr/bin/docker",
+                "arguments": [ "compose", "-f", "${container_root}/docker-compose.yml", "down" ]
+              },
+              "impersonation": { "user": "${docker_user}" }
+            }
+          }
+        },
+        {
+          "module": {
+            "cyborg.modules.guard.v1": {
+              "try": {
+                "module": {
+                  "cyborg.modules.foreach.v1": {
+                    "collection": "backup_hosts",
+                    "item_variable": "host",
+                    "body": {
+                      "module": {
+                        "cyborg.modules.sequence.v1": {
+                          "steps": [
+                            // TODO: borg backup jobs for each host: create, prune, compact
+                          ]
+                        }
+                      }
+                    }
+                  }
+                },
+                "finally": {
+                  "module": {
+                    "cyborg.modules.subprocess.v1": {
+                      "command": {
+                        "executable": "/usr/bin/docker",
+                        "arguments": [ "compose", "-f", "${container_root}/docker-compose.yml", "up", "-d" ]
+                      },
+                      "impersonation": { "user": "${docker_user}" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

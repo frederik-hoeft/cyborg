@@ -3,7 +3,7 @@ using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
-using Cyborg.Modules.Template;
+using Cyborg.Modules.Switch;
 using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics.CodeAnalysis;
 
@@ -17,7 +17,7 @@ internal sealed class Commands
     {
         using DefaultServiceProvider sp = new();
         GlobalRuntimeEnvironment defaultEnvironment = sp.GetRequiredService<GlobalRuntimeEnvironment>();
-        defaultEnvironment.SetVariable(TemplateModule.LoadTargetName, template);
+        defaultEnvironment.SetVariable("template", template);
         IModuleConfigurationLoader configurationLoader = sp.GetService<IModuleConfigurationLoader>();
         ModuleContext module = await configurationLoader.LoadModuleAsync("test.json", cancellationToken);
         module = module with 

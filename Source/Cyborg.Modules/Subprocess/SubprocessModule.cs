@@ -12,16 +12,24 @@ public sealed partial record SubprocessModule
 (
     [property: Required] SubprocessCommand Command,
     [property: Required][property: DefaultInstance] SubprocessOutputOptions Output,
-    [property: DefaultValue<bool>(true)] bool CheckExitCode
+    [property: DefaultValue<bool>(true)] bool CheckExitCode,
+    ImpersonationContext? Impersonation
 ) : ModuleBase, IModule
 {
     public static string ModuleId => "cyborg.modules.subprocess.v1";
 }
 
 [Validatable]
+public sealed record ImpersonationContext
+(
+    [property: Required][property: DefaultValue<string>("/usr/bin/runuser")][property: FileExists] string Executable,
+    [property: Required] string User
+);
+
+[Validatable]
 public sealed record SubprocessCommand
 (
-    [property: Required][property: MinLength(1)] string Executable,
+    [property: Required][property: FileExists] string Executable,
     [property: Required] ImmutableArray<string> Arguments
 );
 

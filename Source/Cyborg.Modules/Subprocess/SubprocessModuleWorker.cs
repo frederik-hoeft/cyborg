@@ -3,17 +3,29 @@ using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Services.Dispatch;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Modules.Subprocess;
 
-// sample subprocess module
 public sealed class SubprocessModuleWorker(IWorkerContext<SubprocessModule> context, IChildProcessDispatcher dispatcher) : ModuleWorker<SubprocessModule>(context)
 {
     protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
-        ProcessStartInfo startInfo = new(Module.Command.Executable, Module.Command.Arguments)
+        string executable = Module.Command.Executable;
+        ImmutableArray<string> arguments = Module.Command.Arguments;
+        if (Module.Impersonation is { } runUser)
+        {
+            executable = runUser.Executable;
+            arguments =
+            [
+                "-u", runUser.User,
+                "--", Module.Command.Executable,
+                ..Module.Command.Arguments
+            ];
+        }
+        ProcessStartInfo startInfo = new(executable, arguments)
         {
             RedirectStandardOutput = Module.Output.ReadStdout,
             RedirectStandardError = Module.Output.ReadStderr,

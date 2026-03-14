@@ -7,7 +7,10 @@ using System.Collections.Immutable;
 namespace Cyborg.Modules.Configuration.ConfigCollection;
 
 [GeneratedModuleValidation]
-public sealed partial record ConfigCollectionModule([property: MinLength(1)] ImmutableArray<ModuleReference> Sources) : ModuleBase, IModule
+public sealed partial record ConfigCollectionModule
+(
+    [property: MinLength(1)] ImmutableArray<ModuleReference> Sources
+) : ModuleBase, IModule
 {
     public static string ModuleId => "cyborg.modules.config.collection.v1";
 }

@@ -6,6 +6,36 @@ Legend: ✅ Implemented | 🚧 Partial/WIP | ❌ Planned
 
 <!-- @import "[TOC]" {cmd="toc" depthFrom=2 depthTo=6 orderedList=false} -->
 
+<!-- code_chunk_output -->
+
+- [Core Control Flow Modules](#core-control-flow-modules)
+  - [ForEach Module (`cyborg.modules.foreach.v1`) ✅](#foreach-module-cyborgmodulesforeachv1-)
+  - [Guard Module (`cyborg.modules.guard.v1`) 🚧](#guard-module-cyborgmodulesguardv1-)
+  - [Conditional Module (`cyborg.modules.if.v1`) ✅](#conditional-module-cyborgmodulesifv1-)
+- [Borg Modules](#borg-modules)
+  - [Repository Configuration Module (`cyborg.modules.borg.repository.v1`) 🚧](#repository-configuration-module-cyborgmodulesborgrepositoryv1-)
+  - [Borg Create Module (`cyborg.modules.borg.create.v1`) 🚧](#borg-create-module-cyborgmodulesborgcreatev1-)
+  - [Borg Prune Module (`cyborg.modules.borg.prune.v1`) 🚧](#borg-prune-module-cyborgmodulesborgprunev1-)
+  - [Borg Compact Module (`cyborg.modules.borg.compact.v1`) 🚧](#borg-compact-module-cyborgmodulesborgcompactv1-)
+- [Service Management Modules](#service-management-modules)
+  - [Docker Compose Down Module (`cyborg.modules.docker.down.v1`) 🚧](#docker-compose-down-module-cyborgmodulesdockerdownv1-)
+  - [Docker Compose Up Module (`cyborg.modules.docker.up.v1`) 🚧](#docker-compose-up-module-cyborgmodulesdockerupv1-)
+  - [Systemd Start Module (`cyborg.modules.systemd.start.v1`) 🚧](#systemd-start-module-cyborgmodulessystemdstartv1-)
+  - [Systemd Stop Module (`cyborg.modules.systemd.stop.v1`) 🚧](#systemd-stop-module-cyborgmodulessystemdstopv1-)
+- [Network Modules](#network-modules)
+  - [Wake-on-LAN Module (`cyborg.modules.network.wol.v1`) ✅](#wake-on-lan-module-cyborgmodulesnetworkwolv1-)
+  - [SSH Shutdown Module (`cyborg.modules.network.ssh_shutdown.v1`) 🚧](#ssh-shutdown-module-cyborgmodulesnetworkssh_shutdownv1-)
+  - [Network Ping Module (`cyborg.modules.net.ping.v1`) 🚧](#network-ping-module-cyborgmodulesnetpingv1-)
+- [Security Modules](#security-modules)
+  - [Secrets Load Module (`cyborg.modules.secrets.load.v1`) 🚧](#secrets-load-module-cyborgmodulessecretsloadv1-)
+- [System Modules](#system-modules)
+  - [Run-As Module (`cyborg.modules.system.run_as.v1`) 🚧](#run-as-module-cyborgmodulessystemrun_asv1-)
+- [Logging Modules](#logging-modules)
+  - [Log Module (`cyborg.modules.log.v1`) 🚧](#log-module-cyborgmoduleslogv1-)
+
+<!-- /code_chunk_output -->
+
+
 ## Core Control Flow Modules
 
 ### ForEach Module (`cyborg.modules.foreach.v1`) ✅

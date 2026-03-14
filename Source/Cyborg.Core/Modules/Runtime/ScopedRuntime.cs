@@ -32,7 +32,15 @@ internal sealed class ScopedRuntime(IModuleRuntime root, IModuleRuntime parent, 
 
     public override bool TryAddEnvironment(IRuntimeEnvironment environment) => root.TryAddEnvironment(environment);
 
-    public override bool TryGetEnvironment(string name, [NotNullWhen(true)] out IRuntimeEnvironment? environment) => root.TryGetEnvironment(name, out environment);
+    public override bool TryGetEnvironment(string name, [NotNullWhen(true)] out IRuntimeEnvironment? environment)
+    {
+        if (Environment.Name.Equals(name, StringComparison.Ordinal))
+        {
+            environment = Environment;
+            return true;
+        }
+        return parent.TryGetEnvironment(name, out environment);
+    }
 
     public override bool TryRemoveEnvironment(IRuntimeEnvironment environment) => root.TryRemoveEnvironment(environment);
 }

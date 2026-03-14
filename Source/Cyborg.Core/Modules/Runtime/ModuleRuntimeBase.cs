@@ -19,10 +19,9 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory) : I
 
     protected VariableSyntaxBuilder SyntaxFactory => syntaxFactory;
 
-    protected IRuntimeEnvironment CreateScopedEnvironment(IModuleRuntime parent, EnvironmentScope scope, string? name)
+    protected IRuntimeEnvironment CreateScopedEnvironment(IModuleRuntime parent, EnvironmentScope scope, string? name, bool transient = false)
     {
         ArgumentNullException.ThrowIfNull(parent);
-        bool transient = false;
         if (string.IsNullOrEmpty(name))
         {
             transient = true;
@@ -59,7 +58,7 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory) : I
                 throw new InvalidOperationException($"Attempting to reference an environment that does not exist: {moduleEnvironment.Name}");
             }
         }
-        environment ??= CreateScopedEnvironment(parent: this, moduleEnvironment.Scope, moduleEnvironment.Name);
+        environment ??= CreateScopedEnvironment(parent: this, moduleEnvironment.Scope, moduleEnvironment.Name, moduleEnvironment.Transient);
         return environment;
     }
 
