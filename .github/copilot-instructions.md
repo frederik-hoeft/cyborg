@@ -4,7 +4,7 @@ Cyborg is a WIP .NET 10 application that will fully replace the legacy `borg/` s
 
 **Status:** Proof-of-concept stage. Core module system is functional; testing infrastructure will be added as the project moves toward release.
 
-> **For design and architectural work, refer to [/Source/architecture.md](/Source/architecture.md)** — it contains comprehensive documentation on module patterns, environment scoping, parsing infrastructure, planned modules, and migration strategy.
+> **For design and architectural work, refer to [/docs/architecture.md](/docs/architecture.md)** — it contains comprehensive documentation on module patterns, environment scoping, parsing infrastructure, planned modules, and migration strategy.
 
 ## Project Structure
 
