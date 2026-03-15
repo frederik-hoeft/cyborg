@@ -4,57 +4,6 @@ Implementation priorities, security principles, metrics, and extension points.
 
 <!-- @import "[TOC]" {cmd="toc" depthFrom=2 depthTo=6 orderedList=false} -->
 
-## Implementation Priorities
-
-Legend: ✅ Done | 🚧 In Progress | ❌ TODO
-
-### Phase 1: Core Control Flow (Required for any job)
-
-1. ✅ `cyborg.modules.foreach.v1` - Iterate over hosts
-2. ❌ `cyborg.modules.guard.v1` - Try-finally semantics
-3. ✅ `cyborg.modules.if.v1` - Conditional execution
-4. ❌ `cyborg.modules.log.v1` - Logging
-
-**Also implemented (foundational):**
-- ✅ `cyborg.modules.sequence.v1` - Sequential execution
-- ✅ `cyborg.modules.subprocess.v1` - Process execution
-- ✅ `cyborg.modules.template.v1` - JSON template loading
-- ✅ `cyborg.modules.config.map.v1` - Key-value configuration
-- ✅ `cyborg.modules.config.collection.v1` - Multiple config sources
-- ✅ `cyborg.modules.named.definition.v1` - Named module definitions
-- ✅ `cyborg.modules.named.reference.v1` - Named module references
-
-### Phase 2: Borg Operations (Core backup functionality)
-
-5. ❌ `cyborg.modules.borg.repository.v1` - Repository context
-6. ❌ `cyborg.modules.borg.create.v1` - Create archives
-7. ❌ `cyborg.modules.borg.prune.v1` - Prune old archives
-8. ❌ `cyborg.modules.borg.compact.v1` - Compact repository
-
-**Note:** `BorgJobModule` wrapper exists but is not yet registered/functional.
-
-### Phase 3: Service Management (Required for existing jobs)
-
-9. ❌ `cyborg.modules.docker.down.v1` - Stop Docker
-10. ❌ `cyborg.modules.docker.up.v1` - Start Docker
-11. ❌ `cyborg.modules.systemd.start.v1` - Start systemd
-12. ❌ `cyborg.modules.systemd.stop.v1` - Stop systemd
-13. ❌ `cyborg.modules.system.run_as.v1` - User switching
-
-### Phase 4: Network Operations (Required for multi-host)
-
-14. ✅ `cyborg.modules.network.wol.v1` - Wake-on-LAN
-15. 🚧 `cyborg.modules.network.ssh_shutdown.v1` - Remote shutdown (module only)
-16. ❌ `cyborg.modules.net.ping.v1` - Host reachability
-
-### Phase 5: Security & Observability
-
-17. ❌ `cyborg.modules.secrets.load.v1` - Secret management
-18. ❌ Prometheus metrics integration for all modules
-19. ❌ Borg output parsing grammars
-
----
-
 ## Security Design Principles
 
 ### No Shell Expansion
@@ -88,7 +37,7 @@ Each module validates inputs at deserialization time:
 
 ## Metrics Schema
 
-All metrics use `cyborg_` prefix and follow Prometheus conventions:
+All metrics use `cyborg_` prefix and follow Prometheus conventions (non-exhaustive samples below):
 
 ### Backup Metrics
 

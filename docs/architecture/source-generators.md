@@ -2,6 +2,15 @@
 
 <!-- @import "[TOC]" {cmd="toc" depthFrom=2 depthTo=6 orderedList=false} -->
 
+<!-- code_chunk_output -->
+
+- [Generator Contract Registrations](#generator-contract-registrations)
+- [ModuleLoaderFactoryGenerator](#moduleloaderfactorygenerator)
+- [ModuleValidationGenerator](#modulevalidationgenerator)
+
+<!-- /code_chunk_output -->
+
+
 ## Generator Contract Registrations
 
 Source generators in `Cyborg.Core.Aot` need to reference runtime types from `Cyborg.Core` (e.g., `IModuleRuntime`, `ValidationResult<T>`) when emitting code. Since generators target `netstandard2.0` and cannot directly reference `net10.0` assemblies, a contract registration system bridges this gap.
@@ -89,7 +98,7 @@ public sealed partial record WakeOnLanModule(
 **Generated Contract:**
 
 The generator emits a partial record implementing `IModule<WakeOnLanModule>` with:
-- `ApplyDefaultsAsync()` — Fills `default!` values from `[DefaultValue<T>]` / `[DefaultTimeSpan]` annotations
+- `ApplyDefaultsAsync()` — Fills `default!` values from `[DefaultValue<T>]` / `[DefaultTimeSpan]` / `[DefaultInstance]` annotations
 - `ResolveOverridesAsync()` — Substitutes `${VAR}` references and `@module.property` overrides from runtime environment
 - `ValidateAsync()` — Checks `[Required]`, `[Range<T>]`, `[ExactLength]`, enum validity; returns `ValidationResult<T>`
 

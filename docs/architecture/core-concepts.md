@@ -2,6 +2,17 @@
 
 <!-- @import "[TOC]" {cmd="toc" depthFrom=2 depthTo=6 orderedList=false} -->
 
+<!-- code_chunk_output -->
+
+- [Design Goals](#design-goals)
+- [Project Structure](#project-structure)
+- [JSON Configuration Schema](#json-configuration-schema)
+- [AOT Compatibility Constraints](#aot-compatibility-constraints)
+- [Future Considerations](#future-considerations)
+
+<!-- /code_chunk_output -->
+
+
 ## Design Goals
 
 1. **AOT Compilation** - Native AOT publishing for minimal startup time and memory footprint on Linux servers

@@ -4,6 +4,22 @@ Grammar-based parser combinators for extracting structured data from borg subpro
 
 <!-- @import "[TOC]" {cmd="toc" depthFrom=2 depthTo=6 orderedList=false} -->
 
+<!-- code_chunk_output -->
+
+- [Architecture Overview](#architecture-overview)
+- [Core Components](#core-components)
+- [Design Decisions](#design-decisions)
+- [Creating Terminal Parsers](#creating-terminal-parsers)
+- [Composing Parsers with Grammar Factory](#composing-parsers-with-grammar-factory)
+- [Named Parsers for Parent Discrimination](#named-parsers-for-parent-discrimination)
+- [Syntax Node Hierarchy](#syntax-node-hierarchy)
+- [Visitor Pattern for Data Extraction](#visitor-pattern-for-data-extraction)
+- [Example: Borg Prune Stats Grammar](#example-borg-prune-stats-grammar)
+- [Integration with Subprocess Module](#integration-with-subprocess-module)
+
+<!-- /code_chunk_output -->
+
+
 ## Architecture Overview
 
 ```

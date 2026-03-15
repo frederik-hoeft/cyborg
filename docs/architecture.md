@@ -4,6 +4,17 @@ This document describes the system architecture and key design decisions for the
 
 <!-- @import "[TOC]" {cmd="toc" depthFrom=2 depthTo=6 orderedList=false} -->
 
+<!-- code_chunk_output -->
+
+- [Overview](#overview)
+- [Documentation](#documentation)
+- [Quick Reference](#quick-reference)
+  - [Design Goals](#design-goals)
+  - [Project Layers](#project-layers)
+
+<!-- /code_chunk_output -->
+
+
 ## Overview
 
 Cyborg is a .NET 10 application providing modular, JSON-configured backup orchestration with native AOT compilation support. It replaces legacy bash-based backup scripts with a type-safe, extensible module system.
@@ -42,22 +53,3 @@ Cyborg.Modules     ← Built-in module implementations
      ↑
 Cyborg.Cli         ← Application entry point
 ```
-
-### Module Status
-
-Legend: ✅ Implemented | 🚧 Partial/WIP | ❌ Planned
-
-| Category | Modules |
-|----------|---------|
-| Control Flow | ✅ Sequence, ✅ ForEach, ✅ Conditional, 🚧 Guard |
-| Configuration | ✅ ConfigMap, ✅ ConfigCollection, ✅ Template |
-| Named Modules | ✅ Definition, ✅ Reference |
-| Subprocess | ✅ Subprocess |
-| Network | ✅ Wake-on-LAN, 🚧 SSH Shutdown, ❌ Ping |
-| Borg | ❌ Repository, ❌ Create, ❌ Prune, ❌ Compact |
-| Services | ❌ Docker Up/Down, ❌ Systemd Start/Stop |
-| Security | ❌ Secrets Load |
-| System | ❌ Run-As |
-| Logging | ❌ Log |
-
-See [Module Reference](architecture/modules-reference.md) for complete documentation.

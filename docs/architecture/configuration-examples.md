@@ -534,14 +534,14 @@ The root configuration establishes the global environment with backup hosts and 
               "port": 22,
               "wake_on_lan_mac": "11:22:33:44:55:66",
               "borg_rsh": "/usr/bin/sshpass -f/root/.ssh/pass -P assphrase /usr/bin/ssh",
-              "borg_repo_root": "/var/backups/borg/nas1.dmz.home.arpa"
+              "borg_repo_root": "/var/backups/borg/nas1.service.local"
             },
             {
-              "hostname": "backup2.service.home.arpa",
+              "hostname": "backup2.service.local",
               "port": 22,
-              "wake_on_lan_mac": "f4:4d:30:45:70:37",
+              "wake_on_lan_mac": "aa:bb:cc:dd:ee:ff",
               "borg_rsh": "/usr/bin/sshpass -f/root/.ssh/pass -P assphrase /usr/bin/ssh",
-              "borg_repo_root": "/var/backups/borg/nas1.service.home.arpa"
+              "borg_repo_root": "/var/backups/borg/nas1.service.local"
             }
           ]
         },

@@ -2,6 +2,18 @@
 
 <!-- @import "[TOC]" {cmd="toc" depthFrom=2 depthTo=6 orderedList=false} -->
 
+<!-- code_chunk_output -->
+
+- [Three-Part Module Pattern](#three-part-module-pattern)
+- [Module Execution Lifecycle](#module-execution-lifecycle)
+- [Module Composition via ModuleReference](#module-composition-via-modulereference)
+- [DI Module Registration Flow](#di-module-registration-flow)
+- [Dependency Injection Architecture](#dependency-injection-architecture)
+- [Metrics Architecture](#metrics-architecture)
+
+<!-- /code_chunk_output -->
+
+
 ## Three-Part Module Pattern
 
 Each module consists of three types serving distinct responsibilities:
