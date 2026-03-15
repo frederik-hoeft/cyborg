@@ -47,11 +47,19 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
             aspect.EmitValidation(builder, contractInfo, property, moduleVariableName, propertyAccessExpression);
         }
 
-        if (!property.IsValidatableType || property.Children.IsDefaultOrEmpty)
+        if (property.HasValidatableChildren)
         {
-            return;
+            AppendNestedValidationForProperty(builder, property, moduleVariableName, propertyAccessExpression);
         }
 
+        if (property.HasCollectionElementChildren)
+        {
+            AppendCollectionValidationForProperty(builder, property, moduleVariableName, propertyAccessExpression);
+        }
+    }
+
+    private void AppendNestedValidationForProperty(IndentedStringBuilder builder, PropertyModel property, string moduleVariableName, string propertyAccessExpression)
+    {
         StringBuilder nestedRawBuilder = new();
         IndentedStringBuilder nestedBuilder = new(nestedRawBuilder, indentLevel: builder.IndentLevel + 1);
 
@@ -64,6 +72,7 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
         {
             return;
         }
+
         builder.AppendBlock(
             $$"""
             if ({{propertyAccessExpression}} is not null)
@@ -72,4 +81,81 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
         builder.Raw.Append(nestedRawBuilder.ToString());
         builder.AppendLine("}");
     }
+
+    private void AppendCollectionValidationForProperty(IndentedStringBuilder builder, PropertyModel property, string moduleVariableName, string propertyAccessExpression)
+    {
+        CollectionModel collection = property.Collection!;
+        string safeIdentifier = CreateSafeIdentifier(propertyAccessExpression);
+        string collectionAccessExpression = propertyAccessExpression;
+        string elementVariable = $"{safeIdentifier}Element";
+        string elementCurrentVariable = $"{safeIdentifier}ElementCurrent";
+        bool collectionPropertyRequiresNullCheck = property.IsNullable || !property.Symbol.Type.IsValueType;
+        int elementPropertyIndentLevel = 1;
+        if (collection.ElementRequiresNullCheck)
+        {
+            elementPropertyIndentLevel++;
+        }
+        if (collectionPropertyRequiresNullCheck)
+        {
+            elementPropertyIndentLevel++;
+        }
+        StringBuilder nestedRawBuilder = new();
+        IndentedStringBuilder nestedBuilder = new(nestedRawBuilder, indentLevel: builder.IndentLevel + elementPropertyIndentLevel);
+
+        string nestedAccessExpression = elementCurrentVariable;
+        foreach (PropertyModel child in collection.ElementChildren)
+        {
+            AppendValidationForProperty(nestedBuilder, child, moduleVariableName, $"{nestedAccessExpression}.{child.Name}");
+        }
+
+        if (nestedBuilder.Raw.Length == 0)
+        {
+            return;
+        }
+
+        if (collectionPropertyRequiresNullCheck)
+        {
+            string collectionCurrentVariable = $"{safeIdentifier}CollectionCurrent";
+            builder.AppendBlock(
+                $$"""
+                if ({{propertyAccessExpression}} is not null)
+                {
+                    {{property.NonNullableTypeName}} {{collectionCurrentVariable}} = {{propertyAccessExpression}};
+                """);
+            builder = builder.IncreaseIndent();
+            collectionAccessExpression = collectionCurrentVariable;
+        }
+
+        builder.AppendLine($"foreach ({collection.ElementNullableTypeName} {elementVariable} in {collectionAccessExpression})");
+        builder.AppendLine("{");
+
+        if (collection.ElementRequiresNullCheck)
+        {
+            IndentedStringBuilder loopBuilder = builder.IncreaseIndent();
+            loopBuilder.AppendBlock(
+                $$"""
+                if ({{elementVariable}} is not null)
+                {
+                    {{collection.ElementNonNullableTypeName}} {{elementCurrentVariable}} = {{elementVariable}};
+                """);
+            loopBuilder.Raw.Append(nestedBuilder.Raw.ToString());
+            loopBuilder.AppendLine("}");
+        }
+        else
+        {
+            IndentedStringBuilder loopBuilder = builder.IncreaseIndent();
+            loopBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elementCurrentVariable} = {elementVariable};");
+            loopBuilder.Raw.Append(nestedBuilder.Raw.ToString());
+        }
+
+        builder.AppendLine("}");
+
+        if (collectionPropertyRequiresNullCheck)
+        {
+            builder = builder.DecreaseIndent();
+            builder.AppendLine("}");
+        }
+    }
+
+    private static string CreateSafeIdentifier(string value) => string.Concat(value.Select(static character => char.IsLetterOrDigit(character) ? character : '_'));
 }

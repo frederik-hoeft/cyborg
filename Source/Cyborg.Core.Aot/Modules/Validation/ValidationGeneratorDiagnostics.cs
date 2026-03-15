@@ -141,4 +141,13 @@ internal static class ValidationGeneratorDiagnostics
         category: CATEGORY,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault : true);
+
+    public static DiagnosticDescriptor UnsupportedValidatableCollectionShape { get; } = new(
+        id: "CYBORGVAL018",
+        title: "Unsupported validatable collection shape",
+        messageFormat: "Property '{0}' on '{1}' is a collection of [Validatable] elements, but collection type '{2}' cannot currently be reconstructed by the generator",
+        category: CATEGORY,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
 }

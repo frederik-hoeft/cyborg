@@ -10,7 +10,13 @@ internal static class KnownTypes
 
     public static string IEnumerableOfT(string typeArgument) => $"global::{typeof(IEnumerable<>).Namespace}.{nameof(IEnumerable<>)}<{typeArgument}>";
 
+    public static string ICollectionOfT(string typeArgument) => $"global::{typeof(ICollection<>).Namespace}.{nameof(ICollection<>)}<{typeArgument}>";
+
     public static string ListOfT(string typeArgument) => $"global::{typeof(List<>).Namespace}.{nameof(List<>)}<{typeArgument}>";
+
+    public static string Enumerable => "global::System.Linq.Enumerable";
+
+    public static string ImmutableArray => "global::System.Collections.Immutable.ImmutableArray";
 
     public static string TimeSpan => field ??= $"global::{typeof(TimeSpan).FullName}";
 
