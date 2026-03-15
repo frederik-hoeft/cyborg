@@ -1,3 +1,3 @@
-﻿namespace Cyborg.Core.Modules.Configuration.Serialization.DynamicValueProviders;
+﻿namespace Cyborg.Core.Modules.Configuration.Serialization.Dynamics.ValueProviders;
 
 public sealed class DynamicSByteProvider() : DynamicValueProviderPrimitives<sbyte>("sbyte");

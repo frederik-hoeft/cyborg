@@ -7,6 +7,7 @@ using Cyborg.Modules.EnvironmentDefinitions;
 using Cyborg.Modules.External;
 using Cyborg.Modules.Foreach;
 using Cyborg.Modules.Glob;
+using Cyborg.Modules.Guard;
 using Cyborg.Modules.If;
 using Cyborg.Modules.If.Conditions.IsSet;
 using Cyborg.Modules.If.Conditions.IsTrue;
@@ -42,4 +43,5 @@ namespace Cyborg.Modules;
 [JsonSerializable(typeof(DynamicModule))]
 [JsonSerializable(typeof(AssertModule))]
 [JsonSerializable(typeof(TemplateModule))]
+[JsonSerializable(typeof(GuardModule))]
 public sealed partial class ModuleJsonSerializerContext : JsonSerializerContext;

@@ -9,6 +9,7 @@ using Cyborg.Modules.EnvironmentDefinitions;
 using Cyborg.Modules.External;
 using Cyborg.Modules.Foreach;
 using Cyborg.Modules.Glob;
+using Cyborg.Modules.Guard;
 using Cyborg.Modules.If;
 using Cyborg.Modules.If.Conditions.IsSet;
 using Cyborg.Modules.If.Conditions.IsTrue;
@@ -41,6 +42,7 @@ namespace Cyborg.Modules;
 [Singleton<IModuleLoader, IfModuleLoader>]
 [Singleton<IModuleLoader, IsTrueModuleLoader>]
 [Singleton<IModuleLoader, IsSetModuleLoader>]
+[Singleton<IModuleLoader, GuardModuleLoader>]
 [Singleton<IModuleLoader, GlobModuleLoader>]
 [Singleton<IModuleLoader, ExternalModuleLoader>]
 [Singleton<IModuleLoader, EnvironmentDefinitionsModuleLoader>]

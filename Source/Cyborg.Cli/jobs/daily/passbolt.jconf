@@ -28,9 +28,9 @@
             "cyborg.modules.template.v1": {
               "namespace": "cyborg.templates.check_variables.v1",
               "path": "check_variables.jconf",
-              "arguments": {
-                "variables": [ "docker_root", "borg_passphrase", "docker_user", "backup_hosts" ]
-              }
+              "arguments": [
+                { "key": "variables", "collection<string>": [ "docker_root", "borg_passphrase", "docker_user", "backup_hosts" ] }
+              ]
             }
           }
         },

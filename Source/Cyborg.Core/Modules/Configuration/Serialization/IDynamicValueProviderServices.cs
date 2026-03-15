@@ -1,10 +1,12 @@
-﻿using Cyborg.Core.Modules.Configuration.Serialization.DynamicValueProviders;
+﻿using Cyborg.Core.Modules.Configuration.Serialization.Dynamics;
+using Cyborg.Core.Modules.Configuration.Serialization.Dynamics.ValueProviders;
 using Jab;
 
 namespace Cyborg.Core.Modules.Configuration.Serialization;
 
 [ServiceProviderModule]
-[Singleton<IDynamicValueProviderRegistry, DefaultDynamicValueProviderRegistry>]
+[Singleton<IDynamicGenericValueProviderFactory, CollectionDynamicValueProviderFactory>]
+[Singleton<IDynamicValueProviderRegistry, DynamicValueProviderRegistry>]
 [Singleton<IDynamicValueProvider, DynamicSByteProvider>]
 [Singleton<IDynamicValueProvider, DynamicByteProvider>]
 [Singleton<IDynamicValueProvider, DynamicInt16Provider>]

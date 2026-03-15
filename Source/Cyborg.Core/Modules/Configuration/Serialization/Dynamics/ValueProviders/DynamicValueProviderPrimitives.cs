@@ -2,7 +2,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 
-namespace Cyborg.Core.Modules.Configuration.Serialization.DynamicValueProviders;
+namespace Cyborg.Core.Modules.Configuration.Serialization.Dynamics.ValueProviders;
 
 public abstract class DynamicValueProviderPrimitives<T>(string typeName) : IDynamicValueProvider
 {
