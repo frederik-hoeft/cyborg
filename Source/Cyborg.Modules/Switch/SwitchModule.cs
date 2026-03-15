@@ -19,6 +19,6 @@ public sealed partial record SwitchModule
 [Validatable]
 public sealed record SwitchReference
 (
-    [property: Required][property: MinLength(1)] string Name,
-    [property: Required][property: MinLength(1)] string Path
+    [property: Required] string Name,
+    [property: Required] string Path
 );

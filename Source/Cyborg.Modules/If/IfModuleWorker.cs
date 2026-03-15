@@ -38,7 +38,11 @@ public sealed class IfModuleWorker(IWorkerContext<IfModule> context) : ModuleWor
             // this is not a valid result from the condition module
             return runtime.Exit(WithStatus(ModuleExitStatus.Failed));
         }
-        ModuleContext branchToExecute = condition ? Module.Then : Module.Else ?? Module.Then;
+        ModuleContext? branchToExecute = condition ? Module.Then : Module.Else;
+        if (branchToExecute is null)
+        {
+            return runtime.Exit(WithStatus(ModuleExitStatus.Skipped));
+        }
         IModuleExecutionResult branchResult = await runtime.ExecuteAsync(branchToExecute, cancellationToken);
         return runtime.Exit(WithStatus(branchResult.Status));
     }

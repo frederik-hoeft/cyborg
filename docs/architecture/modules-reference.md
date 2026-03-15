@@ -2,57 +2,97 @@
 
 Complete documentation for all Cyborg modules.
 
-Legend: ✅ Implemented | 🚧 Partial/WIP | ❌ Planned
+Legend: ✅ Implemented | ⚠️ Definition only (no worker) | ❌ Not yet implemented
 
 <!-- @import "[TOC]" {cmd="toc" depthFrom=2 depthTo=6 orderedList=false} -->
 
 <!-- code_chunk_output -->
 
-- [Core Control Flow Modules](#core-control-flow-modules)
+- [Control Flow Modules](#control-flow-modules)
+  - [Sequence Module (`cyborg.modules.sequence.v1`) ✅](#sequence-module-cyborgmodulessequencev1-)
   - [ForEach Module (`cyborg.modules.foreach.v1`) ✅](#foreach-module-cyborgmodulesforeachv1-)
-  - [Guard Module (`cyborg.modules.guard.v1`) 🚧](#guard-module-cyborgmodulesguardv1-)
-  - [Conditional Module (`cyborg.modules.if.v1`) ✅](#conditional-module-cyborgmodulesifv1-)
-- [Borg Modules](#borg-modules)
-  - [Repository Configuration Module (`cyborg.modules.borg.repository.v1`) 🚧](#repository-configuration-module-cyborgmodulesborgrepositoryv1-)
-  - [Borg Create Module (`cyborg.modules.borg.create.v1`) 🚧](#borg-create-module-cyborgmodulesborgcreatev1-)
-  - [Borg Prune Module (`cyborg.modules.borg.prune.v1`) 🚧](#borg-prune-module-cyborgmodulesborgprunev1-)
-  - [Borg Compact Module (`cyborg.modules.borg.compact.v1`) 🚧](#borg-compact-module-cyborgmodulesborgcompactv1-)
-- [Service Management Modules](#service-management-modules)
-  - [Docker Compose Down Module (`cyborg.modules.docker.down.v1`) 🚧](#docker-compose-down-module-cyborgmodulesdockerdownv1-)
-  - [Docker Compose Up Module (`cyborg.modules.docker.up.v1`) 🚧](#docker-compose-up-module-cyborgmodulesdockerupv1-)
-  - [Systemd Start Module (`cyborg.modules.systemd.start.v1`) 🚧](#systemd-start-module-cyborgmodulessystemdstartv1-)
-  - [Systemd Stop Module (`cyborg.modules.systemd.stop.v1`) 🚧](#systemd-stop-module-cyborgmodulessystemdstopv1-)
+  - [Guard Module (`cyborg.modules.guard.v1`) ✅](#guard-module-cyborgmodulesguardv1-)
+  - [If Module (`cyborg.modules.if.v1`) ✅](#if-module-cyborgmodulesifv1-)
+    - [IsTrue Condition (`cyborg.modules.if.condition.is_true.v1`) ✅](#istrue-condition-cyborgmodulesifconditionis_truev1-)
+    - [IsSet Condition (`cyborg.modules.if.condition.is_set.v1`) ✅](#isset-condition-cyborgmodulesifconditionis_setv1-)
+  - [Assert Module (`cyborg.modules.assert.v1`) ✅](#assert-module-cyborgmodulesassertv1-)
+  - [Switch Module (`cyborg.modules.switch.v1`) ✅](#switch-module-cyborgmodulesswitchv1-)
+  - [Dynamic Module (`cyborg.modules.dynamic.v1`) ✅](#dynamic-module-cyborgmodulesdynamicv1-)
+- [External Execution Modules](#external-execution-modules)
+  - [Subprocess Module (`cyborg.modules.subprocess.v1`) ✅](#subprocess-module-cyborgmodulessubprocessv1-)
+  - [External Module (`cyborg.modules.external.v1`) ✅](#external-module-cyborgmodulesexternalv1-)
+  - [Template Module (`cyborg.modules.template.v1`) ✅](#template-module-cyborgmodulestemplatev1-)
+- [Configuration Modules](#configuration-modules)
+  - [ConfigMap Module (`cyborg.modules.config.map.v1`) ✅](#configmap-module-cyborgmodulesconfigmapv1-)
+  - [ConfigCollection Module (`cyborg.modules.config.collection.v1`) ✅](#configcollection-module-cyborgmodulesconfigcollectionv1-)
+  - [ExternalConfig Module (`cyborg.modules.config.external.v1`) ✅](#externalconfig-module-cyborgmodulesconfigexternalv1-)
+- [Environment Modules](#environment-modules)
+  - [Environment Definitions Module (`cyborg.modules.environment.defs.v1`) ✅](#environment-definitions-module-cyborgmodulesenvironmentdefsv1-)
+  - [Named Module Reference (`cyborg.modules.named.ref.v1`) ✅](#named-module-reference-cyborgmodulesnamedrefv1-)
+- [File System Modules](#file-system-modules)
+  - [Glob Module (`cyborg.modules.glob.v1`) ✅](#glob-module-cyborgmodulesglobv1-)
 - [Network Modules](#network-modules)
   - [Wake-on-LAN Module (`cyborg.modules.network.wol.v1`) ✅](#wake-on-lan-module-cyborgmodulesnetworkwolv1-)
-  - [SSH Shutdown Module (`cyborg.modules.network.ssh_shutdown.v1`) 🚧](#ssh-shutdown-module-cyborgmodulesnetworkssh_shutdownv1-)
-  - [Network Ping Module (`cyborg.modules.net.ping.v1`) 🚧](#network-ping-module-cyborgmodulesnetpingv1-)
-- [Security Modules](#security-modules)
-  - [Secrets Load Module (`cyborg.modules.secrets.load.v1`) 🚧](#secrets-load-module-cyborgmodulessecretsloadv1-)
-- [System Modules](#system-modules)
-  - [Run-As Module (`cyborg.modules.system.run_as.v1`) 🚧](#run-as-module-cyborgmodulessystemrun_asv1-)
-- [Logging Modules](#logging-modules)
-  - [Log Module (`cyborg.modules.log.v1`) 🚧](#log-module-cyborgmoduleslogv1-)
+  - [SSH Shutdown Module (`cyborg.modules.network.ssh_shutdown.v1`) ✅](#ssh-shutdown-module-cyborgmodulesnetworkssh_shutdownv1-)
+- [Borg Modules](#borg-modules)
+  - [Borg Job Module (`cyborg.modules.borg.job.v1`) ⚠️](#borg-job-module-cyborgmodulesborgjobv1-️)
+  - [Borg Backup Module (`cyborg.modules.borg.backup.v1`) ⚠️](#borg-backup-module-cyborgmodulesborgbackupv1-️)
 
 <!-- /code_chunk_output -->
 
 
-## Core Control Flow Modules
+## Control Flow Modules
+
+### Sequence Module (`cyborg.modules.sequence.v1`) ✅
+
+Executes a list of child modules in order.
+
+**Module Record:**
+```csharp
+[GeneratedModuleValidation]
+public sealed partial record SequenceModule(
+    [property: MinLength(1)] IReadOnlyCollection<ModuleContext> Steps
+) : ModuleBase, IModule
+{
+    public static string ModuleId => "cyborg.modules.sequence.v1";
+}
+```
+
+**JSON Configuration:**
+```json
+{
+  "cyborg.modules.sequence.v1": {
+    "steps": [
+      {
+        "module": { "cyborg.modules.subprocess.v1": { "command": { "executable": "/usr/bin/ls", "arguments": ["-la"] } } }
+      },
+      {
+        "module": { "cyborg.modules.subprocess.v1": { "command": { "executable": "/usr/bin/echo", "arguments": ["done"] } } }
+      }
+    ]
+  }
+}
+```
+
+**Worker Behavior:**
+1. Iterate through `Steps` in order
+2. Execute each step via `runtime.ExecuteAsync(step)`
+3. If any step returns `Canceled` or `Failed`, abort immediately with that status
+4. If at least one step succeeds, return `Success`; if all steps are skipped, return `Skipped`
+
+---
 
 ### ForEach Module (`cyborg.modules.foreach.v1`) ✅
 
 Iterates over a collection in the environment, executing a child module for each item.
-
-**Status:** Implemented
-
-**Purpose:** Replace bash `for` loops over backup hosts, SMB targets, etc.
 
 **Module Record:**
 ```csharp
 [GeneratedModuleValidation]
 public sealed partial record ForeachModule
 (
-    [property: Required][property: MinLength(1)] string Collection,
-    [property: Required][property: MinLength(1)] string ItemVariable,
+    [property: Required] string Collection,
+    [property: Required] string ItemVariable,
     [property: DefaultValue<bool>(false)] bool ContinueOnError,
     [property: Required] ModuleContext Body
 ) : ModuleBase, IModule
@@ -73,114 +113,97 @@ public sealed partial record ForeachModule
         "scope": "inherit_parent",
         "name": "host_iteration"
       },
-      "module": { "cyborg.modules.borg.create.v1": { ... } }
+      "module": { "cyborg.modules.sequence.v1": { "steps": [] } }
     }
   }
 }
 ```
 
 **Worker Behavior:**
-1. Resolve collection variable from environment (fail if not found)
-2. Prepare loop environment using `runtime.PrepareEnvironment(Module.Body)`
-3. For each item in collection:
-   - Set `item_variable` in environment
-   - Recursively decompose `IDecomposable` items to dot-notation vars (e.g., `host.hostname`)
-   - Execute body module
-   - If failure and `continue_on_error` is false, abort
-4. Return aggregate result
-
-**Key Features:**
-- Uses `runtime.PrepareEnvironment()` to create iteration scope based on `body.environment`
-- Recursively decomposes `IDecomposable` items (e.g., `BorgRemote`) into dot-notation variables (`host.hostname`, `host.port`, etc.)
-- Named environments (`body.environment.name`) are registered for later `Reference` scope usage
+1. Resolve `Collection` variable from environment (must be `IEnumerable<object>`)
+2. For each item in the collection:
+   - Create a loop environment via `runtime.PrepareEnvironment(Module.Body)`
+   - If the item implements `IDecomposable`, publish it with `DecompositionStrategy.FullHierarchy` (e.g., `current_host.hostname`, `current_host.port`)
+   - Otherwise, set `ItemVariable` directly
+   - Execute `Body` module in the loop environment
+3. If a step fails and `ContinueOnError` is `false`, return `Failed` immediately
+4. If `ContinueOnError` is `true`, track failure but continue iteration
+5. Return `Success` if at least one iteration succeeded, `Skipped` if all skipped
 
 ---
 
-### Guard Module (`cyborg.modules.guard.v1`) 🚧
+### Guard Module (`cyborg.modules.guard.v1`) ✅
 
-> **Status:** Planned - not yet implemented
+Executes a body module with try-catch-finally semantics, guaranteeing cleanup.
 
-Executes a body module with guaranteed cleanup, similar to try-finally semantics.
-
-**Purpose:** Ensure services are restarted even if backup fails (replaces bash `restore_current` pattern).
-
-**Planned Module Record:**
+**Module Record:**
 ```csharp
-public sealed record GuardModule(
-    ModuleContext Body,             // Primary module to execute
-    ModuleContext Finally,          // Always executed after body (success or failure)
-    ModuleContext? OnError          // Optional: executed only on error, before finally
-) : IModule
+[GeneratedModuleValidation]
+public sealed partial record GuardModule
+(
+    [property: Required] ModuleContext Try,
+    ModuleContext? Catch,
+    [property: Required] ModuleContext Finally,
+    [property: DefinedEnumValue][property: DefaultValue<GuardModuleBehavior>(GuardModuleBehavior.Rethrow)] GuardModuleBehavior Behavior
+) : ModuleBase, IModule
 {
     public static string ModuleId => "cyborg.modules.guard.v1";
 }
+
+public enum GuardModuleBehavior
+{
+    Rethrow,
+    Swallow,
+}
 ```
 
-**JSON Configuration (with scoping):**
+**JSON Configuration:**
 ```json
 {
   "cyborg.modules.guard.v1": {
-    "body": {
-      "environment": {
-        "scope": "inherit_parent",
-        "name": "backup_session"
-      },
-      "configuration": {
-        "cyborg.modules.config.map.v1": {
-          "entries": [
-            { "key": "container_name", "string": "overleaf" }
-          ]
-        }
-      },
+    "try": {
+      "environment": { "scope": "inherit_parent", "name": "backup_session" },
       "module": {
         "cyborg.modules.sequence.v1": {
           "steps": [
-            { "module": { "cyborg.modules.docker.down.v1": { ... } } },
-            { "module": { "cyborg.modules.borg.create.v1": { ... } } }
+            { "module": { "cyborg.modules.subprocess.v1": { "command": { "executable": "docker", "arguments": ["compose", "down"] } } } }
           ]
         }
       }
     },
-    "on_error": {
-      "environment": {
-        "scope": "reference",
-        "name": "backup_session"
-      },
-      "module": { "cyborg.modules.log.error.v1": { "message": "Backup failed for ${container_name}" } }
+    "catch": {
+      "environment": { "scope": "reference", "name": "backup_session" },
+      "module": { "cyborg.modules.subprocess.v1": { "command": { "executable": "/usr/bin/echo", "arguments": ["error occurred"] } } }
     },
     "finally": {
-      "environment": {
-        "scope": "reference",
-        "name": "backup_session"
-      },
-      "module": { "cyborg.modules.docker.up.v1": { ... } }
-    }
+      "environment": { "scope": "reference", "name": "backup_session" },
+      "module": { "cyborg.modules.subprocess.v1": { "command": { "executable": "docker", "arguments": ["compose", "up", "-d"] } } }
+    },
+    "behavior": "rethrow"
   }
 }
 ```
 
-**Key Scoping Pattern:**
-- `body` creates a named environment (`"backup_session"`) with `inherit_parent` scope
-- `on_error` and `finally` use `reference` scope to access the same environment
-- This allows `finally` to read variables set during `body` execution (e.g., `container_name`)
-
 **Worker Behavior:**
-1. Execute `body` module, capture result
-2. If body failed and `on_error` is defined, execute it (can reference body's named environment)
-3. In `finally` block (always runs, even on cancellation):
-   - Execute `finally` module with `CancellationToken.None` to ensure cleanup
-   - Runtime automatically cleans up transient environments
-4. Return body result
+1. Execute `Try` block, capture result
+2. If `Try` fails or throws a non-cancellation exception:
+   - If `Catch` is defined, execute it and use its exit status
+   - If no `Catch` and `Behavior` is `Swallow`, return `Success`
+   - If no `Catch` and `Behavior` is `Rethrow`, return `Failed`
+3. Prevents double-handling: if the catch block itself fails after a `Try` failure, returns `Failed` immediately
+4. `Finally` block always executes (unless cancelled), regardless of `Try`/`Catch` outcome
+5. Returns the final resolved exit status
+
+**Key Scoping Pattern:**
+- `Try` creates a named environment (e.g., `"backup_session"`) with `inherit_parent` scope
+- `Catch` and `Finally` use `reference` scope to access the same environment
+- This allows `Finally` to read variables set during `Try` execution
 
 ---
 
-### Conditional Module (`cyborg.modules.if.v1`) ✅
+### If Module (`cyborg.modules.if.v1`) ✅
 
-Conditionally executes modules based on another module's success/failure result.
-
-**Status:** Implemented
-
-**Purpose:** Handle conditional execution where the condition itself is a module (e.g., check if a file exists via subprocess, or any module that returns success/failure).
+Conditionally executes modules based on a condition module's result.
 
 **Module Record:**
 ```csharp
@@ -201,387 +224,620 @@ public sealed partial record IfModule
 {
   "cyborg.modules.if.v1": {
     "condition": {
-      "cyborg.modules.subprocess.v1": {
-        "executable": "/usr/bin/test",
-        "arguments": ["-d", "${smb_root}"]
+      "cyborg.modules.if.condition.is_set.v1": {
+        "variable": "smb_root"
       }
     },
     "then": {
       "environment": { "scope": "parent" },
-      "module": { "cyborg.modules.borg.create.v1": { ... } }
+      "module": { "cyborg.modules.subprocess.v1": { "command": { "executable": "/usr/bin/echo", "arguments": ["found"] } } }
     },
     "else": {
       "environment": { "scope": "parent" },
-      "module": { "cyborg.modules.log.warn.v1": { "message": "Skipping: directory not found" } }
+      "module": { "cyborg.modules.subprocess.v1": { "command": { "executable": "/usr/bin/echo", "arguments": ["not found"] } } }
     }
   }
 }
 ```
 
 **Worker Behavior:**
-1. Execute condition module in current environment
-2. If condition succeeded, execute `then` branch; otherwise execute `else` branch (or `then` if no `else`)
-3. Return branch execution result
+1. Create an isolated environment for the condition module
+2. Override the condition's artifact output to write to a known location in the parent environment
+3. Execute the `Condition` module, which must return a `ConditionalResult` with a boolean `Result`
+4. If `Condition` does not succeed, propagate its status
+5. If `Result` is `true`, execute the `Then` branch
+6. If `Result` is `false`, execute the `Else` branch (or skip if `Else` is not defined)
+7. Return the executed branch's status (or `Skipped`)
 
-**Key Features:**
-- Condition is any module that returns success (true) or failure (false)
-- Enables flexible conditions: subprocess exit codes, file existence checks, or custom condition modules
-- If no `else` branch and condition fails, executes `then` branch (fallback behavior)
+**Condition Modules:** The `Condition` must be a module that produces a `ConditionalResult(bool Result)`. Built-in condition modules include `IsTrue` and `IsSet` (see below).
 
 ---
 
-## Borg Modules
+#### IsTrue Condition (`cyborg.modules.if.condition.is_true.v1`) ✅
 
-> **Note:** Borg modules are currently in design phase. A `BorgJobModule` wrapper exists but specific borg command modules are not yet implemented.
+Checks whether an environment variable resolves to a boolean `true` value.
 
-### Repository Configuration Module (`cyborg.modules.borg.repository.v1`) 🚧
-
-> **Status:** Planned - not yet implemented
-
-Sets up borg repository environment variables for child modules. Uses standard environment scoping.
-
-**Purpose:** Centralize repository configuration, inject `BORG_REPO` and `BORG_RSH` environment variables for child modules.
-
-**Planned Module Record:**
+**Module Record:**
 ```csharp
-public sealed record BorgRepositoryModule(
-    string Hostname,                    // Remote host (e.g., "backup1.service.local")
-    int Port,                           // SSH port (e.g., 22)
-    string RepositoryRoot,              // Base path on remote (e.g., "/var/backups/borg/nas1")
-    string RepositoryName,              // Repository name (e.g., "overleaf")
-    string? SshCommand,                 // Custom SSH command (for sshpass)
-    string? PassphraseVariable,         // Environment variable containing passphrase
-    ModuleContext Body                  // Child module(s) to execute with this repository
-) : IModule
+[GeneratedModuleValidation]
+public sealed partial record IsTrueModule
+(
+    [property: Required] string Variable
+) : ModuleBase, IModule
 {
-    public static string ModuleId => "cyborg.modules.borg.repository.v1";
+    public static string ModuleId => "cyborg.modules.if.condition.is_true.v1";
 }
 ```
 
-**JSON Configuration (leveraging scoping):**
+**JSON Configuration:**
 ```json
 {
-  "environment": {
-    "scope": "inherit_parent",
-    "name": "borg_repo_session"
-  },
+  "cyborg.modules.if.condition.is_true.v1": {
+    "variable": "feature_enabled"
+  }
+}
+```
+
+**Worker Behavior:**
+1. Resolve `Variable` from the environment as a `bool`
+2. If the variable is undefined or cannot be resolved as a bool, return `Failed`
+3. Return `Success` with `ConditionalResult(value)`
+
+---
+
+#### IsSet Condition (`cyborg.modules.if.condition.is_set.v1`) ✅
+
+Checks whether an environment variable is defined (regardless of value).
+
+**Module Record:**
+```csharp
+[GeneratedModuleValidation]
+public sealed partial record IsSetModule
+(
+    [property: Required] string Variable
+) : ModuleBase, IModule
+{
+    public static string ModuleId => "cyborg.modules.if.condition.is_set.v1";
+}
+```
+
+**JSON Configuration:**
+```json
+{
+  "cyborg.modules.if.condition.is_set.v1": {
+    "variable": "docker_user"
+  }
+}
+```
+
+**Worker Behavior:**
+1. Check whether `Variable` is defined in the environment
+2. Return `Success` with `ConditionalResult(true)` if set, `ConditionalResult(false)` if not
+
+---
+
+### Assert Module (`cyborg.modules.assert.v1`) ✅
+
+Validates a condition and fails with a message if the assertion is false.
+
+**Module Record:**
+```csharp
+[GeneratedModuleValidation]
+public sealed partial record AssertModule
+(
+    [property: Required] ModuleReference Assertion,
+    [property: Required] string Message
+) : ModuleBase, IModule
+{
+    public static string ModuleId => "cyborg.modules.assert.v1";
+}
+```
+
+**Result Type:**
+```csharp
+[GeneratedDecomposition]
+public sealed partial record AssertModuleResult(string Message) : IDecomposable;
+```
+
+**JSON Configuration:**
+```json
+{
+  "cyborg.modules.assert.v1": {
+    "assertion": {
+      "cyborg.modules.if.condition.is_set.v1": {
+        "variable": "backup_target"
+      }
+    },
+    "message": "Required variable 'backup_target' is not defined"
+  }
+}
+```
+
+**Worker Behavior:**
+1. Execute `Assertion` module (must return a `ConditionalResult`)
+2. If the assertion module itself fails, propagate that status
+3. If `ConditionalResult.Result` is `false`, return `Failed` with `AssertModuleResult(Message)` (message is interpolated)
+4. If `ConditionalResult.Result` is `true`, return `Success`
+
+---
+
+### Switch Module (`cyborg.modules.switch.v1`) ✅
+
+Dispatches execution to one of several named cases based on an environment variable's value.
+
+**Module Record:**
+```csharp
+[GeneratedModuleValidation]
+public sealed partial record SwitchModule
+(
+    [property: Required] string Variable,
+    [property: MinLength(1)] ImmutableArray<SwitchReference> Cases
+) : ModuleBase, IModule
+{
+    public static string ModuleId => "cyborg.modules.switch.v1";
+}
+
+[Validatable]
+public sealed record SwitchReference
+(
+    [property: Required] string Name,
+    [property: Required] string Path
+);
+```
+
+**JSON Configuration:**
+```json
+{
+  "cyborg.modules.switch.v1": {
+    "variable": "backup_strategy",
+    "cases": [
+      { "name": "full", "path": "/etc/cyborg/strategies/full.json" },
+      { "name": "incremental", "path": "/etc/cyborg/strategies/incremental.json" }
+    ]
+  }
+}
+```
+
+**Worker Behavior:**
+1. Resolve `Variable` from the global runtime environment as a string
+2. Look up the matching `Name` in `Cases`
+3. Load the module configuration from the matched case's `Path`
+4. Execute the loaded module
+5. Throws if variable cannot be resolved or no matching case is found
+
+---
+
+### Dynamic Module (`cyborg.modules.dynamic.v1`) ✅
+
+A passthrough wrapper that executes a child module in its body context. Allows dynamic resolution of the child module at runtime via environment overrides.
+
+**Module Record:**
+```csharp
+[GeneratedModuleValidation]
+public sealed partial record DynamicModule
+(
+    [property: Required] ModuleContext Body
+) : ModuleBase, IModule
+{
+    public static string ModuleId => "cyborg.modules.dynamic.v1";
+}
+```
+
+**JSON Configuration:**
+```json
+{
   "configuration": {
     "cyborg.modules.config.map.v1": {
       "entries": [
-        { "key": "borg_passphrase", "string": "${secrets.overleaf.passphrase}" }
+        {
+          "key": "@my_dynamic.body",
+          "cyborg.types.module.context.v1": {
+            "module": { 
+              "cyborg.modules.subprocess.v1": { 
+                "command": { "executable": "/usr/bin/echo", "arguments": ["hello"] } 
+              } 
+            }
+          }
+        }
       ]
     }
   },
-  "module": {
-    "cyborg.modules.borg.repository.v1": {
-      "hostname": "${current_host.hostname}",
-      "port": "${current_host.port}",
-      "repository_root": "${current_host.borg_repo_root}",
-      "repository_name": "${container_name}",
-      "ssh_command": "${current_host.borg_rsh}",
-      "passphrase_variable": "borg_passphrase",
-      "body": {
-        "environment": { "scope": "parent" },
-        "module": {
-          "cyborg.modules.sequence.v1": {
-            "steps": [
-              { "module": { "cyborg.modules.borg.create.v1": { ... } } },
-              { "module": { "cyborg.modules.borg.prune.v1": { ... } } },
-              { "module": { "cyborg.modules.borg.compact.v1": { ... } } }
-            ]
-          }
-        }
-      }
+  "cyborg.modules.dynamic.v1": {
+    "name": "my_dynamic"
+  }
+}
+```
+
+**Worker Behavior:**
+1. Automatically resolves overrides for the `Body` property from the environment (e.g., `@my_dynamic.body`) as usual
+2. Executes the resolved `Body` module
+3. Returns the executed body's status
+
+---
+
+## External Execution Modules
+
+### Subprocess Module (`cyborg.modules.subprocess.v1`) ✅
+
+Executes an external process with optional impersonation and output capture.
+
+**Module Record:**
+```csharp
+[GeneratedModuleValidation]
+public sealed partial record SubprocessModule
+(
+    [property: Required] SubprocessCommand Command,
+    [property: Required][property: DefaultInstance] SubprocessOutputOptions Output,
+    [property: DefaultValue<bool>(true)] bool CheckExitCode,
+    ImpersonationContext? Impersonation
+) : ModuleBase, IModule
+{
+    public static string ModuleId => "cyborg.modules.subprocess.v1";
+}
+
+[Validatable]
+public sealed record ImpersonationContext
+(
+    [property: Required][property: DefaultValue<string>("/usr/bin/runuser")][property: FileExists] string Executable,
+    [property: Required] string User
+);
+
+[Validatable]
+public sealed record SubprocessCommand
+(
+    [property: Required][property: FileExists] string Executable,
+    [property: Required] ImmutableArray<string> Arguments
+);
+
+[Validatable]
+public sealed record SubprocessOutputOptions
+(
+    bool ReadStdout,
+    bool ReadStderr
+) : IDefaultInstance<SubprocessOutputOptions>
+{
+    public static SubprocessOutputOptions Default => new(ReadStdout: false, ReadStderr: false);
+}
+```
+
+**Result Type:**
+```csharp
+[GeneratedDecomposition]
+public sealed partial record SubprocessModuleResult(int ExitCode, string? Stdout, string? Stderr) : IDecomposable;
+```
+
+**JSON Configuration:**
+```json
+{
+  "cyborg.modules.subprocess.v1": {
+    "command": {
+      "executable": "/usr/bin/borg",
+      "arguments": ["create", "--stats", "::archive-{now}"]
+    },
+    "output": {
+      "read_stdout": true,
+      "read_stderr": true
+    },
+    "check_exit_code": true,
+    "impersonation": {
+      "executable": "/usr/bin/runuser",
+      "user": "docker"
     }
   }
 }
 ```
 
 **Worker Behavior:**
-1. Resolve hostname, port, repository root/name from module properties (may contain `${var}` indirection)
-2. Construct `BORG_REPO` URL: `ssh://borg@{hostname}:{port}{repoRoot}/{repoName}`
-3. Set `BORG_REPO` in current environment scope
-4. If `ssh_command` specified, set `BORG_RSH`
-5. If `passphrase_variable` specified, resolve passphrase from environment and set `BORG_PASSPHRASE`
-6. Execute body module (inherits borg vars via scoping)
-7. In `finally`: clear `BORG_PASSPHRASE` for security
-
-**Environment Flow:**
-1. Parent scope sets secrets via `ConfigMapModule` (e.g., `borg_passphrase`)
-2. `BorgRepositoryModule` reads passphrase from `passphrase_variable`
-3. Module sets `BORG_REPO`, `BORG_RSH`, `BORG_PASSPHRASE` in current environment
-4. Body's `scope: parent` shares the same environment
-5. Child borg modules (`create`, `prune`, `compact`) read from environment
-6. Cleanup removes `BORG_PASSPHRASE`
+1. Build process arguments from `Command`
+2. If `Impersonation` is set, wrap with `runuser -u <user> -- <executable> <args>`
+3. Configure stdout/stderr redirection based on `Output` options
+4. Execute via `IChildProcessDispatcher`
+5. If `CheckExitCode` is `true` and exit code ≠ 0, return `Failed` with result
+6. Otherwise return `Success` with `SubprocessModuleResult`
 
 ---
 
-### Borg Create Module (`cyborg.modules.borg.create.v1`) 🚧
+### External Module (`cyborg.modules.external.v1`) ✅
 
-> **Status:** Planned - not yet implemented
+Loads and executes a module from an external JSON configuration file.
 
-Executes `borg create` to create a backup archive.
-
-**Purpose:** Type-safe borg create invocation with all supported options.
-
-**Planned Module Record:**
+**Module Record:**
 ```csharp
-public sealed record BorgCreateModule(
-    string ArchiveNamePattern,                      // e.g., "{name}-{now}" (borg placeholders)
-    ImmutableArray<string> Paths,                   // Paths to backup
-    BorgCompression? Compression,                   // Compression settings
-    ImmutableArray<string> ExcludePatterns,         // --exclude patterns
-    bool ExcludeCaches = true,                      // --exclude-caches
-    bool ShowStats = true,                          // --stats
-    bool ShowRc = true                              // --show-rc
-) : IModule
+[GeneratedModuleValidation]
+public sealed partial record ExternalModule
+(
+    [property: Required][property: FileExists] string Path
+) : ModuleBase, IModule
 {
-    public static string ModuleId => "cyborg.modules.borg.create.v1";
+    public static string ModuleId => "cyborg.modules.external.v1";
 }
-
-public sealed record BorgCompression(
-    BorgCompressionAlgorithm Algorithm,
-    int? Level                                      // Optional compression level
-);
-
-public enum BorgCompressionAlgorithm { None, Lz4, Zstd, Zlib, Lzma }
 ```
 
 **JSON Configuration:**
 ```json
 {
-  "cyborg.modules.borg.create.v1": {
-    "archive_name_pattern": "overleaf-{now}",
-    "paths": [ "/opt/docker/volumes/overleaf" ],
-    "compression": {
-      "algorithm": "zlib"
-    },
-    "exclude_patterns": [
-      "*/mongo/diagnostic.data/*",
-      "*/sharelatex/tmp/*",
-      "*/sharelatex/data/cache/*"
-    ],
-    "exclude_caches": true,
-    "show_stats": true,
-    "show_rc": true
+  "cyborg.modules.external.v1": {
+    "path": "/etc/cyborg/jobs/daily-backup.json"
   }
 }
 ```
 
 **Worker Behavior:**
-1. Resolve `BORG_REPO`, `BORG_RSH`, `BORG_PASSPHRASE` from environment (set by repository module)
-2. Build argument list programmatically: `create`, flags (`--show-rc`, `--stats`), compression, excludes, archive pattern, paths
-3. Execute subprocess with environment variables (array-based args, no shell expansion = injection-safe)
-4. Parse stdout via grammar-based parser
-5. Record Prometheus metrics
+1. Load module configuration from `Path` via `IModuleConfigurationLoader`
+2. Execute the loaded module
+3. Return the loaded module's execution status
 
 ---
 
-### Borg Prune Module (`cyborg.modules.borg.prune.v1`) 🚧
+### Template Module (`cyborg.modules.template.v1`) ✅
 
-> **Status:** Planned - not yet implemented
+Loads and executes an external module with namespaced arguments injected into the environment.
 
-Executes `borg prune` to remove old archives.
-
-**Planned Module Record:**
+**Module Record:**
 ```csharp
-public sealed record BorgPruneModule(
-    string GlobArchives,                            // --glob-archives pattern
-    BorgRetentionPolicy Retention,                  // Retention settings
-    bool ShowList = true,                           // --list
-    bool ShowRc = true                              // --show-rc
-) : IModule
+[GeneratedModuleValidation]
+public sealed partial record TemplateModule
+(
+    [property: Required][property: MustMatch(nameof(TemplateModule.NamespaceRegex))] string Namespace,
+    [property: Required][property: FileExists] string Path,
+    ImmutableArray<DynamicKeyValuePair> Arguments
+) : ModuleBase, IModule
 {
-    public static string ModuleId => "cyborg.modules.borg.prune.v1";
-}
+    public static string ModuleId => "cyborg.modules.template.v1";
 
-public sealed record BorgRetentionPolicy(
-    int? KeepDaily,
-    int? KeepWeekly,
-    int? KeepMonthly,
-    int? KeepYearly
-);
-```
-
-**JSON Configuration:**
-```json
-{
-  "cyborg.modules.borg.prune.v1": {
-    "glob_archives": "overleaf-*",
-    "retention": {
-      "keep_daily": 30,
-      "keep_weekly": 12,
-      "keep_monthly": 12
-    },
-    "show_list": true,
-    "show_rc": true
-  }
-}
-```
-
----
-
-### Borg Compact Module (`cyborg.modules.borg.compact.v1`) 🚧
-
-> **Status:** Planned - not yet implemented
-
-Executes `borg compact` to reclaim disk space.
-
-**Planned Module Record:**
-```csharp
-public sealed record BorgCompactModule(
-    bool ShowRc = true                              // --show-rc
-) : IModule
-{
-    public static string ModuleId => "cyborg.modules.borg.compact.v1";
+    [GeneratedRegex(@"^[A-Za-z0-9_](\.[A-Za-z0-9_\-]+)*$")]
+    private static partial Regex NamespaceRegex { get; }
 }
 ```
 
 **JSON Configuration:**
 ```json
 {
-  "cyborg.modules.borg.compact.v1": {
-    "show_rc": true
-  }
-}
-```
-
----
-
-## Service Management Modules
-
-> **Status:** All service management modules are planned but not yet implemented.
-
-### Docker Compose Down Module (`cyborg.modules.docker.down.v1`) 🚧
-
-> **Status:** Planned - not yet implemented
-
-Stops a Docker Compose stack.
-
-**Purpose:** Replace `docker_down()` bash function with type-safe subprocess invocation.
-
-**Planned Module Record:**
-```csharp
-public sealed record DockerComposeDownModule(
-    string ComposePath,                             // Path to docker-compose.yml
-    string? User,                                   // Run as this user (su -c)
-    int TimeoutSeconds = 60                         // Timeout waiting for containers to stop
-) : IModule
-{
-    public static string ModuleId => "cyborg.modules.docker.down.v1";
-}
-```
-
-**JSON Configuration:**
-```json
-{
-  "cyborg.modules.docker.down.v1": {
-    "compose_path": "/opt/docker/containers/overleaf/docker-compose.yml",
-    "user": "docker",
-    "timeout_seconds": 60
+  "cyborg.modules.template.v1": {
+    "namespace": "backup.overleaf",
+    "path": "/etc/cyborg/templates/docker-backup.json",
+    "arguments": [
+      { "key": "container_name", "string": "overleaf" },
+      { "key": "compose_path", "string": "/opt/docker/containers/overleaf/docker-compose.yml" }
+    ]
   }
 }
 ```
 
 **Worker Behavior:**
-1. Validate compose file exists (fail early, don't invoke subprocess)
-2. Build command: `["docker", "compose", "-f", composePath, "down"]`
-3. If `user` specified: prepend user switching (via `su` or capability-based approach)
-4. Execute subprocess with timeout
-5. Return success/failure based on exit code
-
-**Security Note:** The `user` field is validated against a whitelist of allowed users defined in global configuration, preventing privilege escalation to arbitrary users.
+1. For each argument in `Arguments`, set the variable under the namespace path (e.g., `backup.overleaf.container_name`)
+2. Load module configuration from `Path`
+3. Execute the loaded module
+4. Return the loaded module's execution status
 
 ---
 
-### Docker Compose Up Module (`cyborg.modules.docker.up.v1`) 🚧
+## Configuration Modules
 
-> **Status:** Planned - not yet implemented
+Configuration modules implement `IConfigurationModule` and are used in the `configuration` property of a `ModuleContext` to set up environment variables before the main module executes.
 
-Starts a Docker Compose stack.
+### ConfigMap Module (`cyborg.modules.config.map.v1`) ✅
 
-**Planned Module Record:**
+Sets key-value pairs in the current environment.
+
+**Module Record:**
 ```csharp
-public sealed record DockerComposeUpModule(
-    string ComposePath,
-    string? User,
-    bool Detached = true,                           // -d flag
-    int TimeoutSeconds = 120
-) : IModule
+[GeneratedModuleValidation]
+public sealed partial record ConfigMapModule(
+    [property: MinLength(1)] ImmutableArray<DynamicKeyValuePair> Entries
+) : ModuleBase, IModule
 {
-    public static string ModuleId => "cyborg.modules.docker.up.v1";
+    public static string ModuleId => "cyborg.modules.config.map.v1";
 }
 ```
 
 **JSON Configuration:**
 ```json
 {
-  "cyborg.modules.docker.up.v1": {
-    "compose_path": "/opt/docker/containers/overleaf/docker-compose.yml",
-    "user": "docker",
-    "detached": true
-  }
-}
-```
-
----
-
-### Systemd Start Module (`cyborg.modules.systemd.start.v1`) 🚧
-
-> **Status:** Planned - not yet implemented
-
-Starts a systemd service.
-
-**Planned Module Record:**
-```csharp
-public sealed record SystemdStartModule(
-    string ServiceName                              // Service unit name (e.g., "smbd.service")
-) : IModule
-{
-    public static string ModuleId => "cyborg.modules.systemd.start.v1";
-}
-```
-
-**JSON Configuration:**
-```json
-{
-  "cyborg.modules.systemd.start.v1": {
-    "service_name": "smbd.service"
+  "cyborg.modules.config.map.v1": {
+    "entries": [
+      { "key": "container_name", "string": "overleaf" },
+      { "key": "compose_path", "string": "/opt/docker/containers/overleaf/docker-compose.yml" },
+      { "key": "ssh_port", "int": 22 }
+    ]
   }
 }
 ```
 
 **Worker Behavior:**
-1. Validate service name matches pattern `^[a-zA-Z0-9_-]+\.service$` (prevent injection)
-2. Execute: `systemctl start {serviceName}`
-3. Return based on exit code
+1. Runtime resolves stronly-typed values from the JSON configuration based on registered type providers (e.g., `string`, `int`, `bool`, `collection<T>`, custom types, etc.) 
+2. For each `DynamicKeyValuePair` in `Entries`, set the key-value pair in the current runtime environment
+3. Return `Success`
 
 ---
 
-### Systemd Stop Module (`cyborg.modules.systemd.stop.v1`) 🚧
+### ConfigCollection Module (`cyborg.modules.config.collection.v1`) ✅
 
-> **Status:** Planned - not yet implemented
+Aggregates multiple configuration sources into a single configuration block.
 
-Stops a systemd service.
-
-**Planned Module Record:**
+**Module Record:**
 ```csharp
-public sealed record SystemdStopModule(
-    string ServiceName
-) : IModule
+[GeneratedModuleValidation]
+public sealed partial record ConfigCollectionModule
+(
+    [property: MinLength(1)] ImmutableArray<ModuleReference> Sources
+) : ModuleBase, IModule
 {
-    public static string ModuleId => "cyborg.modules.systemd.stop.v1";
+    public static string ModuleId => "cyborg.modules.config.collection.v1";
 }
 ```
 
 **JSON Configuration:**
 ```json
 {
-  "cyborg.modules.systemd.stop.v1": {
-    "service_name": "smbd.service"
+  "cyborg.modules.config.collection.v1": {
+    "sources": [
+      {
+        "cyborg.modules.config.map.v1": {
+          "entries": [
+            { "key": "container_name", "string": "overleaf" }
+          ]
+        }
+      },
+      {
+        "cyborg.modules.config.external.v1": {
+          "path": "/etc/cyborg/config/shared.json"
+        }
+      }
+    ]
   }
 }
 ```
+
+**Worker Behavior:**
+1. Validate all `Sources` implement `IConfigurationModule`
+2. Execute each source in order in the current runtime environment
+3. If any source returns `Canceled` or `Failed`, abort with that status
+4. Return `Success` if at least one source succeeds, `Skipped` if all skipped
+
+---
+
+### ExternalConfig Module (`cyborg.modules.config.external.v1`) ✅
+
+Loads and executes configuration from an external file.
+
+**Module Record:**
+```csharp
+[GeneratedModuleValidation]
+public sealed partial record ExternalConfigModule
+(
+    [property: Required][property: FileExists] string Path
+) : ModuleBase, IModule
+{
+    public static string ModuleId => "cyborg.modules.config.external.v1";
+}
+```
+
+**JSON Configuration:**
+```json
+{
+  "cyborg.modules.config.external.v1": {
+    "path": "/etc/cyborg/config/hosts.json"
+  }
+}
+```
+
+**Worker Behavior:**
+1. Load module configuration from `Path` via `IModuleConfigurationLoader`
+2. Execute the loaded module's configuration in the current runtime environment
+3. Return execution status
+
+---
+
+## Environment Modules
+
+### Environment Definitions Module (`cyborg.modules.environment.defs.v1`) ✅
+
+Pre-creates named environment scopes for later reference by other modules.
+
+**Module Record:**
+```csharp
+[GeneratedModuleValidation]
+public sealed partial record EnvironmentDefinitionsModule
+(
+    [property: Required][property: MinLength(1)] ImmutableArray<ModuleEnvironment> Environments
+) : ModuleBase, IModule
+{
+    public static string ModuleId => "cyborg.modules.environment.defs.v1";
+}
+```
+
+**JSON Configuration:**
+```json
+{
+  "cyborg.modules.environment.defs.v1": {
+    "environments": [
+      { "scope": "inherit_parent", "name": "backup_session" },
+      { "scope": "isolated", "name": "temp_workspace" }
+    ]
+  }
+}
+```
+
+**Worker Behavior:**
+1. For each `ModuleEnvironment` in `Environments`, call `runtime.PrepareEnvironment(environment)` to create the scope
+2. Return `Success`
+
+---
+
+### Named Module Reference (`cyborg.modules.named.ref.v1`) ✅
+
+Executes a module registered in the `IModuleRegistry` by name. If modules specify a `Name` property, they are automatically registered in the registry during JSON deserialization and can be referenced by this module.
+
+**Module Record:**
+```csharp
+[GeneratedModuleValidation]
+public sealed partial record NamedModuleReferenceModule(
+    [property: Required] string Target
+) : ModuleBase, IModule
+{
+    public static string ModuleId => "cyborg.modules.named.ref.v1";
+}
+```
+
+**JSON Configuration:**
+```json
+{
+  "cyborg.modules.named.ref.v1": {
+    "target": "daily_backup"
+  }
+}
+```
+
+**Worker Behavior:**
+1. Look up the module by `Target` name in `IModuleRegistry`
+2. Execute the resolved module
+3. Throws if no module with the given name is found
+
+---
+
+## File System Modules
+
+### Glob Module (`cyborg.modules.glob.v1`) ✅
+
+Matches files in a directory using a regex pattern.
+
+**Module Record:**
+```csharp
+[GeneratedModuleValidation]
+public sealed partial record GlobModule
+(
+    [property: Required] string Pattern,
+    [property: Required][property: DirectoryExists] string Root,
+    [property: DefaultValue<bool>(false)] bool Recurse
+) : ModuleBase, IModule
+{
+    public static string ModuleId => "cyborg.modules.glob.v1";
+}
+```
+
+**Result Type:**
+```csharp
+[GeneratedDecomposition]
+public sealed partial record GlobModuleResult(IEnumerable<string> Files) : IDecomposable;
+```
+
+**JSON Configuration:**
+```json
+{
+  "cyborg.modules.glob.v1": {
+    "pattern": "\\.conf$",
+    "root": "/etc/cyborg/jobs",
+    "recurse": true
+  }
+}
+```
+
+**Worker Behavior:**
+1. Compile `Pattern` as a case-insensitive `Regex`
+2. Enumerate files from `Root` (recursively if `Recurse` is `true`)
+3. Filter files matching the regex
+4. Return `Success` with `GlobModuleResult` containing matching file paths
 
 ---
 
@@ -591,26 +847,30 @@ public sealed record SystemdStopModule(
 
 Wakes a remote host via Wake-on-LAN and waits for port availability.
 
-**Status:** Implemented
-
-**Purpose:** Replace `borg_poke_backup_host()` function.
-
 **Module Record:**
 ```csharp
 [GeneratedModuleValidation]
 public sealed partial record WakeOnLanModule
 (
     [property: Required] string TargetHost,
-    [property: Required][property: ExactLength(17)] string MacAddress,
+    [property: Required][property: MustMatch(nameof(WakeOnLanModule.MacAddressRegex))] string MacAddress,
     [property: Required][property: Range<int>(Min = 1, Max = ushort.MaxValue)] int LivenessProbePort,
-    [property: Required] string StateVariable,
     [property: DefaultTimeSpan("00:05:00")] TimeSpan MaxWaitTime,
     [property: DefaultTimeSpan("00:00:30")] TimeSpan HostDiscoveryTimeout,
-    [property: Required][property: DefaultValue<string>("/usr/bin/wakeonlan")] string Executable
+    [property: Required][property: DefaultValue<string>("/usr/bin/wakeonlan")][property: FileExists] string Executable
 ) : ModuleBase, IModule
 {
     public static string ModuleId => "cyborg.modules.network.wol.v1";
+
+    [GeneratedRegex(@"^([0-9A-Fa-f]{2}[:\-]){5}([0-9A-Fa-f]{2})$")]
+    private static partial Regex MacAddressRegex { get; }
 }
+```
+
+**Result Type:**
+```csharp
+[GeneratedDecomposition]
+public sealed partial record WakeOnLanModuleResult(bool WokeUp) : IDecomposable;
 ```
 
 **JSON Configuration:**
@@ -620,7 +880,6 @@ public sealed partial record WakeOnLanModule
     "target_host": "backup1.service.local",
     "mac_address": "11:22:33:44:55:66",
     "liveness_probe_port": 22,
-    "state_variable": "wol_state.backup1",
     "max_wait_time": "00:05:00",
     "host_discovery_timeout": "00:00:30"
   }
@@ -628,251 +887,125 @@ public sealed partial record WakeOnLanModule
 ```
 
 **Worker Behavior:**
-1. Ping host to check current state
-2. If unreachable:
-   a. Resolve hostname to IP
-   b. Send WoL magic packet via `wakeonlan` subprocess
-   c. Poll liveness probe port until reachable or timeout
-   d. Set `state_variable = "woken"` in environment
-3. If already reachable:
-   a. Set `state_variable = "was_up"` in environment
-4. Return success/failure
+1. Ping `TargetHost` with `HostDiscoveryTimeout`
+2. If already reachable, return `Success` with `WokeUp: false`
+3. If unreachable, execute `wakeonlan -i <host> <mac>` via subprocess
+4. If wakeonlan fails (non-zero exit code), throw
+5. Probe `LivenessProbePort` with `MaxWaitTime` timeout while the target host is booting up
+6. If port responds, return `Success` with `WokeUp: true`
+7. If timeout expires, return `Failed` with `WokeUp: false`
 
 ---
 
-### SSH Shutdown Module (`cyborg.modules.network.ssh_shutdown.v1`) 🚧
+### SSH Shutdown Module (`cyborg.modules.network.ssh_shutdown.v1`) ✅
 
-> **Status:** Partially implemented - module record exists, worker not yet implemented
-
-Shuts down a remote host via SSH (for cleanup after WoL).
+Shuts down a remote host via SSH.
 
 **Module Record:**
 ```csharp
 [GeneratedModuleValidation]
 public sealed partial record SshShutdownModule
 (
+    [property: Required][property: DefaultValue<string>("/usr/bin/ssh")][property: FileExists] string Executable,
     [property: Required] string Hostname,
-    [property: Required][property: Range<int>(Min = 1, Max = ushort.MaxValue)] int Port
+    [property: Required] string Username,
+    [property: Required][property: Range<int>(Min = 1, Max = ushort.MaxValue)][property: DefaultValue<int>(22)] int Port,
+    [property: Required][property: DefaultValue<string>("/usr/bin/shutdown -h now")] string ShutdownCommand,
+    SshPass? SshPass
 ) : ModuleBase, IModule
 {
     public static string ModuleId => "cyborg.modules.network.ssh_shutdown.v1";
 }
+
+[Validatable]
+public sealed record SshPass
+(
+    [property: Required][property: DefaultValue<string>("/usr/bin/sshpass")][property: FileExists] string Executable,
+    [property: Required] string FilePath,
+    string? MatchPrompt
+);
+```
+
+**Result Type:**
+```csharp
+[GeneratedDecomposition]
+public sealed partial record SshShutdownModuleResult(int ExitCode, string? StandardOutput, string? StandardError) : IDecomposable;
 ```
 
 **JSON Configuration:**
 ```json
 {
-  "cyborg.modules.ssh.shutdown.v1": {
+  "cyborg.modules.network.ssh_shutdown.v1": {
     "hostname": "backup1.service.local",
+    "username": "root",
     "port": 22,
-    "ssh_command": "/usr/bin/sshpass -f/root/.ssh/pass -P assphrase /usr/bin/ssh",
-    "state_variable": "wol_state.backup1"
+    "shutdown_command": "/usr/bin/shutdown -h now",
+    "ssh_pass": {
+      "file_path": "/root/.ssh/pass",
+      "match_prompt": "assphrase"
+    }
   }
 }
 ```
 
 **Worker Behavior:**
-1. If `state_variable` is set and value is not `"woken"`, skip (return success)
-2. Execute: `{ssh_command} root@{hostname} '/usr/bin/shutdown -h now'`
-3. Return success (shutdown won't return)
+1. Build SSH arguments: `<username>@<hostname>:<port> <shutdown_command>`
+2. If `SshPass` is configured, wrap with `sshpass -f<file_path> [-P <match_prompt>] ssh <args>`
+3. Execute via `IChildProcessDispatcher`
+4. Return `Failed` if exit code ≠ 0, `Success` otherwise
 
 ---
 
-### Network Ping Module (`cyborg.modules.net.ping.v1`) 🚧
+## Borg Modules
 
-> **Status:** Planned - not yet implemented
+> **Note:** Borg modules have record definitions but no worker implementations yet. They live in the separate `Cyborg.Modules.Borg` project.
 
-Checks if a host is reachable via ICMP ping.
+### Borg Job Module (`cyborg.modules.borg.job.v1`) ⚠️
 
-**Planned Module Record:**
+> **Status:** Definition only — no worker implementation
+
+Orchestrates a borg backup job with lifecycle hooks.
+
+**Module Record:**
 ```csharp
-public sealed record NetworkPingModule(
+[GeneratedModuleValidation]
+public sealed partial record BorgJobModule
+(
+    ModuleContext Job,
+    ModuleContext? BeforeJob,
+    ModuleContext? AfterJob,
+    ModuleContext? OnError
+) : ModuleBase, IModule
+{
+    public static string ModuleId => "cyborg.modules.borg.job.v1";
+}
+```
+
+---
+
+### Borg Backup Module (`cyborg.modules.borg.backup.v1`) ⚠️
+
+> **Status:** Definition only — no worker implementation
+
+Defines borg backup remote targets.
+
+**Module Record:**
+```csharp
+public sealed record BorgBackupModule(
+    ImmutableArray<BorgRemote> Remotes
+) : ModuleBase, IModule
+{
+    public static string ModuleId => "cyborg.modules.borg.backup.v1";
+}
+
+[GeneratedDecomposition]
+public sealed partial record BorgRemote(
     string Hostname,
-    int TimeoutSeconds = 10,
-    int Count = 1,
-    string? ResultVariable                          // Store result in environment
-) : IModule
-{
-    public static string ModuleId => "cyborg.modules.net.ping.v1";
-}
+    int Port,
+    string? WakeOnLanMac,
+    string BorgRsh,
+    string BorgRepoRoot
+);
 ```
 
-**JSON Configuration:**
-```json
-{
-  "cyborg.modules.net.ping.v1": {
-    "hostname": "backup1.service.local",
-    "timeout_seconds": 10,
-    "result_variable": "host_reachable"
-  }
-}
-```
-
----
-
-## Security Modules
-
-> **Status:** Security modules are planned but not yet implemented.
-
-### Secrets Load Module (`cyborg.modules.secrets.load.v1`) 🚧
-
-> **Status:** Planned - not yet implemented
-
-Loads secrets from a secure source into the runtime environment.
-
-**Purpose:** Replace bash `.secrets` file sourcing with secure, structured secret loading.
-
-**Planned Module Record:**
-```csharp
-public sealed record SecretsLoadModule(
-    string Source,                                  // Secret source identifier
-    SecretsSourceType SourceType,                   // How to load secrets
-    string EnvironmentPrefix,                       // Prefix for environment variables
-    ImmutableArray<string>? Keys                    // Specific keys to load (null = all)
-) : IModule, IConfigurationModule                   // Implements IConfigurationModule for use in configuration blocks
-{
-    public static string ModuleId => "cyborg.modules.secrets.load.v1";
-}
-
-public enum SecretsSourceType
-{
-    EnvironmentVariable,                            // From process environment
-    JsonFile,                                       // From JSON file (encrypted or not)
-    SystemdCredential                               // From systemd credentials API
-}
-```
-
-**JSON Configuration (as configuration module):**
-
-Secrets can be loaded via the `configuration` property of a `ModuleContext`, populating the environment before the main module executes:
-
-```json
-{
-  "environment": {
-    "scope": "inherit_parent",
-    "name": "backup_session"
-  },
-  "configuration": {
-    "cyborg.modules.config.collection.v1": {
-      "sources": [
-        {
-          "cyborg.modules.secrets.load.v1": {
-            "source": "overleaf-secrets",
-            "source_type": "systemd_credential",
-            "environment_prefix": "secrets",
-            "keys": [ "passphrase" ]
-          }
-        },
-        {
-          "cyborg.modules.config.map.v1": {
-            "entries": [
-              { "key": "container_name", "string": "overleaf" }
-            ]
-          }
-        }
-      ]
-    }
-  },
-  "module": { "cyborg.modules.borg.repository.v1": { ... } }
-}
-```
-
-**Worker Behavior:**
-1. Load secrets from source using specified `source_type`
-2. Filter to requested keys (if specified)
-3. Set each secret as `{prefix}.{key}` in current environment scope
-4. Return success
-
-**Environment Integration:**
-- Secrets module implements `IConfigurationModule`, allowing use in `configuration` blocks
-- Variables are set in the current environment scope
-- Subsequent modules (and children via `inherit_parent`) can resolve secrets via `${secrets.passphrase}`
-- Transient environments automatically clean up secrets when scope exits
-
-**Supported Sources (extensible):**
-- `EnvironmentVariable` - Read from process environment (for Kubernetes/container secrets)
-- `JsonFile` - Read from JSON file (can be encrypted with age/sops)
-- `SystemdCredential` - Use systemd's credentials mechanism for services
-
----
-
-## System Modules
-
-> **Status:** System modules are planned but not yet implemented.
-
-### Run-As Module (`cyborg.modules.system.run_as.v1`) 🚧
-
-> **Status:** Planned - not yet implemented
-
-Executes child modules as a different user.
-
-**Purpose:** Replace `su -c` patterns for running Docker as non-root user.
-
-**Planned Module Record:**
-```csharp
-public sealed record RunAsModule(
-    string User,                                    // Target user
-    ModuleContext Body                              // Module to execute as user
-) : IModule
-{
-    public static string ModuleId => "cyborg.modules.system.run_as.v1";
-}
-```
-
-**JSON Configuration:**
-```json
-{
-  "cyborg.modules.system.run_as.v1": {
-    "user": "docker",
-    "body": {
-      "module": {
-        "cyborg.modules.docker.down.v1": {
-          "compose_path": "/opt/docker/containers/overleaf/docker-compose.yml"
-        }
-      }
-    }
-  }
-}
-```
-
-**Security Constraints:**
-1. `User` must be in allowed users list (global configuration)
-2. Implementation uses capability-based switching or `sudo -u` with NOPASSWD for specific commands
-3. No arbitrary command execution - only child module commands are allowed
-
----
-
-## Logging Modules
-
-> **Status:** Logging modules are planned but not yet implemented.
-
-### Log Module (`cyborg.modules.log.v1`) 🚧
-
-> **Status:** Planned - not yet implemented
-
-Writes a structured log message.
-
-**Planned Module Record:**
-```csharp
-public sealed record LogModule(
-    LogLevel Level,
-    string Message,
-    ImmutableDictionary<string, string>? Properties
-) : IModule
-{
-    public static string ModuleId => "cyborg.modules.log.v1";
-}
-```
-
-**JSON Configuration:**
-```json
-{
-  "cyborg.modules.log.v1": {
-    "level": "info",
-    "message": "Starting backup for ${container_name}",
-    "properties": {
-      "host": "${current_host.hostname}"
-    }
-  }
-}
-```
+`BorgRemote` implements `IDecomposable` and has a `BorgRemoteValueProvider : IDynamicValueProvider` for JSON deserialization via the `cyborg.types.borg.remote.v1` type name.

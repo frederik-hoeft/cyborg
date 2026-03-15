@@ -8,8 +8,8 @@ namespace Cyborg.Modules.Foreach;
 [GeneratedModuleValidation]
 public sealed partial record ForeachModule
 (
-    [property: Required][property: MinLength(1)] string Collection,
-    [property: Required][property: MinLength(1)] string ItemVariable,
+    [property: Required] string Collection,
+    [property: Required] string ItemVariable,
     [property: DefaultValue<bool>(false)] bool ContinueOnError,
     [property: Required] ModuleContext Body
 ) : ModuleBase, IModule
