@@ -225,9 +225,13 @@ When a module property is resolved via `IRuntimeEnvironment.Resolve<TModule, T>(
 
 ### Override Use Case
 
-Overrides are an extremely powerful feature for injecting dynamic values into module properties at binding time, just before individual module execution. They solve the problem of injecting non-string typed values into module properties when the source is a string variable. String interpolation (`${host.port}`) always produces a string, but a module property like `liveness_probe_port` expects an `int`. By setting `@my_module.liveness_probe_port` to `"${host.port}"` in the environment, the override system interpolates the string, then type-converts the result to the target type. The override system supports any addressable property on the module, including `ModuleReference` properties, allowing modules to be treated as data and enabling dynamic module composition patterns.
+Overrides are an extremely powerful feature for injecting dynamic values into module properties at binding time, just-in-time before individual module execution. They solve the problem of injecting non-string typed values into module properties when the source is a string variable. String interpolation (`${host.port}`) always produces a string, but a module property like `liveness_probe_port` expects an `int`. By setting `@my_module.liveness_probe_port` to `"${host.port}"` in the environment, the override system interpolates the string, then type-converts the result to the target type. The override system supports any addressable property on the module, including `ModuleReference` properties, allowing modules to be treated as data and enabling dynamic module composition patterns.
+
+Note that overrides always operate in a deterministic copy-on-write manner — the original deserialized module instance is never mutated. Instead, a new instance is returned with freshly resolved properties for each execution. This ensures that module definitions remain immutable and free of side effects, while modules always observe the latest environment state at execution time.
 
 The override resolution is ordered — the module's `Name` is checked before its `ModuleId`, allowing instance-specific overrides to take priority over type-level overrides.
+
+Also note that overrides are resolved before default values are applied and before constraints are validated in the source-generated validation pipeline. This means that overrides must produce valid values that satisfy the module's constraints and validation attributes, and they can also be used to erase values to trigger default value substitution (e.g., setting `@my_module.port` to `0` to trigger a `[DefaultValue<int>]` of `22`).
 
 ## Artifact Publishing
 
