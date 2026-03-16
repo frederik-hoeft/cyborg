@@ -7,7 +7,7 @@ public abstract class ParserBase(string? name) : IParser
 {
     public string? Name { get; init; } = name;
 
-    public abstract bool TryParse(string input, int offset, [NotNullWhen(true)] out ISyntaxNode? syntaxNode, out int charsConsumed);
+    public abstract bool TryParse(ReadOnlySpan<char> input, [NotNullWhen(true)] out ISyntaxNode? syntaxNode, out int charsConsumed);
 
     public abstract IParser NamedCopy(string name);
 }

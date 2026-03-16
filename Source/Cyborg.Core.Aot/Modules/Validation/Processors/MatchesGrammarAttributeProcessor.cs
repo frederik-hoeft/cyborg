@@ -65,7 +65,7 @@ internal sealed class MatchesGrammarAttributeProcessor : IPropertyAttributeProce
             // bool TryParse(string input, int offset, [NotNullWhen(true)] out ISyntaxNode? syntaxNode, out int charsConsumed);
             builder.AppendBlock(
             $$"""
-            if ({{model.AccessExpression}} is not null && !{{valueExpression}}.TryParse({{model.AccessExpression}}, 0, out _, out _))
+            if ({{model.AccessExpression}} is not null && !{{valueExpression}}.TryParse({{model.AccessExpression}}, out _, out _))
             {
                 errors.Add({{CreateValidationError(model, "match_grammar", $"Property '{{nameof({model.AccessExpression})}}' does not match the required grammar.")}});
             }

@@ -9,6 +9,7 @@ public class WhitespaceSyntaxNode(string? name, int length) : SyntaxNodeBase(nam
 
     public override void ToString(StringBuilder builder, int indentLevel)
     {
+        ArgumentNullException.ThrowIfNull(builder);
         builder.Append(' ', indentLevel * 2);
         builder.Append(GetType().Name);
         if (Name is not null)

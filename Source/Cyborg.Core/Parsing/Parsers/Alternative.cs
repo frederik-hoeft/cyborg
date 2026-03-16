@@ -4,17 +4,15 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Core.Parsing.Parsers;
 
-public class Alternative(ImmutableArray<IParser> parsers, string? name = null) : IParser
+public class Alternative(ImmutableArray<IParser> parsers, string? name = null) : ParserBase(name)
 {
-    public string? Name => name;
+    public override IParser NamedCopy(string name) => new Alternative(parsers, name);
 
-    public IParser NamedCopy(string name) => new Alternative(parsers, name);
-
-    public bool TryParse(string input, int offset, [NotNullWhen(true)] out ISyntaxNode? syntaxNode, out int charsConsumed)
+    public override bool TryParse(ReadOnlySpan<char> input, [NotNullWhen(true)] out ISyntaxNode? syntaxNode, out int charsConsumed)
     {
         foreach (IParser parser in parsers)
         {
-            if (parser.TryParse(input, offset, out ISyntaxNode? node, out int consumed))
+            if (parser.TryParse(input, out ISyntaxNode? node, out int consumed))
             {
                 charsConsumed = consumed;
                 syntaxNode = Name is null ? node : new AlternativeSyntaxNode(Name, node);

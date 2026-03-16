@@ -8,10 +8,9 @@ internal sealed class Literal(string value, string? name = null) : ParserBase(na
 {
     public override IParser NamedCopy(string name) => new Literal(value, name);
 
-    public override bool TryParse(string input, int offset, [NotNullWhen(true)] out ISyntaxNode? syntaxNode, out int charsConsumed)
+    public override bool TryParse(ReadOnlySpan<char> input, [NotNullWhen(true)] out ISyntaxNode? syntaxNode, out int charsConsumed)
     {
-        ReadOnlySpan<char> inputSpan = input.AsSpan(offset);
-        if (inputSpan.StartsWith(value, StringComparison.Ordinal))
+        if (input.StartsWith(value, StringComparison.Ordinal))
         {
             charsConsumed = value.Length;
             syntaxNode = new LiteralSyntaxNode(Name, value);

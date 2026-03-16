@@ -11,5 +11,5 @@ public interface IParser
 
     IParser NamedCopy(string name);
 
-    bool TryParse(string input, int offset, [NotNullWhen(true)] out ISyntaxNode? syntaxNode, out int charsConsumed);
+    bool TryParse(ReadOnlySpan<char> input, [NotNullWhen(true)] out ISyntaxNode? syntaxNode, out int charsConsumed);
 }

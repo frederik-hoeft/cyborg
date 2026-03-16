@@ -4,25 +4,24 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Core.Parsing.Parsers;
 
-public class Sequence(ImmutableArray<IParser> parsers, string? name = null) : IParser
+public class Sequence(ImmutableArray<IParser> parsers, string? name = null) : ParserBase(name)
 {
-    public string? Name => name;
+    public override IParser NamedCopy(string name) => new Sequence(parsers, name);
 
-    public IParser NamedCopy(string name) => new Sequence(parsers, name);
-
-    public bool TryParse(string input, int offset, [NotNullWhen(true)] out ISyntaxNode? syntaxNode, out int charsConsumed)
+    public override bool TryParse(ReadOnlySpan<char> input, [NotNullWhen(true)] out ISyntaxNode? syntaxNode, out int charsConsumed)
     {
-        int currentOffset = offset;
+        charsConsumed = 0;
         ISyntaxNode? tail = null;
         foreach (IParser parser in parsers)
         {
-            if (!parser.TryParse(input, currentOffset, out ISyntaxNode? node, out int consumed))
+            if (!parser.TryParse(input, out ISyntaxNode? node, out int consumed))
             {
                 charsConsumed = 0;
                 syntaxNode = null;
                 return false;
             }
-            currentOffset += consumed;
+            input = input[consumed..];
+            charsConsumed += consumed;
             if (tail is null)
             {
                 tail = node;
@@ -38,8 +37,7 @@ public class Sequence(ImmutableArray<IParser> parsers, string? name = null) : IP
             syntaxNode = null;
             return false;
         }
-        charsConsumed = currentOffset - offset;
-        syntaxNode = tail!;
+        syntaxNode = tail;
         return true;
     }
 }

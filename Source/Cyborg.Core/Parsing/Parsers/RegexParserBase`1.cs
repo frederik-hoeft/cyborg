@@ -8,10 +8,10 @@ public abstract class RegexParserBase<TSelf>(string? name) : ParserBase(name) wh
 {
     protected abstract bool TryCreateSyntaxNode(Match match, [NotNullWhen(true)] out ISyntaxNode? syntaxNode);
 
-    public override bool TryParse(string input, int offset, [NotNullWhen(true)] out ISyntaxNode? syntaxNode, out int charsConsumed)
+    public override bool TryParse(ReadOnlySpan<char> input, [NotNullWhen(true)] out ISyntaxNode? syntaxNode, out int charsConsumed)
     {
-        if (TSelf.ParserRegex.IsMatch(input.AsSpan(offset))                       // zero-alloc pre-check
-            && TSelf.ParserRegex.Match(input, offset) is { Success: true } match  // should never fail
+        if (TSelf.ParserRegex.IsMatch(input)                                         // zero-alloc pre-check
+            && TSelf.ParserRegex.Match(input.ToString()) is { Success: true } match  // should never fail
             && TryCreateSyntaxNode(match, out syntaxNode))
         {
             charsConsumed = match.Length;
