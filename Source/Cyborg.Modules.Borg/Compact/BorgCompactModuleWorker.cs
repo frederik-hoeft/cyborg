@@ -4,34 +4,23 @@ using Cyborg.Core.Services.Dispatch;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
-namespace Cyborg.Modules.Borg.Create;
+namespace Cyborg.Modules.Borg.Compact;
 
-public sealed class BorgCreateModuleWorker
+public sealed class BorgCompactModuleWorker
 (
-    IWorkerContext<BorgCreateModule> context,
+    IWorkerContext<BorgCompactModule> context,
     IChildProcessDispatcher processDispatcher,
-    IPosixShellCommandBuilder shellCommandBuilder
-) : BorgModuleWorker<BorgCreateModule>(context, shellCommandBuilder)
+    IPosixShellCommandBuilder commandBuilder
+) : BorgModuleWorker<BorgCompactModule>(context, commandBuilder)
 {
     protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
         List<string> arguments =
         [
-            "create",
-            "--stats", "--json",
-            "--compression", Module.Compression
+            "compact",
+            "--threshold", Module.Threshold.ToString(),
         ];
-        if (Module.Exclude.Caches)
-        {
-            arguments.Add("--exclude-caches");
-        }
-        foreach (string path in Module.Exclude.Paths)
-        {
-            arguments.Add("--exclude");
-            arguments.Add(path);
-        }
-        arguments.Add($"{Module.Repository}::{Module.ArchiveName}");
-        arguments.Add(Module.SourcePath);
+        arguments.Add(Module.Repository);
         ProcessStartInfo startInfo = new(Module.Executable, arguments);
         AddDefaults(startInfo);
         ChildProcessResult executionResult = await processDispatcher.ExecuteAsync(startInfo, cancellationToken);

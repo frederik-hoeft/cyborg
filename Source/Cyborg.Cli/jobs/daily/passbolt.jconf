@@ -9,7 +9,10 @@
               { "key": "container_name", "string": "passbolt" },
               { "key": "container_root", "string": "${docker_root}/containers/${container_name}" },
               { "key": "volume_root", "string": "${docker_root}/volumes/${container_name}" },
-              { "key": "repository_path", "string": "ssh://${@host.borg_user}@${@host.hostname}:${@host.port}${@host.borg_repo_root}/${container_name}" }
+              { "key": "repository_path", "string": "ssh://${@host.borg_user}@${@host.hostname}:${@host.port}${@host.borg_repo_root}/${container_name}" },
+              { "key": "@cyborg.modules.borg.create.v1.remote_shell", "string": "${@host.remote_shell}"},
+              { "key": "@cyborg.modules.borg.prune.v1.remote_shell", "string": "${@host.remote_shell}"},
+              { "key": "@cyborg.modules.borg.compact.v1.remote_shell", "string": "${@host.remote_shell}"}
             ]
           }
         },
@@ -69,12 +72,6 @@
                                   "exclude": {
                                     "caches": true,
                                     "paths": []
-                                  },
-                                  "remote_shell": {
-                                    "ssh_pass": {
-                                      "file_path": "/root/.ssh/pass",
-                                      "match_prompt": "assphrase"
-                                    }
                                   }
                                 }
                               }
@@ -89,17 +86,18 @@
                                     "daily": 30,
                                     "weekly": 24,
                                     "monthly": 48
-                                  },
-                                  "remote_shell": {
-                                    "ssh_pass": {
-                                      "file_path": "/root/.ssh/pass",
-                                      "match_prompt": "assphrase"
-                                    }
                                   }
                                 }
                               }
+                            },
+                            {
+                              "module": {
+                                "cyborg.modules.borg.compact.v1": {
+                                  "repository": "${repository_path}",
+                                  "passphrase": "${borg_passphrase}"
+                                }
+                              }
                             }
-                            // TODO: borg backup jobs for each host: create, prune, compact
                           ]
                         }
                       }

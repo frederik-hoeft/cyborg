@@ -1,6 +1,7 @@
 ﻿using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Configuration.Serialization;
+using Cyborg.Modules.Borg.Compact;
 using Cyborg.Modules.Borg.Create;
 using Cyborg.Modules.Borg.Model;
 using Cyborg.Modules.Borg.Prune;
@@ -17,6 +18,7 @@ namespace Cyborg.Modules.Borg;
 [Singleton<IDynamicValueProvider, BorgRemoteValueProvider>]
 [Singleton<IModuleLoader, BorgCreateModuleLoader>]
 [Singleton<IModuleLoader, BorgPruneModuleLoader>]
+[Singleton<IModuleLoader, BorgCompactModuleLoader>]
 [Singleton<JsonConverter>(Factory = nameof(CreateEnvironmentScopeReferenceConverter))]
 public interface ICyborgBorgServices
 {

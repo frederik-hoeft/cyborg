@@ -51,16 +51,8 @@ public sealed class BorgPruneModuleWorker
             }
         }
         arguments.Add(Module.Repository);
-        ProcessStartInfo startInfo = new(Module.Executable, arguments)
-        {
-            RedirectStandardError = true,
-            RedirectStandardOutput = true,
-        };
-        if (Module.RemoteShell is not null)
-        {
-            startInfo.Environment[BORG_RSH_ENV_VAR] = BuildBorgRsh(Module.RemoteShell);
-        }
-        startInfo.Environment[BORG_PASSPHRASE_ENV_VAR] = Module.Passphrase;
+        ProcessStartInfo startInfo = new(Module.Executable, arguments);
+        AddDefaults(startInfo);
         ChildProcessResult executionResult = await processDispatcher.ExecuteAsync(startInfo, cancellationToken);
         // TODO: output parsing and metric extraction
         if (executionResult.ExitCode != 0)
