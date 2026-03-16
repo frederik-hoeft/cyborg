@@ -1,5 +1,4 @@
-﻿using Cyborg.Core.Modules.Configuration.Model;
-using Cyborg.Core.Modules.Runtime.Environments.Syntax;
+﻿using Cyborg.Core.Modules.Runtime.Environments.Syntax;
 
 namespace Cyborg.Core.Modules.Runtime.Environments.Artifacts;
 

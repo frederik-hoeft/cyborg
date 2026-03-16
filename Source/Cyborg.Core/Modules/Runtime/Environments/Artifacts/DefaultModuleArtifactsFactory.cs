@@ -1,6 +1,4 @@
-﻿using Cyborg.Core.Modules.Configuration.Model;
-
-namespace Cyborg.Core.Modules.Runtime.Environments.Artifacts;
+﻿namespace Cyborg.Core.Modules.Runtime.Environments.Artifacts;
 
 public sealed class DefaultModuleArtifactsFactory : IModuleArtifactsFactory
 {

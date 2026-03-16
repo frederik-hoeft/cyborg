@@ -1,6 +1,5 @@
 ﻿using Cyborg.Core.Aot.Modules.Validation;
 using Cyborg.Core.Modules;
-using Cyborg.Core.Modules.Configuration.Model;
 using System.ComponentModel.DataAnnotations;
 
 namespace Cyborg.Modules.If.Conditions.IsSet;

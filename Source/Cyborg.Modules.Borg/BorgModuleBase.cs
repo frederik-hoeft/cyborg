@@ -1,5 +1,5 @@
 ﻿using Cyborg.Core.Aot.Modules.Validation.Attributes;
-using Cyborg.Core.Modules.Configuration.Model;
+using Cyborg.Core.Modules;
 using Cyborg.Modules.Borg.Model;
 
 namespace Cyborg.Modules.Borg;

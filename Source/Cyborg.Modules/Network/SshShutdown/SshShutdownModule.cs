@@ -1,7 +1,6 @@
 ﻿using Cyborg.Core.Aot.Modules.Validation;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Cyborg.Core.Modules;
-using Cyborg.Core.Modules.Configuration.Model;
 
 namespace Cyborg.Modules.Network.SshShutdown;
 
