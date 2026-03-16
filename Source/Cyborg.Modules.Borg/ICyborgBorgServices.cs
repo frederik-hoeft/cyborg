@@ -1,5 +1,9 @@
-﻿using Cyborg.Core.Modules.Configuration.Model;
+﻿using Cyborg.Core.Modules.Configuration;
+using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Configuration.Serialization;
+using Cyborg.Modules.Borg.Create;
+using Cyborg.Modules.Borg.Model;
+using Cyborg.Modules.Borg.Prune;
 using Jab;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -11,6 +15,8 @@ namespace Cyborg.Modules.Borg;
 [Singleton<JsonSerializerContext>(Factory = nameof(GetBorgJsonSerializerContext))]
 [Singleton<JsonNamingPolicy>(Factory = nameof(GetModuleJsonNamingPolicy))]
 [Singleton<IDynamicValueProvider, BorgRemoteValueProvider>]
+[Singleton<IModuleLoader, BorgCreateModuleLoader>]
+[Singleton<IModuleLoader, BorgPruneModuleLoader>]
 [Singleton<JsonConverter>(Factory = nameof(CreateEnvironmentScopeReferenceConverter))]
 public interface ICyborgBorgServices
 {

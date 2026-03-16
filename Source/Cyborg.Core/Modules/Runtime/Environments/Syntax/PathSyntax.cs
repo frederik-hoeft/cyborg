@@ -39,6 +39,12 @@ public readonly record struct PathSyntax : IChildSyntaxProvider<PathSyntax>
         return new RefSyntax(NamingPolicy, $"${{{Value}}}");
     }
 
+    public LateRefSyntax LateRef()
+    {
+        VariableSyntaxHelpers.ThrowIfEmpty(Value, "Cannot create a reference from an empty path.");
+        return new LateRefSyntax(NamingPolicy, $"${{@{Value}}}");
+    }
+
     public override string ToString() => Value;
 
     public static implicit operator string(PathSyntax value) => value.ToString();

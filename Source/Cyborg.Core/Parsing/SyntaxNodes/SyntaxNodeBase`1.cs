@@ -8,6 +8,7 @@ public abstract class SyntaxNodeBase<TResult>(string? name, TResult result) : Sy
 
     public override void ToString(StringBuilder builder, int indentLevel)
     {
+        ArgumentNullException.ThrowIfNull(builder);
         builder.Append(' ', indentLevel * 2);
         builder.Append(GetType().Name);
         builder.Append($" (Name: '{Name ?? "<unnamed>"}', Result: '{result}')");

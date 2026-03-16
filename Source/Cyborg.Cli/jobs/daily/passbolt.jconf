@@ -8,7 +8,8 @@
             "entries": [
               { "key": "container_name", "string": "passbolt" },
               { "key": "container_root", "string": "${docker_root}/containers/${container_name}" },
-              { "key": "volume_root", "string": "${docker_root}/volumes/${container_name}" }
+              { "key": "volume_root", "string": "${docker_root}/volumes/${container_name}" },
+              { "key": "repository_path", "string": "ssh://${@host.borg_user}@${@host.hostname}:${@host.port}${@host.borg_repo_root}/${container_name}" }
             ]
           }
         },
@@ -57,6 +58,47 @@
                       "module": {
                         "cyborg.modules.sequence.v1": {
                           "steps": [
+                            {
+                              "module": {
+                                "cyborg.modules.borg.create.v1": {
+                                  "repository": "${repository_path}",
+                                  "archive_name": "${container_name}-{now}",
+                                  "source_path": "${volume_root}",
+                                  "compression": "zlib",
+                                  "passphrase": "${borg_passphrase}",
+                                  "exclude": {
+                                    "caches": true,
+                                    "paths": []
+                                  },
+                                  "remote_shell": {
+                                    "ssh_pass": {
+                                      "file_path": "/root/.ssh/pass",
+                                      "match_prompt": "assphrase"
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "module": {
+                                "cyborg.modules.borg.prune.v1": {
+                                  "repository": "${repository_path}",
+                                  "passphrase": "${borg_passphrase}",
+                                  "glob_archives": "${container_name}-*",
+                                  "keep": {
+                                    "daily": 30,
+                                    "weekly": 24,
+                                    "monthly": 48
+                                  },
+                                  "remote_shell": {
+                                    "ssh_pass": {
+                                      "file_path": "/root/.ssh/pass",
+                                      "match_prompt": "assphrase"
+                                    }
+                                  }
+                                }
+                              }
+                            }
                             // TODO: borg backup jobs for each host: create, prune, compact
                           ]
                         }

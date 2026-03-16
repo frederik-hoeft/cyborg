@@ -22,10 +22,11 @@ internal static class ValidationProcessorRegistry
         new ExactLengthAttributeProcessor(),
         new DefinedEnumValueAttributeProcessor(),
         new DefaultInstanceAttributeProcessor(),
-        new MustMatchAttributeProcessor(),
+        new MatchesRegexAttributeProcessor(),
         new FileExistsAttributeProcessor(),
         new DirectoryExistsAttributeProcessor(),
         new ReadOnlyCollectionOverrideProcessor(),
+        new MatchesGrammarAttributeProcessor(),
     ];
 
     private static FrozenDictionary<string, IPropertyAttributeProcessor> ByMetadataName => 

@@ -12,11 +12,17 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
     [return: NotNullIfNotNull(nameof(value))]
     public virtual IReadOnlyCollection<T>? ResolveCollection<TModule, T>(TModule module, IReadOnlyCollection<T>? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
         where TModule : ModuleBase, IModule
+        => ResolveCollectionCore(this, module, value, moduleExpression, valueExpression);
+
+    [return: NotNullIfNotNull(nameof(value))]
+    internal protected virtual IReadOnlyCollection<T>? ResolveCollectionCore<TModule, T>(EnvironmentLike entryPoint, TModule module, IReadOnlyCollection<T>? value, string? moduleExpression, string? valueExpression)
+        where TModule : ModuleBase, IModule
     {
+        ArgumentNullException.ThrowIfNull(entryPoint);
         ArgumentNullException.ThrowIfNull(module);
         string valuePath = ConstructValueResolutionPath(value, moduleExpression, valueExpression);
         string overridePath = SyntaxFactory.Path(NamespaceOf(module), valuePath).Override();
-        if (TryResolveVariable(overridePath, out IEnumerable? resolvedValue))
+        if (TryResolveVariable(overridePath, entryPoint, out IEnumerable? resolvedValue))
         {
             if (resolvedValue is IReadOnlyCollection<T> typedCollection)
             {
@@ -33,18 +39,24 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
     [return: NotNullIfNotNull(nameof(value))]
     public virtual T? Resolve<TModule, T>(TModule module, T? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
         where TModule : ModuleBase, IModule
+        => ResolveCore(this, module, value, moduleExpression, valueExpression);
+
+    [return: NotNullIfNotNull(nameof(value))]
+    internal protected virtual T? ResolveCore<TModule, T>(EnvironmentLike entryPoint, TModule module, T? value, string? moduleExpression, string? valueExpression)
+        where TModule : ModuleBase, IModule
     {
+        ArgumentNullException.ThrowIfNull(entryPoint);
         ArgumentNullException.ThrowIfNull(module);
         string valuePath = ConstructValueResolutionPath(value, moduleExpression, valueExpression);
         string overridePath = SyntaxFactory.Path(NamespaceOf(module), valuePath).Override();
-        if (TryResolveVariable(overridePath, out T? resolvedValue))
+        if (TryResolveVariable(overridePath, entryPoint, out T? resolvedValue))
         {
             value = resolvedValue;
         }
         else if (value is string stringValue)
         {
             // Handle indirection via string variables
-            string resolvedString = Interpolate(stringValue);
+            string resolvedString = Interpolate(stringValue, entryPoint);
             value = Unsafe.As<string, T>(ref resolvedString);
         }
         return value;

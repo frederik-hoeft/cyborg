@@ -25,7 +25,7 @@ internal static class ValidationGeneratorDiagnostics
     public static DiagnosticDescriptor PropertyMustBeSettable { get; } = new(
         id: "CYBORGVAL003",
         title: "Annotated module property must be init/settable",
-        messageFormat: "Property '{0}' on '{1}' must have an init or set accessor so the generated code can use a 'with' expression",
+        messageFormat: "Property '{0}' on '{1}' must have an init or set accessor so the generated code can use a 'with' expression to apply {2}",
         category: CATEGORY,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
@@ -150,4 +150,19 @@ internal static class ValidationGeneratorDiagnostics
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
 
+    public static DiagnosticDescriptor MemberNotFound { get; } = new(
+        id: "CYBORGVAL019",
+        title: "Attribute member not found",
+        messageFormat: "Property '{0}' on '{1}' has a '{2}' referencing member '{3}' that could not be found in the declaring type or its base types",
+        category: CATEGORY,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    public static DiagnosticDescriptor InvalidTimeSpanLiteral { get; } = new(
+        id: "CYBORGVAL020",
+        title: "Invalid TimeSpan literal",
+        messageFormat: "Property '{0}' on '{1}' has a {2} with an invalid TimeSpan literal value '{3}'. This value must be parseable by TimeSpan.ParseExact with the 'c' format specifier",
+        category: CATEGORY,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
 }

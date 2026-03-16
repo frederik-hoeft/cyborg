@@ -23,6 +23,6 @@ public sealed partial record SshShutdownModule
 public sealed record SshPass
 (
     [property: Required][property: DefaultValue<string>("/usr/bin/sshpass")][property: FileExists] string Executable,
-    [property: Required] string FilePath,
+    [property: Required][property: FileExists] string FilePath,
     string? MatchPrompt
 );

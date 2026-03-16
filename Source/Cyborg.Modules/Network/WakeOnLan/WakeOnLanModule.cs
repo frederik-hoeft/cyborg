@@ -10,7 +10,7 @@ namespace Cyborg.Modules.Network.WakeOnLan;
 public sealed partial record WakeOnLanModule
 (
     [property: Required] string TargetHost,
-    [property: Required][property: MustMatch(nameof(WakeOnLanModule.MacAddressRegex))] string MacAddress,
+    [property: Required][property: MatchesRegex(nameof(WakeOnLanModule.MacAddressRegex))] string MacAddress,
     [property: Required][property: Range<int>(Min = 1, Max = ushort.MaxValue)] int LivenessProbePort,
     [property: DefaultTimeSpan("00:05:00")] TimeSpan MaxWaitTime,
     [property: DefaultTimeSpan("00:00:30")] TimeSpan HostDiscoveryTimeout,

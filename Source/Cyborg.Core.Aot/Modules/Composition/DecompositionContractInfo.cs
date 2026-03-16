@@ -4,8 +4,8 @@ using System.Collections.Immutable;
 
 namespace Cyborg.Core.Aot.Modules.Composition;
 
-internal sealed class DecompositionContractInfo(Dictionary<ModelDecompositionGeneratorContract, INamedTypeSymbol> contractTypes)
-    : ContractInfoBase<ModelDecompositionGeneratorContract>(contractTypes)
+internal sealed class DecompositionContractInfo(Dictionary<ModelDecompositionGeneratorContract, INamedTypeSymbol> contractTypes, Compilation compilation)
+    : ContractInfoBase<ModelDecompositionGeneratorContract>(contractTypes, compilation)
 {
     private static readonly ImmutableArray<ModelDecompositionGeneratorContract> s_allContracts =
     [
@@ -25,6 +25,6 @@ internal sealed class DecompositionContractInfo(Dictionary<ModelDecompositionGen
             return null;
         }
 
-        return new DecompositionContractInfo(contracts);
+        return new DecompositionContractInfo(contracts, explorer.Compilation);
     }
 }

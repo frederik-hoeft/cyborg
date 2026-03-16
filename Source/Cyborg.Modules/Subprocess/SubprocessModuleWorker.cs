@@ -29,7 +29,6 @@ public sealed class SubprocessModuleWorker(IWorkerContext<SubprocessModule> cont
         {
             RedirectStandardOutput = Module.Output.ReadStdout,
             RedirectStandardError = Module.Output.ReadStderr,
-            UseShellExecute = false,
         };
         ChildProcessResult executionResult = await dispatcher.ExecuteAsync(startInfo, cancellationToken);
         SubprocessModuleResult result = new(executionResult.ExitCode, executionResult.StandardOutput, executionResult.StandardError);

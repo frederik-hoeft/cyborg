@@ -35,7 +35,8 @@
         <EmbeddedResource Include="Modules\Validation\Attributes\LengthAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\MaxLengthAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\MinLengthAttribute.cs" />
-        <EmbeddedResource Include="Modules\Validation\Attributes\MustMatchAttribute.cs" />
+        <EmbeddedResource Include="Modules\Validation\Attributes\MatchesGrammarAttribute.cs" />
+        <EmbeddedResource Include="Modules\Validation\Attributes\MatchesRegexAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\RangeAttribute`1.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\RequiredAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\ValidatableAttribute.cs" />

@@ -6,9 +6,9 @@ using System.Text.RegularExpressions;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal sealed class MustMatchAttributeProcessor : IPropertyAttributeProcessor
+internal sealed class MatchesRegexAttributeProcessor : IPropertyAttributeProcessor
 {
-    public string AttributeMetadataName => typeof(MustMatchAttribute).FullName;
+    public string AttributeMetadataName => typeof(MatchesRegexAttribute).FullName;
 
     public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
     {
@@ -21,12 +21,12 @@ internal sealed class MustMatchAttributeProcessor : IPropertyAttributeProcessor
         }
         if (context.Property.Type.SpecialType is not SpecialType.System_String)
         {
-            context.Report(ValidationGeneratorDiagnostics.TypeMismatch, context.Property.Name, context.ContainingType.Name, nameof(MustMatchAttribute), nameof(String));
+            context.Report(ValidationGeneratorDiagnostics.TypeMismatch, context.Property.Name, context.ContainingType.Name, nameof(MatchesRegexAttribute), nameof(String));
             return false;
         }
         if (attribute.ConstructorArguments.Length == 0)
         {
-            context.Report(ValidationGeneratorDiagnostics.MissingArgument, context.Property.Name, context.ContainingType.Name, nameof(MustMatchAttribute));
+            context.Report(ValidationGeneratorDiagnostics.MissingArgument, context.Property.Name, context.ContainingType.Name, nameof(MatchesRegexAttribute));
             return false;
         }
         if (attribute.ConstructorArguments[0].Value is not string valueExpression)
@@ -40,7 +40,7 @@ internal sealed class MustMatchAttributeProcessor : IPropertyAttributeProcessor
             context.Report(ValidationGeneratorDiagnostics.MemberTypeMismatch, 
                 context.Property.Name, 
                 context.ContainingType.Name, 
-                nameof(MustMatchAttribute),
+                nameof(MatchesRegexAttribute),
                 valueExpression,
                 nameof(Regex));
             return false;
@@ -57,7 +57,7 @@ internal sealed class MustMatchAttributeProcessor : IPropertyAttributeProcessor
             context.Report(ValidationGeneratorDiagnostics.PropertyAttributePreconditionNotMet,
                 context.Property.Name,
                 context.ContainingType.Name,
-                nameof(MustMatchAttribute),
+                nameof(MatchesRegexAttribute),
                 $"The property '{valueExpression}' must be annotated with [GeneratedRegex] and specify the regex pattern to be used for validation.");
             return false;
         }
@@ -75,7 +75,7 @@ internal sealed class MustMatchAttributeProcessor : IPropertyAttributeProcessor
             $$"""
             if ({{model.AccessExpression}} is not null && !{{regexMember}}.IsMatch({{model.AccessExpression}}))
             {
-                errors.Add({{CreateValidationError(model, "must_match", $"Property '{{nameof({model.AccessExpression})}}' must match the following pattern: '{{{SymbolDisplay.FormatLiteral(pattern, quote: true)}}}'.")}});
+                errors.Add({{CreateValidationError(model, "match_regex", $"Property '{{nameof({model.AccessExpression})}}' must match the following pattern: '{{{SymbolDisplay.FormatLiteral(pattern, quote: true)}}}'.")}});
             }
             """);
         }

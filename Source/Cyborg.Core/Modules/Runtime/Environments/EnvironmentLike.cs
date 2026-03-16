@@ -15,10 +15,10 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
 
     protected JsonNamingPolicy NamingPolicy => SyntaxFactory.NamingPolicy;
 
-    [GeneratedRegex(@"^\$\{(?<variable_name>([A-Za-z_][A-Za-z_0-9\-\.]*)|@)\}$")]
+    [GeneratedRegex(@"^\$\{(?<expression>@(?:[A-Za-z_][A-Za-z_0-9\-\.]*)?|[A-Za-z_][A-Za-z_0-9\-\.]*)\}$")]
     protected static partial Regex VariableRegex { get; }
 
-    [GeneratedRegex(@"\$\{(?<variable_name>([A-Za-z_][A-Za-z_0-9\-\.]*)|@)\}")]
+    [GeneratedRegex(@"\$\{(?<expression>@(?:[A-Za-z_][A-Za-z_0-9\-\.]*)?|[A-Za-z_][A-Za-z_0-9\-\.]*)\}")]
     protected static partial Regex InterpolationRegex { get; }
 
     protected virtual string InterpolateString(ResolutionContext context, string stringValue)
@@ -35,8 +35,8 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         {
             sb.Append(valueSpan[currentIndex..match.Index]);
             ReadOnlySpan<char> variableSlice = valueSpan.Slice(match.Index, match.Length);
-            string variableName = variableSlice[2..^1].ToString();
-            if (TryResolveVariableCore(context.With(variableName), out object? resolvedValue))
+            string expression = variableSlice[2..^1].ToString();
+            if (TryParseVariableReference(expression, out VariableReference reference) && TryResolveVariableReference(context, reference, out object? resolvedValue))
             {
                 sb.Append(resolvedValue);
             }
@@ -57,14 +57,17 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         ArgumentNullException.ThrowIfNull(name);
         if (name.StartsWith('$') && VariableRegex.Match(name) is { Success: true } match)
         {
-            string variable = match.Groups["variable_name"].Value;
-            return TryResolveVariableCore(context.With(variable), out value);
+            string expression = match.Groups["expression"].Value;
+            if (TryParseVariableReference(expression, out VariableReference reference))
+            {
+                return TryResolveVariableReference(context, reference, out value);
+            }
         }
         value = default;
         return false;
     }
 
-    protected virtual bool TryResolveVariableCore(ResolutionContext context, [NotNullWhen(true)] out object? value)
+    protected virtual bool TryResolveVariableInCurrentScopeCore(ResolutionContext context, [NotNullWhen(true)] out object? value)
     {
         ArgumentNullException.ThrowIfNull(context);
         // handle self-reference
@@ -93,9 +96,13 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         return false;
     }
 
-    private protected virtual bool TryResolveVariableCore<T>(ResolutionContext context, [NotNullWhen(true)] out T? value)
+    internal protected virtual bool TryResolveVariableRecursiveCore(ResolutionContext context, [NotNullWhen(true)] out object? value) =>
+        TryResolveVariableInCurrentScopeCore(context, out value);
+
+    internal protected bool TryResolveVariableRecursiveCore<T>(ResolutionContext context, [NotNullWhen(true)] out T? value)
     {
-        if (TryResolveVariableCore(context, out object? objValue))
+        ArgumentNullException.ThrowIfNull(context);
+        if (TryResolveVariableRecursiveCore(context, out object? objValue))
         {
             if (objValue is T typedValue)
             {
@@ -108,7 +115,23 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         return false;
     }
 
-    public virtual bool TryResolveVariable<T>(string name, [NotNullWhen(true)] out T? value) => TryResolveVariableCore(ResolutionContext.Create(name), out value);
+    protected bool TryResolveVariableReference<T>(ResolutionContext context, VariableReference reference, [NotNullWhen(true)] out T? value)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ResolutionContext nextContext = context.With(reference.Name, reference.Origin);
+        return reference.Origin switch
+        {
+            ResolutionOrigin.CurrentScope => TryResolveVariableRecursiveCore(nextContext, out value),
+            ResolutionOrigin.EntryPoint => context.EntryPoint.TryResolveVariableRecursiveCore(nextContext, out value),
+            _ => throw new ArgumentOutOfRangeException(nameof(reference))
+        };
+    }
+
+    public virtual bool TryResolveVariable<T>(string name, [NotNullWhen(true)] out T? value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        return TryResolveVariable(name, entryPoint: this, out value);
+    }
 
     public virtual void SetVariable<T>(string name, T value) => Variables[name] = value;
 
@@ -117,7 +140,7 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
     public virtual string Interpolate(string template)
     {
         ArgumentNullException.ThrowIfNull(template);
-        return InterpolateString(ResolutionContext.Empty, template);
+        return Interpolate(template, entryPoint: this);
     }
 
     public virtual void Publish(string root, IDecomposable decomposable, DecompositionStrategy strategy, bool publishNullValues)
@@ -155,37 +178,91 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    protected sealed class ResolutionContext
+    private protected bool TryResolveVariable<T>(string name, EnvironmentLike entryPoint, [NotNullWhen(true)] out T? value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(entryPoint);
+        return TryResolveVariableRecursiveCore(ResolutionContext.Create(entryPoint, name), out value);
+    }
+
+    private protected string Interpolate(string template, EnvironmentLike entryPoint)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+        ArgumentNullException.ThrowIfNull(entryPoint);
+        return InterpolateString(ResolutionContext.CreateRoot(entryPoint), template);
+    }
+
+    private bool TryParseVariableReference(string expression, out VariableReference reference)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(expression);
+        string self = SyntaxFactory.Self();
+        if (expression.Equals(self, StringComparison.Ordinal))
+        {
+            reference = new VariableReference(self, ResolutionOrigin.CurrentScope);
+            return true;
+        }
+        if (expression.StartsWith(self, StringComparison.Ordinal))
+        {
+            reference = new VariableReference(expression[self.Length..], ResolutionOrigin.EntryPoint);
+            return true;
+        }
+        reference = new VariableReference(expression, ResolutionOrigin.CurrentScope);
+        return true;
+    }
+
+    protected readonly record struct VariableReference(string Name, ResolutionOrigin Origin);
+
+    internal protected enum ResolutionOrigin
+    {
+        CurrentScope,
+        EntryPoint
+    }
+
+    internal protected sealed class ResolutionContext
     {
         private readonly ResolutionContext? _parent;
 
+        public EnvironmentLike EntryPoint { get; }
+
         public string Name { get; }
 
-        private ResolutionContext(ResolutionContext? parent, string name)
+        public ResolutionOrigin Origin { get; }
+
+        private ResolutionContext(ResolutionContext? parent, EnvironmentLike entryPoint, string name, ResolutionOrigin origin)
         {
             _parent = parent;
+            EntryPoint = entryPoint;
             Name = name;
+            Origin = origin;
         }
 
-        public static ResolutionContext Create(string name)
+        public static ResolutionContext Create(EnvironmentLike entryPoint, string name)
         {
+            ArgumentNullException.ThrowIfNull(entryPoint);
             ArgumentException.ThrowIfNullOrWhiteSpace(name);
-            return new ResolutionContext(parent: null, name);
+            return new ResolutionContext(parent: null, entryPoint, name, ResolutionOrigin.CurrentScope);
         }
 
-        public static ResolutionContext Empty { get; } = new ResolutionContext(parent: null, name: string.Empty);
+        public static ResolutionContext CreateRoot(EnvironmentLike entryPoint)
+        {
+            ArgumentNullException.ThrowIfNull(entryPoint);
+            return new ResolutionContext(parent: null, entryPoint, name: string.Empty, ResolutionOrigin.CurrentScope);
+        }
 
-        public ResolutionContext With(string name)
+        public ResolutionContext With(string name, ResolutionOrigin origin)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(name);
             for (ResolutionContext? current = this; current is not null; current = current._parent)
             {
-                if (current.Name.Equals(name, StringComparison.Ordinal))
+                if (current.Name.Equals(name, StringComparison.Ordinal) && current.Origin == origin)
                 {
-                    throw new InvalidOperationException($"Cyclic variable reference detected for variable '{name}'.");
+                    throw new InvalidOperationException($"Cyclic variable reference detected for variable '{FormatReference(name, origin)}'.");
                 }
             }
-            return new ResolutionContext(this, name);
+            return new ResolutionContext(this, EntryPoint, name, origin);
         }
+
+        private static string FormatReference(string name, ResolutionOrigin origin)
+            => origin is ResolutionOrigin.EntryPoint ? $"${{@{name}}}" : $"${{{name}}}";
     }
 }

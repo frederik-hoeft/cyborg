@@ -5,6 +5,8 @@ namespace Cyborg.Core.Aot.Contracts;
 
 internal sealed class ContractExplorer(Compilation compilation)
 {
+    public Compilation Compilation => compilation;
+
     public ContractDiscoveryResult<TContract> DiscoverContracts<TContract>() where TContract : unmanaged, Enum
     {
         List<Diagnostic> diagnostics = [];

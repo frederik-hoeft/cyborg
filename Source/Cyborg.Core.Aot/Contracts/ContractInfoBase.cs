@@ -4,9 +4,11 @@ using System.Collections.Immutable;
 
 namespace Cyborg.Core.Aot.Contracts;
 
-internal abstract class ContractInfoBase<TContract>(Dictionary<TContract, INamedTypeSymbol> contractTypes) where TContract : unmanaged, Enum
+internal abstract class ContractInfoBase<TContract>(Dictionary<TContract, INamedTypeSymbol> contractTypes, Compilation compilation) where TContract : unmanaged, Enum
 {
     protected FrozenDictionary<TContract, INamedTypeSymbol> ContractTypes { get; } = contractTypes.ToFrozenDictionary();
+
+    public Compilation Compilation => compilation;
 
     protected static Dictionary<TContract, INamedTypeSymbol>? FetchContracts(
         ContractExplorer contractExplorer,

@@ -1,25 +1,27 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 
 namespace Cyborg.Core.Modules.Runtime.Environments.Syntax;
 
-public readonly record struct RefSyntax : IChildSyntaxProvider<RefSyntax>
+public readonly record struct LateRefSyntax : IChildSyntaxProvider<LateRefSyntax>
 {
     private JsonNamingPolicy NamingPolicy { get; }
 
     private string Value { get; }
 
-    JsonNamingPolicy IChildSyntaxProvider<RefSyntax>.NamingPolicy => NamingPolicy;
-
-    internal RefSyntax(JsonNamingPolicy namingPolicy, string value)
+    internal LateRefSyntax(JsonNamingPolicy namingPolicy, string value)
     {
         NamingPolicy = namingPolicy ?? throw new ArgumentNullException(nameof(namingPolicy));
         Value = value ?? throw new ArgumentNullException(nameof(value));
     }
 
-    public RefSyntax Child(string segment) =>
+    public bool IsEmpty => string.IsNullOrEmpty(Value);
+
+    JsonNamingPolicy IChildSyntaxProvider<LateRefSyntax>.NamingPolicy => NamingPolicy;
+
+    public LateRefSyntax Child(string segment) =>
         new(NamingPolicy, VariableSyntaxHelpers.Join(Value, VariableSyntaxHelpers.NormalizePath(segment, nameof(segment))).ToString());
 
-    public RefSyntax Child(PathSyntax other) =>
+    public LateRefSyntax Child(PathSyntax other) =>
         new(NamingPolicy, VariableSyntaxHelpers.Join(Value, other.ToString()).ToString());
 
     public RefSyntax Child(RefSyntax other) =>
@@ -30,5 +32,5 @@ public readonly record struct RefSyntax : IChildSyntaxProvider<RefSyntax>
 
     public override string ToString() => Value;
 
-    public static implicit operator string(RefSyntax value) => value.ToString();
+    public static implicit operator string(LateRefSyntax value) => value.ToString();
 }

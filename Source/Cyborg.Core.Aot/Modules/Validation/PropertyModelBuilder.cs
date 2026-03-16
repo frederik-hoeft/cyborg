@@ -26,12 +26,6 @@ internal sealed class PropertyModelBuilder(GenerationCandidateFactory factory, L
                 continue;
             }
 
-            if (property.SetMethod is not { } setter || !_visibilityContext.IsVisible(setter))
-            {
-                AddDiagnostic(ValidationGeneratorDiagnostics.PropertyMustBeSettable, property.Locations.FirstOrDefault(), property.Name, CandidateType.Name);
-                continue;
-            }
-
             if (!TryCreatePropertyModel(CandidateType, property, ImmutableHashSet<INamedTypeSymbol>.Empty.WithComparer(SymbolEqualityComparer.Default), out PropertyModel? propertyModel))
             {
                 continue;

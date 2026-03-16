@@ -1,4 +1,5 @@
-﻿using Cyborg.Core.Aot.Modules.Validation;
+﻿using Cyborg.Core.Aot.Modules.Composition;
+using Cyborg.Core.Aot.Modules.Validation;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Configuration.Model;
@@ -13,7 +14,8 @@ public sealed partial record SubprocessModule
     [property: Required] SubprocessCommand Command,
     [property: Required][property: DefaultInstance] SubprocessOutputOptions Output,
     [property: DefaultValue<bool>(true)] bool CheckExitCode,
-    ImpersonationContext? Impersonation
+    ImpersonationContext? Impersonation,
+    IReadOnlyCollection<EnvironmentVariable>? EnvironmentVariables
 ) : ModuleBase, IModule
 {
     public static string ModuleId => "cyborg.modules.subprocess.v1";
@@ -42,3 +44,11 @@ public sealed record SubprocessOutputOptions
 {
     public static SubprocessOutputOptions Default => new(ReadStdout: false, ReadStderr: false);
 }
+
+[Validatable]
+[GeneratedDecomposition]
+public sealed partial record EnvironmentVariable
+(
+    [property: Required] string Key,
+    [property: Required] string Value
+) : IDecomposable;

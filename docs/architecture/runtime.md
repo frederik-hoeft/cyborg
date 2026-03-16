@@ -175,22 +175,39 @@ Variables are the primary communication mechanism between modules. The resolutio
 
 ### Resolution Semantics
 
-When `TryResolveVariable<T>(name)` is called:
+When `TryResolveVariable<T>(name)` is called, the runtime captures the environment where the lookup started as the **entry point**. Recursive resolution then distinguishes between two reference modes:
 
-1. **Self-reference** — The special name `@` resolves to the environment's current namespace.
+- **Current-scope references** — `${name}` starts from the environment currently evaluating the value and follows normal parent fallback.
+- **Entry-point references** — `${@name}` starts from the original entry-point environment that initiated the current resolution chain, even if the containing value was defined in a parent scope.
+- **Self-reference** — `${@}` resolves to the current environment's namespace.
+
+Resolution proceeds as follows:
+
+1. **Self-reference** — The special name `@` resolves to the environment's current namespace, and may be referenced in both current-scope and entry-point modes (i.e., `${@}` or `${@@}`) to get the namespace of the current definition scope or the original entry point, respectively.
 2. **Direct lookup** — The variable name is looked up in the local dictionary.
-3. **Indirection** — If the stored value is a string matching the pattern `${variable_name}`, the referenced variable is resolved recursively.
+3. **Indirection** — If the stored value is a string matching the pattern `${variable_name}` or `${@variable_name}`, the referenced variable is resolved recursively using the corresponding lookup origin.
 4. **Interpolation** — If the stored value is a string containing `${...}` placeholders mixed with literal text, all placeholders are replaced with their resolved values. Unresolvable placeholders are left as-is.
-5. **Parent fallback** — In an `InheritedRuntimeEnvironment`, if the variable is not found locally, the lookup delegated to the parent chain.
+5. **Parent fallback** — In an `InheritedRuntimeEnvironment`, if the variable is not found locally, the lookup is delegated to the parent chain without changing the original entry point.
 6. **Type casting** — The resolved value is matched against the requested type `T`. A type mismatch is treated as a resolution failure.
+
+This allows parent-defined templates to late-bind variables from child scopes. For example, a parent scope can define:
+
+```json
+{
+  "key": "repository_path",
+  "string": "ssh://${@host.borg_user}@${@host.hostname}:${@host.port}${@host.borg_repo_root}/${container_name}"
+}
+```
+
+and a child scope can later resolve `${repository_path}`. The `${@host...}` placeholders are evaluated from the child environment that initiated the lookup, while `${container_name}` still resolves from the current definition scope using normal rules.
 
 ### Cycle Detection
 
-The resolution system tracks the chain of variable names during recursive resolution via a linked `ResolutionContext`. If a variable name appears twice in the resolution chain, an `InvalidOperationException` is thrown to prevent infinite loops.
+The resolution system tracks the chain of variable references during recursive resolution via a linked `ResolutionContext`. Cycle detection includes both the variable name and its lookup origin, so `${name}` and `${@name}` are treated as distinct references. If the same reference appears twice in the active resolution chain, an `InvalidOperationException` is thrown to prevent infinite loops.
 
 ### Variable Name Syntax
 
-Variable names follow the pattern `[A-Za-z_][A-Za-z_0-9\-\.]*`. Dots serve as hierarchical separators (e.g., `host.port`), enabling structured access into decomposed objects.
+Variable names follow the pattern `[A-Za-z_][A-Za-z_0-9\-\.]*`. Dots serve as hierarchical separators (e.g., `host.port`), enabling structured access into decomposed objects. Inside interpolation and indirection expressions, the runtime also supports an entry-point prefix: `${@host.port}` starts lookup from the original resolution entry point instead of the current definition scope.
 
 ### Decomposable Objects
 
@@ -221,7 +238,7 @@ When a module property is resolved via `IRuntimeEnvironment.Resolve<TModule, T>(
 1. The property name is extracted from the call site using `CallerArgumentExpression` and converted to snake_case.
 2. An override key is constructed: `@{namespace}.{property_name}`, where the namespace is the module's `Name` (if set) or its `ModuleId`.
 3. The environment is checked for a variable matching the override key. If found, its value replaces the module property.
-4. If no override is found and the property value is a string, it is interpolated (replacing `${...}` placeholders).
+4. If no override is found and the property value is a string, it is interpolated (replacing `${...}` and `${@...}` placeholders). Entry-point placeholders continue to resolve from the environment that initiated override resolution, not from the scope where the override string was defined.
 
 ### Override Use Case
 

@@ -1,28 +1,50 @@
 ﻿using Cyborg.Core.Modules.Runtime.Environments.Syntax;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
 
 namespace Cyborg.Core.Modules.Runtime.Environments;
 
-internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironment Parent, bool IsTransient, VariableSyntaxBuilder SyntaxFactory, string Namespace) 
+internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironment Parent, bool IsTransient, VariableSyntaxBuilder SyntaxFactory, string Namespace)
     : RuntimeEnvironment(Name, IsTransient, SyntaxFactory, Namespace)
 {
-    public override bool TryResolveVariable<T>(string name, [NotNullWhen(true)] out T? value) where T : default
+    internal protected override bool TryResolveVariableRecursiveCore(ResolutionContext context, [NotNullWhen(true)] out object? value)
     {
-        if (base.TryResolveVariable(name, out value))
+        if (TryResolveVariableInCurrentScopeCore(context, out value))
         {
             return true;
         }
-        return Parent.TryResolveVariable(name, out value);
+        if (Parent is RuntimeEnvironment runtimeParent)
+        {
+            return runtimeParent.TryResolveVariableRecursiveCore(context, out value);
+        }
+        return Parent.TryResolveVariable(context.Name, out value);
     }
 
     [return: NotNullIfNotNull(nameof(value))]
-    public override T? Resolve<TModule, T>(TModule module, T? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null) where T : default
+    internal protected override IReadOnlyCollection<T>? ResolveCollectionCore<TModule, T>(EnvironmentLike entryPoint, TModule module, IReadOnlyCollection<T>? value, string? moduleExpression, string? valueExpression)
     {
-        T? v = base.Resolve(module, value, moduleExpression, valueExpression);
-        if (v is not null && !v.Equals(value))
+        IReadOnlyCollection<T>? resolvedValue = base.ResolveCollectionCore(entryPoint, module, value, moduleExpression, valueExpression);
+        if (resolvedValue is not null && !resolvedValue.Equals(value))
         {
-            return v;
+            return resolvedValue;
+        }
+        if (Parent is RuntimeEnvironment runtimeParent)
+        {
+            return runtimeParent.ResolveCollectionCore(entryPoint, module, value, moduleExpression, valueExpression);
+        }
+        return Parent.ResolveCollection(module, value, moduleExpression, valueExpression);
+    }
+
+    [return: NotNullIfNotNull(nameof(value))]
+    internal protected override T? ResolveCore<TModule, T>(EnvironmentLike entryPoint, TModule module, T? value, string? moduleExpression, string? valueExpression) where T : default
+    {
+        T? resolvedValue = base.ResolveCore(entryPoint, module, value, moduleExpression, valueExpression);
+        if (resolvedValue is not null && !resolvedValue.Equals(value))
+        {
+            return resolvedValue;
+        }
+        if (Parent is RuntimeEnvironment runtimeParent)
+        {
+            return runtimeParent.ResolveCore(entryPoint, module, value, moduleExpression, valueExpression);
         }
         return Parent.Resolve(module, value, moduleExpression, valueExpression);
     }

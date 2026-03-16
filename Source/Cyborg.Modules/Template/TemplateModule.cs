@@ -10,7 +10,7 @@ namespace Cyborg.Modules.Template;
 [GeneratedModuleValidation]
 public sealed partial record TemplateModule
 (
-    [property: Required][property: MustMatch(nameof(TemplateModule.NamespaceRegex))] string Namespace,
+    [property: Required][property: MatchesRegex(nameof(TemplateModule.NamespaceRegex))] string Namespace,
     [property: Required][property: FileExists] string Path,
     ImmutableArray<DynamicKeyValuePair> Arguments
 ) : ModuleBase, IModule

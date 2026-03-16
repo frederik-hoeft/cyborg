@@ -30,6 +30,7 @@ public abstract class SyntaxNodeBase(string? name) : ISyntaxNode
 
     public virtual void ToString(StringBuilder builder, int indentLevel)
     {
+        ArgumentNullException.ThrowIfNull(builder);
         builder.Append(' ', indentLevel * 2);
         builder.Append(GetType().Name);
         if (Name is not null)

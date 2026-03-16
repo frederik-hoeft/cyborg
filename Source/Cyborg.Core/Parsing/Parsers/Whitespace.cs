@@ -13,6 +13,7 @@ public class Whitespace(string? name = null) : IParser<Whitespace>
 
     public virtual bool TryParse(string input, int offset, [NotNullWhen(true)] out ISyntaxNode? syntaxNode, out int charsConsumed)
     {
+        ArgumentNullException.ThrowIfNull(input);
         int i = offset;
         while (i < input.Length && char.IsWhiteSpace(input[i]))
         {

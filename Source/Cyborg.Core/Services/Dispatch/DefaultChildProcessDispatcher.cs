@@ -7,6 +7,8 @@ public sealed class DefaultChildProcessDispatcher : IChildProcessDispatcher
     public async Task<ChildProcessResult> ExecuteAsync(ProcessStartInfo processStartInfo, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(processStartInfo);
+        // always disable shell execution to ensure that we can redirect streams and kill the process tree if needed
+        processStartInfo.UseShellExecute = false;
         using Process process = new()
         {
             StartInfo = processStartInfo,

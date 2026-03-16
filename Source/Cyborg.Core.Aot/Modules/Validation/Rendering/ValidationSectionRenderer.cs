@@ -4,7 +4,7 @@ using Cyborg.Core.Aot.Modules.Validation.Models;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
 
-internal sealed class ValidationSectionRenderer(ValidationContractInfo contractInfo) : ISectionRenderer
+internal sealed class ValidationSectionRenderer(ValidationContractInfo contractInfo, DiagnosticsReporter diagnosticsReporter) : ISectionRenderer
 {
     public void RenderSection(IndentedStringBuilder builder, ModuleModel model)
     {
@@ -44,7 +44,7 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
     {
         foreach (PropertyValidationAspect aspect in property.Aspects)
         {
-            aspect.EmitValidation(builder, contractInfo, property, moduleVariableName, propertyAccessExpression);
+            aspect.EmitValidation(builder, contractInfo, diagnosticsReporter, property, moduleVariableName, propertyAccessExpression);
         }
 
         if (property.HasValidatableChildren)

@@ -7,4 +7,5 @@ internal enum ModuleValidationGeneratorContract
     ValidationResultT,
     ValidationError,
     IDefaultValueT,
+    IParser,
 }

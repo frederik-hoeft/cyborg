@@ -33,6 +33,7 @@ namespace Cyborg.Core;
 [Singleton<IChildProcessDispatcher, DefaultChildProcessDispatcher>]
 [Singleton<IPingService, DefaultPingService>]
 [Singleton<IPortProbeService, TcpPortProbeService>]
+[Singleton<IPosixShellCommandBuilder, PosixShellCommandBuilder>]
 [Singleton<JsonSerializerContext>(Factory = nameof(GetCoreJsonSerializerContext))]
 [Singleton<GlobalRuntimeEnvironment>]
 public interface ICyborgCoreServices

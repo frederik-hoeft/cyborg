@@ -1,8 +1,10 @@
-﻿using Cyborg.Core.Parsing.SyntaxNodes;
+﻿using Cyborg.Core.Aot.Contracts;
+using Cyborg.Core.Parsing.SyntaxNodes;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Core.Parsing.Parsers;
 
+[GeneratorContractRegistration<ModuleValidationGeneratorContract>(ModuleValidationGeneratorContract.IParser)]
 public interface IParser
 {
     string? Name { get; }

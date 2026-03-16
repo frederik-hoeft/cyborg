@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
+using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
 
@@ -47,6 +48,16 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
 
             if (!hasDirectAssignment && !hasChildAssignments)
             {
+                continue;
+            }
+
+            if (property.Symbol.SetMethod is not { } setter || !contractInfo.Compilation.IsSymbolAccessibleWithin(setter, property.Symbol.Type))
+            {
+                diagnosticsReporter.Report(ValidationGeneratorDiagnostics.PropertyMustBeSettable,
+                    property.Symbol.Locations.FirstOrDefault() ?? Location.None,
+                    property.Symbol.Name,
+                    property.Symbol.ContainingType,
+                    "overrides");
                 continue;
             }
 

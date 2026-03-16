@@ -4,8 +4,8 @@ using System.Collections.Immutable;
 
 namespace Cyborg.Core.Aot.Modules.Loaders;
 
-internal sealed class LoaderContractInfo(Dictionary<ModuleLoaderFactoryGeneratorContract, INamedTypeSymbol> contractTypes) 
-    : ContractInfoBase<ModuleLoaderFactoryGeneratorContract>(contractTypes)
+internal sealed class LoaderContractInfo(Dictionary<ModuleLoaderFactoryGeneratorContract, INamedTypeSymbol> contractTypes, Compilation compilation) 
+    : ContractInfoBase<ModuleLoaderFactoryGeneratorContract>(contractTypes, compilation)
 {
     private static readonly ImmutableArray<ModuleLoaderFactoryGeneratorContract> s_allContracts =
     [
@@ -30,6 +30,6 @@ internal sealed class LoaderContractInfo(Dictionary<ModuleLoaderFactoryGenerator
         {
             return null;
         }
-        return new LoaderContractInfo(contracts);
+        return new LoaderContractInfo(contracts, contractExplorer.Compilation);
     }
 }
