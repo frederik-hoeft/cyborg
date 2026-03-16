@@ -12,9 +12,9 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
         {
             return true;
         }
-        if (Parent is RuntimeEnvironment runtimeParent)
+        if (Parent is EnvironmentLike parent)
         {
-            return runtimeParent.TryResolveVariableRecursiveCore(context, out value);
+            return parent.TryResolveVariableRecursiveCore(context, out value);
         }
         return Parent.TryResolveVariable(context.Name, out value);
     }

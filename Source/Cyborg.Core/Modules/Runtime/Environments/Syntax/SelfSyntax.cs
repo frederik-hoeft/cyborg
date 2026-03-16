@@ -11,7 +11,9 @@ public readonly record struct SelfSyntax
         NamingPolicy = namingPolicy ?? throw new ArgumentNullException(nameof(namingPolicy));
     }
 
-    public RefSyntax Ref() => new(NamingPolicy, "${@}");
+    public RefSyntax Ref() => new(NamingPolicy, ToString());
+
+    public LateRefSyntax LateRef() => new(NamingPolicy, ToString());
 
     public override string ToString() => "@";
 

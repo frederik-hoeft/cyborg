@@ -12,8 +12,10 @@ public readonly record struct RefSyntax : IChildSyntaxProvider<RefSyntax>
 
     internal RefSyntax(JsonNamingPolicy namingPolicy, string value)
     {
-        NamingPolicy = namingPolicy ?? throw new ArgumentNullException(nameof(namingPolicy));
-        Value = value ?? throw new ArgumentNullException(nameof(value));
+        ArgumentNullException.ThrowIfNull(namingPolicy);
+        ArgumentNullException.ThrowIfNull(value);
+        NamingPolicy = namingPolicy;
+        Value = UncheckedMakeRef(value);
     }
 
     public RefSyntax Child(string segment) =>
@@ -29,6 +31,8 @@ public readonly record struct RefSyntax : IChildSyntaxProvider<RefSyntax>
         new(NamingPolicy, VariableSyntaxHelpers.Join(Value, other.ToString()).ToString());
 
     public override string ToString() => Value;
+
+    internal static string UncheckedMakeRef(string s) => $"${{{s}}}";
 
     public static implicit operator string(RefSyntax value) => value.ToString();
 }

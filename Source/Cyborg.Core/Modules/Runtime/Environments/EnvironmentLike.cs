@@ -15,10 +15,10 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
 
     protected JsonNamingPolicy NamingPolicy => SyntaxFactory.NamingPolicy;
 
-    [GeneratedRegex(@"^\$\{(?<expression>@(?:[A-Za-z_][A-Za-z_0-9\-\.]*)?|[A-Za-z_][A-Za-z_0-9\-\.]*)\}$")]
+    [GeneratedRegex(@"^\$\{(?<expression>@@|@(?:[A-Za-z_][A-Za-z_0-9\-\.]*)?|[A-Za-z_][A-Za-z_0-9\-\.]*)\}$")]
     protected static partial Regex VariableRegex { get; }
 
-    [GeneratedRegex(@"\$\{(?<expression>@(?:[A-Za-z_][A-Za-z_0-9\-\.]*)?|[A-Za-z_][A-Za-z_0-9\-\.]*)\}")]
+    [GeneratedRegex(@"\$\{(?<expression>@@|@(?:[A-Za-z_][A-Za-z_0-9\-\.]*)?|[A-Za-z_][A-Za-z_0-9\-\.]*)\}")]
     protected static partial Regex InterpolationRegex { get; }
 
     protected virtual string InterpolateString(ResolutionContext context, string stringValue)
@@ -201,9 +201,14 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
             reference = new VariableReference(self, ResolutionOrigin.CurrentScope);
             return true;
         }
-        if (expression.StartsWith(self, StringComparison.Ordinal))
+        if (expression.Equals(LateRefSyntax.UncheckedMakeLate(SyntaxFactory.Self()), StringComparison.Ordinal))
         {
-            reference = new VariableReference(expression[self.Length..], ResolutionOrigin.EntryPoint);
+            reference = new VariableReference(self, ResolutionOrigin.EntryPoint);
+            return true;
+        }
+        if (expression.StartsWith(LateRefSyntax.Symbol, StringComparison.Ordinal))
+        {
+            reference = new VariableReference(expression[LateRefSyntax.Symbol.Length..], ResolutionOrigin.EntryPoint);
             return true;
         }
         reference = new VariableReference(expression, ResolutionOrigin.CurrentScope);
@@ -263,6 +268,6 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         }
 
         private static string FormatReference(string name, ResolutionOrigin origin)
-            => origin is ResolutionOrigin.EntryPoint ? $"${{@{name}}}" : $"${{{name}}}";
+            => origin is ResolutionOrigin.EntryPoint ? LateRefSyntax.UncheckedMakeLateRef(name) : RefSyntax.UncheckedMakeRef(name);
     }
 }

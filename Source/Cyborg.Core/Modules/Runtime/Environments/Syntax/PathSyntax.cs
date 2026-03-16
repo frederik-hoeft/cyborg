@@ -36,13 +36,13 @@ public readonly record struct PathSyntax : IChildSyntaxProvider<PathSyntax>
     public RefSyntax Ref()
     {
         VariableSyntaxHelpers.ThrowIfEmpty(Value, "Cannot create a reference from an empty path.");
-        return new RefSyntax(NamingPolicy, $"${{{Value}}}");
+        return new RefSyntax(NamingPolicy, Value);
     }
 
     public LateRefSyntax LateRef()
     {
         VariableSyntaxHelpers.ThrowIfEmpty(Value, "Cannot create a reference from an empty path.");
-        return new LateRefSyntax(NamingPolicy, $"${{@{Value}}}");
+        return new LateRefSyntax(NamingPolicy, Value);
     }
 
     public override string ToString() => Value;

@@ -10,11 +10,11 @@ public readonly record struct LateRefSyntax : IChildSyntaxProvider<LateRefSyntax
 
     internal LateRefSyntax(JsonNamingPolicy namingPolicy, string value)
     {
-        NamingPolicy = namingPolicy ?? throw new ArgumentNullException(nameof(namingPolicy));
-        Value = value ?? throw new ArgumentNullException(nameof(value));
+        ArgumentNullException.ThrowIfNull(namingPolicy);
+        ArgumentNullException.ThrowIfNull(value);
+        NamingPolicy = namingPolicy;
+        Value = RefSyntax.UncheckedMakeRef(UncheckedMakeLate(value));
     }
-
-    public bool IsEmpty => string.IsNullOrEmpty(Value);
 
     JsonNamingPolicy IChildSyntaxProvider<LateRefSyntax>.NamingPolicy => NamingPolicy;
 
@@ -31,6 +31,12 @@ public readonly record struct LateRefSyntax : IChildSyntaxProvider<LateRefSyntax
         new(NamingPolicy, VariableSyntaxHelpers.Join(Value, other.ToString()).ToString());
 
     public override string ToString() => Value;
+
+    internal static string Symbol => "@";
+
+    internal static string UncheckedMakeLate(string value) => $"{Symbol}{value}";
+
+    internal static string UncheckedMakeLateRef(string value) => RefSyntax.UncheckedMakeRef(UncheckedMakeLate(value));
 
     public static implicit operator string(LateRefSyntax value) => value.ToString();
 }
