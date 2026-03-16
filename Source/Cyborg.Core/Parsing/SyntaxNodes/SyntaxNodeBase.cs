@@ -3,11 +3,16 @@ using System.Text;
 
 namespace Cyborg.Core.Parsing.SyntaxNodes;
 
-public abstract class SyntaxNodeBase(string? name) : ISyntaxNode
+public abstract class SyntaxNodeBase : ISyntaxNode
 {
-    public string? Name => name;
+    public string? Name { get; }
 
     public ISyntaxNode? Parent { get; set; }
+
+    private protected SyntaxNodeBase(string? name)
+    {
+        Name = name;
+    }
 
     public abstract void Accept(INodeVisitor visitor);
 
@@ -33,10 +38,7 @@ public abstract class SyntaxNodeBase(string? name) : ISyntaxNode
         ArgumentNullException.ThrowIfNull(builder);
         builder.Append(' ', indentLevel * 2);
         builder.Append(GetType().Name);
-        if (Name is not null)
-        {
-            builder.Append($" (Name: '{Name}')");
-        }
+        builder.Append($" (Name: '{Name ?? "<unnamed>"}')");
         builder.AppendLine();
     }
 }

@@ -4,13 +4,11 @@ using System.Text.RegularExpressions;
 
 namespace Cyborg.Core.Parsing.Parsers;
 
-public abstract class RegexParserBase<TSelf>(string? name) : IParser where TSelf : RegexParserBase<TSelf>, IRegexOwner
+public abstract class RegexParserBase<TSelf>(string? name) : ParserBase(name) where TSelf : RegexParserBase<TSelf>, IRegexOwner
 {
-    public string? Name { get; init; } = name;
-
     protected abstract bool TryCreateSyntaxNode(Match match, [NotNullWhen(true)] out ISyntaxNode? syntaxNode);
 
-    public virtual bool TryParse(string input, int offset, [NotNullWhen(true)] out ISyntaxNode? syntaxNode, out int charsConsumed)
+    public override bool TryParse(string input, int offset, [NotNullWhen(true)] out ISyntaxNode? syntaxNode, out int charsConsumed)
     {
         if (TSelf.ParserRegex.IsMatch(input.AsSpan(offset))                       // zero-alloc pre-check
             && TSelf.ParserRegex.Match(input, offset) is { Success: true } match  // should never fail
@@ -23,6 +21,5 @@ public abstract class RegexParserBase<TSelf>(string? name) : IParser where TSelf
         syntaxNode = null;
         return false;
     }
-
-    public abstract IParser NamedCopy(string name);
 }
+

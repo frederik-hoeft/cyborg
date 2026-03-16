@@ -4,21 +4,17 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Modules.Borg.Create.InputValidation;
 
-internal sealed class Literal(string value, string? name = null) : IParser
+internal sealed class Literal(string value, string? name = null) : ParserBase(name)
 {
-    public string? Name => name;
+    public override IParser NamedCopy(string name) => new Literal(value, name);
 
-    public string Value => value;
-
-    public IParser NamedCopy(string name) => new Literal(Value, name);
-
-    public bool TryParse(string input, int offset, [NotNullWhen(true)] out ISyntaxNode? syntaxNode, out int charsConsumed)
+    public override bool TryParse(string input, int offset, [NotNullWhen(true)] out ISyntaxNode? syntaxNode, out int charsConsumed)
     {
         ReadOnlySpan<char> inputSpan = input.AsSpan(offset);
-        if (inputSpan.StartsWith(Value, StringComparison.Ordinal))
+        if (inputSpan.StartsWith(value, StringComparison.Ordinal))
         {
-            charsConsumed = Value.Length;
-            syntaxNode = new LiteralSyntaxNode(Name, Value);
+            charsConsumed = value.Length;
+            syntaxNode = new LiteralSyntaxNode(Name, value);
             return true;
         }
         charsConsumed = 0;

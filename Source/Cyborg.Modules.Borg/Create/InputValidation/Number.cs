@@ -11,16 +11,12 @@ internal sealed partial class Number(int min = int.MinValue, int max = int.MaxVa
     [GeneratedRegex(@"\G\[\s*(?<number>[1-9][0-9]*)\]")]
     public static partial Regex ParserRegex { get; }
 
-    public int Min => min;
-
-    public int Max => max;
-
-    public override IParser NamedCopy(string name) => new Number(Min, Max, name);
+    public override IParser NamedCopy(string name) => new Number(min, max, name);
 
     protected override bool TryCreateSyntaxNode(Match match, [NotNullWhen(true)] out ISyntaxNode? syntaxNode)
     {
         string rowNumberText = match.Groups["number"].Value;
-        if (int.TryParse(rowNumberText, out int rowNumber) && rowNumber >= Min && rowNumber <= Max)
+        if (int.TryParse(rowNumberText, out int rowNumber) && rowNumber >= min && rowNumber <= max)
         {
             syntaxNode = new NumberSyntaxNode(Name, rowNumber);
             return true;
