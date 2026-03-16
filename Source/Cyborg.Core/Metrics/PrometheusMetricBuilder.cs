@@ -1,59 +1,42 @@
-﻿using SmartmonExporter.Domain.Metrics;
-using System.Text;
+﻿using System.Text;
 
 namespace Cyborg.Core.Metrics;
 
 internal sealed class PrometheusMetricBuilder(PrometheusMetric metric, bool includeTimeStamp)
 {
-    public PrometheusMetricBuilder AddSample(bool value, params ReadOnlySpan<PrometheusLabel?> labels) =>
+    public PrometheusMetricBuilder AddSample(bool value, IReadOnlyList<PrometheusLabel> labels) =>
         AddSample(value ? "1" : "0", labels);
 
-    public PrometheusMetricBuilder AddSample(float value, params ReadOnlySpan<PrometheusLabel?> labels) =>
+    public PrometheusMetricBuilder AddSample(float value, IReadOnlyList<PrometheusLabel> labels) =>
         AddSample((double)value, labels);
 
-    public PrometheusMetricBuilder AddSample(long value, params ReadOnlySpan<PrometheusLabel?> labels) =>
+    public PrometheusMetricBuilder AddSample(long value, IReadOnlyList<PrometheusLabel> labels) =>
         AddSample(value.ToString(), labels);
 
-    public PrometheusMetricBuilder AddSample(int value, params ReadOnlySpan<PrometheusLabel?> labels) =>
+    public PrometheusMetricBuilder AddSample(int value, IReadOnlyList<PrometheusLabel> labels) =>
         AddSample(value.ToString(), labels);
 
-    public PrometheusMetricBuilder AddSample(double value, params ReadOnlySpan<PrometheusLabel?> labels) =>
+    public PrometheusMetricBuilder AddSample(double value, IReadOnlyList<PrometheusLabel> labels) =>
         AddSample(value.ToPrometheusString(), labels);
 
-    internal PrometheusMetricBuilder AddSample(string value, params ReadOnlySpan<PrometheusLabel?> labels)
+    internal PrometheusMetricBuilder AddSample(string value, IReadOnlyList<PrometheusLabel> labels)
     {
         StringBuilder builder = metric._builder;
         builder.Append(metric.Namespace).Append('_').Append(metric.Name);
         
-        // Count non-null labels
-        int nonNullCount = 0;
-        for (int i = 0; i < labels.Length; i++)
-        {
-            if (labels[i].HasValue)
-            {
-                nonNullCount++;
-            }
-        }
-        
-        if (nonNullCount > 0)
+        if (labels.Count > 0)
         {
             builder.Append('{');
             bool first = true;
-            for (int i = 0; i < labels.Length; i++)
+            for (int i = 0; i < labels.Count; i++)
             {
-                PrometheusLabel? nullableLabel = labels[i];
-                if (!nullableLabel.HasValue)
-                {
-                    continue;
-                }
-                
                 if (!first)
                 {
                     builder.Append(',');
                 }
                 first = false;
                 
-                (string label, string labelValue) = nullableLabel.Value;
+                (string label, string labelValue) = labels[i];
                 if (!PrometheusBuilder.PrometheusNameRegex.IsMatch(label))
                 {
                     throw new ArgumentException($"Invalid label name '{label}'");

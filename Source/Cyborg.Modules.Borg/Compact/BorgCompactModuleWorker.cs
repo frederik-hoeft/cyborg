@@ -20,7 +20,7 @@ public sealed class BorgCompactModuleWorker
             "compact",
             "--threshold", Module.Threshold.ToString(),
         ];
-        arguments.Add(Module.Repository);
+        arguments.Add(Module.RemoteRepository.GetRepositoryUri());
         ProcessStartInfo startInfo = new(Module.Executable, arguments);
         AddDefaults(startInfo);
         ChildProcessResult executionResult = await processDispatcher.ExecuteAsync(startInfo, cancellationToken);

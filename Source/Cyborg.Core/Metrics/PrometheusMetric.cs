@@ -2,7 +2,7 @@
 
 namespace Cyborg.Core.Metrics;
 
-internal sealed class PrometheusMetric(string prometheusNamespace, string name, PrometheusMetricTypeDescriptor? type = default)
+public sealed class PrometheusMetric(string prometheusNamespace, string name, PrometheusMetricTypeDescriptor? type = default)
 {
     internal readonly StringBuilder _builder = new();
 

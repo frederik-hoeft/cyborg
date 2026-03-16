@@ -10,8 +10,17 @@
               { "key": "container_root", "string": "${docker_root}/containers/${container_name}" },
               { "key": "volume_root", "string": "${docker_root}/volumes/${container_name}" },
               { "key": "@borg_jobs.remote_shell", "string": "${@host.remote_shell}"},
-              { "key": "@borg_jobs.repository", "string": "ssh://${@host.borg_user}@${@host.hostname}:${@host.port}${@host.borg_repo_root}/${container_name}"},
-              { "key": "@borg_jobs.passphrase", "string": "${borg_passphrase}"}
+              { "key": "@borg_jobs.passphrase", "string": "${borg_passphrase}"},
+              {
+                "key": "@borg_jobs.remote_repository",
+                "cyborg.types.borg.repository.v1": {
+                  "username": "${@host.borg_user}",
+                  "hostname": "${@host.hostname}",
+                  "repository_root": "${@host.borg_repo_root}",
+                  "repository_name": "${container_name}"
+                }
+              },
+              { "key": "@borg_jobs.remote_repository.port", "string": "${@host.port}" }
             ]
           }
         },

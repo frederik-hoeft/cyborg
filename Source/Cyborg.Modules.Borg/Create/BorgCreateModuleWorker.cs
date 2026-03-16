@@ -30,7 +30,7 @@ public sealed class BorgCreateModuleWorker
             arguments.Add("--exclude");
             arguments.Add(path);
         }
-        arguments.Add($"{Module.Repository}::{Module.ArchiveName}");
+        arguments.Add($"{Module.RemoteRepository.GetRepositoryUri()}::{Module.ArchiveName}");
         arguments.Add(Module.SourcePath);
         ProcessStartInfo startInfo = new(Module.Executable, arguments);
         AddDefaults(startInfo);
@@ -40,6 +40,7 @@ public sealed class BorgCreateModuleWorker
         {
             return runtime.Exit(Failed());
         }
+
         return runtime.Exit(Success());
     }
 }

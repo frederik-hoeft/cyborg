@@ -1,6 +1,7 @@
 ﻿using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Services.Dispatch;
+using Cyborg.Core.Services.Metrics;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
@@ -10,7 +11,8 @@ public sealed class BorgPruneModuleWorker
 (
     IWorkerContext<BorgPruneModule> context,
     IPosixShellCommandBuilder shellCommandBuilder,
-    IChildProcessDispatcher processDispatcher
+    IChildProcessDispatcher processDispatcher,
+    IMetricsCollector metricsCollector
 ) : BorgModuleWorker<BorgPruneModule>(context, shellCommandBuilder)
 {
     protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
@@ -50,15 +52,15 @@ public sealed class BorgPruneModuleWorker
                 arguments.Add(keep.ToString());
             }
         }
-        arguments.Add(Module.Repository);
+        arguments.Add(Module.RemoteRepository.GetRepositoryUri());
         ProcessStartInfo startInfo = new(Module.Executable, arguments);
         AddDefaults(startInfo);
         ChildProcessResult executionResult = await processDispatcher.ExecuteAsync(startInfo, cancellationToken);
-        // TODO: output parsing and metric extraction
         if (executionResult.ExitCode != 0)
         {
             return runtime.Exit(Failed());
         }
+        // TODO: output parsing and metric extraction
         return runtime.Exit(Success());
     }
 }

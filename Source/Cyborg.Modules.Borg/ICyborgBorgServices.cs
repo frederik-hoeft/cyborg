@@ -16,6 +16,7 @@ namespace Cyborg.Modules.Borg;
 [Singleton<JsonSerializerContext>(Factory = nameof(GetBorgJsonSerializerContext))]
 [Singleton<JsonNamingPolicy>(Factory = nameof(GetModuleJsonNamingPolicy))]
 [Singleton<IDynamicValueProvider, BorgRemoteValueProvider>]
+[Singleton<IDynamicValueProvider, BorgRemoteRepositoryValueProvider>]
 [Singleton<IModuleLoader, BorgCreateModuleLoader>]
 [Singleton<IModuleLoader, BorgPruneModuleLoader>]
 [Singleton<IModuleLoader, BorgCompactModuleLoader>]

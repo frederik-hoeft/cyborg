@@ -12,10 +12,10 @@ public abstract record BorgModuleBase : ModuleBase
     public string Executable { get; init; } = null!;
 
     [Required]
-    public string Repository { get; init; } = null!;
-
-    [Required]
     public string Passphrase { get; init; } = null!;
 
     public BorgSshOptions? RemoteShell { get; init; }
+
+    [Required]
+    public BorgRemoteRepository RemoteRepository { get; init; } = null!;
 }

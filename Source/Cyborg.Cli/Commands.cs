@@ -3,7 +3,7 @@ using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
-using Cyborg.Modules.Switch;
+using Cyborg.Core.Services.Metrics;
 using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics.CodeAnalysis;
 
@@ -13,11 +13,11 @@ namespace Cyborg.Cli;
 internal sealed class Commands
 {
     [Command("run")]
-    public async Task RunAsync([Argument] string template, CancellationToken cancellationToken = default)
+    public async Task RunAsync([Argument] string template, string metricsNamespace = "cyborg", CancellationToken cancellationToken = default)
     {
         using DefaultServiceProvider sp = new();
-        GlobalRuntimeEnvironment defaultEnvironment = sp.GetRequiredService<GlobalRuntimeEnvironment>();
-        defaultEnvironment.SetVariable("template", template);
+        sp.GetRequiredService<GlobalRuntimeEnvironment>().SetVariable("template", template);
+        sp.GetRequiredService<MetricsCollectorOptions>().Namespace = metricsNamespace;
         IModuleConfigurationLoader configurationLoader = sp.GetService<IModuleConfigurationLoader>();
         ModuleContext module = await configurationLoader.LoadModuleAsync("test.json", cancellationToken);
         module = module with 

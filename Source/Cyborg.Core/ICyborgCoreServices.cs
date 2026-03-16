@@ -6,6 +6,7 @@ using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Runtime.Environments.Artifacts;
 using Cyborg.Core.Services;
 using Cyborg.Core.Services.Dispatch;
+using Cyborg.Core.Services.Metrics;
 using Cyborg.Core.Services.Network.Probe;
 using Jab;
 using System.Text.Json;
@@ -34,6 +35,8 @@ namespace Cyborg.Core;
 [Singleton<IPingService, DefaultPingService>]
 [Singleton<IPortProbeService, TcpPortProbeService>]
 [Singleton<IPosixShellCommandBuilder, PosixShellCommandBuilder>]
+[Singleton<MetricsCollectorOptions>]
+[Singleton<IMetricsCollector, MetricsCollector>]
 [Singleton<JsonSerializerContext>(Factory = nameof(GetCoreJsonSerializerContext))]
 [Singleton<GlobalRuntimeEnvironment>]
 public interface ICyborgCoreServices

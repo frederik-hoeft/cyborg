@@ -1,6 +1,6 @@
 ﻿namespace Cyborg.Core.Metrics;
 
-internal enum PrometheusMetricType
+public enum PrometheusMetricType
 {
     Untyped,
     Counter,
