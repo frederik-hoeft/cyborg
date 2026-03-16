@@ -105,7 +105,7 @@ When a module calls `runtime.ExecuteAsync(...)`, the runtime:
 
 ### Environment Binding
 
-Each module executes within a *bound* environment — one whose `Namespace` property is set to the module's effective namespace. The effective namespace is the module's `Name` property if set, otherwise its `ModuleId`. This namespace determines how artifact paths and override keys are constructed for that module.
+Each module executes within a *bound* environment — one whose `Namespace` property is set to the module's effective namespace. The effective namespace uses the most specific available identifier in this order: `Name`, `Group`, then `ModuleId`. This namespace determines how artifact paths, self references, and default artifact namespaces are constructed for that module.
 
 ### Execution Result
 
@@ -195,8 +195,8 @@ Variable names follow the pattern `[A-Za-z_][A-Za-z_0-9\-\.]*`. Dots serve as hi
 
 Within `${...}` expressions, the following special forms are also supported:
 
-- `${@}` — current scope namespace
-- `${@@}` — entry-point scope namespace
+- `${@}` — current scope namespace (`Name`, then `Group`, then `ModuleId` for bound module environments)
+- `${@@}` — entry-point scope namespace (`Name`, then `Group`, then `ModuleId` for the environment that initiated the resolution chain)
 - `${name}` — normal lookup from the current resolution scope
 - `${@name}` — late-bound lookup from the entry-point scope
 
@@ -227,9 +227,9 @@ The override system allows runtime environment variables to replace module prope
 When a module property is resolved via `IRuntimeEnvironment.Resolve<TModule, T>()`:
 
 1. The property name is extracted from the call site using `CallerArgumentExpression` and converted to snake_case.
-2. An override key is constructed: `@{namespace}.{property_name}`, where the namespace is the module's `Name` (if set) or its `ModuleId`.
-3. The environment is checked for a variable matching the override key. If found, its value replaces the module property.
-4. If no override is found and the property value is a string, it is interpolated (replacing `${...}` placeholders).
+2. Override keys are constructed for every identifier that can address the module instance: first `@{name}.{property_name}`, then `@{group}.{property_name}` when a group is set, and finally `@{module_id}.{property_name}` as the least specific fallback.
+3. The environment is checked for each override key in that order. Every matching override is applied deterministically, so more specific identifiers win over less specific ones (`name` overrides `group`, which overrides `module_id`).
+4. After override resolution, if the resulting property value is a string, it is interpolated (replacing `${...}` placeholders).
 
 ### Override Use Case
 
@@ -237,7 +237,7 @@ Overrides are an extremely powerful feature for injecting dynamic values into mo
 
 Note that overrides always operate in a deterministic copy-on-write manner — the original deserialized module instance is never mutated. Instead, a new instance is returned with freshly resolved properties for each execution. This ensures that module definitions remain immutable and free of side effects, while modules always observe the latest environment state at execution time.
 
-The override resolution is ordered — the module's `Name` is checked before its `ModuleId`, allowing instance-specific overrides to take priority over type-level overrides.
+The override resolution is ordered and cumulative — for each property `Name` is applied first, then `Group`, then `ModuleId`, allowing more specific overrides to take precedence over more general ones. Override resolution is applied recursively within module properties, so a complex-typed property instance may have overrides applied to its own properties as well.
 
 Also note that overrides are resolved before default values are applied and before constraints are validated in the source-generated validation pipeline. This means that overrides must produce valid values that satisfy the module's constraints and validation attributes, and they can also be used to erase values to trigger default value substitution (e.g., setting `@my_module.port` to `0` to trigger a `[DefaultValue<int>]` of `22`).
 

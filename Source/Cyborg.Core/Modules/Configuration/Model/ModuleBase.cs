@@ -7,6 +7,9 @@ public abstract record ModuleBase
     [IgnoreOverrides]
     public virtual string? Name { get; init; }
 
+    [IgnoreOverrides]
+    public virtual string? Group { get; init; }
+
     [Required]
     [DefaultInstance]
     public ModuleArtifacts Artifacts { get; init; } = null!;

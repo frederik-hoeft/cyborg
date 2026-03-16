@@ -21,18 +21,23 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         ArgumentNullException.ThrowIfNull(entryPoint);
         ArgumentNullException.ThrowIfNull(module);
         string valuePath = ConstructValueResolutionPath(value, moduleExpression, valueExpression);
-        string overridePath = SyntaxFactory.Path(NamespaceOf(module), valuePath).Override();
-        if (TryResolveVariable(overridePath, entryPoint, out IEnumerable? resolvedValue))
+
+        foreach (string identifier in EnumerateOverrideIdentifiers(module.Name, module.Group, TModule.ModuleId))
         {
+            string overridePath = SyntaxFactory.Path(identifier, valuePath).Override();
+            if (!TryResolveVariable(overridePath, entryPoint, out IEnumerable? resolvedValue))
+            {
+                continue;
+            }
             if (resolvedValue is IReadOnlyCollection<T> typedCollection)
             {
                 value = typedCollection;
+                break;
             }
-            else
-            {
-                value = resolvedValue.Cast<T>().ToImmutableArray();
-            }
+            value = resolvedValue.Cast<T>().ToImmutableArray();
+            break;
         }
+
         return value;
     }
 
@@ -48,17 +53,24 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         ArgumentNullException.ThrowIfNull(entryPoint);
         ArgumentNullException.ThrowIfNull(module);
         string valuePath = ConstructValueResolutionPath(value, moduleExpression, valueExpression);
-        string overridePath = SyntaxFactory.Path(NamespaceOf(module), valuePath).Override();
-        if (TryResolveVariable(overridePath, entryPoint, out T? resolvedValue))
+
+        foreach (string identifier in EnumerateOverrideIdentifiers(module.Name, module.Group, TModule.ModuleId))
         {
-            value = resolvedValue;
+            string overridePath = SyntaxFactory.Path(identifier, valuePath).Override();
+            if (TryResolveVariable(overridePath, entryPoint, out T? resolvedValue))
+            {
+                value = resolvedValue;
+                break;
+            }
         }
-        else if (value is string stringValue)
+
+        if (value is string stringValue)
         {
             // Handle indirection via string variables
             string resolvedString = Interpolate(stringValue, entryPoint);
             value = Unsafe.As<string, T>(ref resolvedString);
         }
+
         return value;
     }
 
@@ -94,16 +106,36 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
     public virtual string NamespaceOf<TModule>(TModule module) where TModule : ModuleBase, IModule
     {
         ArgumentNullException.ThrowIfNull(module);
-        return GetEffectiveNamespace(module.Name, TModule.ModuleId);
+        return GetEffectiveNamespace(module.Name, module.Group, TModule.ModuleId);
     }
 
     public virtual string NamespaceOf(IModuleWorker module)
     {
         ArgumentNullException.ThrowIfNull(module);
-        return GetEffectiveNamespace(module.Module.Name, module.ModuleId);
+        return GetEffectiveNamespace(module.Module.Name, module.Module.Group, module.ModuleId);
     }
 
-    private static string GetEffectiveNamespace(string? name, string moduleId) => !string.IsNullOrEmpty(name) ? name : moduleId;
+    private static IEnumerable<string> EnumerateOverrideIdentifiers(string? name, string? group, string moduleId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(moduleId);
+
+        if (!string.IsNullOrEmpty(name))
+        {
+            yield return name;
+        }
+        if (!string.IsNullOrEmpty(group))
+        {
+            yield return group;
+        }
+        yield return moduleId;
+    }
+
+    private static string GetEffectiveNamespace(string? name, string? group, string moduleId) => (name, group) switch
+    {
+        ({ Length: > 0 }, _) => name,
+        (_, { Length: > 0 }) => group,
+        _ => moduleId
+    };
 
     void IRuntimeEnvironment.Publish<TModule, T>(TModule module, string root, T decomposable)
     {

@@ -9,9 +9,10 @@ namespace Cyborg.Core.Modules.Runtime.Environments.Artifacts;
 /// </summary>
 /// <remarks>
 /// By default, artifacts
-/// are published to the namespace of the module that produced them, that is, if the module has a name "my_module",
-/// then the artifact will be published to the "my_module" namespace. If the module does not have a name, the artifact
-/// is published under the module's type id, e.g., "cyborg.modules.my_module.v1". Artifacts may also be published to a
+/// are published to the namespace of the module that produced them, using the most specific available identifier.
+/// If the module has a name such as "my_module", the artifact is published to that namespace. Otherwise, if the
+/// module has a group, the artifact is published to the group namespace. If neither is set, the artifact is
+/// published under the module's type id, e.g., "cyborg.modules.my_module.v1". Artifacts may also be published to a
 /// fully custom path (namespace + name).
 /// <para>
 /// Artifacts are published to the module's artifact environment, which is specified by the module's configuration.

@@ -9,10 +9,9 @@
               { "key": "container_name", "string": "passbolt" },
               { "key": "container_root", "string": "${docker_root}/containers/${container_name}" },
               { "key": "volume_root", "string": "${docker_root}/volumes/${container_name}" },
-              { "key": "repository_path", "string": "ssh://${@host.borg_user}@${@host.hostname}:${@host.port}${@host.borg_repo_root}/${container_name}" },
-              { "key": "@cyborg.modules.borg.create.v1.remote_shell", "string": "${@host.remote_shell}"},
-              { "key": "@cyborg.modules.borg.prune.v1.remote_shell", "string": "${@host.remote_shell}"},
-              { "key": "@cyborg.modules.borg.compact.v1.remote_shell", "string": "${@host.remote_shell}"}
+              { "key": "@borg_jobs.remote_shell", "string": "${@host.remote_shell}"},
+              { "key": "@borg_jobs.repository", "string": "ssh://${@host.borg_user}@${@host.hostname}:${@host.port}${@host.borg_repo_root}/${container_name}"},
+              { "key": "@borg_jobs.passphrase", "string": "${borg_passphrase}"}
             ]
           }
         },
@@ -64,11 +63,10 @@
                             {
                               "module": {
                                 "cyborg.modules.borg.create.v1": {
-                                  "repository": "${repository_path}",
+                                  "group": "borg_jobs",
                                   "archive_name": "${container_name}-{now}",
                                   "source_path": "${volume_root}",
                                   "compression": "zlib",
-                                  "passphrase": "${borg_passphrase}",
                                   "exclude": {
                                     "caches": true,
                                     "paths": []
@@ -79,8 +77,7 @@
                             {
                               "module": {
                                 "cyborg.modules.borg.prune.v1": {
-                                  "repository": "${repository_path}",
-                                  "passphrase": "${borg_passphrase}",
+                                  "group": "borg_jobs",
                                   "glob_archives": "${container_name}-*",
                                   "keep": {
                                     "daily": 30,
@@ -93,8 +90,7 @@
                             {
                               "module": {
                                 "cyborg.modules.borg.compact.v1": {
-                                  "repository": "${repository_path}",
-                                  "passphrase": "${borg_passphrase}"
+                                  "group": "borg_jobs"
                                 }
                               }
                             }
