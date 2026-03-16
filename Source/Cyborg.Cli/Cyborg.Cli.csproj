@@ -32,6 +32,9 @@
       <None Update="hosts.jsecrets">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
+      <None Update="jobs\daily\backup-template.jconf">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
       <None Update="test.json">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>

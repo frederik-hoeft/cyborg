@@ -1,11 +1,31 @@
-﻿using System.Text;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace Cyborg.Core.Modules.Runtime.Environments.Syntax;
 
-public sealed class VariableSyntaxBuilder(JsonNamingPolicy namingPolicy)
+public sealed partial class VariableSyntaxBuilder(JsonNamingPolicy namingPolicy)
 {
     internal JsonNamingPolicy NamingPolicy { get; } = namingPolicy ?? throw new ArgumentNullException(nameof(namingPolicy));
+
+    [GeneratedRegex(@"^[A-Za-z_][A-Za-z_0-9\-\.]*$")]
+    internal partial Regex IdentifierRegex { get; }
+
+    [GeneratedRegex(@"^\$\{(?<expression>@@|@(?:[A-Za-z_][A-Za-z_0-9\-\.]*)?|[A-Za-z_][A-Za-z_0-9\-\.]*)\}$")]
+    internal partial Regex VariableRegex { get; }
+
+    [GeneratedRegex(@"\$\{(?<expression>@@|@(?:[A-Za-z_][A-Za-z_0-9\-\.]*)?|[A-Za-z_][A-Za-z_0-9\-\.]*)\}")]
+    internal partial Regex InterpolationRegex { get; }
+
+    public bool IsValidIdentifier([NotNullWhen(true)] string? identifier)
+    {
+        if (string.IsNullOrWhiteSpace(identifier))
+        {
+            return false;
+        }
+        return IdentifierRegex.IsMatch(identifier);
+    }
 
     public PathSyntax Path(string? segment)
     {

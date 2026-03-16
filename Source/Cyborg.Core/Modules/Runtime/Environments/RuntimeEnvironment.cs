@@ -9,6 +9,8 @@ namespace Cyborg.Core.Modules.Runtime.Environments;
 
 public partial record RuntimeEnvironment(string Name, bool IsTransient, VariableSyntaxBuilder SyntaxFactory, string Namespace) : EnvironmentLike(SyntaxFactory, Namespace), IRuntimeEnvironment
 {
+    public HashSet<string> OverrideResolutionTags { get; } = [];
+
     [return: NotNullIfNotNull(nameof(value))]
     public virtual IReadOnlyCollection<T>? ResolveCollection<TModule, T>(TModule module, IReadOnlyCollection<T>? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
         where TModule : ModuleBase, IModule
@@ -115,7 +117,7 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         return GetEffectiveNamespace(module.Module.Name, module.Module.Group, module.ModuleId);
     }
 
-    private static IEnumerable<string> EnumerateOverrideIdentifiers(string? name, string? group, string moduleId)
+    private IEnumerable<string> EnumerateOverrideIdentifiers(string? name, string? group, string moduleId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(moduleId);
 
@@ -128,6 +130,10 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
             yield return group;
         }
         yield return moduleId;
+        foreach (string tag in OverrideResolutionTags)
+        {
+            yield return tag;
+        }
     }
 
     private static string GetEffectiveNamespace(string? name, string? group, string moduleId) => (name, group) switch

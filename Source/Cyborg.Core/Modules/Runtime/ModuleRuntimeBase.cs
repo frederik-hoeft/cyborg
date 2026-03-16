@@ -2,6 +2,7 @@
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Runtime.Environments.Syntax;
 using System.Diagnostics.CodeAnalysis;
+using System.Drawing;
 
 namespace Cyborg.Core.Modules.Runtime;
 
@@ -71,6 +72,52 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory) : I
     public virtual async Task<IModuleExecutionResult> ExecuteAsync(ModuleContext moduleContext, IRuntimeEnvironment environment, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(moduleContext);
+        ArgumentNullException.ThrowIfNull(environment);
+        if (moduleContext.Template is { Namespace: var ns, Arguments: { Count: > 0 } args })
+        {
+            List<string> errors = [];
+            List<(string Argument, object Value)> resolvedArguments = [];
+            bool isNamespaced = !string.IsNullOrEmpty(ns);
+            if (!string.IsNullOrEmpty(ns) && !SyntaxFactory.IsValidIdentifier(ns))
+            {
+                errors.Add($"Template namespaces must be valid identifiers: \"{ns}\"");
+            }
+            int i = -1;
+            foreach (string arg in args)
+            {
+                ++i;
+                if (!SyntaxFactory.IsValidIdentifier(arg))
+                {
+                    errors.Add($"Template argument names must be valid identifiers: argv[{i}] = \"{arg}\"");
+                    continue;
+                }
+                object? value;
+                if (isNamespaced)
+                {
+                    string qualifiedName = SyntaxFactory.Path(ns!, arg);
+                    if (environment.TryResolveVariable(qualifiedName, out value))
+                    {
+                        resolvedArguments.Add((arg, value));
+                        continue;
+                    }
+                }
+                if (environment.TryResolveVariable(arg, out value))
+                {
+                    resolvedArguments.Add((arg, value));
+                    continue;
+                }
+                errors.Add($"Unable to resolve template argument: {arg}");
+            }
+            if (errors.Count > 0)
+            {
+                throw new InvalidOperationException($"Module execution failed due to missing required arguments:{System.Environment.NewLine}    {string.Join($"{System.Environment.NewLine}    ", errors)}");
+            }
+            // normalize resolved arguments to be unqualified by the template namespace, since they are now scoped to the current namespace and should be easily accessible
+            foreach ((string argument, object value) in resolvedArguments)
+            {
+                environment.SetVariable(argument, value);
+            }
+        }
         if (moduleContext.Configuration is { } configuration)
         {
             await ExecuteAsync(configuration.Module, environment, cancellationToken);

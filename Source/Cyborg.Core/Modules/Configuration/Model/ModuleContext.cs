@@ -6,6 +6,7 @@ namespace Cyborg.Core.Modules.Configuration.Model;
 public record ModuleContext
 (
     [property: Required] ModuleReference Module,
-    [property: DefaultInstance] ModuleEnvironment? Environment,
-    ModuleReference? Configuration
+    [property: Required][property: DefaultInstance] ModuleEnvironment Environment,
+    ModuleReference? Configuration,
+    [property: Required][property: DefaultInstance] ModuleTemplateDefinition Template
 );

@@ -1,7 +1,7 @@
 {
-  "environment": { "name": "passbolt", "scope": "inherit_parent", "transient": true },
-  "requires": {
-    "arguments": [ "docker_root", "borg_passphrase", "docker_user", "backup_hosts", "job_directory" ]
+  "template": {
+    "namespace": "cyborg.template.backup-job.v1",
+    "arguments": [ "container_name", "docker_root", "borg_passphrase", "docker_user", "backup_hosts", "job_directory", "borg_create", "borg_prune", "borg_compact" ]
   },
   "configuration": {
     "cyborg.modules.config.collection.v1": {
@@ -9,9 +9,11 @@
         {
           "cyborg.modules.config.map.v1": {
             "entries": [
-              { "key": "container_name", "string": "passbolt" },
               { "key": "container_root", "string": "${docker_root}/containers/${container_name}" },
               { "key": "volume_root", "string": "${docker_root}/volumes/${container_name}" },
+              { "key": "@borg_create.target", "string": "${borg_create}" },
+              { "key": "@borg_prune.target", "string": "${borg_prune}" },
+              { "key": "@borg_compact.target", "string": "${borg_compact}" },
               { "key": "@borg_tasks.remote_shell", "string": "${@host.remote_shell}"},
               { "key": "@borg_tasks.passphrase", "string": "${borg_passphrase}"},
               {
@@ -65,35 +67,25 @@
                           "steps": [
                             {
                               "module": {
-                                "cyborg.modules.borg.create.v1": {
-                                  "group": "borg_tasks",
-                                  "archive_name": "${container_name}-{now}",
-                                  "source_path": "${volume_root}",
-                                  "compression": "zlib",
-                                  "exclude": {
-                                    "caches": true,
-                                    "paths": []
-                                  }
+                                "cyborg.modules.dynamic.v1": {
+                                  "name": "borg_create",
+                                  "tags": [ "borg_tasks" ]
                                 }
                               }
                             },
                             {
                               "module": {
-                                "cyborg.modules.borg.prune.v1": {
-                                  "group": "borg_tasks",
-                                  "glob_archives": "${container_name}-*",
-                                  "keep": {
-                                    "daily": 30,
-                                    "weekly": 24,
-                                    "monthly": 48
-                                  }
+                                "cyborg.modules.dynamic.v1": {
+                                  "name": "borg_prune",
+                                  "tags": [ "borg_tasks" ]
                                 }
                               }
                             },
                             {
                               "module": {
-                                "cyborg.modules.borg.compact.v1": {
-                                  "group": "borg_tasks"
+                                "cyborg.modules.dynamic.v1": {
+                                  "name": "borg_compact",
+                                  "tags": [ "borg_tasks" ]
                                 }
                               }
                             }

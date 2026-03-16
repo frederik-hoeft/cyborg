@@ -15,23 +15,17 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
 
     protected JsonNamingPolicy NamingPolicy => SyntaxFactory.NamingPolicy;
 
-    [GeneratedRegex(@"^\$\{(?<expression>@@|@(?:[A-Za-z_][A-Za-z_0-9\-\.]*)?|[A-Za-z_][A-Za-z_0-9\-\.]*)\}$")]
-    protected static partial Regex VariableRegex { get; }
-
-    [GeneratedRegex(@"\$\{(?<expression>@@|@(?:[A-Za-z_][A-Za-z_0-9\-\.]*)?|[A-Za-z_][A-Za-z_0-9\-\.]*)\}")]
-    protected static partial Regex InterpolationRegex { get; }
-
     protected virtual string InterpolateString(ResolutionContext context, string stringValue)
     {
         ArgumentNullException.ThrowIfNull(context);
-        if (!InterpolationRegex.IsMatch(stringValue))
+        if (!SyntaxFactory.InterpolationRegex.IsMatch(stringValue))
         {
             return stringValue;
         }
         StringBuilder sb = new();
         int currentIndex = 0;
         ReadOnlySpan<char> valueSpan = stringValue.AsSpan();
-        foreach (ValueMatch match in InterpolationRegex.EnumerateMatches(stringValue))
+        foreach (ValueMatch match in SyntaxFactory.InterpolationRegex.EnumerateMatches(stringValue))
         {
             sb.Append(valueSpan[currentIndex..match.Index]);
             ReadOnlySpan<char> variableSlice = valueSpan.Slice(match.Index, match.Length);
@@ -55,7 +49,7 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(name);
-        if (name.StartsWith('$') && VariableRegex.Match(name) is { Success: true } match)
+        if (name.StartsWith('$') && SyntaxFactory.VariableRegex.Match(name) is { Success: true } match)
         {
             string expression = match.Groups["expression"].Value;
             if (TryParseVariableReference(expression, out VariableReference reference))

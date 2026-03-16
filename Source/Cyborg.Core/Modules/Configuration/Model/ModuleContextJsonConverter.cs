@@ -17,4 +17,10 @@ public sealed class ModuleContextJsonConverter(IModuleRegistry registry, IModule
     }
 }
 
-public sealed record ModuleContextDeserializationDummy(ModuleReference Module, ModuleEnvironment? Environment, ModuleReference? Configuration) : ModuleContext(Module, Environment, Configuration);
+public sealed record ModuleContextDeserializationDummy
+(
+    ModuleReference Module,
+    ModuleEnvironment Environment,
+    ModuleReference? Configuration,
+    ModuleTemplateDefinition Requires
+) : ModuleContext(Module, Environment, Configuration, Requires);

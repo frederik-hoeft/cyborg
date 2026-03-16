@@ -10,6 +10,8 @@ public interface IRuntimeEnvironment : IEnvironmentLike
 
     bool IsTransient { get; }
 
+    HashSet<string> OverrideResolutionTags { get; }
+
     /// <summary>
     /// Resolves the specified value for the given module. The module and value expressions are used for override resolution based on corresponding environment variables.
     /// The module expression is used to determine the module for which the variable is being resolved, while the value expression is used to determine the specific variable being resolved.
