@@ -28,6 +28,7 @@ For module lifecycle details (validation pipeline, three-part pattern), see [Mod
 - [Module Property Overrides](#module-property-overrides)
   - [Override Resolution](#override-resolution)
   - [Override Use Case](#override-use-case)
+  - [Override Resolution Tags](#override-resolution-tags)
 - [Artifact Publishing](#artifact-publishing)
   - [Artifact Lifecycle](#artifact-lifecycle)
   - [Artifact Configuration](#artifact-configuration)
@@ -227,8 +228,8 @@ The override system allows runtime environment variables to replace module prope
 When a module property is resolved via `IRuntimeEnvironment.Resolve<TModule, T>()`:
 
 1. The property name is extracted from the call site using `CallerArgumentExpression` and converted to snake_case.
-2. Override keys are constructed for every identifier that can address the module instance: first `@{name}.{property_name}`, then `@{group}.{property_name}` when a group is set, and finally `@{module_id}.{property_name}` as the least specific fallback.
-3. The environment is checked for each override key in that order. Every matching override is applied deterministically, so more specific identifiers win over less specific ones (`name` overrides `group`, which overrides `module_id`).
+2. Override keys are constructed for every identifier that can address the module instance: first `@{name}.{property_name}`, then `@{group}.{property_name}` when a group is set, then `@{module_id}.{property_name}`, and finally `@{tag}.{property_name}` for each override resolution tag attached to the environment.
+3. The environment is checked for each override key in that order. The first matching override wins, so more specific identifiers take priority (`name` > `group` > `module_id` > tags).
 4. After override resolution, if the resulting property value is a string, it is interpolated (replacing `${...}` placeholders).
 
 ### Override Use Case
@@ -237,7 +238,15 @@ Overrides are an extremely powerful feature for injecting dynamic values into mo
 
 Note that overrides always operate in a deterministic copy-on-write manner — the original deserialized module instance is never mutated. Instead, a new instance is returned with freshly resolved properties for each execution. This ensures that module definitions remain immutable and free of side effects, while modules always observe the latest environment state at execution time.
 
-The override resolution is ordered and cumulative — for each property `Name` is applied first, then `Group`, then `ModuleId`, allowing more specific overrides to take precedence over more general ones. Override resolution is applied recursively within module properties, so a complex-typed property instance may have overrides applied to its own properties as well.
+The override resolution is ordered — for each property, `Name` is checked first, then `Group`, then `ModuleId`, and finally any override resolution tags, allowing more specific overrides to take precedence over more general ones. Override resolution is applied recursively within module properties, so a complex-typed property instance may have overrides applied to its own properties as well.
+
+### Override Resolution Tags
+
+Override resolution tags are additional identifiers attached to an environment that extend the override lookup chain beyond the built-in `Name` → `Group` → `ModuleId` sequence. They are set when preparing an environment via `PrepareEnvironment(moduleEnvironment, overrideResolutionTags)` and stored on the `IRuntimeEnvironment`.
+
+Tags are appended after `ModuleId` in the override resolution order. This means they act as a fallback — they only match if no override was found via the module's `Name`, `Group`, or `ModuleId`. Tag values must be valid identifiers.
+
+This mechanism enables parent modules to inject ambient overrides into child execution scopes without requiring knowledge of the child module's name or type. For example, a workflow orchestrator could tag an environment with `"production"`, causing any module executing in that environment to pick up overrides keyed under `@production.{property}`.
 
 Also note that overrides are resolved before default values are applied and before constraints are validated in the source-generated validation pipeline. This means that overrides must produce valid values that satisfy the module's constraints and validation attributes, and they can also be used to erase values to trigger default value substitution (e.g., setting `@my_module.port` to `0` to trigger a `[DefaultValue<int>]` of `22`).
 
