@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Modules.Configuration.Model;
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
@@ -10,7 +11,7 @@ public interface IRuntimeEnvironment : IEnvironmentLike
 
     bool IsTransient { get; }
 
-    HashSet<string> OverrideResolutionTags { get; }
+    IReadOnlyCollection<string> OverrideResolutionTags { get; }
 
     /// <summary>
     /// Resolves the specified value for the given module. The module and value expressions are used for override resolution based on corresponding environment variables.
@@ -42,9 +43,11 @@ public interface IRuntimeEnvironment : IEnvironmentLike
 
     void Publish(IEnvironmentLike other);
 
-    IRuntimeEnvironment Bind(IModuleWorker module);
+    internal IRuntimeEnvironment Bind(IModuleWorker module);
 
     internal IRuntimeEnvironment Bind(string ns);
+
+    internal IRuntimeEnvironment WithOverrideResolutionTags(IReadOnlyCollection<string> tags);
 
     IEnvironmentLike CreateArtifactCollection(ModuleArtifacts artifacts);
 }

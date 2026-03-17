@@ -28,9 +28,9 @@ public interface IModuleRuntime
 
     Task<IModuleExecutionResult> ExecuteAsync(ModuleContext moduleContext, IRuntimeEnvironment environment, CancellationToken cancellationToken = default);
 
-    IRuntimeEnvironment PrepareEnvironment(ModuleContext moduleContext);
+    IRuntimeEnvironment PrepareEnvironment(ModuleContext moduleContext, IReadOnlyCollection<string>? overrideResolutionTags = null);
 
-    IRuntimeEnvironment PrepareEnvironment(ModuleEnvironment moduleEnvironment);
+    IRuntimeEnvironment PrepareEnvironment(ModuleEnvironment moduleEnvironment, IReadOnlyCollection<string>? overrideResolutionTags = null);
 
     IRuntimeEnvironment? ResolveEnvironmentReference(ModuleEnvironmentReference environmentReference);
 

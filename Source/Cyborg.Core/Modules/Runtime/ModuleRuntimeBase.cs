@@ -2,7 +2,6 @@
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Runtime.Environments.Syntax;
 using System.Diagnostics.CodeAnalysis;
-using System.Drawing;
 
 namespace Cyborg.Core.Modules.Runtime;
 
@@ -42,9 +41,10 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory) : I
         return environment;
     }
 
-    public IRuntimeEnvironment PrepareEnvironment(ModuleContext moduleContext) => PrepareEnvironment(moduleContext?.Environment ?? ModuleEnvironment.Default);
+    public IRuntimeEnvironment PrepareEnvironment(ModuleContext moduleContext, IReadOnlyCollection<string>? overrideResolutionTags = null) =>
+        PrepareEnvironment(moduleContext?.Environment ?? ModuleEnvironment.Default, overrideResolutionTags);
 
-    public IRuntimeEnvironment PrepareEnvironment(ModuleEnvironment moduleEnvironment)
+    public IRuntimeEnvironment PrepareEnvironment(ModuleEnvironment moduleEnvironment, IReadOnlyCollection<string>? overrideResolutionTags = null)
     {
         ArgumentNullException.ThrowIfNull(moduleEnvironment);
         IRuntimeEnvironment? environment = null;
@@ -60,6 +60,17 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory) : I
             }
         }
         environment ??= CreateScopedEnvironment(parent: this, moduleEnvironment.Scope, moduleEnvironment.Name, moduleEnvironment.Transient);
+        if (overrideResolutionTags is not null)
+        {
+            foreach (string tag in overrideResolutionTags)
+            {
+                if (!SyntaxFactory.IsValidIdentifier(tag))
+                {
+                    throw new InvalidOperationException($"Override resolution tags must be valid identifiers: \"{tag}\"");
+                }
+            }
+            environment = environment.WithOverrideResolutionTags(overrideResolutionTags);
+        }
         return environment;
     }
 

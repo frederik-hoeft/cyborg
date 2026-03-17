@@ -9,7 +9,7 @@ namespace Cyborg.Core.Modules.Runtime.Environments;
 
 public partial record RuntimeEnvironment(string Name, bool IsTransient, VariableSyntaxBuilder SyntaxFactory, string Namespace) : EnvironmentLike(SyntaxFactory, Namespace), IRuntimeEnvironment
 {
-    public HashSet<string> OverrideResolutionTags { get; } = [];
+    public IReadOnlyCollection<string> OverrideResolutionTags { get; init; } = [];
 
     [return: NotNullIfNotNull(nameof(value))]
     public virtual IReadOnlyCollection<T>? ResolveCollection<TModule, T>(TModule module, IReadOnlyCollection<T>? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
@@ -178,4 +178,9 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         ArgumentNullException.ThrowIfNull(artifacts);
         return new EnvironmentLike(SyntaxFactory, artifacts.Namespace ?? Namespace);
     }
+
+    public IRuntimeEnvironment WithOverrideResolutionTags(IReadOnlyCollection<string> tags) => this with
+    {
+        OverrideResolutionTags = tags
+    };
 }

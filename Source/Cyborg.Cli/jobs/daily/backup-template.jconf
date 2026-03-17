@@ -1,3 +1,5 @@
+// docker-based backup job template that stops the container, runs borg create, borg prune, and borg compact for each backup host, then restarts the container.
+// Concrete borg modules are injected via configuration ("modules as data") and configured with the appropriate repository and authentication information for each host.
 {
   "template": {
     "namespace": "cyborg.template.backup-job.v1",
@@ -69,6 +71,7 @@
                               "module": {
                                 "cyborg.modules.dynamic.v1": {
                                   "name": "borg_create",
+                                  // inject resolution tag into dynamically supplied module implementation to allow overrides via known addresses
                                   "tags": [ "borg_tasks" ]
                                 }
                               }
