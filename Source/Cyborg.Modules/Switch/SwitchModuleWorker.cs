@@ -2,16 +2,15 @@
 using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime;
-using Cyborg.Core.Modules.Runtime.Environments;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Modules.Switch;
 
-public sealed class SwitchModuleWorker(IWorkerContext<SwitchModule> context, GlobalRuntimeEnvironment defaultEnvironment, IModuleConfigurationLoader configurationLoader) : ModuleWorker<SwitchModule>(context)
+public sealed class SwitchModuleWorker(IWorkerContext<SwitchModule> context, IModuleConfigurationLoader configurationLoader) : ModuleWorker<SwitchModule>(context)
 {
     protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
-        if (!defaultEnvironment.TryResolveVariable(Module.Variable, out string? caseName))
+        if (!runtime.Environment.TryResolveVariable(Module.Variable, out string? caseName))
         {
             throw new InvalidOperationException("Failed to resolve case from environment.");
         }

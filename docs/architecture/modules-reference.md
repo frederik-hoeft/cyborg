@@ -1,6 +1,10 @@
 # Module Reference
 
-Reference documentation for all Cyborg modules, organized by category.
+This document covers the configuration and behavior of all Cyborg modules. Modules are the building blocks of Cyborg workflows: each module is a self-contained unit that performs a specific task, and modules compose together through the module context system to form arbitrarily complex execution graphs.
+
+Every module is identified by a versioned ID (e.g., `cyborg.modules.sequence.v1`) which serves as both the JSON discriminator key and the version identifier. Modules communicate through a hierarchical environment of typed variables, where each module can read from and publish to scoped environments. Module properties support runtime overrides from the environment, enabling data-driven composition patterns.
+
+For details on the execution model, environment scoping semantics, variable resolution, the property override system, and artifact publishing, see [Runtime Infrastructure](runtime.md).
 
 <!-- @import "[TOC]" {cmd="toc" depthFrom=2 depthTo=6 orderedList=false} -->
 
@@ -70,27 +74,33 @@ Modules are not invoked directly. They are wrapped in a **module context** which
 | `configuration` | module reference | No | `null` | A configuration module to execute before the main module. Must implement the configuration module interface. |
 | `template` | object | No | `{ "namespace": null, "arguments": [] }` | Template metadata: a `namespace` string and an `arguments` list of expected parameter names. |
 
+When a module context is executed, the runtime first prepares an environment according to the `environment` settings, then executes the `configuration` module (if present) to populate that environment, and finally executes the main `module` within it. This sequencing ensures that configuration values are available to the main module and that environment scoping is fully established before any work begins.
+
 ### Environment Scoping
 
 The `environment` property on a module context controls variable scope inheritance:
 
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
-| `scope` | enum | No | `inherit_parent` | Scoping strategy. One of: `inherit_parent`, `isolated`, `global`, `inherit_global`, `parent`, `reference`, `current`. |
+| `scope` | enum | No | `inherit_parent` | Scoping strategy, see [Runtime Infrastructure -- Environment Scoping](runtime.md#environment-scoping) for available strategies and detailed semantics. |
 | `name` | string | No | `null` | Optional scope name. Required for `reference` scope; used to create named scopes with other strategies. |
 | `transient` | bool | No | `false` | Whether the scope is transient (not persisted beyond execution). |
 
+Environments declared with an explicit `name` (and not marked `transient`) are registered globally. Any subsequent module can access them via `reference` scope. This is the primary mechanism for cross-step state sharing. For a detailed overview of environment semantics, see [Runtime Infrastructure -- Environment Scoping](runtime.md#environment-scoping).
+
 ### Artifacts
 
-The `artifacts` property controls how a module's execution results are decomposed and published into the environment.
+The `artifacts` property controls how a module's execution results are decomposed and published into the environment. When a module completes, its result object (if any) is decomposed into individual variables and published to a target environment, making the output accessible to subsequent modules via standard variable resolution.
 
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
-| `namespace` | string | No | `null` | Prefix for published artifact variable names. |
-| `exit_status_name` | string | No | `"$?"` | Variable name under which the module's exit status is stored. |
-| `environment` | object | No | `{ "scope": "parent" }` | Environment scope for artifact publication. Uses the same scoping model as module contexts but defaults to `parent`. |
-| `decomposition_strategy` | enum | No | `leaves_only` | How result objects are flattened: `leaves_only`, `shallow`, or `full_hierarchy`. |
+| `namespace` | string | No | Module's effective namespace | Prefix for published artifact variable names. The effective namespace is the module's `name` if set, otherwise its `group`, otherwise the module ID. |
+| `exit_status_name` | string | No | `"$?"` | Variable name under which the module's exit status (`Success`, `Failed`, `Skipped`, `Canceled`) is stored. |
+| `environment` | object | No | `{ "scope": "parent" }` | Target environment for artifact publication. Uses the same scoping model as module contexts but defaults to `parent`, meaning artifacts flow to the parent module's environment. |
+| `decomposition_strategy` | enum | No | `leaves_only` | Controls how deeply result objects are flattened into variables. `leaves_only`: only leaf (non-decomposable) values are published. `shallow`: top-level properties are published. `full_hierarchy`: the root and all nested levels are published. |
 | `publish_null_values` | bool | No | `false` | Whether null-valued result properties are published. |
+
+For more details on artifact lifecycle and exposure patterns, see [Runtime Infrastructure -- Artifact Publishing](runtime.md#artifact-publishing).
 
 ---
 
@@ -122,7 +132,7 @@ Iterates over a collection variable, executing a body module for each item.
 
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
-| `collection` | string | Yes | -- | Name of an environment variable containing an iterable collection. |
+| `collection` | string | Yes | -- | Name of an environment variable containing an iterable collection. Collections are typically populated via the dynamic value system using the `collection<T>` type syntax in a ConfigMap (e.g., `"collection<cyborg.types.borg.remote.v1>"`). |
 | `item_variable` | string | Yes | -- | Variable name to bind the current item to in each iteration. |
 | `continue_on_error` | bool | No | `false` | When `true`, continues iteration even if an item fails. |
 | `body` | module context | Yes | -- | Module to execute for each collection item. |
@@ -187,14 +197,14 @@ See [Condition Modules](#condition-modules) for built-in conditions.
 
 ### Assert (`cyborg.modules.assert.v1`)
 
-Validates a condition and fails with a diagnostic message if the assertion is false.
+Validates a condition and fails with a diagnostic message if the assertion is false. Useful for enforcing preconditions at the start of a workflow (e.g., verifying that required variables are defined before proceeding).
 
 **Properties:**
 
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
 | `assertion` | module reference | Yes | -- | A condition module that produces a boolean result. |
-| `message` | string | Yes | -- | Failure message. Supports variable interpolation. |
+| `message` | string | Yes | -- | Failure message. Supports `${...}` variable interpolation, so the message can include resolved environment values for diagnostics. |
 
 **Behavior:**
 
@@ -208,13 +218,13 @@ Validates a condition and fails with a diagnostic message if the assertion is fa
 
 ### Switch (`cyborg.modules.switch.v1`)
 
-Dispatches execution to one of several named cases based on an environment variable's value.
+Dispatches execution to one of several named cases based on an environment variable's value. Each case maps a string value to an external module configuration file that is loaded and executed when matched.
 
 **Properties:**
 
 | Property | Type | Required | Default | Constraints | Description |
 |----------|------|----------|---------|-------------|-------------|
-| `variable` | string | Yes | -- | -- | Name of the variable to resolve from the global runtime environment. |
+| `variable` | string | Yes | -- | -- | Name of the variable to resolve. |
 | `cases` | array of case references | Yes | -- | Minimum 1 element | Named cases mapping values to external module files. |
 
 Each case has:
@@ -226,7 +236,7 @@ Each case has:
 
 **Behavior:**
 
-- Resolves `variable` from the global runtime environment.
+- Resolves `variable` from the environment.
 - Finds the case whose `name` matches the resolved value.
 - Loads and executes the matched module configuration from the case's `path`.
 - Throws if the variable cannot be resolved or no case matches.
@@ -235,14 +245,14 @@ Each case has:
 
 ### Dynamic (`cyborg.modules.dynamic.v1`)
 
-Executes a child module context, allowing the target to be replaced at runtime via environment overrides.
+Executes a child module context, allowing the target to be replaced at runtime via environment overrides. This module is the primary mechanism for late-bound module composition, where the actual module to execute is determined by the environment state at runtime rather than being statically defined in the configuration.
 
 **Properties:**
 
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
-| `target` | module context | Yes | -- | The module context to execute. Can be overridden via the environment using the `@<name>.target` convention. |
-| `tags` | array of strings | No | `null` | Override resolution tags applied to the child environment, controlling which overrides are selected. |
+| `target` | module context | Yes | -- | The module context to execute. Like all module properties, this can be overridden from the environment using the `@<name>.target` convention, which is what makes the module "dynamic" -- a parent module can inject a different module context at runtime. |
+| `tags` | array of strings | No | `null` | Override resolution tags applied to the child environment. Tags extend the override lookup chain beyond the standard `name` / `group` / `module_id` sequence, allowing ambient overrides keyed by tag to apply to any module executing in that environment. See [Runtime Infrastructure -- Override Resolution Tags](runtime.md#override-resolution-tags). |
 
 **Behavior:**
 
@@ -334,7 +344,7 @@ Executes an external process with optional impersonation and output capture.
 - Captures stdout/stderr based on `output` settings.
 - If `check_exit_code` is `true` (default) and the process exits with a non-zero code, returns `Failed`.
 
-**Result:** Publishes a `SubprocessModuleResult` with `exit_code`, `stdout`, and `stderr` properties.
+**Result:** Publishes a `SubprocessModuleResult` with `exit_code`, `stdout`, and `stderr` properties. These are available as variables in the artifact target environment (by default, the parent scope) under the module's artifact namespace.
 
 ---
 
@@ -357,7 +367,7 @@ Loads and executes a module definition from an external JSON file.
 
 ### Template (`cyborg.modules.template.v1`)
 
-Loads and executes an external module, injecting namespaced arguments into the environment.
+Loads and executes an external module, injecting namespaced arguments into the environment. This is the standard mechanism for reusable module definitions: a template file defines a parameterized workflow, and each invocation supplies its own arguments under a unique namespace.
 
 **Properties:**
 
@@ -365,19 +375,19 @@ Loads and executes an external module, injecting namespaced arguments into the e
 |----------|------|----------|-------------|-------------|
 | `namespace` | string | Yes | Must match `^[A-Za-z0-9_](\.[A-Za-z0-9_\-]+)*$` | Prefix for argument variables. |
 | `path` | string | Yes | Must exist on disk | Path to the template module configuration file. |
-| `arguments` | array of key-value pairs | No | -- | Typed arguments to inject, scoped under the namespace. |
+| `arguments` | array of key-value pairs | No | -- | Typed arguments to inject, scoped under the namespace. Uses the same dynamic value system as ConfigMap entries (`"string"`, `"int"`, `"bool"`, registered custom types). |
 
 **Behavior:**
 
 - For each argument, sets a variable named `<namespace>.<key>` in the current environment (e.g., with namespace `backup.overleaf` and key `container_name`, the variable `backup.overleaf.container_name` is set).
-- Loads and executes the module at `path`.
+- Loads and executes the module at `path`. The loaded module's properties can reference template arguments via the standard variable interpolation and override mechanisms (e.g., `${backup.overleaf.container_name}`).
 - Returns the loaded module's execution status.
 
 ---
 
 ## Configuration Modules
 
-Configuration modules are used in the `configuration` property of a module context. They execute before the main module and set up environment variables in the current scope.
+Configuration modules are used in the `configuration` property of a module context. They execute before the main module and set up environment variables in the current scope. Unlike regular modules, configuration modules write directly into the current environment rather than creating a child scope, ensuring their variables are visible to the main module they configure.
 
 ### ConfigMap (`cyborg.modules.config.map.v1`)
 
@@ -387,15 +397,18 @@ Sets typed key-value pairs in the current environment.
 
 | Property | Type | Required | Constraints | Description |
 |----------|------|----------|-------------|-------------|
-| `entries` | array of key-value pairs | Yes | Minimum 1 element | Key-value pairs to set. Values are strongly typed through the dynamic value provider system (e.g., `"string"`, `"int"`, `"bool"`, registered custom types). |
+| `entries` | array of key-value pairs | Yes | Minimum 1 element | Key-value pairs to set. Values are strongly typed through the dynamic value provider system. |
 
-**Example entry formats:**
+Each entry is a JSON object with a `key` and exactly one type-tagged value. The type name is a property key that identifies the value provider:
 
 ```json
 { "key": "name", "string": "overleaf" }
 { "key": "port", "int": 22 }
 { "key": "enabled", "bool": true }
+{ "key": "hosts", "collection<cyborg.types.borg.remote.v1>": [{ ... }] }
 ```
+
+Built-in types include `string`, `int`, `bool`, and `collection<T>`. Custom types register a versioned type name (e.g., `cyborg.types.borg.remote.v1`) and are resolved through the dynamic value provider registry. See [Runtime Infrastructure -- Dynamic Value System](runtime.md#dynamic-value-system) for details.
 
 **Behavior:**
 
@@ -462,7 +475,7 @@ This is useful when multiple modules need to share a named scope that must be cr
 
 ### Named Reference (`cyborg.modules.named.ref.v1`)
 
-Executes a module that was registered in the module registry by name.
+Executes a module that was registered in the module registry by name. Any module that declares a `name` in its [base properties](#module-base-properties) is automatically registered during JSON deserialization and becomes referenceable by this module. This supports defining a module once and invoking it from multiple places without duplicating the configuration.
 
 **Properties:**
 
@@ -472,7 +485,7 @@ Executes a module that was registered in the module registry by name.
 
 **Behavior:**
 
-- Looks up the module by `target` in the module registry. Modules are registered when they specify a `name` property during configuration loading.
+- Looks up the module by `target` in the module registry.
 - Executes the resolved module and returns its status.
 - Throws if no module with the given name is found.
 
@@ -566,13 +579,13 @@ Shuts down a remote host by executing a command over SSH.
 
 ## Borg Modules
 
-Borg modules integrate with [BorgBackup](https://borgbackup.readthedocs.io/) for repository management. They share a common set of properties inherited from a Borg-specific base type, in addition to the standard [module base properties](#module-base-properties).
+Borg modules integrate with [BorgBackup](https://borgbackup.readthedocs.io/) for repository management. They share a common set of properties inherited from a Borg-specific base type, in addition to the standard [module base properties](#module-base-properties). All shared Borg properties support the standard override mechanism, so values like `executable`, `passphrase`, and `remote_repository` can be injected from the environment at runtime -- typically via a ConfigMap or Template at the job level.
 
 **Shared Borg Properties:**
 
 | Property | Type | Required | Default | Constraints | Description |
 |----------|------|----------|---------|-------------|-------------|
-| `executable` | string | No | `"/usr/bin/borg"` | Must exist on disk | Path to the borg binary. |
+| `executable` | string | Yes | `"/usr/bin/borg"` | Must exist on disk | Path to the borg binary. |
 | `passphrase` | string | Yes | -- | -- | Repository passphrase (set as `BORG_PASSPHRASE`). |
 | `remote_shell` | object | No | `null` | -- | SSH transport options. See Remote Shell below. |
 | `remote_repository` | object | Yes | -- | -- | Remote repository connection details. See Remote Repository below. |
@@ -581,7 +594,7 @@ Borg modules integrate with [BorgBackup](https://borgbackup.readthedocs.io/) for
 
 | Property | Type | Required | Default | Constraints | Description |
 |----------|------|----------|---------|-------------|-------------|
-| `executable` | string | No | `"/usr/bin/ssh"` | Must exist on disk | Path to the SSH client. |
+| `executable` | string | Yes | `"/usr/bin/ssh"` | Must exist on disk | Path to the SSH client. |
 | `ssh_pass` | object | No | `null` | -- | Optional sshpass configuration (same structure as SSH Shutdown's `ssh_pass`: `executable`, `file_path`, `match_prompt`). |
 
 When `remote_shell` is set, constructs the `BORG_RSH` environment variable for the borg process.
@@ -590,7 +603,7 @@ When `remote_shell` is set, constructs the `BORG_RSH` environment variable for t
 
 | Property | Type | Required | Default | Constraints | Description |
 |----------|------|----------|---------|-------------|-------------|
-| `protocol` | string | No | `"ssh://"` | -- | Repository URI protocol. |
+| `protocol` | string | Yes | `"ssh://"` | -- | Repository URI protocol. |
 | `username` | string | Yes | -- | -- | Remote user. |
 | `hostname` | string | Yes | -- | -- | Remote host. |
 | `port` | int | Yes | -- | 1 -- 65535 | Remote port. |
