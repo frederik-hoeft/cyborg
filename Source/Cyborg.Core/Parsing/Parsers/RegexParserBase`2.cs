@@ -9,11 +9,11 @@ public abstract class RegexParserBase<TVisitor, TSelf>(string? name) : RegexPars
     where TSelf : RegexParserBase<TVisitor, TSelf>, IRegexOwner
     where TVisitor : class, INodeVisitor
 {
-    protected abstract bool TryCreateSyntaxNode(Match match, [NotNullWhen(true)] out ISyntaxNode<TVisitor>? syntaxNode);
+    protected abstract bool TryCreateSyntaxNode([NotNull] Match match, [NotNullWhen(true)] out SyntaxNode<TVisitor>? syntaxNode);
 
-    protected sealed override bool TryCreateSyntaxNode(Match match, [NotNullWhen(true)] out ISyntaxNode? syntaxNode)
+    protected sealed override bool TryCreateSyntaxNode([NotNull] Match match, [NotNullWhen(true)] out ISyntaxNode? syntaxNode)
     {
-        if (TryCreateSyntaxNode(match, out ISyntaxNode<TVisitor>? typedNode))
+        if (TryCreateSyntaxNode(match, out SyntaxNode<TVisitor>? typedNode))
         {
             syntaxNode = typedNode;
             return true;

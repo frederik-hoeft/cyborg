@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Parsing.Visitors;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Core.Parsing.SyntaxNodes;
 
@@ -18,5 +19,5 @@ public abstract class SyntaxNode<TVisitor>(string? name) : SyntaxNodeBase(name) 
         Accept(typedVisitor);
     }
 
-    protected abstract void Accept(TVisitor visitor);
+    protected abstract void Accept([NotNull] TVisitor visitor);
 }

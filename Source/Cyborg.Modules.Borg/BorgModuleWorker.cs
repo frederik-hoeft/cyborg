@@ -1,6 +1,7 @@
 ﻿using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Validation;
 using Cyborg.Core.Services.Dispatch;
+using Cyborg.Core.Services.Metrics;
 using Cyborg.Modules.Borg.Model;
 using System.Diagnostics;
 
@@ -25,6 +26,22 @@ public abstract class BorgModuleWorker<TModule>
             startInfo.Environment[BORG_RSH_ENV_VAR] = BuildBorgRsh(Module.RemoteShell);
         }
         startInfo.Environment[BORG_PASSPHRASE_ENV_VAR] = Module.Passphrase;
+    }
+
+    protected virtual IMetricsLabelCollection AddDefaultLabels(IMetricsLabelCollection labels)
+    {
+        ArgumentNullException.ThrowIfNull(labels);
+        if (Module.RemoteRepository.RepositoryRoot is not null)
+        {
+            labels = labels.AddLabel("repository_root", Module.RemoteRepository.RepositoryRoot);
+        }
+        return labels
+            .AddLabel("cyborg_module", TModule.ModuleId)
+            .AddLabel("hostname", Module.RemoteRepository.Hostname)
+            .AddLabel("port", Module.RemoteRepository.Port.ToString())
+            .AddLabel("username", Module.RemoteRepository.Username)
+            .AddLabel("repository_uri", Module.RemoteRepository.GetRepositoryUri())
+            .AddLabel("repository", Module.RemoteRepository.RepositoryName);
     }
 
     protected string BuildBorgRsh(BorgSshOptions options)

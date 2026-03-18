@@ -6,7 +6,7 @@ namespace Cyborg.Core.Parsing.Parsers;
 
 public abstract class RegexParserBase<TSelf>(string? name) : ParserBase(name) where TSelf : RegexParserBase<TSelf>, IRegexOwner
 {
-    protected abstract bool TryCreateSyntaxNode(Match match, [NotNullWhen(true)] out ISyntaxNode? syntaxNode);
+    protected abstract bool TryCreateSyntaxNode([NotNull] Match match, [NotNullWhen(true)] out ISyntaxNode? syntaxNode);
 
     public override bool TryParse(ReadOnlySpan<char> input, [NotNullWhen(true)] out ISyntaxNode? syntaxNode, out int charsConsumed)
     {
