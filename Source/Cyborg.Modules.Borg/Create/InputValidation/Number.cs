@@ -13,7 +13,7 @@ internal sealed partial class Number(int min = int.MinValue, int max = int.MaxVa
 
     public override IParser NamedCopy(string name) => new Number(min, max, name);
 
-    protected override bool TryCreateSyntaxNode(Match match, [NotNullWhen(true)] out ISyntaxNode? syntaxNode)
+    protected override bool TryCreateSyntaxNode([NotNull] Match match, [NotNullWhen(true)] out ISyntaxNode? syntaxNode)
     {
         string rowNumberText = match.Groups["number"].Value;
         if (int.TryParse(rowNumberText, out int rowNumber) && rowNumber >= min && rowNumber <= max)

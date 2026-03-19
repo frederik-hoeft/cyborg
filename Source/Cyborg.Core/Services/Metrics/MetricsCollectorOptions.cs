@@ -4,5 +4,5 @@ public sealed class MetricsCollectorOptions
 {
     public string Namespace { get; set; } = null!;
 
-    public bool IncludeTimeStamp { get; set; } = true;
+    public bool IncludeTimeStamp { get; set; } = false;
 }
