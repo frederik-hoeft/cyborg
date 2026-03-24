@@ -25,7 +25,7 @@ public sealed class BorgPruneModuleWorker
     private const string BORG_PRUNE_LAST_DURATION_SECONDS = "borg_prune_last_duration_seconds";
     private const string BORG_PRUNE_LAST_RUN_SUCCESS = "borg_prune_last_run_success";
     private const string BORG_PRUNE_LAST_DELETED_ARCHIVES = "borg_prune_last_deleted_archives";
-    private const string BORG_PRUNE_LAST_KEPT_ARCHIVES = "borg_prune_last_kept_archives";
+    private const string BORG_PRUNE_LAST_KEPT_ARCHIVES_BY_RULE = "borg_prune_last_kept_archives_by_rule";
     private const string BORG_BACKUP_LATEST_TIMESTAMP_SECONDS = "borg_backup_latest_timestamp_seconds";
     private const string BORG_BACKUP_OLDEST_TIMESTAMP_SECONDS = "borg_backup_oldest_timestamp_seconds";
     private const string BORG_RETAINED_BACKUP_TIMESTAMP_SECONDS = "borg_retained_backup_timestamp_seconds";
@@ -168,7 +168,7 @@ public sealed class BorgPruneModuleWorker
                 .Add(new DateTimeOffset(oldestArchive).ToUnixTimeSeconds(), defaultLabels));
         }
 
-        metricsCollector.AddGauge(BORG_PRUNE_LAST_KEPT_ARCHIVES, "Number of archives retained by the most recent borg prune command", samples =>
+        metricsCollector.AddGauge(BORG_PRUNE_LAST_KEPT_ARCHIVES_BY_RULE, "Number of archives retained by the most recent borg prune command", samples =>
         {
             foreach ((string ruleName, List<BorgPruneLineModel> retainedArchives) in retainedArchivesByRule)
             {

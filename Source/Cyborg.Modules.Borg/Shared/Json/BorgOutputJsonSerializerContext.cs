@@ -9,4 +9,5 @@ namespace Cyborg.Modules.Borg.Shared.Json;
 [JsonSerializable(typeof(BorgCreateJsonResult))]
 [JsonSerializable(typeof(BorgJsonLineHeader))]
 [JsonSerializable(typeof(BorgLogMessageJsonLine))]
-public sealed partial class BorgOutputJsonSerializerContext(JsonSerializerOptions? options) : JsonSerializerContext(options);
+[JsonSerializable(typeof(BorgCreateJsonResult))]
+public sealed partial class BorgOutputJsonSerializerContext : JsonSerializerContext;
