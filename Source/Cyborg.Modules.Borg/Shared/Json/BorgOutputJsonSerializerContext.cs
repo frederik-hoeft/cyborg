@@ -1,6 +1,5 @@
-﻿using Cyborg.Modules.Borg.Shared.Json.Create;
+﻿using Cyborg.Modules.Borg.Create.Metrics;
 using Cyborg.Modules.Borg.Shared.Json.Logging;
-using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Cyborg.Modules.Borg.Shared.Json;
@@ -9,5 +8,4 @@ namespace Cyborg.Modules.Borg.Shared.Json;
 [JsonSerializable(typeof(BorgCreateJsonResult))]
 [JsonSerializable(typeof(BorgJsonLineHeader))]
 [JsonSerializable(typeof(BorgLogMessageJsonLine))]
-[JsonSerializable(typeof(BorgCreateJsonResult))]
 public sealed partial class BorgOutputJsonSerializerContext : JsonSerializerContext;
