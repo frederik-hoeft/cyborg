@@ -18,9 +18,9 @@ public sealed partial class VariableSyntaxBuilder(JsonNamingPolicy namingPolicy)
     [GeneratedRegex(@"\$\{(?<expression>@@|@(?:[A-Za-z_][A-Za-z_0-9\-\.]*)?|[A-Za-z_][A-Za-z_0-9\-\.]*)\}")]
     internal partial Regex InterpolationRegex { get; }
 
-    public bool IsValidIdentifier([NotNullWhen(true)] string? identifier)
+    public bool IsValidIdentifier(ReadOnlySpan<char> identifier)
     {
-        if (string.IsNullOrWhiteSpace(identifier))
+        if (identifier.IsWhiteSpace())
         {
             return false;
         }
@@ -34,6 +34,14 @@ public sealed partial class VariableSyntaxBuilder(JsonNamingPolicy namingPolicy)
             return Root();
         }
         return new PathSyntax(NamingPolicy, VariableSyntaxHelpers.NormalizePath(segment, nameof(segment)).ToString());
+    }
+
+    public PathSyntax Path(ReadOnlySpan<char> first, ReadOnlySpan<char> second)
+    {
+        StringBuilder builder = new();
+        VariableSyntaxHelpers.Join(builder, VariableSyntaxHelpers.NormalizePath(first, nameof(first)));
+        VariableSyntaxHelpers.Join(builder, VariableSyntaxHelpers.NormalizePath(second, nameof(second)));
+        return new PathSyntax(NamingPolicy, builder.ToString());
     }
 
     public PathSyntax Path(params ReadOnlySpan<string> segments)

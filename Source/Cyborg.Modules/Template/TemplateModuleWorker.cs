@@ -12,7 +12,15 @@ public sealed class TemplateModuleWorker(IWorkerContext<TemplateModule> context,
     {
         foreach (DynamicKeyValuePair entry in Module.Arguments)
         {
-            string key = runtime.Environment.SyntaxFactory.Path(Module.Namespace, entry.Key);
+            string key;
+            if (entry.Key.StartsWith('@'))
+            {
+                key = runtime.Environment.SyntaxFactory.Path(Module.Namespace.AsSpan(), entry.Key.AsSpan()[1..]).Override();
+            }
+            else
+            {
+                key = runtime.Environment.SyntaxFactory.Path(Module.Namespace, entry.Key);
+            }
             runtime.Environment.SetVariable(key, entry.Value);
         }
         ModuleContext moduleContext = await configurationLoader.LoadModuleAsync(Module.Path, cancellationToken);

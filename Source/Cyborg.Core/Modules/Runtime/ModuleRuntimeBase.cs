@@ -91,7 +91,7 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory) : I
             bool isNamespaced = !string.IsNullOrEmpty(ns);
             if (!string.IsNullOrEmpty(ns) && !SyntaxFactory.IsValidIdentifier(ns))
             {
-                errors.Add($"Template namespaces must be valid identifiers: \"{ns}\"");
+                errors.Add($"Template namespaces must be valid identifiers: '{ns}'");
             }
             int i = -1;
             foreach (string arg in args)
@@ -99,25 +99,16 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory) : I
                 ++i;
                 if (!SyntaxFactory.IsValidIdentifier(arg))
                 {
-                    errors.Add($"Template argument names must be valid identifiers: argv[{i}] = \"{arg}\"");
+                    errors.Add($"Template argument names must be valid identifiers: argv[{i}] = '{arg}'");
                     continue;
                 }
-                object? value;
-                if (isNamespaced)
+                PathSyntax pathSyntax = isNamespaced ? SyntaxFactory.Path(ns!, arg) : SyntaxFactory.Path(arg);
+                if (TryResolveArgument(environment, pathSyntax, out string? resolvedArg, out object? value))
                 {
-                    string qualifiedName = SyntaxFactory.Path(ns!, arg);
-                    if (environment.TryResolveVariable(qualifiedName, out value))
-                    {
-                        resolvedArguments.Add((arg, value));
-                        continue;
-                    }
-                }
-                if (environment.TryResolveVariable(arg, out value))
-                {
-                    resolvedArguments.Add((arg, value));
+                    resolvedArguments.Add((resolvedArg, value!));
                     continue;
                 }
-                errors.Add($"Unable to resolve template argument: {arg}");
+                errors.Add($"Unable to resolve template argument: '{arg}'");
             }
             if (errors.Count > 0)
             {
@@ -134,6 +125,23 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory) : I
             await ExecuteAsync(configuration.Module, environment, cancellationToken);
         }
         return await ExecuteAsync(moduleContext.Module.Module, environment, cancellationToken);
+    }
+
+    private static bool TryResolveArgument(IRuntimeEnvironment environment, PathSyntax argument, [NotNullWhen(true)] out string? resolvedArgument, [NotNullWhen(true)] out object? value)
+    {
+        if (!environment.TryResolveVariable(argument, out value))
+        {
+            OverrideSyntax overrideSyntax = argument.Override();
+            if (environment.TryResolveVariable(overrideSyntax, out value))
+            {
+                resolvedArgument = overrideSyntax;
+                return true;
+            }
+            resolvedArgument = null;
+            return false;
+        }
+        resolvedArgument = argument;
+        return true;
     }
 
     public abstract Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker module, EnvironmentScope scope = EnvironmentScope.Global, string? name = null, CancellationToken cancellationToken = default);
