@@ -1,0 +1,71 @@
+// systemd-based template that stops the specified service, runs the specified body task for each backup host, then restarts the service.
+{
+  "requires": {
+    "template_namespace": "cyborg.template.systemd.v1",
+    "arguments": [ "service_name", "backup_hosts", "body_task" ]
+  },
+  "configuration": {
+    "cyborg.modules.config.collection.v1": {
+      "sources": [
+        {
+          "cyborg.modules.config.map.v1": {
+            "entries": [
+              { "key": "@body_task.target", "string": "${body_task}" }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "module": {
+    "cyborg.modules.sequence.v1": {
+      "steps": [
+        {
+          "module": {
+            "cyborg.modules.subprocess.v1": {
+              "name": "systemd_tasks.stop",
+              "group": "systemd_tasks",
+              "command": {
+                "executable": "/usr/bin/systemctl",
+                "arguments": [ "stop", "${service_name}" ]
+              }
+            }
+          }
+        },
+        {
+          "module": {
+            "cyborg.modules.guard.v1": {
+              "try": {
+                "module": {
+                  "cyborg.modules.foreach.v1": {
+                    "collection": "backup_hosts",
+                    "item_variable": "host",
+                    "body": {
+                      "module": {
+                        "cyborg.modules.dynamic.v1": {
+                          "name": "body_task"
+                        }
+                      }
+                    }
+                  }
+                },
+                "finally": {
+                  "module": {
+                    "cyborg.modules.subprocess.v1": {
+                      "name": "systemd_tasks.start",
+                      "group": "systemd_tasks",
+                      "command": {
+                        "executable": "/usr/bin/systemctl",
+                        "arguments": [ "start", "${service_name}" ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

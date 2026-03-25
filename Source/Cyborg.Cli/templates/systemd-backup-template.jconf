@@ -1,0 +1,117 @@
+// systemd-based backup job template that stops the service, runs borg create, borg prune, and borg compact for each backup host, then restarts the service.
+// Concrete borg modules are injected via configuration ("modules as data") and configured with the appropriate repository and authentication information for each host.
+{
+  "requires": {
+    "template_namespace": "cyborg.template.backup-job.systemd.v1",
+    "arguments": [ "borg_passphrase", "repository_name", "service_name", "backup_hosts", "job_directory", "borg_create", "borg_prune", "borg_compact" ]
+  },
+  "configuration": {
+    "cyborg.modules.config.collection.v1": {
+      "sources": [
+        {
+          "cyborg.modules.config.map.v1": {
+            "entries": [
+              { "key": "@borg_create.target", "string": "${borg_create}" },
+              { "key": "@borg_prune.target", "string": "${borg_prune}" },
+              { "key": "@borg_compact.target", "string": "${borg_compact}" },
+              { "key": "@borg_tasks.remote_shell", "string": "${@host.remote_shell}"},
+              { "key": "@borg_tasks.passphrase", "string": "${borg_passphrase}"},
+              {
+                "key": "@borg_tasks.remote_repository",
+                "cyborg.types.borg.repository.v1": {
+                  "username": "${@host.borg_user}",
+                  "hostname": "${@host.hostname}",
+                  "repository_root": "${@host.borg_repo_root}",
+                  "repository_name": "${repository_name}"
+                }
+              },
+              { "key": "@borg_tasks.remote_repository.port", "string": "${@host.port}" }
+            ]
+          }
+        },
+        {
+          "cyborg.modules.config.external.v1": {
+            "path": "${job_directory}/${repository_name}.jsecrets"
+          }
+        }
+      ]
+    }
+  },
+  "module": {
+    "cyborg.modules.sequence.v1": {
+      "steps": [
+        {
+          "module": {
+            "cyborg.modules.subprocess.v1": {
+              "name": "systemd_tasks.stop",
+              "group": "systemd_tasks",
+              "command": {
+                "executable": "/usr/bin/systemctl",
+                "arguments": [ "stop", "${service_name}" ]
+              }
+            }
+          }
+        },
+        {
+          "module": {
+            "cyborg.modules.guard.v1": {
+              "try": {
+                "module": {
+                  "cyborg.modules.foreach.v1": {
+                    "collection": "backup_hosts",
+                    "item_variable": "host",
+                    "body": {
+                      "module": {
+                        "cyborg.modules.sequence.v1": {
+                          "steps": [
+                            {
+                              "module": {
+                                "cyborg.modules.dynamic.v1": {
+                                  "name": "borg_create",
+                                  // inject resolution tag into dynamically supplied module implementation to allow overrides via known symbol addresses
+                                  "tags": [ "borg_tasks" ]
+                                }
+                              }
+                            },
+                            {
+                              "module": {
+                                "cyborg.modules.dynamic.v1": {
+                                  "name": "borg_prune",
+                                  "tags": [ "borg_tasks" ]
+                                }
+                              }
+                            },
+                            {
+                              "module": {
+                                "cyborg.modules.dynamic.v1": {
+                                  "name": "borg_compact",
+                                  "tags": [ "borg_tasks" ]
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                },
+                "finally": {
+                  "module": {
+                    "cyborg.modules.subprocess.v1": {
+                      "name": "systemd_tasks.start",
+                      "group": "systemd_tasks",
+                      "command": {
+                        "executable": "/usr/bin/systemctl",
+                        "arguments": [ "start", "${service_name}" ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
