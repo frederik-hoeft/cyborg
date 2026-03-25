@@ -8,6 +8,7 @@
             "entries": [
               { "key": "cyborg_config_root", "string": "/etc/cyborg" },
               { "key": "cyborg_job_root", "string": "${cyborg_config_root}/jobs" },
+              { "key": "cyborg_template_root", "string": "${cyborg_config_root}/templates" },
               { "key": "cyborg_log_file", "string": "/var/log/cyborg/cyborg.log" }
             ]
           }

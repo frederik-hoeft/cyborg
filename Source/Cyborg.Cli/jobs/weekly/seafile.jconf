@@ -1,5 +1,5 @@
 {
-  "environment": { "name": "passbolt", "scope": "inherit_parent", "transient": true },
+  "environment": { "name": "seafile", "scope": "inherit_parent", "transient": true },
   "requires": {
     "arguments": [ "docker_root", "borg_passphrase", "docker_user", "backup_hosts", "job_directory", "cyborg_template_root" ]
   },
@@ -8,7 +8,7 @@
       "namespace": "cyborg.template.backup-job.docker.v1",
       "path": "${cyborg_template_root}/docker-backup-template.jconf",
       "arguments": [
-        { "key": "container_name", "string": "passbolt" },
+        { "key": "container_name", "string": "seafile" },
         { 
           "key": "borg_create",
           "cyborg.types.module.context.v1": {
@@ -16,10 +16,14 @@
               "cyborg.modules.borg.create.v1": {
                 "archive_name": "${container_name}-{now}",
                 "source_path": "${volume_root}",
-                "compression": "zlib",
+                "compression": "lz4",
                 "exclude": {
                   "caches": true,
-                  "paths": []
+                  "paths": [
+                    "*/logs/*",
+                    "*/seafile-data/httptmp/*",
+                    "*/seafile-data/tmpfiles/*"
+                  ]
                 }
               }
             }
@@ -32,9 +36,8 @@
               "cyborg.modules.borg.prune.v1": {
                 "glob_archives": "${container_name}-*",
                 "keep": {
-                  "daily": 30,
-                  "weekly": 24,
-                  "monthly": 48
+                  "weekly": 12,
+                  "monthly": 12
                 }
               }
             }

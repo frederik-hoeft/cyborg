@@ -1,5 +1,5 @@
 {
-  "environment": { "name": "passbolt", "scope": "inherit_parent", "transient": true },
+  "environment": { "name": "overleaf", "scope": "inherit_parent", "transient": true },
   "requires": {
     "arguments": [ "docker_root", "borg_passphrase", "docker_user", "backup_hosts", "job_directory", "cyborg_template_root" ]
   },
@@ -8,7 +8,10 @@
       "namespace": "cyborg.template.backup-job.docker.v1",
       "path": "${cyborg_template_root}/docker-backup-template.jconf",
       "arguments": [
-        { "key": "container_name", "string": "passbolt" },
+        { "key": "container_name", "string": "overleaf" },
+        { "key": "@docker_tasks.command.executable", "string": "${@container_root}/bin/docker-compose" },
+        { "key": "@docker_tasks.down.command.arguments", "collection<string>": [ "down" ] },
+        { "key": "@docker_tasks.up.command.arguments", "collection<string>": [ "up", "-d" ] },
         { 
           "key": "borg_create",
           "cyborg.types.module.context.v1": {
@@ -19,7 +22,13 @@
                 "compression": "zlib",
                 "exclude": {
                   "caches": true,
-                  "paths": []
+                  "paths": [
+                    "*/mongo/diagnostic.data/*",
+                    "*/sharelatex/tmp/*",
+                    "*/sharelatex/data/cache/*",
+                    "*/sharelatex/data/compiles/*",
+                    "*/sharelatex/data/output/*"
+                  ]
                 }
               }
             }
@@ -33,8 +42,8 @@
                 "glob_archives": "${container_name}-*",
                 "keep": {
                   "daily": 30,
-                  "weekly": 24,
-                  "monthly": 48
+                  "weekly": 12,
+                  "monthly": 12
                 }
               }
             }
