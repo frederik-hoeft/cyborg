@@ -19,8 +19,8 @@ For runtime behavior (resolution, scoping, interpolation, decomposition), see [R
   - [Module Environment (`cyborg.types.module.environment.v1`)](#module-environment-cyborgtypesmoduleenvironmentv1)
   - [Module Context (`cyborg.types.module.context.v1`)](#module-context-cyborgtypesmodulecontextv1)
 - [Supported Borg Types](#supported-borg-types)
-  - [Borg Remote (`cyborg.types.borg.remote.v1`)](#borg-remote-cyborgtypesborgremotev1)
-  - [Borg Repository (`cyborg.types.borgrepositoryv1`)](#borg-repository-cyborgtypesborgrepositoryv1)
+  - [Borg Remote (`cyborg.types.borg.remote.v1.4`)](#borg-remote-cyborgtypesborgremotev14)
+  - [Borg Repository (`cyborg.types.borg.repository.v1.4`)](#borg-repository-cyborgtypesborgrepositoryv14)
 - [Generic Collection Type](#generic-collection-type)
   - [Collection (`collection<T>`)](#collection-collectiont)
 - [Usage Patterns](#usage-patterns)
@@ -58,7 +58,7 @@ Only one typed value property is allowed per entry.
 Dynamic type names support:
 
 - simple names (for example, `string`, `int`, `cyborg.types.module.context.v1`)
-- generic names with type arguments (for example, `collection<string>`, `collection<cyborg.types.borg.remote.v1>`)
+- generic names with type arguments (for example, `collection<string>`, `collection<cyborg.types.borg.remote.v1.4>`)
 - nested generic composition (for example, `collection<collection<int>>`)
 
 ---
@@ -190,7 +190,7 @@ Example:
 
 ## Supported Borg Types
 
-### Borg Remote (`cyborg.types.borg.remote.v1`)
+### Borg Remote (`cyborg.types.borg.remote.v1.4`)
 
 Represents a remote host target used in Borg workflows.
 
@@ -225,7 +225,7 @@ Example:
 ```json
 {
   "key": "backup_target",
-  "cyborg.types.borg.remote.v1": {
+  "cyborg.types.borg.remote.v1.4": {
     "hostname": "nas-01",
     "port": 22,
     "wake_on_lan_mac": "00:11:22:33:44:55",
@@ -245,7 +245,7 @@ Example:
 
 ---
 
-### Borg Repository (`cyborg.types.borg.repository.v1`)
+### Borg Repository (`cyborg.types.borg.repository.v1.4`)
 
 Represents a concrete repository location tuple used by Borg modules.
 
@@ -265,7 +265,7 @@ Example:
 ```json
 {
   "key": "primary_repo",
-  "cyborg.types.borg.repository.v1": {
+  "cyborg.types.borg.repository.v1.4": {
     "protocol": "ssh://",
     "username": "borg",
     "hostname": "nas-01",
@@ -298,7 +298,7 @@ Example structured collection:
 ```json
 {
   "key": "backup_hosts",
-  "collection<cyborg.types.borg.remote.v1>": [
+  "collection<cyborg.types.borg.remote.v1.4>": [
     {
       "hostname": "nas-01",
       "port": 22,
@@ -365,7 +365,7 @@ Example structured collection:
 ```json
 {
   "key": "repositories",
-  "collection<cyborg.types.borg.repository.v1>": [
+  "collection<cyborg.types.borg.repository.v1.4>": [
     {
       "protocol": "ssh://",
       "username": "borg",

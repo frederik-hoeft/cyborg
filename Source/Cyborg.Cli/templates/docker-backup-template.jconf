@@ -3,7 +3,7 @@
 {
   "requires": {
     "template_namespace": "cyborg.template.backup-job.docker.v1",
-    "arguments": [ "container_name", "docker_root", "borg_passphrase", "docker_user", "backup_hosts", "job_directory", "borg_create", "borg_prune", "borg_compact" ]
+    "arguments": [ "container_name", "docker_root", "docker_user", "backup_hosts", "job_directory", "borg_create", "borg_prune", "borg_compact" ]
   },
   "configuration": {
     "cyborg.modules.config.collection.v1": {
@@ -17,10 +17,10 @@
               { "key": "@borg_prune.target", "string": "${borg_prune}" },
               { "key": "@borg_compact.target", "string": "${borg_compact}" },
               { "key": "@borg_tasks.remote_shell", "string": "${@host.remote_shell}"},
-              { "key": "@borg_tasks.passphrase", "string": "${borg_passphrase}"},
+              { "key": "@borg_tasks.passphrase", "string": "${@borg_passphrase}"},
               {
                 "key": "@borg_tasks.remote_repository",
-                "cyborg.types.borg.repository.v1": {
+                "cyborg.types.borg.repository.v1.4": {
                   "username": "${@host.borg_user}",
                   "hostname": "${@host.hostname}",
                   "repository_root": "${@host.borg_repo_root}",
@@ -42,6 +42,12 @@
   "module": {
     "cyborg.modules.sequence.v1": {
       "steps": [
+        {
+          "requires": {
+            "arguments": [ "borg_passphrase" ]
+          },
+          "module": { "cyborg.modules.empty.v1": {} }
+        },
         {
           "module": {
             "cyborg.modules.subprocess.v1": {

@@ -1,9 +1,8 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 
 namespace Cyborg.Core.Modules.Runtime.Environments.Syntax;
 
-[SuppressMessage("Design", "CA1034:Nested types should not be visible", Justification = "False positive for C# 14 extension types.")]
+[SuppressMessage("Design", CA1034, Justification = CA1034_JUSTIFY_EXTENSION_SYNTAX_CSHARP_14)]
 public static class MemberSyntaxExtensions
 {
     extension<T> (T syntax) where T : struct, IChildSyntaxProvider<T>

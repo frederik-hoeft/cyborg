@@ -1,5 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using System.Collections.Frozen;
+﻿using System.Collections.Frozen;
 
 namespace Cyborg.Core.Modules.Configuration;
 

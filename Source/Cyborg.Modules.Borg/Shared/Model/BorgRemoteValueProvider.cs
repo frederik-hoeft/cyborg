@@ -2,4 +2,4 @@
 
 namespace Cyborg.Modules.Borg.Shared.Model;
 
-public sealed class BorgRemoteValueProvider() : DynamicValueProviderBase<BorgRemote>("cyborg.types.borg.remote.v1");
+public sealed class BorgRemoteValueProvider() : DynamicValueProviderBase<BorgRemote>("cyborg.types.borg.remote.v1.4");

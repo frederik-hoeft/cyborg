@@ -2,7 +2,6 @@
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Configuration.Model;
-using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 
 namespace Cyborg.Modules.Template;
@@ -12,7 +11,8 @@ public sealed partial record TemplateModule
 (
     [property: Required][property: MatchesRegex(nameof(TemplateModule.NamespaceRegex))] string Namespace,
     [property: Required][property: FileExists] string Path,
-    ImmutableArray<DynamicKeyValuePair> Arguments
+    IReadOnlyCollection<DynamicKeyValuePair> Arguments,
+    IReadOnlyCollection<DynamicKeyValuePair> Overrides
 ) : ModuleBase, IModule
 {
     public static string ModuleId => "cyborg.modules.template.v1";

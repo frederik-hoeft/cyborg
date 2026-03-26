@@ -4,11 +4,11 @@ using Cyborg.Core.Modules.Validation;
 namespace Cyborg.Core.Modules.Configuration.Model;
 
 [Validatable]
-public sealed record ModuleTemplateDefinition
+public sealed record ModuleRequirements
 (
-    string? Namespace,
+    string? ArgumentNamespace,
     IReadOnlyCollection<string> Arguments
-) : IDefaultInstance<ModuleTemplateDefinition>
+) : IDefaultInstance<ModuleRequirements>
 {
-    public static ModuleTemplateDefinition Default => new(Namespace: null, Arguments: []);
+    public static ModuleRequirements Default => new(ArgumentNamespace: null, Arguments: []);
 }

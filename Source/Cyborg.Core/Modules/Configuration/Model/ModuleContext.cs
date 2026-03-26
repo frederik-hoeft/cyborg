@@ -8,5 +8,5 @@ public record ModuleContext
     [property: Required] ModuleReference Module,
     [property: Required][property: DefaultInstance] ModuleEnvironment Environment,
     ModuleReference? Configuration,
-    [property: Required][property: DefaultInstance] ModuleTemplateDefinition Template
+    [property: Required][property: DefaultInstance] ModuleRequirements Requires
 );

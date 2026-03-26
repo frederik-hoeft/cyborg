@@ -8,7 +8,7 @@
         { "key": "cyborg_log_file", "string": "./cyborg.log" },
         {
           "key": "backup_hosts",
-          "collection<cyborg.types.borg.remote.v1>": [
+          "collection<cyborg.types.borg.remote.v1.4>": [
             {
               "hostname": "backup1.service.local",
               "port": 22,

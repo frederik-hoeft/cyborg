@@ -1,6 +1,6 @@
 {
   "requires": {
-    "arguments": [ "borg_passphrase", "backup_hosts", "job_directory", "cyborg_template_root" ]
+    "arguments": [ "backup_hosts", "job_directory", "cyborg_template_root" ]
   },
   "module": {
     "cyborg.modules.template.v1": {
@@ -40,14 +40,74 @@
                         "item_variable": "smb_job",
                         "body": {
                           "configuration": {
-                            "cyborg.modules.config.external.v1": {
-                              "path": "${smb_job}"
+                            "cyborg.modules.config.collection.v1": {
+                              "sources": [
+                                {
+                                  "cyborg.modules.config.map.v1": {
+                                    "entries": [
+                                      { "key": "@borg_jobs.remote_shell", "string": "${host.remote_shell}"},
+                                      { "key": "@borg_jobs.passphrase", "string": "${@borg_passphrase}"},
+                                      {
+                                        "key": "@borg_jobs.remote_repository",
+                                        "cyborg.types.borg.repository.v1.4": {
+                                          "username": "${host.borg_user}",
+                                          "hostname": "${host.hostname}",
+                                          "repository_root": "${host.borg_repo_root}",
+                                          "repository_name": "${@smb_repository_name}"
+                                        }
+                                      },
+                                      { "key": "@borg_jobs.remote_repository.port", "string": "${host.port}" }
+                                    ]
+                                  }
+                                },
+                                {
+                                  "cyborg.modules.config.external.v1": {
+                                    "path": "${smb_job}"
+                                  }
+                                }
+                              ]
                             }
                           },
                           "module": {
                             "cyborg.modules.sequence.v1": {
                               "steps": [
-                                // TODO: add borg backup and prune steps here, using the secrets loaded from the .jsecrets file for each job
+                                {
+                                  "requires": {
+                                    "arguments": [ "smb_repository_name", "smb_root", "borg_passphrase" ]
+                                  },
+                                  "module": {
+                                    "cyborg.modules.borg.create.v1.4": {
+                                      "group": "borg_jobs",
+                                      "archive_name": "${smb_repository_name}-{now}",
+                                      "source_path": "${smb_root}",
+                                      "compression": "zlib",
+                                      "exclude": {
+                                        "caches": true,
+                                        "paths": []
+                                      }
+                                    }
+                                  }
+                                },
+                                {
+                                  "module": {
+                                    "cyborg.modules.borg.prune.v1.4": {
+                                      "group": "borg_jobs",
+                                      "glob_archives": "${smb_repository_name}-*",
+                                      "keep": {
+                                        "daily": 30,
+                                        "weekly": 24,
+                                        "monthly": 24
+                                      }
+                                    }
+                                  }
+                                },
+                                {
+                                  "module": {
+                                    "cyborg.modules.borg.compact.v1.4": {
+                                      "group": "borg_jobs"
+                                    }
+                                  }
+                                }
                               ]
                             }
                           }

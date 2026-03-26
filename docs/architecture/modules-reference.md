@@ -23,6 +23,7 @@ For details on the execution model, environment scoping semantics, variable reso
   - [Assert (`cyborg.modules.assert.v1`)](#assert-cyborgmodulesassertv1)
   - [Switch (`cyborg.modules.switch.v1`)](#switch-cyborgmodulesswitchv1)
   - [Dynamic (`cyborg.modules.dynamic.v1`)](#dynamic-cyborgmodulesdynamicv1)
+  - [Empty (`cyborg.modules.empty.v1`)](#empty-cyborgmodulesemptyv1)
 - [Condition Modules](#condition-modules)
   - [IsTrue (`cyborg.modules.if.condition.is_true.v1`)](#istrue-cyborgmodulesifconditionis_truev1)
   - [IsSet (`cyborg.modules.if.condition.is_set.v1`)](#isset-cyborgmodulesifconditionis_setv1)
@@ -43,9 +44,10 @@ For details on the execution model, environment scoping semantics, variable reso
   - [Wake-on-LAN (`cyborg.modules.network.wol.v1`)](#wake-on-lan-cyborgmodulesnetworkwolv1)
   - [SSH Shutdown (`cyborg.modules.network.ssh_shutdown.v1`)](#ssh-shutdown-cyborgmodulesnetworkssh_shutdownv1)
 - [Borg Modules](#borg-modules)
-  - [Borg Create (`cyborg.modules.borg.create.v1`)](#borg-create-cyborgmodulesborgcreatev1)
-  - [Borg Prune (`cyborg.modules.borg.prune.v1`)](#borg-prune-cyborgmodulesborgprunev1)
-  - [Borg Compact (`cyborg.modules.borg.compact.v1`)](#borg-compact-cyborgmodulesborgcompactv1)
+  - [Borg v1.4.X Modules](#borg-v14x-modules)
+    - [Borg Create (`cyborg.modules.borg.create.v1.4`)](#borg-create-cyborgmodulesborgcreatev14)
+    - [Borg Prune (`cyborg.modules.borg.prune.v1.4`)](#borg-prune-cyborgmodulesborgprunev14)
+    - [Borg Compact (`cyborg.modules.borg.compact.v1.4`)](#borg-compact-cyborgmodulesborgcompactv14)
 
 <!-- /code_chunk_output -->
 
@@ -132,7 +134,7 @@ Iterates over a collection variable, executing a body module for each item.
 
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
-| `collection` | string | Yes | -- | Name of an environment variable containing an iterable collection. Collections are typically populated via the dynamic value system using the `collection<T>` type syntax in a ConfigMap (e.g., `"collection<cyborg.types.borg.remote.v1>"`). |
+| `collection` | string | Yes | -- | Name of an environment variable containing an iterable collection. Collections are typically populated via the dynamic value system using the `collection<T>` type syntax in a ConfigMap (e.g., `"collection<cyborg.types.borg.remote.v1.4>"`). |
 | `item_variable` | string | Yes | -- | Variable name to bind the current item to in each iteration. |
 | `continue_on_error` | bool | No | `false` | When `true`, continues iteration even if an item fails. |
 | `body` | module context | Yes | -- | Module to execute for each collection item. |
@@ -262,6 +264,20 @@ Executes a child module context, allowing the target to be replaced at runtime v
 
 ---
 
+### Empty (`cyborg.modules.empty.v1`)
+
+A no-op module that immediately returns `Success`. Useful as a placeholder or default value when a module is required but no action is needed. May also be used to enforce required environment variables by declaring them in the `requires::arguments` property of the context.
+
+**Properties:*
+
+None.
+
+**Behavior:**
+
+- Returns `Success` immediately.
+
+---
+
 ## Condition Modules
 
 Condition modules are used with `If` and `Assert`. They produce a `ConditionalResult` containing a boolean `result` property.
@@ -367,7 +383,7 @@ Loads and executes a module definition from an external JSON file.
 
 ### Template (`cyborg.modules.template.v1`)
 
-Loads and executes an external module, injecting namespaced arguments into the environment. This is the standard mechanism for reusable module definitions: a template file defines a parameterized workflow, and each invocation supplies its own arguments under a unique namespace.
+Loads and executes an external module, injecting namespaced arguments into the child environment. This is the standard mechanism for reusable module definitions: a template file defines a parameterized workflow, and each invocation supplies its own arguments under a unique namespace.
 
 **Properties:**
 
@@ -376,10 +392,12 @@ Loads and executes an external module, injecting namespaced arguments into the e
 | `namespace` | string | Yes | Must match `^[A-Za-z0-9_](\.[A-Za-z0-9_\-]+)*$` | Prefix for argument variables. |
 | `path` | string | Yes | Must exist on disk | Path to the template module configuration file. |
 | `arguments` | array of key-value pairs | No | -- | Typed arguments to inject, scoped under the namespace. Uses the same dynamic value system as ConfigMap entries (`"string"`, `"int"`, `"bool"`, registered custom types). |
+| `overrides` | array of key-value pairs | No | -- | Optional environment overrides to apply when executing the loaded module. Each entry has `key` (string) and `value` (string) properties. The `key` is the override key (e.g., `@my_template.target`) and the `value` is the override value. |
 
 **Behavior:**
 
-- For each argument, sets a variable named `<namespace>.<key>` in the current environment (e.g., with namespace `backup.overleaf` and key `container_name`, the variable `backup.overleaf.container_name` is set).
+- For each argument, sets a variable named `<namespace>.<key>` in the child environment (e.g., with namespace `backup.overleaf` and key `container_name`, the variable `backup.overleaf.container_name` is set).
+- For each override, sets the specified override key and value in the child environment's override resolution context.
 - Loads and executes the module at `path`. The loaded module's properties can reference template arguments via the standard variable interpolation and override mechanisms (e.g., `${backup.overleaf.container_name}`).
 - Returns the loaded module's execution status.
 
@@ -405,10 +423,10 @@ Each entry is a JSON object with a `key` and exactly one type-tagged value. The 
 { "key": "name", "string": "overleaf" }
 { "key": "port", "int": 22 }
 { "key": "enabled", "bool": true }
-{ "key": "hosts", "collection<cyborg.types.borg.remote.v1>": [{ ... }] }
+{ "key": "hosts", "collection<cyborg.types.borg.remote.v1.4>": [{ ... }] }
 ```
 
-Built-in types include `string`, `int`, `bool`, and `collection<T>`. Custom types register a versioned type name (e.g., `cyborg.types.borg.remote.v1`) and are resolved through the dynamic value provider registry. See [Runtime Infrastructure -- Dynamic Value System](runtime.md#dynamic-value-system) for details.
+Built-in types include `string`, `int`, `bool`, and `collection<T>`. Custom types register a versioned type name (e.g., `cyborg.types.borg.remote.v1.4`) and are resolved through the dynamic value provider registry. See [Runtime Infrastructure -- Dynamic Value System](runtime.md#dynamic-value-system) for details.
 
 **Behavior:**
 
@@ -581,6 +599,12 @@ Shuts down a remote host by executing a command over SSH.
 
 Borg modules integrate with [BorgBackup](https://borgbackup.readthedocs.io/) for repository management. They share a common set of properties inherited from a Borg-specific base type, in addition to the standard [module base properties](#module-base-properties). All shared Borg properties support the standard override mechanism, so values like `executable`, `passphrase`, and `remote_repository` can be injected from the environment at runtime -- typically via a ConfigMap or Template at the job level.
 
+### Borg v1.4.X Modules
+
+These modules are designed for Borg v1.4.X, which is the latest stable release series as of this writing. They leverage features and improvements introduced in the 1.4 release, such as enhanced JSON output and new pruning options. Support for older versions of Borg may be added in the future if needed, but v1.4 is recommended for its performance and reliability benefits.
+
+Borg v2.X compatibility will be added in a future release once the 2.0 API stabilizes and we can define a clear set of properties and behaviors for the new version.
+
 **Shared Borg Properties:**
 
 | Property | Type | Required | Default | Constraints | Description |
@@ -614,9 +638,9 @@ The repository URI is constructed as `<protocol><username>@<hostname>:<port><rep
 
 ---
 
-### Borg Create (`cyborg.modules.borg.create.v1`)
+#### Borg Create (`cyborg.modules.borg.create.v1.4`)
 
-Creates a new archive in a borg repository.
+Creates a new archive in a borg v1.4.X repository.
 
 **Properties** (in addition to shared Borg properties):
 
@@ -642,9 +666,9 @@ Creates a new archive in a borg repository.
 
 ---
 
-### Borg Prune (`cyborg.modules.borg.prune.v1`)
+#### Borg Prune (`cyborg.modules.borg.prune.v1.4`)
 
-Prunes old archives from a borg repository based on retention rules.
+Prunes old archives from a borg v1.4.X repository based on retention rules.
 
 **Properties** (in addition to shared Borg properties):
 
@@ -679,9 +703,9 @@ All values are integers. A value of `0` means the rule is not applied.
 
 ---
 
-### Borg Compact (`cyborg.modules.borg.compact.v1`)
+#### Borg Compact (`cyborg.modules.borg.compact.v1.4`)
 
-Compacts a borg repository to reclaim disk space freed by pruning.
+Compacts a borg v1.4.X repository to reclaim disk space freed by pruning.
 
 **Properties** (in addition to shared Borg properties):
 

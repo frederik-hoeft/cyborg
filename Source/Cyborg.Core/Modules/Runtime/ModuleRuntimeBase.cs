@@ -1,7 +1,6 @@
 ﻿using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Runtime.Environments.Syntax;
-using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Core.Modules.Runtime;
 
@@ -84,7 +83,7 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory) : I
     {
         ArgumentNullException.ThrowIfNull(moduleContext);
         ArgumentNullException.ThrowIfNull(environment);
-        if (moduleContext.Template is { Namespace: var ns, Arguments: { Count: > 0 } args })
+        if (moduleContext.Requires is { ArgumentNamespace: var ns, Arguments: { Count: > 0 } args })
         {
             List<string> errors = [];
             List<(string Argument, object Value)> resolvedArguments = [];
@@ -103,9 +102,9 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory) : I
                     continue;
                 }
                 PathSyntax pathSyntax = isNamespaced ? SyntaxFactory.Path(ns!, arg) : SyntaxFactory.Path(arg);
-                if (TryResolveArgument(environment, pathSyntax, out string? resolvedArg, out object? value))
+                if (environment.TryResolveVariable(pathSyntax, out object? value))
                 {
-                    resolvedArguments.Add((resolvedArg, value!));
+                    resolvedArguments.Add((pathSyntax, value));
                     continue;
                 }
                 errors.Add($"Unable to resolve template argument: '{arg}'");
@@ -125,23 +124,6 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory) : I
             await ExecuteAsync(configuration.Module, environment, cancellationToken);
         }
         return await ExecuteAsync(moduleContext.Module.Module, environment, cancellationToken);
-    }
-
-    private static bool TryResolveArgument(IRuntimeEnvironment environment, PathSyntax argument, [NotNullWhen(true)] out string? resolvedArgument, [NotNullWhen(true)] out object? value)
-    {
-        if (!environment.TryResolveVariable(argument, out value))
-        {
-            OverrideSyntax overrideSyntax = argument.Override();
-            if (environment.TryResolveVariable(overrideSyntax, out value))
-            {
-                resolvedArgument = overrideSyntax;
-                return true;
-            }
-            resolvedArgument = null;
-            return false;
-        }
-        resolvedArgument = argument;
-        return true;
     }
 
     public abstract Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker module, EnvironmentScope scope = EnvironmentScope.Global, string? name = null, CancellationToken cancellationToken = default);

@@ -3,6 +3,7 @@ using Cyborg.Modules.Configuration.ConfigCollection;
 using Cyborg.Modules.Configuration.ConfigMap;
 using Cyborg.Modules.Configuration.ExternalConfig;
 using Cyborg.Modules.Dynamic;
+using Cyborg.Modules.Empty;
 using Cyborg.Modules.EnvironmentDefinitions;
 using Cyborg.Modules.External;
 using Cyborg.Modules.Foreach;
@@ -44,4 +45,5 @@ namespace Cyborg.Modules;
 [JsonSerializable(typeof(AssertModule))]
 [JsonSerializable(typeof(TemplateModule))]
 [JsonSerializable(typeof(GuardModule))]
+[JsonSerializable(typeof(EmptyModule))]
 public sealed partial class ModuleJsonSerializerContext : JsonSerializerContext;

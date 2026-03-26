@@ -17,7 +17,7 @@ public sealed partial record BorgCreateModule
     [property: Required][property: DefaultInstance] BorgExcludeOptions Exclude
 ) : BorgModuleBase, IModule
 {
-    public static string ModuleId => "cyborg.modules.borg.create.v1";
+    public static string ModuleId => "cyborg.modules.borg.create.v1.4";
 
     private static IParser CompressionGrammar
     {

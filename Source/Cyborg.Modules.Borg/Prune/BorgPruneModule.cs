@@ -13,7 +13,7 @@ public sealed partial record BorgPruneModule
     [property: DefaultTimeSpan("00:30:00")] TimeSpan CheckpointInterval
 ) : BorgModuleBase, IModule
 {
-    public static string ModuleId => "cyborg.modules.borg.prune.v1";
+    public static string ModuleId => "cyborg.modules.borg.prune.v1.4";
 
     [IgnoreOverrides]
     [Range<int>(Min = 1, Max = int.MaxValue)]

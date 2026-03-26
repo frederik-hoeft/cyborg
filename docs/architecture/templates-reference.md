@@ -72,14 +72,14 @@ Invoke the template through `cyborg.modules.template.v1` using the namespace dec
       { "key": "borg_passphrase", "string": "${some_secret}" },
       {
         "key": "backup_hosts",
-        "collection<cyborg.types.borg.remote.v1>": [
+        "collection<cyborg.types.borg.remote.v1.4>": [
           { "hostname": "nas-01", "port": 22, "borg_repo_root": "/srv/borg", "borg_user": "borg", "remote_shell": { "executable": "/usr/bin/ssh" } }
         ]
       },
       { "key": "job_directory", "string": "/etc/cyborg/jobs" },
-      { "key": "borg_create", "cyborg.types.module.context.v1": { "module": { "cyborg.modules.borg.create.v1": { } } } },
-      { "key": "borg_prune", "cyborg.types.module.context.v1": { "module": { "cyborg.modules.borg.prune.v1": { } } } },
-      { "key": "borg_compact", "cyborg.types.module.context.v1": { "module": { "cyborg.modules.borg.compact.v1": { } } } }
+      { "key": "borg_create", "cyborg.types.module.context.v1": { "module": { "cyborg.modules.borg.create.v1.4": { } } } },
+      { "key": "borg_prune", "cyborg.types.module.context.v1": { "module": { "cyborg.modules.borg.prune.v1.4": { } } } },
+      { "key": "borg_compact", "cyborg.types.module.context.v1": { "module": { "cyborg.modules.borg.compact.v1.4": { } } } }
     ]
   }
 }
@@ -95,9 +95,8 @@ The template declares the following required arguments:
 |----------|------|-------------|
 | `container_name` | `string` | Logical container/application name. Also used as the Borg repository name. |
 | `docker_root` | `string` | Root directory containing the template's expected Docker layout. |
-| `borg_passphrase` | `string` | Borg repository passphrase injected into the Borg tasks. |
 | `docker_user` | `string` | User used for Docker subprocess impersonation. |
-| `backup_hosts` | `collection<cyborg.types.borg.remote.v1>` | Backup targets processed sequentially. Each host provides `hostname`, `port`, `borg_user`, `borg_repo_root`, and `remote_shell`. |
+| `backup_hosts` | `collection<cyborg.types.borg.remote.v1.4>` | Backup targets processed sequentially. Each host provides `hostname`, `port`, `borg_user`, `borg_repo_root`, and `remote_shell`. |
 | `job_directory` | `string` | Base directory for job-specific companion files. Used to load `${job_directory}/${container_name}.jsecrets`. |
 | `borg_create` | `cyborg.types.module.context.v1` | Module context executed for archive creation. Intended to be a Borg Create module. |
 | `borg_prune` | `cyborg.types.module.context.v1` | Module context executed for retention/pruning. Intended to be a Borg Prune module. |
@@ -230,7 +229,7 @@ A minimal job in the style of `passbolt.jconf` usually supplies the following te
           "key": "borg_create",
           "cyborg.types.module.context.v1": {
             "module": {
-              "cyborg.modules.borg.create.v1": {
+              "cyborg.modules.borg.create.v1.4": {
                 "archive_name": "${container_name}-{now}",
                 "source_path": "${volume_root}",
                 "compression": "zlib",
@@ -246,7 +245,7 @@ A minimal job in the style of `passbolt.jconf` usually supplies the following te
           "key": "borg_prune",
           "cyborg.types.module.context.v1": {
             "module": {
-              "cyborg.modules.borg.prune.v1": {
+              "cyborg.modules.borg.prune.v1.4": {
                 "glob_archives": "${container_name}-*",
                 "keep": {
                   "daily": 30,
@@ -261,7 +260,7 @@ A minimal job in the style of `passbolt.jconf` usually supplies the following te
           "key": "borg_compact",
           "cyborg.types.module.context.v1": {
             "module": {
-              "cyborg.modules.borg.compact.v1": { }
+              "cyborg.modules.borg.compact.v1.4": { }
             }
           }
         }
@@ -283,11 +282,13 @@ A job in the style of `overleaf.jconf` can override the internal Docker task com
     "cyborg.modules.template.v1": {
       "namespace": "cyborg.template.backup-job.docker.v1",
       "path": "${cyborg_template_root}/docker-backup-template.jconf",
-      "arguments": [
-        { "key": "container_name", "string": "overleaf" },
+      "overrides": [
         { "key": "@docker_tasks.command.executable", "string": "${@container_root}/bin/docker-compose" },
         { "key": "@docker_tasks.down.command.arguments", "collection<string>": [ "down" ] },
         { "key": "@docker_tasks.up.command.arguments", "collection<string>": [ "up", "-d" ] }
+      ],
+      "arguments": [
+        { "key": "container_name", "string": "overleaf" }
       ]
     }
   }
@@ -327,14 +328,14 @@ Invoke the template through `cyborg.modules.template.v1` using the namespace dec
       { "key": "borg_passphrase", "string": "${some_secret}" },
       {
         "key": "backup_hosts",
-        "collection<cyborg.types.borg.remote.v1>": [
+        "collection<cyborg.types.borg.remote.v1.4>": [
           { "hostname": "nas-01", "port": 22, "borg_repo_root": "/srv/borg", "borg_user": "borg", "remote_shell": { "executable": "/usr/bin/ssh" } }
         ]
       },
       { "key": "job_directory", "string": "/etc/cyborg/jobs" },
-      { "key": "borg_create", "cyborg.types.module.context.v1": { "module": { "cyborg.modules.borg.create.v1": { } } } },
-      { "key": "borg_prune", "cyborg.types.module.context.v1": { "module": { "cyborg.modules.borg.prune.v1": { } } } },
-      { "key": "borg_compact", "cyborg.types.module.context.v1": { "module": { "cyborg.modules.borg.compact.v1": { } } } }
+      { "key": "borg_create", "cyborg.types.module.context.v1": { "module": { "cyborg.modules.borg.create.v1.4": { } } } },
+      { "key": "borg_prune", "cyborg.types.module.context.v1": { "module": { "cyborg.modules.borg.prune.v1.4": { } } } },
+      { "key": "borg_compact", "cyborg.types.module.context.v1": { "module": { "cyborg.modules.borg.compact.v1.4": { } } } }
     ]
   }
 }
@@ -352,8 +353,7 @@ The supported required arguments are:
 |----------|------|-------------|
 | `service_name` | `string` | Service unit passed to `systemctl`, for example `postgresql.service`. |
 | `repository_name` | `string` | Borg repository name used for the remote repository and for the job-specific secrets file name. |
-| `borg_passphrase` | `string` | Borg repository passphrase injected into the Borg tasks. |
-| `backup_hosts` | `collection<cyborg.types.borg.remote.v1>` | Backup targets processed sequentially. Each host provides `hostname`, `port`, `borg_user`, `borg_repo_root`, and `remote_shell`. |
+| `backup_hosts` | `collection<cyborg.types.borg.remote.v1.4>` | Backup targets processed sequentially. Each host provides `hostname`, `port`, `borg_user`, `borg_repo_root`, and `remote_shell`. |
 | `job_directory` | `string` | Base directory for job-specific companion files. Used to load `${job_directory}/${repository_name}.jsecrets`. |
 | `borg_create` | `cyborg.types.module.context.v1` | Module context executed for archive creation. Intended to be a Borg Create module. |
 | `borg_prune` | `cyborg.types.module.context.v1` | Module context executed for retention/pruning. Intended to be a Borg Prune module. |
@@ -479,7 +479,7 @@ A minimal Systemd-backed job usually supplies the following template-specific ar
           "key": "borg_create",
           "cyborg.types.module.context.v1": {
             "module": {
-              "cyborg.modules.borg.create.v1": {
+              "cyborg.modules.borg.create.v1.4": {
                 "archive_name": "${repository_name}-{now}",
                 "source_path": "/var/lib/postgresql",
                 "compression": "lz4"
@@ -491,7 +491,7 @@ A minimal Systemd-backed job usually supplies the following template-specific ar
           "key": "borg_prune",
           "cyborg.types.module.context.v1": {
             "module": {
-              "cyborg.modules.borg.prune.v1": {
+              "cyborg.modules.borg.prune.v1.4": {
                 "glob_archives": "${repository_name}-*",
                 "keep": {
                   "daily": 30,
@@ -506,7 +506,7 @@ A minimal Systemd-backed job usually supplies the following template-specific ar
           "key": "borg_compact",
           "cyborg.types.module.context.v1": {
             "module": {
-              "cyborg.modules.borg.compact.v1": { }
+              "cyborg.modules.borg.compact.v1.4": { }
             }
           }
         }
@@ -528,11 +528,13 @@ A caller can override the internal Systemd task commands while still reusing the
     "cyborg.modules.template.v1": {
       "namespace": "cyborg.template.backup-job.systemd.v1",
       "path": "${cyborg_template_root}/systemd-backup-template.jconf",
-      "arguments": [
-        { "key": "service_name", "string": "postgresql.service" },
+      "overrides": [
         { "key": "@systemd_tasks.command.executable", "string": "/usr/local/bin/systemctl-wrapper" },
         { "key": "@systemd_tasks.stop.command.arguments", "collection<string>": [ "stop", "${service_name}" ] },
         { "key": "@systemd_tasks.start.command.arguments", "collection<string>": [ "start", "${service_name}" ] }
+      ],
+      "arguments": [
+        { "key": "service_name", "string": "postgresql.service" }
       ]
     }
   }

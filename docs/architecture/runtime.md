@@ -72,10 +72,10 @@ Configuration modules populate the environment with typed values using the `IDyn
 { "key": "container_name", "string": "overleaf" }
 ```
 
-Providers are registered by type name (e.g., `"int"`, `"string"`, `"bool"`, `"cyborg.types.borg.remote.v1"`) in the `IDynamicValueProviderRegistry`. Typed collections use `collection<T>` syntax:
+Providers are registered by type name (e.g., `"int"`, `"string"`, `"bool"`, `"cyborg.types.borg.remote.v1.4"`) in the `IDynamicValueProviderRegistry`. Typed collections use `collection<T>` syntax:
 
 ```json
-{ "key": "backup_hosts", "collection<cyborg.types.borg.remote.v1>": [{ ... }, { ... }] }
+{ "key": "backup_hosts", "collection<cyborg.types.borg.remote.v1.4>": [{ ... }, { ... }] }
 ```
 
 Custom types implement `IDynamicValueProvider` and register a versioned type name. When annotated with `[GeneratedDecomposition]`, they gain `IDecomposable` support for hierarchical property access (e.g., `${host.hostname}`, `${host.port}`).

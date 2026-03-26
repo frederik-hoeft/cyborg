@@ -1,5 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using System.Text.Json;
+﻿using System.Text.Json;
 
 namespace Cyborg.Core.Modules.Configuration.Serialization;
 
@@ -7,8 +6,7 @@ namespace Cyborg.Core.Modules.Configuration.Serialization;
     Justification = "This is safe, since we ensure that the JsonSerializerOptions is using the source-generated context, which will preserve the necessary metadata for the types being deserialized.")]
 [SuppressMessage("AOT", "IL3050:Calling members annotated with 'RequiresDynamicCodeAttribute' may break functionality when AOT compiling.",
     Justification = "This is safe, since we ensure that the JsonSerializerOptions is using the source-generated context, which will preserve the necessary metadata for the types being deserialized.")]
-[SuppressMessage("Design", "CA1034:Nested types should not be visible",
-    Justification = "False positive for new C# 14 extension class syntax.")]
+[SuppressMessage("Design", CA1034, Justification = CA1034_JUSTIFY_EXTENSION_SYNTAX_CSHARP_14)]
 public static class JsonSerializerExtensions
 {
     extension (JsonSerializer)

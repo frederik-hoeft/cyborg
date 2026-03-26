@@ -1,5 +1,4 @@
 ﻿using Cyborg.Core.Parsing.Visitors;
-using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Core.Parsing.SyntaxNodes;
 

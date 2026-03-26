@@ -1,6 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
-
-namespace Cyborg.Core.Modules.Configuration;
+﻿namespace Cyborg.Core.Modules.Configuration;
 
 public interface IModuleLoaderRegistry
 {

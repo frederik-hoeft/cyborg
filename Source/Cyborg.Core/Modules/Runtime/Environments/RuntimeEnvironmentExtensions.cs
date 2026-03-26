@@ -1,9 +1,8 @@
 ﻿using Cyborg.Core.Modules.Configuration.Model;
-using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Core.Modules.Runtime.Environments;
 
-[SuppressMessage("Design", "CA1034:Nested types should not be visible", Justification = "False positive for C# 14 extension syntax.")]
+[SuppressMessage("Design", CA1034, Justification = CA1034_JUSTIFY_EXTENSION_SYNTAX_CSHARP_14)]
 public static class RuntimeEnvironmentExtensions
 {
     extension (IRuntimeEnvironment environment)

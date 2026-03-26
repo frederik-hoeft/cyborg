@@ -5,6 +5,7 @@ using Cyborg.Modules.Configuration.ConfigCollection;
 using Cyborg.Modules.Configuration.ConfigMap;
 using Cyborg.Modules.Configuration.ExternalConfig;
 using Cyborg.Modules.Dynamic;
+using Cyborg.Modules.Empty;
 using Cyborg.Modules.EnvironmentDefinitions;
 using Cyborg.Modules.External;
 using Cyborg.Modules.Foreach;
@@ -50,6 +51,7 @@ namespace Cyborg.Modules;
 [Singleton<IModuleLoader, DynamicModuleLoader>]
 [Singleton<IModuleLoader, AssertModuleLoader>]
 [Singleton<IModuleLoader, TemplateModuleLoader>]
+[Singleton<IModuleLoader, EmptyModuleLoader>]
 [Singleton<JsonConverter>(Factory = nameof(CreateEnvironmentScopeReferenceConverter))]
 public interface ICyborgModuleServices
 {

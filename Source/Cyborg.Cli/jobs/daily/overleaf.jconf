@@ -1,22 +1,24 @@
 {
   "environment": { "name": "overleaf", "scope": "inherit_parent", "transient": true },
   "requires": {
-    "arguments": [ "docker_root", "borg_passphrase", "docker_user", "backup_hosts", "job_directory", "cyborg_template_root" ]
+    "arguments": [ "docker_root", "docker_user", "backup_hosts", "job_directory", "cyborg_template_root" ]
   },
   "module": {
     "cyborg.modules.template.v1": {
       "namespace": "cyborg.template.backup-job.docker.v1",
       "path": "${cyborg_template_root}/docker-backup-template.jconf",
-      "arguments": [
-        { "key": "container_name", "string": "overleaf" },
+      "overrides": [
         { "key": "@docker_tasks.command.executable", "string": "${@container_root}/bin/docker-compose" },
         { "key": "@docker_tasks.down.command.arguments", "collection<string>": [ "down" ] },
-        { "key": "@docker_tasks.up.command.arguments", "collection<string>": [ "up", "-d" ] },
+        { "key": "@docker_tasks.up.command.arguments", "collection<string>": [ "up", "-d" ] }
+      ],
+      "arguments": [
+        { "key": "container_name", "string": "overleaf" },
         { 
           "key": "borg_create",
           "cyborg.types.module.context.v1": {
             "module": {
-              "cyborg.modules.borg.create.v1": {
+              "cyborg.modules.borg.create.v1.4": {
                 "archive_name": "${container_name}-{now}",
                 "source_path": "${volume_root}",
                 "compression": "zlib",
@@ -38,7 +40,7 @@
           "key": "borg_prune",
           "cyborg.types.module.context.v1": {
             "module": {
-              "cyborg.modules.borg.prune.v1": {
+              "cyborg.modules.borg.prune.v1.4": {
                 "glob_archives": "${container_name}-*",
                 "keep": {
                   "daily": 30,
@@ -53,7 +55,7 @@
           "key": "borg_compact",
           "cyborg.types.module.context.v1": {
             "module": {
-              "cyborg.modules.borg.compact.v1": { }
+              "cyborg.modules.borg.compact.v1.4": { }
             }
           }
         }

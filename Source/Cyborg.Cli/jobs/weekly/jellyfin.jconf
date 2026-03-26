@@ -1,7 +1,7 @@
 {
   "environment": { "name": "jellyfin", "scope": "inherit_parent", "transient": true },
   "requires": {
-    "arguments": [ "docker_root", "borg_passphrase", "docker_user", "backup_hosts", "job_directory", "cyborg_template_root" ]
+    "arguments": [ "docker_root", "docker_user", "backup_hosts", "job_directory", "cyborg_template_root" ]
   },
   "module": {
     "cyborg.modules.template.v1": {
@@ -13,7 +13,7 @@
           "key": "borg_create",
           "cyborg.types.module.context.v1": {
             "module": {
-              "cyborg.modules.borg.create.v1": {
+              "cyborg.modules.borg.create.v1.4": {
                 "archive_name": "${container_name}-{now}",
                 "source_path": "${volume_root}",
                 "compression": "lz4",
@@ -33,7 +33,7 @@
           "key": "borg_prune",
           "cyborg.types.module.context.v1": {
             "module": {
-              "cyborg.modules.borg.prune.v1": {
+              "cyborg.modules.borg.prune.v1.4": {
                 "glob_archives": "${container_name}-*",
                 "keep": {
                   "weekly": 12,
@@ -47,7 +47,7 @@
           "key": "borg_compact",
           "cyborg.types.module.context.v1": {
             "module": {
-              "cyborg.modules.borg.compact.v1": { }
+              "cyborg.modules.borg.compact.v1.4": { }
             }
           }
         }

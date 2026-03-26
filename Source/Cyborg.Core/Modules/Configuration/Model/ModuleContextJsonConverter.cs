@@ -22,5 +22,5 @@ public sealed record ModuleContextDeserializationDummy
     ModuleReference Module,
     ModuleEnvironment Environment,
     ModuleReference? Configuration,
-    ModuleTemplateDefinition Requires
+    ModuleRequirements Requires
 ) : ModuleContext(Module, Environment, Configuration, Requires);

@@ -1,5 +1,4 @@
 ﻿using Cyborg.Core.Modules.Configuration.Model;
-using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Core.Modules.Configuration;
 
