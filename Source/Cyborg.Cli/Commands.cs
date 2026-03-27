@@ -1,10 +1,12 @@
 ﻿using ConsoleAppFramework;
+using Cyborg.Cli.Logging;
 using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Services.Metrics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Cli;
@@ -16,6 +18,7 @@ internal sealed class Commands
     public async Task RunAsync([Argument] string template, string metricsNamespace = "cyborg", CancellationToken cancellationToken = default)
     {
         using DefaultServiceProvider sp = new();
+        ILogger<Commands> logger = sp.GetRequiredService<ILoggerFactory>().CreateLogger<Commands>();
         sp.GetRequiredService<GlobalRuntimeEnvironment>().SetVariable("template", template);
         sp.GetRequiredService<MetricsCollectorOptions>().Namespace = metricsNamespace;
         IModuleConfigurationLoader configurationLoader = sp.GetService<IModuleConfigurationLoader>();
@@ -25,6 +28,8 @@ internal sealed class Commands
             Environment = module.Environment ?? ModuleEnvironment.Default,
         };
         IModuleRuntime runtime = sp.GetRequiredService<IModuleRuntime>();
+        logger.LogRunStarted(template);
         await runtime.ExecuteAsync(module, cancellationToken);
+        logger.LogRunCompleted(template);
     }
 }

@@ -3,14 +3,18 @@ using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Services.Dispatch;
+using Cyborg.Modules.Logging;
+using Microsoft.Extensions.Logging;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Modules.Subprocess;
 
-public sealed class SubprocessModuleWorker(IWorkerContext<SubprocessModule> context, IChildProcessDispatcher dispatcher) : ModuleWorker<SubprocessModule>(context)
+public sealed class SubprocessModuleWorker(IWorkerContext<SubprocessModule> context, IChildProcessDispatcher dispatcher, ILoggerFactory loggerFactory) : ModuleWorker<SubprocessModule>(context)
 {
+    private readonly ILogger<SubprocessModuleWorker> _logger = loggerFactory.CreateLogger<SubprocessModuleWorker>();
+
     protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
         string executable = Module.Command.Executable;
@@ -25,6 +29,7 @@ public sealed class SubprocessModuleWorker(IWorkerContext<SubprocessModule> cont
                 ..Module.Command.Arguments
             ];
         }
+        _logger.LogSubprocessStarted(executable, arguments.Length);
         ProcessStartInfo startInfo = new(executable, arguments)
         {
             RedirectStandardOutput = Module.Output.ReadStdout,
@@ -34,8 +39,10 @@ public sealed class SubprocessModuleWorker(IWorkerContext<SubprocessModule> cont
         SubprocessModuleResult result = new(executionResult.ExitCode, executionResult.StandardOutput, executionResult.StandardError);
         if (Module.CheckExitCode && result.ExitCode != 0)
         {
+            _logger.LogSubprocessFailed(executable, result.ExitCode);
             return runtime.Exit(Failed(result));
         }
+        _logger.LogSubprocessCompleted(executable, result.ExitCode);
         return runtime.Exit(Success(result));
     }
 }
