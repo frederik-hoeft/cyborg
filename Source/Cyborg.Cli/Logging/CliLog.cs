@@ -11,6 +11,6 @@ internal static partial class CliLog
     [ZLoggerMessage(LogLevel.Information, "Template {template} executed successfully")]
     public static partial void LogRunCompleted(this ILogger logger, string template);
 
-    [ZLoggerMessage(LogLevel.Error, "Template {template} execution failed")]
-    public static partial void LogRunFailed(this ILogger logger, string template, Exception exception);
+    [ZLoggerMessage(LogLevel.Warning, "Template {template} execution completed with status: {status}")]
+    public static partial void LogRunCompletedWithStatus(this ILogger logger, string template, string status);
 }

@@ -29,7 +29,14 @@ internal sealed class Commands
         };
         IModuleRuntime runtime = sp.GetRequiredService<IModuleRuntime>();
         logger.LogRunStarted(template);
-        await runtime.ExecuteAsync(module, cancellationToken);
-        logger.LogRunCompleted(template);
+        IModuleExecutionResult result = await runtime.ExecuteAsync(module, cancellationToken);
+        if (result.Status is ModuleExitStatus.Success or ModuleExitStatus.Skipped)
+        {
+            logger.LogRunCompleted(template);
+        }
+        else
+        {
+            logger.LogRunCompletedWithStatus(template, result.Status.ToString());
+        }
     }
 }

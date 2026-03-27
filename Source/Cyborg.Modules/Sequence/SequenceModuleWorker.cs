@@ -28,7 +28,7 @@ public sealed class SequenceModuleWorker(IWorkerContext<SequenceModule> context,
             IModuleExecutionResult result = await runtime.ExecuteAsync(step, cancellationToken);
             if (result.Status is ModuleExitStatus.Canceled or ModuleExitStatus.Failed)
             {
-                _logger.LogModuleCanceled(ModuleId);
+                _logger.LogModuleCompleted(ModuleId, result.Status.ToString());
                 return runtime.Exit(WithStatus(result.Status));
             }
             if (result.Status is ModuleExitStatus.Success)
