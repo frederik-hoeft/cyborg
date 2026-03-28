@@ -20,9 +20,20 @@ public sealed class DefaultChildProcessDispatcher(ILoggerFactory loggerFactory) 
         bool readStderr = processStartInfo.RedirectStandardError;
         List<Task<CommandOutput>> ioTasks = [];
         string executable = processStartInfo.FileName;
+        // join for display only — individual arguments are passed unmodified to the OS
+        string arguments = string.Join(" ", processStartInfo.ArgumentList);
+        _logger.LogProcessLaunching(executable, arguments);
         try
         {
-            process.Start();
+            try
+            {
+                process.Start();
+            }
+            catch (Exception e)
+            {
+                _logger.LogProcessStartFailed(executable, e);
+                throw;
+            }
             _logger.LogProcessStarted(executable);
             if (readStdout)
             {
