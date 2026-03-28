@@ -143,6 +143,36 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory, ILo
 
     public abstract Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken = default);
 
+    protected async Task<IModuleExecutionResult> ExecuteModuleAsync(IModuleRuntime root, IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken)
+    {
+        IRuntimeEnvironment boundEnvironment = environment.Bind(module);
+        IModuleRuntime runtime = new ScopedRuntime(root, parent: this, boundEnvironment, SyntaxFactory, LoggerFactory);
+        Logger.LogModuleDispatched(module.ModuleId, boundEnvironment.Name);
+        try
+        {
+            IModuleExecutionResult result = await module.ExecuteAsync(runtime, cancellationToken);
+            if (result.Status is ModuleExitStatus.Failed or ModuleExitStatus.Canceled)
+            {
+                Logger.LogModuleExecutionFailed(module.ModuleId, result.Status.ToString(), boundEnvironment.Name);
+            }
+            else
+            {
+                Logger.LogModuleCompleted(module.ModuleId, result.Status.ToString(), boundEnvironment.Name);
+            }
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            Logger.LogModuleCanceled(module.ModuleId, boundEnvironment.Name);
+            return new ModuleExecutionResult(module.Module, ModuleExitStatus.Canceled, boundEnvironment);
+        }
+        catch (Exception e)
+        {
+            Logger.LogModuleUnhandledException(module.ModuleId, boundEnvironment.Name, e);
+            return new ModuleExecutionResult(module.Module, ModuleExitStatus.Failed, boundEnvironment);
+        }
+    }
+
     public abstract bool TryAddEnvironment(IRuntimeEnvironment environment);
 
     public abstract bool TryGetEnvironment(string name, [NotNullWhen(true)] out IRuntimeEnvironment? environment);

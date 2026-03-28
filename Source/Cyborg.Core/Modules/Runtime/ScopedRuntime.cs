@@ -21,22 +21,10 @@ internal sealed class ScopedRuntime(IModuleRuntime root, IModuleRuntime parent, 
         return ExecuteAsync(module, scopedEnvironment, cancellationToken);
     }
 
-    public async override Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker module, IRuntimeEnvironment moduleEnvironment, CancellationToken cancellationToken = default)
+    public override Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker module, IRuntimeEnvironment moduleEnvironment, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(module);
-        IRuntimeEnvironment boundEnvironment = moduleEnvironment.Bind(module);
-        IModuleRuntime runtime = new ScopedRuntime(root, parent: this, boundEnvironment, SyntaxFactory, LoggerFactory);
-        Logger.LogModuleDispatched(module.ModuleId, boundEnvironment.Name);
-        IModuleExecutionResult result = await module.ExecuteAsync(runtime, cancellationToken);
-        if (result.Status is ModuleExitStatus.Failed or ModuleExitStatus.Canceled)
-        {
-            Logger.LogModuleExecutionFailed(module.ModuleId, result.Status.ToString(), boundEnvironment.Name);
-        }
-        else
-        {
-            Logger.LogModuleCompleted(module.ModuleId, result.Status.ToString(), boundEnvironment.Name);
-        }
-        return result;
+        return ExecuteModuleAsync(root, module, moduleEnvironment, cancellationToken);
     }
 
     public override bool TryAddEnvironment(IRuntimeEnvironment runtimeEnvironment) => root.TryAddEnvironment(runtimeEnvironment);

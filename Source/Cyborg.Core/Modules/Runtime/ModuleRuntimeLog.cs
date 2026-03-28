@@ -16,6 +16,12 @@ internal static partial class ModuleRuntimeLog
     [ZLoggerMessage(LogLevel.Warning, "Module '{moduleId}' in environment '{environment}' completed with non-success status: {status}")]
     public static partial void LogModuleExecutionFailed(this ILogger logger, string moduleId, string status, string environment);
 
+    [ZLoggerMessage(LogLevel.Warning, "Module '{moduleId}' in environment '{environment}' was canceled")]
+    public static partial void LogModuleCanceled(this ILogger logger, string moduleId, string environment);
+
+    [ZLoggerMessage(LogLevel.Error, "Module '{moduleId}' in environment '{environment}' threw an unhandled exception")]
+    public static partial void LogModuleUnhandledException(this ILogger logger, string moduleId, string environment, Exception exception);
+
     // ── Module context execution ──────────────────────────────────────────────
 
     [ZLoggerMessage(LogLevel.Debug, "Running configuration module '{configModuleId}' before main module '{mainModuleId}'")]
