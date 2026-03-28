@@ -1,12 +1,17 @@
 ﻿using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Runtime.Environments.Syntax;
+using Microsoft.Extensions.Logging;
 
 namespace Cyborg.Core.Modules.Runtime;
 
-public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory) : IModuleRuntime
+public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory, ILoggerFactory loggerFactory) : IModuleRuntime
 {
     private const string UNBOUND_ENVIRONMENT = "__UNBOUND";
+
+    protected ILoggerFactory LoggerFactory { get; } = loggerFactory;
+
+    protected ILogger Logger { get; } = loggerFactory.CreateLogger<ModuleRuntimeBase>();
 
     public abstract IRuntimeEnvironment GlobalEnvironment { get; }
 
