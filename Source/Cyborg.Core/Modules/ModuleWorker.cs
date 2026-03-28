@@ -19,6 +19,8 @@ public abstract class ModuleWorker<TModule>(IWorkerContext<TModule> context) : I
 
     protected IServiceProvider ServiceProvider => context.ServiceProvider;
 
+    protected ILogger Logger => _logger;
+
     IModule IModuleWorker.Module => context.Module;
 
     protected abstract Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken);

@@ -41,6 +41,7 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory, ILo
             EnvironmentScope.Reference => throw new ArgumentException("Attempting to create an environment by reference without providing an environment reference.", nameof(scope)),
             _ => throw new ArgumentOutOfRangeException(nameof(scope), scope, "Invalid environment scope.")
         };
+        Logger.LogEnvironmentCreated(scope.ToString(), name);
         parent.TryAddEnvironment(environment);
         return environment;
     }
@@ -62,6 +63,7 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory, ILo
             {
                 throw new InvalidOperationException($"Attempting to reference an environment that does not exist: {moduleEnvironment.Name}");
             }
+            Logger.LogNamedEnvironmentResolved(moduleEnvironment.Name);
         }
         environment ??= CreateScopedEnvironment(parent: this, moduleEnvironment.Scope, moduleEnvironment.Name, moduleEnvironment.Transient);
         if (overrideResolutionTags is not null)
@@ -73,6 +75,7 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory, ILo
                     throw new InvalidOperationException($"Override resolution tags must be valid identifiers: \"{tag}\"");
                 }
             }
+            Logger.LogOverrideTagsApplied(string.Join(", ", overrideResolutionTags), environment.Name);
             environment = environment.WithOverrideResolutionTags(overrideResolutionTags);
         }
         return environment;
@@ -93,6 +96,8 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory, ILo
             List<string> errors = [];
             List<(string Argument, object Value)> resolvedArguments = [];
             bool isNamespaced = !string.IsNullOrEmpty(ns);
+            string argumentNamespace = ns ?? "(none)";
+            Logger.LogTemplateArgumentsResolving(args.Count, moduleContext.Module.Module.ModuleId, argumentNamespace);
             if (!string.IsNullOrEmpty(ns) && !SyntaxFactory.IsValidIdentifier(ns))
             {
                 errors.Add($"Template namespaces must be valid identifiers: '{ns}'");
@@ -116,7 +121,9 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory, ILo
             }
             if (errors.Count > 0)
             {
-                throw new InvalidOperationException($"Module execution failed due to missing required arguments:{System.Environment.NewLine}    {string.Join($"{System.Environment.NewLine}    ", errors)}");
+                string errorMessage = $"Module execution failed due to missing required arguments:{System.Environment.NewLine}    {string.Join($"{System.Environment.NewLine}    ", errors)}";
+                Logger.LogTemplateArgumentResolutionFailed(moduleContext.Module.Module.ModuleId, errorMessage);
+                throw new InvalidOperationException(errorMessage);
             }
             // normalize resolved arguments to be unqualified by the template namespace, since they are now scoped to the current namespace and should be easily accessible
             foreach ((string argument, object value) in resolvedArguments)
@@ -126,6 +133,7 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory, ILo
         }
         if (moduleContext.Configuration is { } configuration)
         {
+            Logger.LogConfigurationModuleRunning(configuration.Module.ModuleId, moduleContext.Module.Module.ModuleId);
             await ExecuteAsync(configuration.Module, environment, cancellationToken);
         }
         return await ExecuteAsync(moduleContext.Module.Module, environment, cancellationToken);
@@ -150,6 +158,7 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory, ILo
         IModuleRuntime responsibleRuntime = Parent ?? this;
         ModuleEnvironment deploymentTarget = result.Module.Artifacts.Environment;
         IRuntimeEnvironment targetEnvironment = responsibleRuntime.PrepareEnvironment(deploymentTarget);
+        Logger.LogArtifactPublishing(TModule.ModuleId, deploymentTarget.Scope.ToString());
         targetEnvironment.Publish(artifacts);
         return new ModuleExecutionResult(result.Module, result.Status, artifacts);
     }

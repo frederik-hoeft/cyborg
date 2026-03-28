@@ -24,10 +24,13 @@ public sealed class IfModuleWorker(IWorkerContext<IfModule> context) : ModuleWor
         // @<child_module_id>.artifacts via @ override of child property
         string artifactsOverride = environment.SyntaxFactory.Path(environment.NamespaceOf(Module.Condition)).Property(Module.Artifacts).Override();
         environment.SetVariable(artifactsOverride, childArtifacts);
+        string conditionModuleId = Module.Condition.Module.ModuleId;
+        Logger.LogIfConditionEvaluating(conditionModuleId);
         IModuleExecutionResult result = await runtime.ExecuteAsync(Module.Condition.Module, environment, cancellationToken);
         if (result.Status is not ModuleExitStatus.Success)
         {
             // this was unexpected
+            Logger.LogIfConditionFailed(conditionModuleId, result.Status.ToString());
             return runtime.Exit(WithStatus(result.Status));
         }
         // ${@}.result, via ${@} self reference
@@ -36,13 +39,16 @@ public sealed class IfModuleWorker(IWorkerContext<IfModule> context) : ModuleWor
         if (!result.Artifacts.TryResolveVariable(resultVariable, out bool condition))
         {
             // this is not a valid result from the condition module
+            Logger.LogIfConditionResultUnreadable(conditionModuleId);
             return runtime.Exit(WithStatus(ModuleExitStatus.Failed));
         }
         ModuleContext? branchToExecute = condition ? Module.Then : Module.Else;
         if (branchToExecute is null)
         {
+            Logger.LogIfNoBranch(condition);
             return runtime.Exit(WithStatus(ModuleExitStatus.Skipped));
         }
+        Logger.LogIfBranchTaken(condition, condition ? "then" : "else");
         IModuleExecutionResult branchResult = await runtime.ExecuteAsync(branchToExecute, cancellationToken);
         return runtime.Exit(WithStatus(branchResult.Status));
     }

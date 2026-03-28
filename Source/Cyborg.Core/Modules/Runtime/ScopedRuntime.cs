@@ -28,7 +28,14 @@ internal sealed class ScopedRuntime(IModuleRuntime root, IModuleRuntime parent, 
         IModuleRuntime runtime = new ScopedRuntime(root, parent: this, boundEnvironment, SyntaxFactory, LoggerFactory);
         Logger.LogModuleDispatched(module.ModuleId, boundEnvironment.Name);
         IModuleExecutionResult result = await module.ExecuteAsync(runtime, cancellationToken);
-        Logger.LogModuleCompleted(module.ModuleId, result.Status.ToString(), boundEnvironment.Name);
+        if (result.Status is ModuleExitStatus.Failed or ModuleExitStatus.Canceled)
+        {
+            Logger.LogModuleExecutionFailed(module.ModuleId, result.Status.ToString(), boundEnvironment.Name);
+        }
+        else
+        {
+            Logger.LogModuleCompleted(module.ModuleId, result.Status.ToString(), boundEnvironment.Name);
+        }
         return result;
     }
 

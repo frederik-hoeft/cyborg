@@ -10,6 +10,7 @@ public sealed partial class GuardModuleWorker(IWorkerContext<GuardModule> contex
     {
         bool handledFailure = false;
         ModuleExitStatus? exitStatus = null;
+        Logger.LogGuardTryExecuting(ModuleId);
         try
         {
             IModuleExecutionResult result = await runtime.ExecuteAsync(Module.Try, cancellationToken);
@@ -17,6 +18,7 @@ public sealed partial class GuardModuleWorker(IWorkerContext<GuardModule> contex
             {
                 // prevent double handling of failure in the case where the catch block also fails
                 handledFailure = true;
+                Logger.LogGuardCatchTriggeredByFailure(ModuleId, result.Status.ToString());
                 IModuleExecutionResult<GuardModule> catchResult = await ExecuteCatchAsync(runtime, cancellationToken);
                 exitStatus = catchResult.Status;
             }
@@ -24,6 +26,7 @@ public sealed partial class GuardModuleWorker(IWorkerContext<GuardModule> contex
         // explicitly fail on cancellation (Ctrl-C, etc.)
         catch (Exception e) when (e is not OperationCanceledException)
         {
+            Logger.LogGuardCatchTriggeredByException(ModuleId, e.GetType().Name);
             if (handledFailure)
             {
                 return runtime.Exit(Failed());
@@ -35,11 +38,17 @@ public sealed partial class GuardModuleWorker(IWorkerContext<GuardModule> contex
         {
             if (!cancellationToken.IsCancellationRequested)
             {
+                Logger.LogGuardFinallyExecuting(ModuleId);
                 IModuleExecutionResult finallyResult = await runtime.ExecuteAsync(Module.Finally, cancellationToken);
                 exitStatus ??= finallyResult.Status;
             }
+            else
+            {
+                Logger.LogGuardFinallySkipped(ModuleId);
+            }
         }
         exitStatus ??= ModuleExitStatus.Failed;
+        Logger.LogGuardCompleted(ModuleId, exitStatus.Value.ToString());
         return runtime.Exit(WithStatus(exitStatus.Value));
     }
 
@@ -50,6 +59,7 @@ public sealed partial class GuardModuleWorker(IWorkerContext<GuardModule> contex
             IModuleExecutionResult catchResult = await runtime.ExecuteAsync(Module.Catch, cancellationToken);
             return WithStatus(catchResult.Status);
         }
+        Logger.LogGuardNoCatchBlock(ModuleId, Module.Behavior.ToString());
         if (Module.Behavior is GuardModuleBehavior.Swallow)
         {
             return Success();
