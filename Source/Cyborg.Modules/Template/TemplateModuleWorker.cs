@@ -13,7 +13,9 @@ public sealed class TemplateModuleWorker(IWorkerContext<TemplateModule> context,
 {
     protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
+        Logger.LogTemplateLoading(Module.Path);
         ModuleContext moduleContext = await configurationLoader.LoadModuleAsync(Module.Path, cancellationToken);
+        Logger.LogTemplateLoaded(moduleContext.Module.Module.ModuleId, Module.Path);
         IRuntimeEnvironment environment = runtime.PrepareEnvironment(moduleContext);
         List<string> templateErrors = [];
         foreach (DynamicKeyValuePair entry in Module.Arguments)
@@ -44,8 +46,11 @@ public sealed class TemplateModuleWorker(IWorkerContext<TemplateModule> context,
         }
         if (templateErrors.Count > 0)
         {
-            throw new InvalidOperationException($"Template module '{Module.ToDisplayString()}' has invalid arguments or overrides:{Environment.NewLine}- {string.Join($"{Environment.NewLine}- ", templateErrors)}");
+            string errorSummary = $"{Environment.NewLine}- {string.Join($"{Environment.NewLine}- ", templateErrors)}";
+            Logger.LogTemplateConfigurationError(Module.Path, errorSummary);
+            throw new InvalidOperationException($"Template module '{Module.ToDisplayString()}' has invalid arguments or overrides:{errorSummary}");
         }
+        Logger.LogTemplateArgumentsApplied(Module.Arguments.Count, Module.Overrides.Count, Module.Path);
         IModuleExecutionResult executionResult = await runtime.ExecuteAsync(moduleContext, environment, cancellationToken);
         return runtime.Exit(WithStatus(executionResult.Status));
     }

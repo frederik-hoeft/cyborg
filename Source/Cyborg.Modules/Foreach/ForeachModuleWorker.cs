@@ -13,17 +13,19 @@ public sealed class ForeachModuleWorker(IWorkerContext<ForeachModule> context) :
     {
         if (!runtime.Environment.TryResolveVariable(Module.Collection, out IEnumerable<object>? collection))
         {
-            // TODO: proper failure result once we have logging
+            Logger.LogCollectionNotFound(Module.Collection);
             throw new InvalidOperationException($"Collection variable '{Module.Collection}' not found in the current environment.");
         }
         ModuleExitStatus exitCode = ModuleExitStatus.Skipped;
+        int iteration = 0;
         foreach (object item in collection)
         {
             if (cancellationToken.IsCancellationRequested)
             {
-                // TODO: logging
+                Logger.LogForeachCanceled(iteration);
                 return runtime.Exit(Canceled());
             }
+            Logger.LogForeachIteration(++iteration, Module.ItemVariable);
             IRuntimeEnvironment loopEnvironment = runtime.PrepareEnvironment(Module.Body);
             if (item is IDecomposable decomposable)
             {
@@ -36,14 +38,17 @@ public sealed class ForeachModuleWorker(IWorkerContext<ForeachModule> context) :
             IModuleExecutionResult result = await runtime.ExecuteAsync(Module.Body, loopEnvironment, cancellationToken);
             if (result.Status is ModuleExitStatus.Canceled)
             {
+                Logger.LogForeachCanceled(iteration);
                 return runtime.Exit(Canceled());
             }
             if (result.Status is ModuleExitStatus.Failed)
             {
                 if (!Module.ContinueOnError)
                 {
+                    Logger.LogForeachIterationFailedAborting(iteration);
                     return runtime.Exit(Failed());
                 }
+                Logger.LogForeachIterationFailedContinuing(iteration);
                 exitCode = ModuleExitStatus.Failed;
             }
             else if (result.Status is ModuleExitStatus.Success && exitCode is ModuleExitStatus.Skipped)
@@ -51,6 +56,7 @@ public sealed class ForeachModuleWorker(IWorkerContext<ForeachModule> context) :
                 exitCode = ModuleExitStatus.Success;
             }
         }
+        Logger.LogForeachCompleted(iteration, exitCode.ToString());
         return runtime.Exit(WithStatus(exitCode));
     }
 }

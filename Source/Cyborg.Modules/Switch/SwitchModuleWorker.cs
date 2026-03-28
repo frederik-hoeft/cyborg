@@ -12,12 +12,15 @@ public sealed class SwitchModuleWorker(IWorkerContext<SwitchModule> context, IMo
     {
         if (!runtime.Environment.TryResolveVariable(Module.Variable, out string? caseName))
         {
+            Logger.LogSwitchVariableNotFound(Module.Variable);
             throw new InvalidOperationException("Failed to resolve case from environment.");
         }
         if (!Module.Cases.ToDictionary(static t => t.Name, static t => t.Path).TryGetValue(caseName, out string? templatePath))
         {
+            Logger.LogSwitchCaseNotFound(caseName);
             throw new InvalidOperationException($"Template '{caseName}' not found in cases.");
         }
+        Logger.LogSwitchCaseSelected(caseName, templatePath);
         // Load the case content from the specified path
         ModuleContext module = await configurationLoader.LoadModuleAsync(templatePath, cancellationToken);
         IModuleExecutionResult result = await runtime.ExecuteAsync(module, cancellationToken);

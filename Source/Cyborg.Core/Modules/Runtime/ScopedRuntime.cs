@@ -1,9 +1,10 @@
 ﻿using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Runtime.Environments.Syntax;
+using Microsoft.Extensions.Logging;
 
 namespace Cyborg.Core.Modules.Runtime;
 
-internal sealed class ScopedRuntime(IModuleRuntime root, IModuleRuntime parent, IRuntimeEnvironment environment, VariableSyntaxBuilder syntaxFactory) : ModuleRuntimeBase(syntaxFactory)
+internal sealed class ScopedRuntime(IModuleRuntime root, IModuleRuntime parent, IRuntimeEnvironment environment, VariableSyntaxBuilder syntaxFactory, ILoggerFactory loggerFactory) : ModuleRuntimeBase(syntaxFactory, loggerFactory)
 {
     public override IRuntimeEnvironment GlobalEnvironment => root.GlobalEnvironment;
 
@@ -16,30 +17,27 @@ internal sealed class ScopedRuntime(IModuleRuntime root, IModuleRuntime parent, 
 
     public override Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker module, EnvironmentScope scope = EnvironmentScope.Global, string? name = null, CancellationToken cancellationToken = default)
     {
-        IRuntimeEnvironment environment = CreateScopedEnvironment(parent: this, scope, name);
-        return ExecuteAsync(module, environment, cancellationToken);
+        IRuntimeEnvironment scopedEnvironment = CreateScopedEnvironment(parent: this, scope, name);
+        return ExecuteAsync(module, scopedEnvironment, cancellationToken);
     }
 
-    public async override Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken = default)
+    public override Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker module, IRuntimeEnvironment moduleEnvironment, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(module);
-        IRuntimeEnvironment boundEnvironment = environment.Bind(module);
-        IModuleRuntime runtime = new ScopedRuntime(root, parent: this, boundEnvironment, SyntaxFactory);
-        IModuleExecutionResult result = await module.ExecuteAsync(runtime, cancellationToken);
-        return result;
+        return ExecuteModuleAsync(root, module, moduleEnvironment, cancellationToken);
     }
 
-    public override bool TryAddEnvironment(IRuntimeEnvironment environment) => root.TryAddEnvironment(environment);
+    public override bool TryAddEnvironment(IRuntimeEnvironment runtimeEnvironment) => root.TryAddEnvironment(runtimeEnvironment);
 
-    public override bool TryGetEnvironment(string name, [NotNullWhen(true)] out IRuntimeEnvironment? environment)
+    public override bool TryGetEnvironment(string name, [NotNullWhen(true)] out IRuntimeEnvironment? runtimeEnvironment)
     {
         if (Environment.Name.Equals(name, StringComparison.Ordinal))
         {
-            environment = Environment;
+            runtimeEnvironment = Environment;
             return true;
         }
-        return parent.TryGetEnvironment(name, out environment);
+        return parent.TryGetEnvironment(name, out runtimeEnvironment);
     }
 
-    public override bool TryRemoveEnvironment(IRuntimeEnvironment environment) => root.TryRemoveEnvironment(environment);
+    public override bool TryRemoveEnvironment(IRuntimeEnvironment runtimeEnvironment) => root.TryRemoveEnvironment(runtimeEnvironment);
 }

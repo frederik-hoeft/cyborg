@@ -1,9 +1,12 @@
-﻿using System.Diagnostics;
+﻿using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 
 namespace Cyborg.Core.Services.Dispatch;
 
-public sealed class DefaultChildProcessDispatcher : IChildProcessDispatcher
+public sealed class DefaultChildProcessDispatcher(ILoggerFactory loggerFactory) : IChildProcessDispatcher
 {
+    private readonly ILogger<DefaultChildProcessDispatcher> _logger = loggerFactory.CreateLogger<DefaultChildProcessDispatcher>();
+
     public async Task<ChildProcessResult> ExecuteAsync(ProcessStartInfo processStartInfo, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(processStartInfo);
@@ -16,9 +19,22 @@ public sealed class DefaultChildProcessDispatcher : IChildProcessDispatcher
         bool readStdout = processStartInfo.RedirectStandardOutput;
         bool readStderr = processStartInfo.RedirectStandardError;
         List<Task<CommandOutput>> ioTasks = [];
+        string executable = processStartInfo.FileName;
+        // join for display only — individual arguments are passed unmodified to the OS
+        string arguments = string.Join(" ", processStartInfo.ArgumentList);
+        _logger.LogProcessLaunching(executable, arguments);
         try
         {
-            process.Start();
+            try
+            {
+                process.Start();
+            }
+            catch (Exception e)
+            {
+                _logger.LogProcessStartFailed(executable, e);
+                throw;
+            }
+            _logger.LogProcessStarted(executable);
             if (readStdout)
             {
                 ioTasks.Add(ReadStreamAsync(process.StandardOutput, static (result, data) => result.StandardOutput = data, cancellationToken));
@@ -37,6 +53,7 @@ public sealed class DefaultChildProcessDispatcher : IChildProcessDispatcher
                 if (!process.HasExited)
                 {
                     process.Kill(entireProcessTree: true);
+                    _logger.LogProcessKilled(executable);
                 }
             }
             catch (InvalidOperationException)
@@ -50,7 +67,9 @@ public sealed class DefaultChildProcessDispatcher : IChildProcessDispatcher
         {
             io.CollectResult(builder);
         }
-        return builder.Build(process.ExitCode);
+        ChildProcessResult childProcessResult = builder.Build(process.ExitCode);
+        _logger.LogProcessExited(executable, childProcessResult.ExitCode);
+        return childProcessResult;
     }
 
     private static async Task<CommandOutput> ReadStreamAsync(StreamReader reader, Action<SubprocessResultBuilder, string> setResult, CancellationToken cancellationToken)

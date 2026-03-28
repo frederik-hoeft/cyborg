@@ -1,8 +1,9 @@
 ﻿using Cyborg.Core.Modules.Runtime.Environments;
+using Microsoft.Extensions.Logging;
 
 namespace Cyborg.Core.Modules.Runtime;
 
-public sealed class RootModuleRuntime(GlobalRuntimeEnvironment defaultEnvironment) : ModuleRuntimeBase(defaultEnvironment.SyntaxFactory)
+public sealed class RootModuleRuntime(GlobalRuntimeEnvironment defaultEnvironment, ILoggerFactory loggerFactory) : ModuleRuntimeBase(defaultEnvironment.SyntaxFactory, loggerFactory)
 {
     private readonly Dictionary<string, IRuntimeEnvironment> _environments = [];
 
@@ -47,12 +48,9 @@ public sealed class RootModuleRuntime(GlobalRuntimeEnvironment defaultEnvironmen
         return ExecuteAsync(module, environment, cancellationToken);
     }
 
-    public async override Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken = default)
+    public override Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(module);
-        IRuntimeEnvironment boundEnvironment = environment.Bind(module);
-        IModuleRuntime runtime = new ScopedRuntime(root: this, parent: this, boundEnvironment, SyntaxFactory);
-        IModuleExecutionResult result = await module.ExecuteAsync(runtime, cancellationToken);
-        return result;
+        return ExecuteModuleAsync(root: this, module, environment, cancellationToken);
     }
 }

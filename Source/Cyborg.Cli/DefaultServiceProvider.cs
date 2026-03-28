@@ -9,4 +9,5 @@ namespace Cyborg.Cli;
 [Import<ICyborgCoreServices>]
 [Import<ICyborgModuleServices>]
 [Import<ICyborgBorgServices>]
+[Import<ICyborgCliLoggingServices>]
 internal sealed partial class DefaultServiceProvider;

@@ -34,6 +34,7 @@ public sealed class SubprocessModuleWorker(IWorkerContext<SubprocessModule> cont
         SubprocessModuleResult result = new(executionResult.ExitCode, executionResult.StandardOutput, executionResult.StandardError);
         if (Module.CheckExitCode && result.ExitCode != 0)
         {
+            Logger.LogSubprocessFailed(executable, result.ExitCode);
             return runtime.Exit(Failed(result));
         }
         return runtime.Exit(Success(result));
