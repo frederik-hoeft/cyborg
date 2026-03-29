@@ -50,6 +50,10 @@ public sealed class BorgCreateModuleWorker
             "--stats", "--json",
             "--compression", Module.Compression
         ];
+        if (IsDryRun)
+        {
+            arguments.Add("--dry-run");
+        }
         if (Module.Exclude.Caches)
         {
             arguments.Add("--exclude-caches");
