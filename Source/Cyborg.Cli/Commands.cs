@@ -5,6 +5,7 @@ using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Services.Metrics;
+using Cyborg.Modules.Borg;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics.CodeAnalysis;
@@ -15,11 +16,16 @@ namespace Cyborg.Cli;
 internal sealed class Commands
 {
     [Command("run")]
-    public async Task RunAsync([Argument] string template, string metricsNamespace = "cyborg", CancellationToken cancellationToken = default)
+    public async Task RunAsync([Argument] string template, string metricsNamespace = "cyborg", bool dryRun = false, CancellationToken cancellationToken = default)
     {
         using DefaultServiceProvider sp = new();
         ILogger<Commands> logger = sp.GetRequiredService<ILoggerFactory>().CreateLogger<Commands>();
-        sp.GetRequiredService<GlobalRuntimeEnvironment>().SetVariable("template", template);
+        GlobalRuntimeEnvironment globalEnvironment = sp.GetRequiredService<GlobalRuntimeEnvironment>();
+        globalEnvironment.SetVariable("template", template);
+        if (dryRun)
+        {
+            globalEnvironment.SetVariable(BorgWellKnownVariables.DRY_RUN, true);
+        }
         sp.GetRequiredService<MetricsCollectorOptions>().Namespace = metricsNamespace;
         IModuleConfigurationLoader configurationLoader = sp.GetService<IModuleConfigurationLoader>();
         ModuleContext module = await configurationLoader.LoadModuleAsync("test.json", cancellationToken);

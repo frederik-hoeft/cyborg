@@ -20,6 +20,10 @@ public sealed class BorgCompactModuleWorker
             "compact",
             "--threshold", Module.Threshold.ToString(),
         ];
+        if (IsDryRun(runtime))
+        {
+            arguments.Add("--dry-run");
+        }
         arguments.Add(Module.RemoteRepository.GetRepositoryUri());
         ProcessStartInfo startInfo = new(Module.Executable, arguments);
         AddDefaults(startInfo);

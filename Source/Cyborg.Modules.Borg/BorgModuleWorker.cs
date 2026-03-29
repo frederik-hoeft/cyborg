@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Modules;
+using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Validation;
 using Cyborg.Core.Services.Dispatch;
 using Cyborg.Core.Services.Metrics;
@@ -15,6 +16,9 @@ public abstract class BorgModuleWorker<TModule>
 {
     protected const string BORG_RSH_ENV_VAR = "BORG_RSH";
     protected const string BORG_PASSPHRASE_ENV_VAR = "BORG_PASSPHRASE";
+
+    protected static bool IsDryRun(IModuleRuntime runtime) =>
+        runtime.Environment.TryResolveVariable<bool>(BorgWellKnownVariables.DRY_RUN, out bool dryRun) && dryRun;
 
     protected void AddDefaults(ProcessStartInfo startInfo)
     {
