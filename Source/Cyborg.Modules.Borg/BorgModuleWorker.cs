@@ -17,10 +17,7 @@ public abstract class BorgModuleWorker<TModule>
     protected const string BORG_RSH_ENV_VAR = "BORG_RSH";
     protected const string BORG_PASSPHRASE_ENV_VAR = "BORG_PASSPHRASE";
 
-    private bool? _isDryRun;
-    protected bool IsDryRun(IModuleRuntime runtime) => _isDryRun ??= ResolveDryRun(runtime);
-
-    private static bool ResolveDryRun(IModuleRuntime runtime) =>
+    protected static bool IsDryRun(IModuleRuntime runtime) =>
         runtime.Environment.TryResolveVariable<bool>(BorgWellKnownVariables.DRY_RUN, out bool dryRun) && dryRun;
 
     protected void AddDefaults(ProcessStartInfo startInfo)
