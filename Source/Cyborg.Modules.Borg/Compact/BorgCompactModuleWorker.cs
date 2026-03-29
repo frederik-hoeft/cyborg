@@ -20,7 +20,7 @@ public sealed class BorgCompactModuleWorker
             "compact",
             "--threshold", Module.Threshold.ToString(),
         ];
-        if (IsDryRun)
+        if (IsDryRun(runtime))
         {
             arguments.Add("--dry-run");
         }

@@ -40,7 +40,7 @@ public sealed class BorgPruneModuleWorker
             "--list", "--log-json",
             "--checkpoint-interval", Module.CheckpointIntervalSeconds.ToString(),
         ];
-        if (IsDryRun)
+        if (IsDryRun(runtime))
         {
             arguments.Add("--dry-run");
         }

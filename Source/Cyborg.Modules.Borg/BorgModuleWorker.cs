@@ -1,10 +1,9 @@
 ﻿using Cyborg.Core.Modules;
-using Cyborg.Core.Modules.Runtime.Environments;
+using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Validation;
 using Cyborg.Core.Services.Dispatch;
 using Cyborg.Core.Services.Metrics;
 using Cyborg.Modules.Borg.Model;
-using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
 
 namespace Cyborg.Modules.Borg;
@@ -19,10 +18,10 @@ public abstract class BorgModuleWorker<TModule>
     protected const string BORG_PASSPHRASE_ENV_VAR = "BORG_PASSPHRASE";
 
     private bool? _isDryRun;
-    protected bool IsDryRun => _isDryRun ??= ResolveDryRun();
+    protected bool IsDryRun(IModuleRuntime runtime) => _isDryRun ??= ResolveDryRun(runtime);
 
-    private bool ResolveDryRun() =>
-        ServiceProvider.GetRequiredService<GlobalRuntimeEnvironment>().TryResolveVariable<bool>(BorgWellKnownVariables.DRY_RUN, out bool dryRun) && dryRun;
+    private static bool ResolveDryRun(IModuleRuntime runtime) =>
+        runtime.Environment.TryResolveVariable<bool>(BorgWellKnownVariables.DRY_RUN, out bool dryRun) && dryRun;
 
     protected void AddDefaults(ProcessStartInfo startInfo)
     {
