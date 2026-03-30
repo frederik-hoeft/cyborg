@@ -10,6 +10,7 @@ public sealed class SshShutdownModuleWorker(IWorkerContext<SshShutdownModule> co
 {
     protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
+        Logger.LogSshShutdownSending(Module.Hostname);
         List<string> sshArguments = [$"{Module.Username}@{Module.Hostname}:{Module.Port}", Module.ShutdownCommand];
         (string executable, List<string> arguments) = Module.SshPass switch
         {
@@ -22,8 +23,10 @@ public sealed class SshShutdownModuleWorker(IWorkerContext<SshShutdownModule> co
         SshShutdownModuleResult result = new(processResult.ExitCode, processResult.StandardOutput, processResult.StandardError);
         if (result.ExitCode != 0)
         {
+            Logger.LogSshShutdownFailed(Module.Hostname, result.ExitCode);
             return runtime.Exit(Failed(result));
         }
+        Logger.LogSshShutdownSucceeded(Module.Hostname);
         return runtime.Exit(Success(result));
     }
 }
