@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 namespace Cyborg.Cli;
 
 [JsonSourceGenerationOptions(ReadCommentHandling = JsonCommentHandling.Skip, UseStringEnumConverter = true, PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower, IncludeFields = true)]
+[JsonSerializable(typeof(GlobalLoggingOptions))]
 [JsonSerializable(typeof(RollingFileLoggingConfiguratorOptions))]
 [JsonSerializable(typeof(FileLoggingConfiguratorOptions))]
 [JsonSerializable(typeof(ConsoleLoggingConfiguratorOptions))]

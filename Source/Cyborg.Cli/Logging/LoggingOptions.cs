@@ -4,5 +4,5 @@ namespace Cyborg.Cli.Logging;
 
 internal sealed class LoggingOptions
 {
-    public LogLevel MinimumLevel { get; set; } = LogLevel.Information;
+    public LogLevel? MinimumLevel { get; set; }
 }
