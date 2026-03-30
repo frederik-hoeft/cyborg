@@ -1,5 +1,4 @@
-﻿using Cyborg.Cli.Logging;
-using Cyborg.Core;
+﻿using Cyborg.Core;
 using Cyborg.Modules;
 using Cyborg.Modules.Borg;
 using Jab;
@@ -11,7 +10,7 @@ namespace Cyborg.Cli;
 [Import<ICyborgCoreServices>]
 [Import<ICyborgModuleServices>]
 [Import<ICyborgBorgServices>]
-[Import<ICyborgCliLoggingServices>]
+[Import<ICyborgCliServiceOptions>]
 [Singleton<JsonSerializerContext>(Factory = nameof(GetCliJsonSerializerContext))]
 internal sealed partial class DefaultServiceProvider
 {

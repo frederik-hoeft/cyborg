@@ -24,6 +24,13 @@
         "path": "/var/log/cyborg/latest.log",
         "format": "json"
       }
+    },
+    {
+      "key": "cyborg.services.metrics",
+      "cyborg.types.services.metrics.v1": {
+        "namespace": "cyborg",
+        "file_path": "/var/log/cyborg/metrics.prom"
+      }
     }
   ]
 }

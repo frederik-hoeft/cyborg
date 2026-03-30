@@ -1,5 +1,6 @@
 ﻿using ConsoleAppFramework;
 using Cyborg.Cli.Logging;
+using Cyborg.Cli.Metrics;
 using Cyborg.Core.Configuration;
 using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
@@ -20,10 +21,10 @@ internal sealed class Commands
 
     [Command("run")]
     public async Task RunAsync([Argument] string target,
-        string metricsNamespace = "cyborg",
         bool dryRun = false,
         string mainModulePath = $"{CYBORG_ROOT}/cyborg.jconf",
         string optionsPath = $"{CYBORG_ROOT}/cyborg.options.jconf",
+        string? metricsOutputPath = null,
         CancellationToken cancellationToken = default)
     {
         using DefaultServiceProvider services = new();
@@ -38,7 +39,9 @@ internal sealed class Commands
         {
             globalEnvironment.SetVariable(BorgWellKnownVariables.DRY_RUN, true);
         }
-        services.GetRequiredService<MetricsCollectorOptions>().Namespace = metricsNamespace;
+        MetricsOptions metricsOptions = configuration.Get("cyborg.services.metrics", () => new MetricsOptions());
+
+        services.GetRequiredService<MetricsCollectorOptions>().Namespace = metricsOptions.Namespace;
         IModuleConfigurationLoader moduleLoader = services.GetService<IModuleConfigurationLoader>();
         ModuleContext module = await moduleLoader.LoadModuleAsync(mainModulePath, cancellationToken);
         module = module with 
@@ -64,5 +67,13 @@ internal sealed class Commands
                 await logStream.CopyToAsync(stdout, cancellationToken);
             }
         }
+        IMetricsCollector metrics = services.GetRequiredService<IMetricsCollector>();
+        string metricsDestinationPath = metricsOutputPath ?? metricsOptions.FilePath;
+        string tempDestination = $"{metricsDestinationPath}.tmp";
+        await using (Stream metricsOutput = File.OpenWrite(tempDestination))
+        {
+            await metrics.WriteToAsync(metricsOutput, cancellationToken);
+        }
+        File.Move(tempDestination, metricsDestinationPath, overwrite: true);
     }
 }

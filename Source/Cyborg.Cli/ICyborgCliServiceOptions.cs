@@ -1,4 +1,6 @@
+using Cyborg.Cli.Logging;
 using Cyborg.Cli.Logging.Options;
+using Cyborg.Cli.Metrics;
 using Cyborg.Core.Logging;
 using Cyborg.Core.Modules.Configuration.Serialization;
 using Jab;
@@ -7,7 +9,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using ZLogger.Providers;
 
-namespace Cyborg.Cli.Logging;
+namespace Cyborg.Cli;
 
 [ServiceProviderModule]
 [Singleton<ILoggingConfigurator, ConsoleLoggingConfigurator>]
@@ -16,10 +18,11 @@ namespace Cyborg.Cli.Logging;
 [Singleton<IDynamicValueProvider, DynamicRollingFileLoggingConfiguratorOptionsProvider>]
 [Singleton<IDynamicValueProvider, DynamicFileLoggingConfiguratorOptionsProvider>]
 [Singleton<IDynamicValueProvider, DynamicConsoleLoggingConfiguratorOptionsProvider>]
+[Singleton<IDynamicValueProvider, DynamicMetricsOptionsProvider>]
 [Singleton<ILoggerFactory>(Factory = nameof(CreateLoggerFactory))]
 [Singleton<JsonConverter>(Factory = nameof(CreateRollingIntervalConverter))]
 [Singleton<JsonConverter>(Factory = nameof(CreateLogFormatConverter))]
-internal interface ICyborgCliLoggingServices
+internal interface ICyborgCliServiceOptions
 {
     static ILoggerFactory CreateLoggerFactory(IEnumerable<ILoggingConfigurator> configurators) =>
         LoggerFactory.Create(builder =>
