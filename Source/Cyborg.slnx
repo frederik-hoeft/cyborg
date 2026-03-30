@@ -2,6 +2,8 @@
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
     <File Path="Directory.Build.props" />
+    <File Path="docker-build.sh" />
+    <File Path="Dockerfile" />
   </Folder>
   <Project Path="Cyborg.Cli/Cyborg.Cli.csproj" />
   <Project Path="Cyborg.Core.Aot/Cyborg.Core.Aot.csproj" />

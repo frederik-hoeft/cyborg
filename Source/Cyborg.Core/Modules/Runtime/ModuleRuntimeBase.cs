@@ -145,6 +145,10 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory, ILo
 
     protected async Task<IModuleExecutionResult> ExecuteModuleAsync(IModuleRuntime root, IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(root);
+        ArgumentNullException.ThrowIfNull(module);
+        ArgumentNullException.ThrowIfNull(environment);
+
         IRuntimeEnvironment boundEnvironment = environment.Bind(module);
         IModuleRuntime runtime = new ScopedRuntime(root, parent: this, boundEnvironment, SyntaxFactory, LoggerFactory);
         Logger.LogModuleDispatched(module.ModuleId, boundEnvironment.Name);

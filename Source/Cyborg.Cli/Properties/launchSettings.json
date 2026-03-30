@@ -3,6 +3,9 @@
     "Cyborg.Cli": {
       "commandName": "Project",
       "commandLineArgs": "run daily"
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker"
     }
   }
 }

@@ -1,0 +1,29 @@
+{
+  "options": [
+    {
+      "key": "cyborg.services.logging.rolling",
+      "cyborg.types.services.logging.rolling.v1": {
+        "enabled": true,
+        "path": "/var/log/cyborg",
+        "rolling_inteval": "day",
+        "rolling_size_bytes": 10485760,
+        "format": "json"
+      }
+    },
+    {
+      "key": "cyborg.services.logging.console",
+      "cyborg.types.services.logging.console.v1": {
+        "enabled": true,
+        "format": "json"
+      }
+    },
+    {
+      "key": "cyborg.services.logging.file",
+      "cyborg.types.services.logging.file.v1": {
+        "enabled": true,
+        "path": "/var/log/cyborg/latest.log",
+        "format": "json"
+      }
+    }
+  ]
+}

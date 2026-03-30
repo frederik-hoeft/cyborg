@@ -1,5 +1,8 @@
 {
   "environment": { "scope": "global" },
+  "requires": {
+    "arguments": [ "target" ]
+  },
   "configuration": {
     "cyborg.modules.config.collection.v1": {
       "sources": [
@@ -15,7 +18,7 @@
         },
         {
           "cyborg.modules.config.external.v1": {
-            "path": "${cyborg_config_root}/cyborg.hosts.jconf"
+            "path": "${cyborg_config_root}/cyborg.hosts.jsecrets"
           }
         }
       ]
@@ -78,7 +81,7 @@
               "entries": [
                 {
                   "key": "job_directory",
-                  "string": "${cyborg_job_root}/${template}"
+                  "string": "${cyborg_job_root}/${target}"
                 }
               ]
             }

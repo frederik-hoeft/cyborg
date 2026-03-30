@@ -13,18 +13,18 @@ RUN apt-get update \
 WORKDIR /src
 
 # Copy solution and project files first to enable NuGet restore layer caching
-COPY Source/Cyborg.slnx Source/Directory.Build.props Source/
-COPY Source/Cyborg.Cli/Cyborg.Cli.csproj Source/Cyborg.Cli/
-COPY Source/Cyborg.Core/Cyborg.Core.csproj Source/Cyborg.Core/
-COPY Source/Cyborg.Core.Aot/Cyborg.Core.Aot.csproj Source/Cyborg.Core.Aot/
-COPY Source/Cyborg.Modules/Cyborg.Modules.csproj Source/Cyborg.Modules/
-COPY Source/Cyborg.Modules.Borg/Cyborg.Modules.Borg.csproj Source/Cyborg.Modules.Borg/
+COPY Cyborg.slnx Directory.Build.props Source/
+COPY Cyborg.Cli/Cyborg.Cli.csproj Source/Cyborg.Cli/
+COPY Cyborg.Core/Cyborg.Core.csproj Source/Cyborg.Core/
+COPY Cyborg.Core.Aot/Cyborg.Core.Aot.csproj Source/Cyborg.Core.Aot/
+COPY Cyborg.Modules/Cyborg.Modules.csproj Source/Cyborg.Modules/
+COPY Cyborg.Modules.Borg/Cyborg.Modules.Borg.csproj Source/Cyborg.Modules.Borg/
 
 # Restore NuGet packages for the target runtime
 RUN dotnet restore Source/Cyborg.Cli/Cyborg.Cli.csproj --runtime linux-x64
 
 # Copy remaining source files
-COPY Source/ Source/
+COPY ./ Source/
 
 # Publish the native AOT binary for linux-x64
 RUN dotnet publish Source/Cyborg.Cli/Cyborg.Cli.csproj \
@@ -36,4 +36,4 @@ RUN dotnet publish Source/Cyborg.Cli/Cyborg.Cli.csproj \
 
 # Artifact stage: contains only the published native binary for host export
 FROM scratch AS artifact
-COPY --from=build /artifacts/Cyborg.Cli /Cyborg.Cli
+COPY --from=build /artifacts/cyborg /cyborg

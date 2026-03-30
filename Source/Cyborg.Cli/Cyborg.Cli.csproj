@@ -9,6 +9,7 @@
         <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
         <IsAotCompatible>true</IsAotCompatible>
         <PublishTrimmed>true</PublishTrimmed>
+        <AssemblyName>cyborg</AssemblyName>
     </PropertyGroup>
     
     <ItemGroup>
@@ -24,29 +25,9 @@
         <ProjectReference Include="..\Cyborg.Core\Cyborg.Core.csproj" />
         <ProjectReference Include="..\Cyborg.Modules\Cyborg.Modules.csproj" />
         <ProjectReference Include="..\Cyborg.Modules.Borg\Cyborg.Modules.Borg.csproj" />
-    </ItemGroup>
-    
-    <ItemGroup>
-      <None Update="check_variables.jconf">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="hosts.jsecrets">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="jobs\daily\backup-template.jconf">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="test.json">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="cyborg.jconf">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="jobs\daily\passbolt.jconf">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="daily.json">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
+        <ProjectReference Include="..\Cyborg.Core.Aot\Cyborg.Core.Aot.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </ProjectReference>
     </ItemGroup>
 </Project>

@@ -5,12 +5,12 @@ namespace Cyborg.Cli.Logging;
 
 internal static partial class CliLog
 {
-    [ZLoggerMessage(LogLevel.Information, "Starting execution of template: {template}")]
-    public static partial void LogRunStarted(this ILogger logger, string template);
+    [ZLoggerMessage(LogLevel.Information, "Starting execution of backup target: {target}")]
+    public static partial void LogRunStarted(this ILogger logger, string target);
 
-    [ZLoggerMessage(LogLevel.Information, "Template {template} executed successfully")]
-    public static partial void LogRunCompleted(this ILogger logger, string template);
+    [ZLoggerMessage(LogLevel.Information, "Backup target {target} executed successfully")]
+    public static partial void LogRunCompleted(this ILogger logger, string target);
 
-    [ZLoggerMessage(LogLevel.Warning, "Template {template} execution completed with status: {status}")]
-    public static partial void LogRunCompletedWithStatus(this ILogger logger, string template, string status);
+    [ZLoggerMessage(LogLevel.Warning, "Backup target {target} execution completed with status: {status}")]
+    public static partial void LogRunCompletedWithStatus(this ILogger logger, string target, string status);
 }
