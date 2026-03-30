@@ -1,4 +1,5 @@
-﻿using Cyborg.Core.Modules.Configuration;
+﻿using Cyborg.Core.Configuration;
+using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Configuration.Serialization;
 using Cyborg.Core.Modules.Runtime;
@@ -16,6 +17,8 @@ namespace Cyborg.Core;
 
 [ServiceProviderModule]
 [Import<IDynamicValueProviderServices>]
+[Singleton<IConfiguration, DefaultConfiguration>]
+[Singleton<IConfigurationLoader, DefaultConfigurationLoader>]
 [Singleton<INamedServiceProvider, NamedServiceProvider>]
 [Singleton<IModuleLoaderContext, DefaultModuleLoaderContext>]
 [Singleton<IModuleLoaderContextProvider, DefaultModuleLoaderContextProvider>]

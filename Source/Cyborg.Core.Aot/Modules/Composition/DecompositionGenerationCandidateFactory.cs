@@ -1,5 +1,7 @@
 ﻿using Cyborg.Core.Aot.Extensions;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Collections.Immutable;
 
 namespace Cyborg.Core.Aot.Modules.Composition;
@@ -28,8 +30,7 @@ internal static class DecompositionGenerationCandidateFactory
 
         ImmutableArray<IPropertySymbol> decomposableProperties =
         [
-            .. typeSymbol.GetMembers()
-                .OfType<IPropertySymbol>()
+            .. typeSymbol.GetMembers().OfType<IPropertySymbol>()
                 .Where(static property => property.DeclaredAccessibility is Accessibility.Public)
                 .Where(static property => !property.GetAttributes().Any(static attr => attr.AttributeClass?.ToDisplayString() == typeof(DecomposeIgnoreAttribute).FullName))
         ];
@@ -53,8 +54,8 @@ internal static class DecompositionGenerationCandidateFactory
     private static bool IsPartial(INamedTypeSymbol typeSymbol) =>
         typeSymbol.DeclaringSyntaxReferences
             .Select(reference => reference.GetSyntax())
-            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.TypeDeclarationSyntax>()
-            .Any(static declaration => declaration.Modifiers.Any(Microsoft.CodeAnalysis.CSharp.SyntaxKind.PartialKeyword));
+            .OfType<TypeDeclarationSyntax>()
+            .Any(static declaration => declaration.Modifiers.Any(SyntaxKind.PartialKeyword));
 
     private static string? GetNamedArgument(AttributeData attributeData, string name)
     {

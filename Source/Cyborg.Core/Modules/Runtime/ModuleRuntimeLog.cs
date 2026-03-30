@@ -16,6 +16,9 @@ internal static partial class ModuleRuntimeLog
     [ZLoggerMessage(LogLevel.Warning, "Module '{moduleId}' in environment '{environment}' completed with non-success status: {status}")]
     public static partial void LogModuleExecutionFailed(this ILogger logger, string moduleId, string status, string environment);
 
+    [ZLoggerMessage(LogLevel.Error, "Configuration module '{configurationModuleId}' failed with status '{status}' while configuring module '{parentModuleId}' in environment '{environment}'")]
+    public static partial void LogModuleConfigurationFailed(this ILogger logger, string configurationModuleId, string status, string parentModuleId, string environment);
+
     [ZLoggerMessage(LogLevel.Warning, "Module '{moduleId}' in environment '{environment}' was canceled")]
     public static partial void LogModuleCanceled(this ILogger logger, string moduleId, string environment);
 

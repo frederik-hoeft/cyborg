@@ -17,6 +17,6 @@ public sealed partial record TemplateModule
 {
     public static string ModuleId => "cyborg.modules.template.v1";
 
-    [GeneratedRegex(@"^[A-Za-z0-9_](\.[A-Za-z0-9_\-]+)*$")]
+    [GeneratedRegex(@"^[A-Za-z0-9_]+(\.[A-Za-z0-9_\-]+)*$")]
     private static partial Regex NamespaceRegex { get; }
 }

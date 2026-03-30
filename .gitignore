@@ -14,3 +14,4 @@ Source/**/*.suo
 Source/**/*.cache
 Source/.vs/
 Source/artifacts/
+bin/
