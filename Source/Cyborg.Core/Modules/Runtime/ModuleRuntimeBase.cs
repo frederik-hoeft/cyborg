@@ -134,7 +134,12 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory, ILo
         if (moduleContext.Configuration is { } configuration)
         {
             Logger.LogConfigurationModuleRunning(configuration.Module.ModuleId, moduleContext.Module.Module.ModuleId);
-            await ExecuteAsync(configuration.Module, environment, cancellationToken);
+            IModuleExecutionResult result = await ExecuteAsync(configuration.Module, environment, cancellationToken);
+            if (result.Status is ModuleExitStatus.Failed or ModuleExitStatus.Canceled)
+            {
+                Logger.LogModuleConfigurationFailed(configuration.Module.ModuleId, result.Status.ToString(), moduleContext.Module.Module.ModuleId, environment.Name);
+                return new ModuleExecutionResult(moduleContext.Module.Module.Module, ModuleExitStatus.Failed, environment.CreateArtifactCollection());
+            }
         }
         return await ExecuteAsync(moduleContext.Module.Module, environment, cancellationToken);
     }
@@ -168,12 +173,12 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory, ILo
         catch (OperationCanceledException)
         {
             Logger.LogModuleCanceled(module.ModuleId, boundEnvironment.Name);
-            return new ModuleExecutionResult(module.Module, ModuleExitStatus.Canceled, boundEnvironment);
+            return new ModuleExecutionResult(module.Module, ModuleExitStatus.Canceled, boundEnvironment.CreateArtifactCollection());
         }
         catch (Exception e)
         {
             Logger.LogModuleUnhandledException(module.ModuleId, boundEnvironment.Name, e);
-            return new ModuleExecutionResult(module.Module, ModuleExitStatus.Failed, boundEnvironment);
+            return new ModuleExecutionResult(module.Module, ModuleExitStatus.Failed, boundEnvironment.CreateArtifactCollection());
         }
     }
 

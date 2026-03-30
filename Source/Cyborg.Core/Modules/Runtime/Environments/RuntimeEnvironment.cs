@@ -178,6 +178,8 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         return new EnvironmentLike(SyntaxFactory, artifacts.Namespace ?? Namespace);
     }
 
+    public IEnvironmentLike CreateArtifactCollection() => new EnvironmentLike(SyntaxFactory, Namespace);
+
     public IRuntimeEnvironment WithOverrideResolutionTags(IReadOnlyCollection<string> tags) => this with
     {
         OverrideResolutionTags = tags
