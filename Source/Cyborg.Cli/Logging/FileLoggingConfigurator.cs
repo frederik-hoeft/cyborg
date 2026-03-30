@@ -16,7 +16,10 @@ internal sealed class FileLoggingConfigurator(IConfiguration configuration) : IL
         {
             return;
         }
-        File.Delete(options.Path);
+        if (File.Exists(options.Path))
+        {
+            File.Delete(options.Path);
+        }
         builder.AddZLoggerFile(options.Path, fileOptions =>
         {
             if (options.Format is LogFormat.Json)
