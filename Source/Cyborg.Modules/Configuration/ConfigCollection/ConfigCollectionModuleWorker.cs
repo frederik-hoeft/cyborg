@@ -16,7 +16,7 @@ public sealed class ConfigCollectionModuleWorker(IWorkerContext<ConfigCollection
             {
                 return runtime.Exit(Canceled());
             }
-            if (source.Module is not IConfigurationModule)
+            if (source.Module.Module is not IConfigurationModule)
             {
                 throw new InvalidOperationException($"Module {source.Module.ModuleId} is not a valid configuration source.");
             }
