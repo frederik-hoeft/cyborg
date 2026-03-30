@@ -19,3 +19,4 @@ borg.hosts.json
 *.log
 *.tmp
 *.stackdump
+dist/
