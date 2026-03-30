@@ -25,6 +25,7 @@ namespace Cyborg.Cli;
 [Singleton<ILoggerFactory>(Factory = nameof(CreateLoggerFactory))]
 [Singleton<JsonConverter>(Factory = nameof(CreateRollingIntervalConverter))]
 [Singleton<JsonConverter>(Factory = nameof(CreateLogFormatConverter))]
+[Singleton<JsonConverter>(Factory = nameof(CreateLogLevelConverter))]
 internal interface ICyborgCliServiceOptions
 {
     static ILoggerFactory CreateLoggerFactory(IEnumerable<ILoggingConfigurator> configurators, IConfiguration configuration, LoggingOptions loggingOptions) =>
@@ -41,4 +42,6 @@ internal interface ICyborgCliServiceOptions
     static JsonConverter CreateRollingIntervalConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<RollingInterval>(namingPolicy);
 
     static JsonConverter CreateLogFormatConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<LogFormat>(namingPolicy);
+
+    static JsonConverter CreateLogLevelConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<LogLevel>(namingPolicy);
 }
