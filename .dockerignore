@@ -1,0 +1,21 @@
+# .NET build artifacts
+Source/**/bin/
+Source/**/obj/
+Source/artifacts/
+Source/.vs/
+Source/**/*.user
+Source/**/*.suo
+Source/**/*.cache
+
+# Git metadata
+.git/
+
+# Secrets and sensitive files
+*.secrets
+*.jsecrets
+borg.hosts.json
+
+# Miscellaneous
+*.log
+*.tmp
+*.stackdump

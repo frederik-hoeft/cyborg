@@ -1,5 +1,34 @@
 # Borg Backup Automation
 
+## Cyborg
+
+Cyborg is the next-generation .NET 10 backup orchestration system that will replace the legacy `borg/` shell scripts. It compiles to a single native AOT binary with no .NET runtime dependency.
+
+### Building with Docker
+
+Build the native AOT binary inside a Docker container and export it to the host (requires [Docker](https://docs.docker.com/get-docker/) with BuildKit enabled):
+
+```bash
+docker build --target artifact --output type=local,dest=./dist .
+```
+
+The compiled binary will be written to `./dist/Cyborg.Cli`.
+
+### Building locally
+
+```bash
+cd Source
+dotnet publish Cyborg.Cli/Cyborg.Cli.csproj \
+    --configuration Release \
+    --runtime linux-x64 \
+    --self-contained true
+```
+
+Artifacts are output to `Source/artifacts/`.
+
+---
+
+
 A cron-based backup automation system using BorgBackup with support for multiple remote destinations and Wake-on-LAN functionality. Intended for setups where backup target hosts and repositories stay powered down or disconnected when idle (cold backups) to reduce energy usage. The system wakes remote hosts via WoL, performs snapshot creation to repositories that may only be reachable briefly, then allows them to return to an offline or low-power state. Designed for use in home or small office environments where backup target hosts are preferred to remain off when not in use. Ensures availability on demand while minimizing energy consumption and prolonging hardware lifespan.
 
 ## Architecture
