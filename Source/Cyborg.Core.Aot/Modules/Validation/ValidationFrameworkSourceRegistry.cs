@@ -26,6 +26,7 @@ internal static class ValidationFrameworkSourceRegistry
         static context => context.AddEmbeddedSource<FileExistsAttribute>(),
         static context => context.AddEmbeddedSource<DirectoryExistsAttribute>(),
         static context => context.AddEmbeddedSource<MatchesGrammarAttribute>(),
+        static context => context.AddEmbeddedSource<DefaultInstanceFactoryAttribute>(),
     ];
 
     public static void Emit(IncrementalGeneratorPostInitializationContext context)

@@ -11,12 +11,16 @@ public sealed partial record TemplateModule
 (
     [property: Required][property: MatchesRegex(nameof(TemplateModule.NamespaceRegex))] string Namespace,
     [property: Required][property: FileExists] string Path,
-    IReadOnlyCollection<DynamicKeyValuePair> Arguments,
-    IReadOnlyCollection<DynamicKeyValuePair> Overrides
+    [property: Required][property: DefaultInstanceFactory(nameof(TemplateModule.DefaultArgumentsFactory))] IReadOnlyCollection<DynamicKeyValuePair> Arguments,
+    [property: Required][property: DefaultInstanceFactory(nameof(TemplateModule.DefaultOverridesFactory))] IReadOnlyCollection<DynamicKeyValuePair> Overrides
 ) : ModuleBase, IModule
 {
     public static string ModuleId => "cyborg.modules.template.v1";
 
     [GeneratedRegex(@"^[A-Za-z0-9_]+(\.[A-Za-z0-9_\-]+)*$")]
     private static partial Regex NamespaceRegex { get; }
+
+    private static DynamicKeyValuePair[] DefaultArgumentsFactory() => [];
+
+    private static DynamicKeyValuePair[] DefaultOverridesFactory() => [];
 }

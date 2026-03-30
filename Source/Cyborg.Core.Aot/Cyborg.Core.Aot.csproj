@@ -25,6 +25,7 @@
         <EmbeddedResource Include="Modules\Composition\GeneratedDecompositionAttribute.cs" />
         <EmbeddedResource Include="Modules\Loaders\Configuration\GeneratedModuleLoaderFactoryAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\DefaultInstanceAttribute.cs" />
+        <EmbeddedResource Include="Modules\Validation\Attributes\DefaultInstanceFactoryAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\DefaultTimeSpanAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\DefaultValueAttribute`1.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\DefinedEnumValueAttribute.cs" />

@@ -22,6 +22,12 @@ internal sealed class ConsoleLoggingConfigurator(IConfiguration configuration) :
             {
                 consoleOptions.UseJsonFormatter();
             }
+            else
+            {
+                consoleOptions.UsePlainTextFormatter(formatter => formatter
+                    .SetPrefixFormatter($"[{0:local-longdate}] {1} ({2}): ", static (in template, in info) => template
+                        .Format(info.Timestamp, info.LogLevel, info.Category)));
+            }
         });
     }
 }

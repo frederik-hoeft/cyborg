@@ -26,6 +26,7 @@ internal static class ValidationProcessorRegistry
         new DirectoryExistsAttributeProcessor(),
         new ReadOnlyCollectionOverrideProcessor(),
         new MatchesGrammarAttributeProcessor(),
+        new DefaultInstanceFactoryAttributeProcessor(),
     ];
 
     private static FrozenDictionary<string, IPropertyAttributeProcessor> ByMetadataName => 

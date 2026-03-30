@@ -165,4 +165,20 @@ internal static class ValidationGeneratorDiagnostics
         category: CATEGORY,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
+
+    public static DiagnosticDescriptor FactoryMemberSignatureMismatch { get; } = new(
+        id: "CYBORGVAL021",
+        title: "Attribute factory member type mismatch",
+        messageFormat: "Property '{0}' on '{1}' has a '{2}' referencing factory '{3}' which does not have a valid signature. A valid factory must be a static method with no parameters returning an instance of '{4}'.",
+        category: CATEGORY,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    public static DiagnosticDescriptor MemberInaccessible { get; } = new(
+        id: "CYBORGVAL022",
+        title: "Attribute member inaccessible",
+        messageFormat: "Property '{0}' on '{1}' has a '{2}' referencing member '{3}' which is not accessible from the generated code",
+        category: CATEGORY,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
 }
