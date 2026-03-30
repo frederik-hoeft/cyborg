@@ -72,82 +72,88 @@
           }
         },
         {
-          "environment": {
-            "scope": "inherit_parent",
-            "name": "jobs"
-          },
-          "configuration": {
-            "cyborg.modules.config.map.v1": {
-              "entries": [
-                {
-                  "key": "job_directory",
-                  "string": "${cyborg_job_root}/${target}"
-                }
-              ]
-            }
-          },
           "module": {
-            "cyborg.modules.sequence.v1": {
-              "steps": [
-                {
-                  "module": {
-                    "cyborg.modules.glob.v1": {
-                      "name": "job_factory",
-                      "root": "${job_directory}/",
-                      "pattern": ".*?\\.jconf$",
-                      "artifacts": {
-                        "environment": {
-                          "scope": "reference",
-                          "name": "jobs"
-                        }
+            "cyborg.modules.guard.v1": {
+              "try": {
+                "environment": {
+                  "scope": "inherit_parent",
+                  "name": "jobs"
+                },
+                "configuration": {
+                  "cyborg.modules.config.map.v1": {
+                    "entries": [
+                      {
+                        "key": "job_directory",
+                        "string": "${cyborg_job_root}/${target}"
                       }
-                    }
+                    ]
                   }
                 },
-                {
-                  "module": {
-                    "cyborg.modules.foreach.v1": {
-                      "collection": "job_factory.files",
-                      "item_variable": "job",
-                      "body": {
+                "module": {
+                  "cyborg.modules.sequence.v1": {
+                    "steps": [
+                      {
                         "module": {
-                          "cyborg.modules.external.v1": {
-                            "path": "${job}"
+                          "cyborg.modules.glob.v1": {
+                            "name": "job_factory",
+                            "root": "${job_directory}/",
+                            "pattern": ".*?\\.jconf$",
+                            "artifacts": {
+                              "environment": {
+                                "scope": "reference",
+                                "name": "jobs"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "module": {
+                          "cyborg.modules.foreach.v1": {
+                            "collection": "job_factory.files",
+                            "item_variable": "job",
+                            "body": {
+                              "module": {
+                                "cyborg.modules.external.v1": {
+                                  "path": "${job}"
+                                }
+                              }
+                            }
                           }
                         }
                       }
-                    }
+                    ]
                   }
                 }
-              ]
-            }
-          }
-        },
-        {
-          "environment": {
-            "scope": "reference",
-            "name": "wol"
-          },
-          "module": {
-            "cyborg.modules.foreach.v1": {
-              "collection": "backup_hosts",
-              "item_variable": "host",
-              "body": {
+              },
+              "finally": {
+                "environment": {
+                  "scope": "reference",
+                  "name": "wol"
+                },
                 "module": {
-                  "cyborg.modules.if.v1": {
-                    "condition": {
-                      "cyborg.modules.if.condition.is_true.v1": {
-                        "variable": "my_wol.${host.hostname}.woke_up"
-                      }
-                    },
-                    "then": {
+                  "cyborg.modules.foreach.v1": {
+                    "collection": "backup_hosts",
+                    "item_variable": "host",
+                    "body": {
                       "module": {
-                        "cyborg.modules.network.ssh_shutdown.v1": {
-                          "hostname": "${host.hostname}",
-                          "username": "root",
-                          "ssh_pass": {
-                            "file_path": "/root/.ssh/pass",
-                            "match_prompt": "assphrase"
+                        "cyborg.modules.if.v1": {
+                          "condition": {
+                            "cyborg.modules.if.condition.is_true.v1": {
+                              "variable": "my_wol.${host.hostname}.woke_up"
+                            }
+                          },
+                          "then": {
+                            "module": {
+                              "cyborg.modules.network.ssh_shutdown.v1": {
+                                "hostname": "${host.hostname}",
+                                "username": "root",
+                                "ssh_pass": {
+                                  "file_path": "/root/.ssh/pass",
+                                  "match_prompt": "assphrase"
+                                }
+                              }
+                            }
                           }
                         }
                       }
