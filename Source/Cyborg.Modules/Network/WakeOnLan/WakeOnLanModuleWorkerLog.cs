@@ -14,7 +14,7 @@ internal static partial class WakeOnLanModuleWorkerLog
     [ZLoggerMessage(LogLevel.Debug, "Host '{targetHost}' is unreachable — sending Wake-on-LAN packet to '{macAddress}'")]
     public static partial void LogWolSendingPacket(this ILogger logger, string targetHost, string macAddress);
 
-    [ZLoggerMessage(LogLevel.Warning, "Wake-on-LAN command failed with exit code {exitCode}: {standardError}")]
+    [ZLoggerMessage(LogLevel.Error, "Wake-on-LAN command failed with exit code {exitCode}: {standardError}")]
     public static partial void LogWolCommandFailed(this ILogger logger, int exitCode, string? standardError);
 
     [ZLoggerMessage(LogLevel.Debug, "Probing host '{targetHost}' on port {port} for up to {maxWaitTime}")]
