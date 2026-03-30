@@ -16,9 +16,10 @@ namespace Cyborg.Cli;
 internal sealed class Commands
 {
     [Command("run")]
-    public async Task RunAsync([Argument] string template, string metricsNamespace = "cyborg", bool dryRun = false, CancellationToken cancellationToken = default)
+    public async Task RunAsync([Argument] string template, string metricsNamespace = "cyborg", bool dryRun = false, LogLevel logLevel = LogLevel.Information, CancellationToken cancellationToken = default)
     {
         using DefaultServiceProvider sp = new();
+        sp.GetRequiredService<LoggingOptions>().MinimumLevel = logLevel;
         ILogger<Commands> logger = sp.GetRequiredService<ILoggerFactory>().CreateLogger<Commands>();
         GlobalRuntimeEnvironment globalEnvironment = sp.GetRequiredService<GlobalRuntimeEnvironment>();
         globalEnvironment.SetVariable("template", template);
