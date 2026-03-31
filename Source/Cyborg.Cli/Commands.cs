@@ -1,4 +1,4 @@
-﻿using ConsoleAppFramework;
+using ConsoleAppFramework;
 using Cyborg.Cli.Logging;
 using Cyborg.Cli.Metrics;
 using Cyborg.Core.Configuration;
@@ -25,12 +25,19 @@ internal sealed class Commands
         string mainModulePath = $"{CYBORG_ROOT}/cyborg.jconf",
         string optionsPath = $"{CYBORG_ROOT}/cyborg.options.jconf",
         string? metricsOutputPath = null,
+        LogLevel? logLevel = null,
         CancellationToken cancellationToken = default)
     {
         using DefaultServiceProvider services = new();
         IConfiguration configuration = services.GetRequiredService<IConfiguration>();
         IConfigurationLoader configurationLoader = services.GetRequiredService<IConfigurationLoader>();
         await configurationLoader.AddSourceAsync(configuration, optionsPath, cancellationToken);
+
+        // CLI --log-level has higher priority than the options file
+        if (logLevel.HasValue)
+        {
+            services.GetRequiredService<LoggingOptions>().MinimumLevel = logLevel.Value;
+        }
 
         ILogger<Commands> logger = services.GetRequiredService<ILoggerFactory>().CreateLogger<Commands>();
         GlobalRuntimeEnvironment globalEnvironment = services.GetRequiredService<GlobalRuntimeEnvironment>();
