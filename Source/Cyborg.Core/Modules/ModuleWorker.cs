@@ -9,8 +9,6 @@ namespace Cyborg.Core.Modules;
 
 public abstract class ModuleWorker<TModule>(IWorkerContext<TModule> context) : IModuleWorker where TModule : ModuleBase, IModule<TModule>
 {
-    private readonly ILogger _logger = context.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(TModule.ModuleId);
-
     protected TModule Module { get; private set; } = null!;
 
     protected IModuleArtifactsBuilder Artifacts { get; private set; } = null!;
@@ -19,7 +17,7 @@ public abstract class ModuleWorker<TModule>(IWorkerContext<TModule> context) : I
 
     protected IServiceProvider ServiceProvider => context.ServiceProvider;
 
-    protected ILogger Logger => _logger;
+    protected ILogger Logger { get; } = context.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(TModule.ModuleId);
 
     IModule IModuleWorker.Module => context.Module;
 
@@ -57,19 +55,19 @@ public abstract class ModuleWorker<TModule>(IWorkerContext<TModule> context) : I
     async Task<IModuleExecutionResult> IModuleWorker.ExecuteAsync(IModuleRuntime runtime, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(runtime);
-        _logger.LogModuleValidationStarted(ModuleId);
+        Logger.LogModuleValidationStarted(ModuleId);
         ValidationResult<TModule> result = await context.Module.ValidateAsync(runtime, ServiceProvider, cancellationToken);
         ValidationResult<TModule> overriddenResult = await ModuleValidationCallbackAsync(result, context.Module, cancellationToken);
         IModuleArtifactsFactory artifactsFactory = ServiceProvider.GetRequiredService<IModuleArtifactsFactory>();
         if (!overriddenResult.IsValid)
         {
-            if (_logger.IsEnabled(LogLevel.Warning))
+            if (Logger.IsEnabled(LogLevel.Warning))
             {
-                _logger.LogModuleValidationFailed(ModuleId, string.Join("; ", overriddenResult.Errors.Select(e => e.Message)));
+                Logger.LogModuleValidationFailed(ModuleId, string.Join("; ", overriddenResult.Errors.Select(e => e.Message)));
             }
             overriddenResult.EnsureValid();
         }
-        _logger.LogModuleValidationCompleted(ModuleId);
+        Logger.LogModuleValidationCompleted(ModuleId);
         Module = overriddenResult.Module;
         Artifacts = artifactsFactory.CreateArtifacts(runtime, Module);
         return await ExecuteAsync(runtime, cancellationToken);

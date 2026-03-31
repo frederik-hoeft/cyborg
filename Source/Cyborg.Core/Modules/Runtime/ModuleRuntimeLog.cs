@@ -38,7 +38,7 @@ internal static partial class ModuleRuntimeLog
 
     // ── Environment lifecycle ─────────────────────────────────────────────────
 
-    [ZLoggerMessage(LogLevel.Debug, "Created {scope} environment '{name}'")]
+    [ZLoggerMessage(LogLevel.Debug, "Created {scope} scope for environment '{name}'")]
     public static partial void LogEnvironmentCreated(this ILogger logger, string scope, string name);
 
     [ZLoggerMessage(LogLevel.Debug, "Resolved named environment reference '{name}'")]
@@ -49,6 +49,6 @@ internal static partial class ModuleRuntimeLog
 
     // ── Artifact publishing ───────────────────────────────────────────────────
 
-    [ZLoggerMessage(LogLevel.Debug, "Publishing artifacts for module '{moduleId}' to {targetScope} environment")]
-    public static partial void LogArtifactPublishing(this ILogger logger, string moduleId, string targetScope);
+    [ZLoggerMessage(LogLevel.Debug, "Publishing artifacts for module '{moduleNamespace} ({moduleId})' to {targetScope} environment '{environment}'")]
+    public static partial void LogArtifactPublishing(this ILogger logger, string moduleNamespace, string moduleId, string targetScope, string environment);
 }

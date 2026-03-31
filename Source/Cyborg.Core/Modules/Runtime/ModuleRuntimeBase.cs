@@ -41,7 +41,7 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory, ILo
             EnvironmentScope.Reference => throw new ArgumentException("Attempting to create an environment by reference without providing an environment reference.", nameof(scope)),
             _ => throw new ArgumentOutOfRangeException(nameof(scope), scope, "Invalid environment scope.")
         };
-        Logger.LogEnvironmentCreated(scope.ToString(), name);
+        Logger.LogEnvironmentCreated(scope.ToString(), environment.Name);
         parent.TryAddEnvironment(environment);
         return environment;
     }
@@ -197,7 +197,7 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory, ILo
         IModuleRuntime responsibleRuntime = Parent ?? this;
         ModuleEnvironment deploymentTarget = result.Module.Artifacts.Environment;
         IRuntimeEnvironment targetEnvironment = responsibleRuntime.PrepareEnvironment(deploymentTarget);
-        Logger.LogArtifactPublishing(TModule.ModuleId, deploymentTarget.Scope.ToString());
+        Logger.LogArtifactPublishing(Environment.NamespaceOf(result.Module), TModule.ModuleId, deploymentTarget.Scope.ToString(), targetEnvironment.Namespace);
         targetEnvironment.Publish(artifacts);
         return new ModuleExecutionResult(result.Module, result.Status, artifacts);
     }
