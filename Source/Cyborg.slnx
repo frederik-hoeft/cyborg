@@ -7,6 +7,7 @@
   </Folder>
   <Project Path="Cyborg.Cli/Cyborg.Cli.csproj" />
   <Project Path="Cyborg.Core.Aot/Cyborg.Core.Aot.csproj" />
+  <Project Path="Cyborg.Core.Tests/Cyborg.Core.Tests.csproj" />
   <Project Path="Cyborg.Core/Cyborg.Core.csproj" />
   <Project Path="Cyborg.Modules.Borg/Cyborg.Modules.Borg.csproj" Id="52006f4b-ff36-4a6e-adb5-f9b136c3f23b" />
   <Project Path="Cyborg.Modules/Cyborg.Modules.csproj" Id="abcd666f-abb6-46d2-90b5-e9f011fd9e6d" />
