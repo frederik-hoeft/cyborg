@@ -16,19 +16,23 @@ public readonly record struct LateRefSyntax : IChildSyntaxProvider<LateRefSyntax
         Value = RefSyntax.UncheckedMakeRef(UncheckedMakeLate(value));
     }
 
+    private LateRefSyntax(LateRefSyntax other, ReadOnlySpan<char> segment)
+    {
+        ArgumentNullException.ThrowIfNull(other.NamingPolicy);
+
+        NamingPolicy = other.NamingPolicy;
+        Value = VariableSyntaxHelpers.Join(other.Value, segment).ToString();
+    }
+
     JsonNamingPolicy IChildSyntaxProvider<LateRefSyntax>.NamingPolicy => NamingPolicy;
 
-    public LateRefSyntax Child(string segment) =>
-        new(NamingPolicy, VariableSyntaxHelpers.Join(Value, VariableSyntaxHelpers.NormalizePath(segment, nameof(segment))).ToString());
+    public LateRefSyntax Child(string segment) => new(this, VariableSyntaxHelpers.NormalizePath(segment, nameof(segment)));
 
-    public LateRefSyntax Child(PathSyntax other) =>
-        new(NamingPolicy, VariableSyntaxHelpers.Join(Value, other.ToString()).ToString());
+    public LateRefSyntax Child(PathSyntax other) => new(this, other.ToString());
 
-    public RefSyntax Child(RefSyntax other) =>
-        new(NamingPolicy, VariableSyntaxHelpers.Join(Value, other.ToString()).ToString());
+    public LateRefSyntax Child(RefSyntax other) => new(this, other.ToString());
 
-    public RefSyntax Child(LateRefSyntax other) =>
-        new(NamingPolicy, VariableSyntaxHelpers.Join(Value, other.ToString()).ToString());
+    public LateRefSyntax Child(LateRefSyntax other) => new(this, other.ToString());
 
     public override string ToString() => Value;
 

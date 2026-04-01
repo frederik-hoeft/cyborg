@@ -42,7 +42,7 @@ public sealed class IfModuleWorker(IWorkerContext<IfModule> context) : ModuleWor
             Logger.LogIfConditionResultUnreadable(conditionModuleId);
             return runtime.Exit(WithStatus(ModuleExitStatus.Failed));
         }
-        ModuleContext? branchToExecute = condition ? Module.Then : Module.Else;
+        ModuleContext? branchToExecute = condition != Module.InvertCondition ? Module.Then : Module.Else;
         if (branchToExecute is null)
         {
             Logger.LogIfNoBranch(condition);

@@ -5,6 +5,7 @@ borg.hosts.json
 *.stackdump
 *.jsecrets
 *.zip
+*.dev.jconf
 
 # .NET build artifacts
 Source/**/bin/

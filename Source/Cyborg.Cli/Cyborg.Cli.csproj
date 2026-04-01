@@ -30,4 +30,16 @@
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </ProjectReference>
     </ItemGroup>
+    
+    <ItemGroup>
+      <None Update="*.dev.jconf">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+    </ItemGroup>
+    
+    <ItemGroup>
+      <None Update="*.dev.jsecrets">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+    </ItemGroup>
 </Project>
