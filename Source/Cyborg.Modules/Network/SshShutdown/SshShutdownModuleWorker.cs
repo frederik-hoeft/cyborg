@@ -11,7 +11,7 @@ public sealed class SshShutdownModuleWorker(IWorkerContext<SshShutdownModule> co
     protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
         Logger.LogSshShutdownSending(Module.Hostname);
-        List<string> sshArguments = [$"{Module.Username}@{Module.Hostname}:{Module.Port}", Module.ShutdownCommand];
+        List<string> sshArguments = ["-p", Module.Port.ToString(), $"{Module.Username}@{Module.Hostname}", Module.ShutdownCommand];
         (string executable, List<string> arguments) = Module.SshPass switch
         {
             { MatchPrompt: not null } sshPass => (sshPass.Executable, [ $"-f{sshPass.FilePath}", "-P", sshPass.MatchPrompt, Module.Executable, ..sshArguments]),
