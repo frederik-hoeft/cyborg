@@ -9,6 +9,8 @@
         <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
         <IsAotCompatible>true</IsAotCompatible>
         <PublishTrimmed>true</PublishTrimmed>
+        <Optimize>true</Optimize>
+        <OptimizationPreference>speed</OptimizationPreference>
         <AssemblyName>cyborg</AssemblyName>
     </PropertyGroup>
     
