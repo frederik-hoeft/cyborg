@@ -10,7 +10,7 @@ public sealed partial record GuardModule
 (
     [property: Required] ModuleContext Try,
     ModuleContext? Catch,
-    [property: Required] ModuleContext Finally,
+    ModuleContext? Finally,
     [property: DefinedEnumValue][property: DefaultValue<GuardModuleBehavior>(GuardModuleBehavior.Rethrow)] GuardModuleBehavior Behavior
 ) : ModuleBase, IModule
 {

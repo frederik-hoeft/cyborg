@@ -1,11 +1,27 @@
 ﻿using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Runtime;
+using Cyborg.Core.Modules.Validation;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Modules.Guard;
 
 public sealed partial class GuardModuleWorker(IWorkerContext<GuardModule> context) : ModuleWorker<GuardModule>(context)
 {
+    protected override ValueTask<ValidationResult<GuardModule>> ModuleValidationCallbackAsync(ValidationResult<GuardModule> validationResult, GuardModule originalModule, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(validationResult);
+        if (Module.Catch is null && Module.Finally is null)
+        {
+            return new ValueTask<ValidationResult<GuardModule>>(ValidationResult<GuardModule>.Invalid(
+            [
+                ..validationResult.Errors,
+                new ValidationError(nameof(Module.Catch), "GuardModuleMustDefineCatchOrFinally", "A GuardModule must define at least a Catch or Finally block.")
+            ]));
+        }
+
+        return base.ModuleValidationCallbackAsync(validationResult, originalModule, cancellationToken);
+    }
+
     protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
         bool handledFailure = false;
@@ -36,7 +52,7 @@ public sealed partial class GuardModuleWorker(IWorkerContext<GuardModule> contex
         }
         finally
         {
-            if (!cancellationToken.IsCancellationRequested)
+            if (!cancellationToken.IsCancellationRequested && Module.Finally is not null)
             {
                 Logger.LogGuardFinallyExecuting(ModuleId);
                 IModuleExecutionResult finallyResult = await runtime.ExecuteAsync(Module.Finally, cancellationToken);
