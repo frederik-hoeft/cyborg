@@ -24,7 +24,7 @@ public sealed partial record SubprocessModule
 [Validatable]
 public sealed record ImpersonationContext
 (
-    [property: Required][property: DefaultValue<string>("/usr/bin/runuser")][property: FileExists] string Executable,
+    [property: Required][property: DefaultValue<string>("/usr/sbin/runuser")][property: FileExists] string Executable,
     [property: Required] string User
 );
 
