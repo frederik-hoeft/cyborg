@@ -11,7 +11,7 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory, ILo
 
     protected ILoggerFactory LoggerFactory { get; } = loggerFactory;
 
-    protected ILogger Logger { get; } = loggerFactory.CreateLogger<ModuleRuntimeBase>();
+    protected ILogger Logger { get; } = loggerFactory.CreateLogger("cyborg.core.runtime");
 
     public abstract IRuntimeEnvironment GlobalEnvironment { get; }
 
@@ -95,7 +95,6 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory, ILo
         {
             List<string> errors = [];
             List<(string Argument, object Value)> resolvedArguments = [];
-            bool isNamespaced = !string.IsNullOrEmpty(ns);
             string argumentNamespace = ns ?? "(none)";
             Logger.LogTemplateArgumentsResolving(args.Count, moduleContext.Module.Module.ModuleId, argumentNamespace);
             if (!string.IsNullOrEmpty(ns) && !SyntaxFactory.IsValidIdentifier(ns))
@@ -111,8 +110,9 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory, ILo
                     errors.Add($"Template argument names must be valid identifiers: argv[{i}] = '{arg}'");
                     continue;
                 }
-                PathSyntax argumentPath = isNamespaced ? SyntaxFactory.Path(ns!, arg) : SyntaxFactory.Path(arg);
-                if (environment.TryResolveVariable(argumentPath, out object? value))
+                PathSyntax path = SyntaxFactory.Path(arg);
+                PathSyntax argumentPath = SyntaxFactory.Path(ns).Child(path);
+                if (environment.TryResolveVariable(argumentPath, out object? value) || environment.TryResolveVariable(path, out value))
                 {
                     resolvedArguments.Add((arg, value));
                     continue;

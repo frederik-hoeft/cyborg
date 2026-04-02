@@ -5,7 +5,7 @@ namespace Cyborg.Core.Services.Dispatch;
 
 public sealed class DefaultChildProcessDispatcher(ILoggerFactory loggerFactory) : IChildProcessDispatcher
 {
-    private readonly ILogger<DefaultChildProcessDispatcher> _logger = loggerFactory.CreateLogger<DefaultChildProcessDispatcher>();
+    private readonly ILogger _logger = loggerFactory.CreateLogger("cyborg.core.services.childprocess");
 
     public async Task<ChildProcessResult> ExecuteAsync(ProcessStartInfo processStartInfo, CancellationToken cancellationToken)
     {

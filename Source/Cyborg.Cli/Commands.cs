@@ -39,7 +39,7 @@ internal sealed class Commands
             services.GetRequiredService<LoggingOptions>().MinimumLevel = logLevel.Value;
         }
 
-        ILogger<Commands> logger = services.GetRequiredService<ILoggerFactory>().CreateLogger<Commands>();
+        ILogger logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("cyborg.cli.main");
         GlobalRuntimeEnvironment globalEnvironment = services.GetRequiredService<GlobalRuntimeEnvironment>();
         globalEnvironment.SetVariable("target", target);
         if (dryRun)
