@@ -13,16 +13,16 @@ public sealed class SubprocessModuleWorker(IWorkerContext<SubprocessModule> cont
 {
     protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
-        string executable = Module.Command.Executable;
-        ImmutableArray<string> arguments = Module.Command.Arguments;
+        string executable = runtime.Environment.Interpolate(Module.Command.Executable);
+        ImmutableArray<string> arguments = [.. Module.Command.Arguments.Select(runtime.Environment.Interpolate)];
         if (Module.Impersonation is { } runUser)
         {
-            executable = runUser.Executable;
+            executable = runtime.Environment.Interpolate(runUser.Executable);
             arguments =
             [
-                "-u", runUser.User,
-                "--", Module.Command.Executable,
-                ..Module.Command.Arguments
+                "-u", runtime.Environment.Interpolate(runUser.User),
+                "--", runtime.Environment.Interpolate(Module.Command.Executable),
+                ..arguments
             ];
         }
         ProcessStartInfo startInfo = new(executable, arguments)
