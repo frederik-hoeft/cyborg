@@ -103,18 +103,18 @@
                       }
                     }
                   }
-                },
-                "finally": {
-                  "module": {
-                    "cyborg.modules.subprocess.v1": {
-                      "name": "docker_tasks.up",
-                      "group": "docker_tasks",
-                      "command": {
-                        "executable": "/usr/bin/docker",
-                        "arguments": [ "compose", "-f", "${container_root}/docker-compose.yml", "up", "-d" ]
-                      },
-                      "impersonation": { "user": "${docker_user}" }
-                    }
+                }
+              },
+              "finally": {
+                "module": {
+                  "cyborg.modules.subprocess.v1": {
+                    "name": "docker_tasks.up",
+                    "group": "docker_tasks",
+                    "command": {
+                      "executable": "/usr/bin/docker",
+                      "arguments": [ "compose", "-f", "${container_root}/docker-compose.yml", "up", "-d" ]
+                    },
+                    "impersonation": { "user": "${docker_user}" }
                   }
                 }
               }

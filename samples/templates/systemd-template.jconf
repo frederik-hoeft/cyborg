@@ -48,16 +48,16 @@
                       }
                     }
                   }
-                },
-                "finally": {
-                  "module": {
-                    "cyborg.modules.subprocess.v1": {
-                      "name": "systemd_tasks.start",
-                      "group": "systemd_tasks",
-                      "command": {
-                        "executable": "/usr/bin/systemctl",
-                        "arguments": [ "start", "${service_name}" ]
-                      }
+                }
+              },
+              "finally": {
+                "module": {
+                  "cyborg.modules.subprocess.v1": {
+                    "name": "systemd_tasks.start",
+                    "group": "systemd_tasks",
+                    "command": {
+                      "executable": "/usr/bin/systemctl",
+                      "arguments": [ "start", "${service_name}" ]
                     }
                   }
                 }
