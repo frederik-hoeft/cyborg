@@ -111,10 +111,10 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory, ILo
                     errors.Add($"Template argument names must be valid identifiers: argv[{i}] = '{arg}'");
                     continue;
                 }
-                PathSyntax pathSyntax = isNamespaced ? SyntaxFactory.Path(ns!, arg) : SyntaxFactory.Path(arg);
-                if (environment.TryResolveVariable(pathSyntax, out object? value))
+                PathSyntax argumentPath = isNamespaced ? SyntaxFactory.Path(ns!, arg) : SyntaxFactory.Path(arg);
+                if (environment.TryResolveVariable(argumentPath, out object? value))
                 {
-                    resolvedArguments.Add((pathSyntax, value));
+                    resolvedArguments.Add((arg, value));
                     continue;
                 }
                 errors.Add($"Unable to resolve template argument: '{arg}'");

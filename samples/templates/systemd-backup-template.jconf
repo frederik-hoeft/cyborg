@@ -2,7 +2,7 @@
 // Concrete borg modules are injected via configuration ("modules as data") and configured with the appropriate repository and authentication information for each host.
 {
   "requires": {
-    "template_namespace": "cyborg.template.backup-job.systemd.v1",
+    "argument_namespace": "cyborg.template.backup-job.systemd.v1",
     "arguments": [ "repository_name", "service_name", "backup_hosts", "job_directory", "borg_create", "borg_prune", "borg_compact" ]
   },
   "configuration": {
