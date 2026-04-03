@@ -182,6 +182,10 @@ public sealed class BorgPruneModuleWorker
             }
         });
 
+        if (retainedArchivesByRule.Count == 0)
+        {
+            return;
+        }
         metricsCollector.AddGauge(BORG_RETAINED_BACKUP_TIMESTAMP_SECONDS, "Unix timestamp in seconds of a retained backup after the most recent borg prune command", samples =>
         {
             foreach ((string ruleName, List<BorgPruneLineModel> retainedArchives) in retainedArchivesByRule)
