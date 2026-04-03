@@ -197,7 +197,7 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory, ILo
         IModuleRuntime responsibleRuntime = Parent ?? this;
         ModuleEnvironment deploymentTarget = result.Module.Artifacts.Environment;
         IRuntimeEnvironment targetEnvironment = responsibleRuntime.PrepareEnvironment(deploymentTarget);
-        Logger.LogArtifactPublishing(Environment.NamespaceOf(result.Module), TModule.ModuleId, deploymentTarget.Scope.ToString(), targetEnvironment.Namespace);
+        Logger.LogArtifactPublishing(Environment.NamespaceOf(result.Module), TModule.ModuleId, deploymentTarget.Scope.ToString(), targetEnvironment.Name);
         targetEnvironment.Publish(artifacts);
         return new ModuleExecutionResult(result.Module, result.Status, artifacts);
     }

@@ -120,45 +120,51 @@ public sealed class BorgPruneModuleWorker
         {
             return;
         }
-        if (executionResult.StandardOutput is not { Length: > 0 } output)
+
+        bool hasOutput = false;
+        foreach (string output in BorgPruneOutputReader.GetOutputs(executionResult))
+        {
+            hasOutput = true;
+            foreach (ReadOnlySpan<char> jsonLine in output.EnumerateLines())
+            {
+                if (!outputLineParser.TryReadLine(jsonLine, out BorgLogMessageJsonLine? line)
+                    || line is not { LevelName: BorgLogMessageJsonLine.INFO, Name: "borg.output.list", Message: { Length: > 0 } message }
+                    || !BorgPruneLineGrammar.TryParse(message, out BorgPruneLineModel? model))
+                {
+                    Logger.LogBorgPruneLineGrammarFailed(jsonLine.ToString());
+                    continue;
+                }
+
+                if (model.Action is BorgPruneKeepAction keepAction)
+                {
+                    if (!retainedArchivesByRule.TryGetValue(keepAction.RuleName, out List<BorgPruneLineModel>? retainedArchives))
+                    {
+                        retainedArchives = [];
+                        retainedArchivesByRule.Add(keepAction.RuleName, retainedArchives);
+                    }
+                    retainedArchives.Add(model);
+
+                    if (latestRetainedArchive is null || model.ArchiveTimestamp > latestRetainedArchive.Value)
+                    {
+                        latestRetainedArchive = model.ArchiveTimestamp;
+                    }
+                    if (oldestRetainedArchive is null || model.ArchiveTimestamp < oldestRetainedArchive.Value)
+                    {
+                        oldestRetainedArchive = model.ArchiveTimestamp;
+                    }
+                    continue;
+                }
+
+                if (model.Action is BorgPrunePruneAction)
+                {
+                    ++deletedArchives;
+                }
+            }
+        }
+        if (!hasOutput)
         {
             Logger.LogBorgPruneNoOutput();
             return;
-        }
-
-        foreach (ReadOnlySpan<char> jsonLine in output.EnumerateLines())
-        {
-            if (!outputLineParser.TryReadLine(jsonLine, out BorgLogMessageJsonLine? line)
-                || line is not { LevelName: BorgLogMessageJsonLine.INFO, Name: "borg.output.list", Message: { Length: > 0 } message }
-                || !BorgPruneLineGrammar.TryParse(message, out BorgPruneLineModel? model))
-            {
-                Logger.LogBorgPruneLineGrammarFailed(jsonLine.ToString());
-                continue;
-            }
-
-            if (model.Action is BorgPruneKeepAction keepAction)
-            {
-                if (!retainedArchivesByRule.TryGetValue(keepAction.RuleName, out List<BorgPruneLineModel>? retainedArchives))
-                {
-                    retainedArchives = [];
-                    retainedArchivesByRule.Add(keepAction.RuleName, retainedArchives);
-                }
-                retainedArchives.Add(model);
-
-                if (latestRetainedArchive is null || model.ArchiveTimestamp > latestRetainedArchive.Value)
-                {
-                    latestRetainedArchive = model.ArchiveTimestamp;
-                }
-                if (oldestRetainedArchive is null || model.ArchiveTimestamp < oldestRetainedArchive.Value)
-                {
-                    oldestRetainedArchive = model.ArchiveTimestamp;
-                }
-                continue;
-            }
-            if (model.Action is BorgPrunePruneAction)
-            {
-                ++deletedArchives;
-            }
         }
 
         metricsCollector.AddGauge(BORG_PRUNE_LAST_DELETED_ARCHIVES, "Number of archives deleted by the most recent borg prune command", samples => samples
