@@ -22,13 +22,13 @@ public sealed class BorgCompactModuleWorker
         ];
         if (IsDryRun(runtime))
         {
-            arguments.Add("--dry-run");
+            // borg compact doesn't have a dry-run mode, so we just skip execution and return success.
+            return runtime.Exit(Success());
         }
         arguments.Add(Module.RemoteRepository.GetRepositoryUri());
         ProcessStartInfo startInfo = new(Module.Executable, arguments);
         AddDefaults(startInfo);
         ChildProcessResult executionResult = await processDispatcher.ExecuteAsync(startInfo, cancellationToken);
-        // TODO: output parsing and metric extraction
         if (executionResult.ExitCode != 0)
         {
             return runtime.Exit(Failed());
