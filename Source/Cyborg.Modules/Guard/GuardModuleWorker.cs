@@ -10,7 +10,8 @@ public sealed partial class GuardModuleWorker(IWorkerContext<GuardModule> contex
     protected override ValueTask<ValidationResult<GuardModule>> ModuleValidationCallbackAsync(ValidationResult<GuardModule> validationResult, GuardModule originalModule, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(validationResult);
-        if (Module.Catch is null && Module.Finally is null)
+        GuardModule? module = validationResult.Module;
+        if (module is { Catch: null, Finally: null })
         {
             return new ValueTask<ValidationResult<GuardModule>>(ValidationResult<GuardModule>.Invalid(
             [
