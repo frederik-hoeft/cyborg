@@ -69,7 +69,28 @@ public sealed class DefaultChildProcessDispatcher(ILoggerFactory loggerFactory) 
         }
         ChildProcessResult childProcessResult = builder.Build(process.ExitCode);
         _logger.LogProcessExited(executable, childProcessResult.ExitCode);
+        LogCapturedOutput(executable, childProcessResult);
         return childProcessResult;
+    }
+
+    private void LogCapturedOutput(string executable, ChildProcessResult childProcessResult)
+    {
+        if (childProcessResult.StandardOutput is not null)
+        {
+            _logger.LogProcessStandardOutput(executable, EscapeNewlines(childProcessResult.StandardOutput));
+        }
+
+        if (childProcessResult.StandardError is not null)
+        {
+            _logger.LogProcessStandardError(executable, EscapeNewlines(childProcessResult.StandardError));
+        }
+    }
+
+    private static string EscapeNewlines(string value)
+    {
+        return value
+            .Replace("\r", "\\r", StringComparison.Ordinal)
+            .Replace("\n", "\\n", StringComparison.Ordinal);
     }
 
     private static async Task<CommandOutput> ReadStreamAsync(StreamReader reader, Action<SubprocessResultBuilder, string> setResult, CancellationToken cancellationToken)
