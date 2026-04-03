@@ -11,11 +11,11 @@
         { 
           "key": "body_task",
           "cyborg.types.module.context.v1": {
+            "environment": {
+              "scope": "inherit_parent",
+              "name": "smb_jobs"
+            },
             "module": {
-              "environment": {
-                "scope": "inherit_parent",
-                "name": "smb_jobs"
-              },
               "cyborg.modules.sequence.v1": {
                 "steps": [
                   {
