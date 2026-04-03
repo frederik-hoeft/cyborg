@@ -12,6 +12,8 @@ using Cyborg.Modules.Foreach;
 using Cyborg.Modules.Glob;
 using Cyborg.Modules.Guard;
 using Cyborg.Modules.If;
+using Cyborg.Modules.If.Conditions.DirectoryExists;
+using Cyborg.Modules.If.Conditions.FileExists;
 using Cyborg.Modules.If.Conditions.IsSet;
 using Cyborg.Modules.If.Conditions.IsTrue;
 using Cyborg.Modules.Named;
@@ -43,6 +45,8 @@ namespace Cyborg.Modules;
 [Singleton<IModuleLoader, IfModuleLoader>]
 [Singleton<IModuleLoader, IsTrueModuleLoader>]
 [Singleton<IModuleLoader, IsSetModuleLoader>]
+[Singleton<IModuleLoader, FileExistsModuleLoader>]
+[Singleton<IModuleLoader, DirectoryExistsModuleLoader>]
 [Singleton<IModuleLoader, GuardModuleLoader>]
 [Singleton<IModuleLoader, GlobModuleLoader>]
 [Singleton<IModuleLoader, ExternalModuleLoader>]

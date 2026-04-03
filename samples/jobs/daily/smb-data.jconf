@@ -22,7 +22,7 @@
                     "module": {
                       "cyborg.modules.glob.v1": {
                         "name": "smb_job_factory",
-                        "root": "${job_directory}/smb-jobs/",
+                        "root": "${job_directory}/smb-targets/",
                         "pattern": ".*?\\.jsecrets$",
                         "artifacts": {
                           "environment": {
@@ -69,46 +69,59 @@
                             }
                           },
                           "module": {
-                            "cyborg.modules.sequence.v1": {
-                              "steps": [
-                                {
-                                  "requires": {
-                                    "arguments": [ "smb_repository_name", "smb_root", "borg_passphrase" ]
-                                  },
-                                  "module": {
-                                    "cyborg.modules.borg.create.v1.4": {
-                                      "group": "borg_jobs",
-                                      "archive_name": "${smb_repository_name}-{now}",
-                                      "source_path": "${smb_root}",
-                                      "compression": "zlib",
-                                      "exclude": {
-                                        "caches": true,
-                                        "paths": []
-                                      }
-                                    }
-                                  }
-                                },
-                                {
-                                  "module": {
-                                    "cyborg.modules.borg.prune.v1.4": {
-                                      "group": "borg_jobs",
-                                      "glob_archives": "${smb_repository_name}-*",
-                                      "keep": {
-                                        "daily": 30,
-                                        "weekly": 24,
-                                        "monthly": 24
-                                      }
-                                    }
-                                  }
-                                },
-                                {
-                                  "module": {
-                                    "cyborg.modules.borg.compact.v1.4": {
-                                      "group": "borg_jobs"
-                                    }
+                            "cyborg.modules.if.v1": {
+                              "condition": {
+                                "module": {
+                                  "cyborg.modules.if.condition.directory_exists.v1": {
+                                    "path": "${smb_root}"
                                   }
                                 }
-                              ]
+                              },
+                              "then": {
+                                "module": {
+                                  "cyborg.modules.sequence.v1": {
+                                    "steps": [
+                                      {
+                                        "requires": {
+                                          "arguments": [ "smb_repository_name", "smb_root", "borg_passphrase" ]
+                                        },
+                                        "module": {
+                                          "cyborg.modules.borg.create.v1.4": {
+                                            "group": "borg_jobs",
+                                            "archive_name": "${smb_repository_name}-{now}",
+                                            "source_path": "${smb_root}",
+                                            "compression": "zlib",
+                                            "exclude": {
+                                              "caches": true,
+                                              "paths": []
+                                            }
+                                          }
+                                        }
+                                      },
+                                      {
+                                        "module": {
+                                          "cyborg.modules.borg.prune.v1.4": {
+                                            "group": "borg_jobs",
+                                            "glob_archives": "${smb_repository_name}-*",
+                                            "keep": {
+                                              "daily": 30,
+                                              "weekly": 24,
+                                              "monthly": 24
+                                            }
+                                          }
+                                        }
+                                      },
+                                      {
+                                        "module": {
+                                          "cyborg.modules.borg.compact.v1.4": {
+                                            "group": "borg_jobs"
+                                          }
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
                             }
                           }
                         }
