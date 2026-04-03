@@ -1,7 +1,6 @@
 ﻿using Cyborg.Core.Aot.Modules.Validation;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Cyborg.Core.Modules;
-using System.Collections.Immutable;
 
 namespace Cyborg.Modules.Switch;
 
@@ -9,7 +8,7 @@ namespace Cyborg.Modules.Switch;
 public sealed partial record SwitchModule
 (
     [property: Required] string Variable,
-    [property: MinLength(1)] ImmutableArray<SwitchReference> Cases
+    [property: Required][property: MinLength(1)] IReadOnlyCollection<SwitchReference> Cases
 ) : ModuleBase, IModule
 {
     public static string ModuleId => "cyborg.modules.switch.v1";

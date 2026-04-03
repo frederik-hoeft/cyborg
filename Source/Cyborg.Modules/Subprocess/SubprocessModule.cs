@@ -32,7 +32,7 @@ public sealed record ImpersonationContext
 public sealed record SubprocessCommand
 (
     [property: Required][property: FileExists] string Executable,
-    [property: Required] ImmutableArray<string> Arguments
+    [property: Required] IReadOnlyCollection<string> Arguments
 );
 
 [Validatable]
