@@ -71,10 +71,8 @@
                           "module": {
                             "cyborg.modules.if.v1": {
                               "condition": {
-                                "module": {
-                                  "cyborg.modules.if.condition.directory_exists.v1": {
-                                    "path": "${smb_root}"
-                                  }
+                                "cyborg.modules.if.condition.directory_exists.v1": {
+                                  "path": "${smb_root}"
                                 }
                               },
                               "then": {
