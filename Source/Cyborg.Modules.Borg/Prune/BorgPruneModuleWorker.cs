@@ -129,6 +129,7 @@ public sealed class BorgPruneModuleWorker
                     || line is not { LevelName: BorgLogMessageJsonLine.INFO, Name: "borg.output.list", Message: { Length: > 0 } message }
                     || !BorgPruneLineGrammar.TryParse(message, out BorgPruneLineModel? model))
                 {
+                    Logger.LogBorgPruneLineGrammarFailed(jsonLine.ToString());
                     continue;
                 }
 
@@ -171,6 +172,10 @@ public sealed class BorgPruneModuleWorker
             metricsCollector.AddGauge(BORG_BACKUP_OLDEST_TIMESTAMP_SECONDS, "Unix timestamp in seconds of the oldest retained backup after the most recent borg prune command", samples => samples
                 .Add(new DateTimeOffset(oldestArchive).ToUnixTimeSeconds(), defaultLabels));
         }
+        if (retainedArchivesByRule.Count == 0)
+        {
+            return;
+        }
 
         metricsCollector.AddGauge(BORG_PRUNE_LAST_KEPT_ARCHIVES_BY_RULE, "Number of archives retained by the most recent borg prune command", samples =>
         {
@@ -182,10 +187,6 @@ public sealed class BorgPruneModuleWorker
             }
         });
 
-        if (retainedArchivesByRule.Count == 0)
-        {
-            return;
-        }
         metricsCollector.AddGauge(BORG_RETAINED_BACKUP_TIMESTAMP_SECONDS, "Unix timestamp in seconds of a retained backup after the most recent borg prune command", samples =>
         {
             foreach ((string ruleName, List<BorgPruneLineModel> retainedArchives) in retainedArchivesByRule)
