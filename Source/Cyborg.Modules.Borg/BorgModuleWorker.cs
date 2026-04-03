@@ -47,7 +47,6 @@ public abstract class BorgModuleWorker<TModule>
             .AddLabel("hostname", Module.RemoteRepository.Hostname)
             .AddLabel("port", Module.RemoteRepository.Port.ToString())
             .AddLabel("username", Module.RemoteRepository.Username)
-            .AddLabel("repository_uri", Module.RemoteRepository.GetRepositoryUri())
             .AddLabel("repository", Module.RemoteRepository.RepositoryName);
     }
 
