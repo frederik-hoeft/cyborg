@@ -19,13 +19,28 @@ public sealed class BorgOutputLineParser
 
     public bool TryReadLine(ReadOnlySpan<char> json, [NotNullWhen(true)] out BorgJsonLine? line)
     {
-        BorgJsonLineHeader? header = JsonSerializer.Deserialize(json, serializerContext.BorgJsonLineHeader);
-        if (header is null || string.IsNullOrWhiteSpace(header.Type) || !deserializerRegistry.TryGetDeserializer(header.Type, out IBorgOutputDeserializer? deserializer))
+        if (json.Trim().IsEmpty)
         {
             line = null;
             return false;
         }
-        return deserializer.TryDeserialize(json, out line);
+
+        try
+        {
+            BorgJsonLineHeader? header = JsonSerializer.Deserialize(json, serializerContext.BorgJsonLineHeader);
+            if (header is null || string.IsNullOrWhiteSpace(header.Type) || !deserializerRegistry.TryGetDeserializer(header.Type, out IBorgOutputDeserializer? deserializer))
+            {
+                line = null;
+                return false;
+            }
+
+            return deserializer.TryDeserialize(json, out line);
+        }
+        catch (JsonException)
+        {
+            line = null;
+            return false;
+        }
     }
 
     public bool TryReadLine<T>(ReadOnlySpan<char> json, [NotNullWhen(true)] out T? line) where T : BorgJsonLine
