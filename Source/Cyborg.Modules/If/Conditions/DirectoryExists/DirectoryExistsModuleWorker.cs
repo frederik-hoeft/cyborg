@@ -8,12 +8,7 @@ public sealed class DirectoryExistsModuleWorker(IWorkerContext<DirectoryExistsMo
 {
     protected override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
-        if (!runtime.Environment.TryResolveVariable(Module.Path, out string? path))
-        {
-            // undefined variable or type mismatch
-            return Task.FromResult(runtime.Exit(Failed()));
-        }
-        bool exists = Directory.Exists(path);
+        bool exists = Directory.Exists(Module.Path);
         return Task.FromResult(runtime.Exit(Success(new ConditionalResult(exists))));
     }
 }

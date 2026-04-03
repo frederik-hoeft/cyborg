@@ -5,8 +5,8 @@ namespace Cyborg.Modules.Network.WakeOnLan;
 
 internal static partial class WakeOnLanModuleWorkerLog
 {
-    [ZLoggerMessage(LogLevel.Debug, "Checking if '{targetHost}' is already reachable")]
-    public static partial void LogWolCheckingReachability(this ILogger logger, string targetHost);
+    [ZLoggerMessage(LogLevel.Debug, "Checking if '{targetHost}' is already reachable with discovery timeout of {discoveryTimeout}")]
+    public static partial void LogWolCheckingReachability(this ILogger logger, string targetHost, string discoveryTimeout);
 
     [ZLoggerMessage(LogLevel.Information, "Host '{targetHost}' is already reachable — no wake needed")]
     public static partial void LogWolHostAlreadyUp(this ILogger logger, string targetHost);

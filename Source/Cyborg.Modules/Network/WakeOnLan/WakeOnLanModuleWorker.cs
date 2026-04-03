@@ -11,7 +11,7 @@ public sealed class WakeOnLanModuleWorker(IWorkerContext<WakeOnLanModule> contex
 {
     protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
-        Logger.LogWolCheckingReachability(Module.TargetHost);
+        Logger.LogWolCheckingReachability(Module.TargetHost, Module.HostDiscoveryTimeout.ToString());
         bool isUp = await pingService.PingAsync(Module.TargetHost, Module.HostDiscoveryTimeout, cancellationToken);
         if (isUp)
         {

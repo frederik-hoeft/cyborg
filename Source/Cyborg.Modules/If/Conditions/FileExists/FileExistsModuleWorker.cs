@@ -8,12 +8,7 @@ public sealed class FileExistsModuleWorker(IWorkerContext<FileExistsModule> cont
 {
     protected override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
-        if (!runtime.Environment.TryResolveVariable(Module.Path, out string? path))
-        {
-            // undefined variable or type mismatch
-            return Task.FromResult(runtime.Exit(Failed()));
-        }
-        bool exists = File.Exists(path);
+        bool exists = File.Exists(Module.Path);
         return Task.FromResult(runtime.Exit(Success(new ConditionalResult(exists))));
     }
 }
