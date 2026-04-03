@@ -7,6 +7,8 @@ namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
 
 internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInfo, string rootModuleVariable, DiagnosticsReporter diagnosticsReporter) : ISectionRenderer
 {
+    private readonly DefaultApplicationRenderer _defaultApplicationRenderer = new(contractInfo, rootModuleVariable, diagnosticsReporter);
+
     public void RenderSection(IndentedStringBuilder builder, ModuleModel model)
     {
         string qualifiedType = model.FullyQualifiedTypeName;
@@ -44,9 +46,12 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
             PropertyRewriteContext rewriteContext = new(property, contractInfo, diagnosticsReporter, rootModuleVariable, propertyAccessExpression);
             string? directExpression = CreateOverrideResolutionExpression(rewriteContext, rootPathExpression);
             bool hasDirectAssignment = !string.IsNullOrEmpty(directExpression);
-            bool hasChildAssignments = property.IsValidatableType && property.Children.Any(c => HasOverrideWork(c, rewriteContext));
+            bool hasChildAssignments = property.IsValidatableType && property.Children.Any(child => HasOverrideWork(child, rewriteContext));
+            bool hasCollectionElementAssignments = property.Collection is { SupportsElementRewrite: true } collection
+                && property.HasCollectionElementChildren
+                && _defaultApplicationRenderer.HasCollectionDefaultWork(collection, rewriteContext);
 
-            if (!hasDirectAssignment && !hasChildAssignments)
+            if (!hasDirectAssignment && !hasChildAssignments && !hasCollectionElementAssignments)
             {
                 continue;
             }
@@ -64,10 +69,16 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
             string localName = $"{targetVariable}_{property.Name}";
             string localInitializer = directExpression ?? propertyAccessExpression;
             builder.AppendLine($"{property.NullableTypeName} {localName} = {localInitializer};");
+            _defaultApplicationRenderer.AppendDirectDefaultApplicationForProperty(builder, property, localName);
 
             if (hasChildAssignments)
             {
                 AppendNestedOverrideResolutionForProperty(builder, rewriteContext, localName, rootPathExpression);
+            }
+
+            if (hasCollectionElementAssignments)
+            {
+                _defaultApplicationRenderer.AppendCollectionDefaultApplicationForProperty(builder, property, localName, diagnosticsPhase: "overrides");
             }
 
             assignments.Add((property.Name, localName));
@@ -78,7 +89,7 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
             return false;
         }
 
-        builder.AppendLine($"{targetVariable} = {targetVariable} with {{ {string.Join(", ", assignments.Select(static a => $"{a.PropertyName} = {a.LocalName}"))} }};");
+        builder.AppendLine($"{targetVariable} = {targetVariable} with {{ {string.Join(", ", assignments.Select(static assignment => $"{assignment.PropertyName} = {assignment.LocalName}"))} }};");
         return true;
     }
 
@@ -114,7 +125,7 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
         builder.AppendLine($"{localName} = {nestedVariable};");
     }
 
-    private static bool HasOverrideWork(PropertyModel property, PropertyRewriteContext rewriteContext) 
+    private static bool HasOverrideWork(PropertyModel property, PropertyRewriteContext rewriteContext)
     {
         MutablePropertyRewriteContext mutableContext = new(property, rewriteContext.ContractInfo, rewriteContext.DiagnosticsReporter, rewriteContext.ModuleVariable, rewriteContext.PropertyAccessExpression);
         return HasOverrideWork(mutableContext);
@@ -127,6 +138,7 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
         {
             return true;
         }
+
         PropertyModel property = rewriteContext.Property;
         if (property.IsValidatableType)
         {
@@ -139,6 +151,7 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
                 }
             }
         }
+
         return false;
     }
 

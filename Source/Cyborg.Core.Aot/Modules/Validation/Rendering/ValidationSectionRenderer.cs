@@ -20,7 +20,9 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
                 cancellationToken.ThrowIfCancellationRequested();
                 {{contractInfo.IModuleT.RenderGlobalWithGenerics(qualifiedType)}} self = this;
                 {{contractInfo.IModuleT.RenderGlobalWithGenerics(qualifiedType)}} withDefaults = await self.ApplyDefaultsAsync(runtime, serviceProvider, cancellationToken);
-                {{qualifiedType}} module = await withDefaults.ResolveOverridesAsync(runtime, serviceProvider, cancellationToken);
+                {{contractInfo.IModuleT.RenderGlobalWithGenerics(qualifiedType)}} withOverrides = await withDefaults.ResolveOverridesAsync(runtime, serviceProvider, cancellationToken);
+                // ensure that defaults are also applied to values injected via overrides
+                {{qualifiedType}} module = await withOverrides.ApplyDefaultsAsync(runtime, serviceProvider, cancellationToken);
                 {{KnownTypes.ListOfT(contractInfo.ValidationError.RenderGlobal())}} errors = [];
 
             """);
