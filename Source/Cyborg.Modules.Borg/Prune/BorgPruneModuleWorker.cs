@@ -131,7 +131,6 @@ public sealed class BorgPruneModuleWorker
                     || line is not { LevelName: BorgLogMessageJsonLine.INFO, Name: "borg.output.list", Message: { Length: > 0 } message }
                     || !BorgPruneLineGrammar.TryParse(message, out BorgPruneLineModel? model))
                 {
-                    Logger.LogBorgPruneLineGrammarFailed(jsonLine.ToString());
                     continue;
                 }
 
@@ -163,7 +162,7 @@ public sealed class BorgPruneModuleWorker
         }
         if (!hasOutput)
         {
-            Logger.LogBorgPruneNoOutput();
+            Logger.LogBorgPruneNoOutput(Module.RemoteRepository.GetRepositoryUri());
             return;
         }
 
