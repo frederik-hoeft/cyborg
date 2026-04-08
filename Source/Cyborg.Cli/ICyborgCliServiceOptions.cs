@@ -1,7 +1,6 @@
 using Cyborg.Cli.Logging;
 using Cyborg.Cli.Logging.Options;
 using Cyborg.Cli.Metrics;
-using Cyborg.Core.Configuration;
 using Cyborg.Core.Logging;
 using Cyborg.Core.Modules.Configuration.Serialization;
 using Jab;
@@ -28,11 +27,10 @@ namespace Cyborg.Cli;
 [Singleton<JsonConverter>(Factory = nameof(CreateLogLevelConverter))]
 internal interface ICyborgCliServiceOptions
 {
-    static ILoggerFactory CreateLoggerFactory(IEnumerable<ILoggingConfigurator> configurators, IConfiguration configuration, LoggingOptions loggingOptions) =>
+    static ILoggerFactory CreateLoggerFactory(IEnumerable<ILoggingConfigurator> configurators) =>
         LoggerFactory.Create(builder =>
         {
-            GlobalLoggingOptions fileOptions = configuration.Get("cyborg.services.logging", () => new GlobalLoggingOptions());
-            builder.SetMinimumLevel(loggingOptions.MinimumLevel ?? fileOptions.MinimumLevel);
+            builder.SetMinimumLevel(LogLevel.Trace);
             foreach (ILoggingConfigurator configurator in configurators)
             {
                 configurator.Configure(builder);

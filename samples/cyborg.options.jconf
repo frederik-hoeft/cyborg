@@ -1,15 +1,10 @@
 {
   "options": [
     {
-      "key": "cyborg.services.logging",
-      "cyborg.types.services.logging.v1": {
-        "minimum_level": "information"
-      }
-    },
-    {
       "key": "cyborg.services.logging.rolling",
       "cyborg.types.services.logging.rolling.v1": {
         "enabled": true,
+        "minimum_level": "information",
         "path": "/var/log/cyborg",
         "rolling_inteval": "day",
         "rolling_size_bytes": 10485760,
@@ -20,6 +15,7 @@
       "key": "cyborg.services.logging.console",
       "cyborg.types.services.logging.console.v1": {
         "enabled": true,
+        "minimum_level": "information",
         "format": "json"
       }
     },
@@ -27,6 +23,7 @@
       "key": "cyborg.services.logging.file",
       "cyborg.types.services.logging.file.v1": {
         "enabled": true,
+        "minimum_level": "information",
         "path": "/var/log/cyborg/latest.log",
         "format": "json"
       }

@@ -33,7 +33,7 @@ internal sealed class Commands
         IConfigurationLoader configurationLoader = services.GetRequiredService<IConfigurationLoader>();
         await configurationLoader.AddSourceAsync(configuration, optionsPath, cancellationToken);
 
-        // CLI --log-level has higher priority than the options file
+        // CLI --log-level overrides only the console sink minimum level.
         if (logLevel.HasValue)
         {
             services.GetRequiredService<LoggingOptions>().MinimumLevel = logLevel.Value;

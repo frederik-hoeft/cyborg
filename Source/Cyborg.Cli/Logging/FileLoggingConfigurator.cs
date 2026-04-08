@@ -16,6 +16,17 @@ internal sealed class FileLoggingConfigurator(IConfiguration configuration) : IL
         {
             return;
         }
+
+        builder.AddFilter((providerName, _, level) =>
+        {
+            if (providerName?.Contains("File", StringComparison.OrdinalIgnoreCase) is true)
+            {
+                return level >= options.MinimumLevel;
+            }
+
+            return true;
+        });
+
         if (File.Exists(options.Path))
         {
             File.Delete(options.Path);
