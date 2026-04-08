@@ -6,7 +6,7 @@
         "enabled": true,
         "minimum_level": "information",
         "path": "/var/log/cyborg",
-        "rolling_inteval": "day",
+        "rolling_interval": "day",
         "rolling_size_bytes": 10485760,
         "format": "json"
       }
