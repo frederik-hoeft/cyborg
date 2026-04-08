@@ -1,6 +1,12 @@
 {
   "options": [
     {
+      "key": "cyborg.services.logging",
+      "cyborg.types.services.logging.v1": {
+        "minimum_level": "trace"
+      }
+    },
+    {
       "key": "cyborg.services.logging.rolling",
       "cyborg.types.services.logging.rolling.v1": {
         "enabled": true,
