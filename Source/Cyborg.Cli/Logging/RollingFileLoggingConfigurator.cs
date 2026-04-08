@@ -4,6 +4,7 @@ using Cyborg.Core.Logging;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using ZLogger;
+using ZLogger.Providers;
 
 namespace Cyborg.Cli.Logging;
 
@@ -16,6 +17,9 @@ internal sealed class RollingFileLoggingConfigurator(IConfiguration configuratio
         {
             return;
         }
+
+        builder.AddFilter<ZLoggerRollingFileLoggerProvider>(null, options.MinimumLevel);
+
         builder.AddZLoggerRollingFile(rollingOptions =>
         {
             rollingOptions.FilePathSelector = (timestamp, sequenceNumber) => Path.Join(options.Path, $"{timestamp.ToLocalTime():yyyy-MM-dd}_{sequenceNumber:000}.log");

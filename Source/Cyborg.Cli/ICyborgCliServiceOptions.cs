@@ -28,11 +28,11 @@ namespace Cyborg.Cli;
 [Singleton<JsonConverter>(Factory = nameof(CreateLogLevelConverter))]
 internal interface ICyborgCliServiceOptions
 {
-    static ILoggerFactory CreateLoggerFactory(IEnumerable<ILoggingConfigurator> configurators, IConfiguration configuration, LoggingOptions loggingOptions) =>
+    static ILoggerFactory CreateLoggerFactory(IConfiguration configuration, IEnumerable<ILoggingConfigurator> configurators) =>
         LoggerFactory.Create(builder =>
         {
-            GlobalLoggingOptions fileOptions = configuration.Get("cyborg.services.logging", () => new GlobalLoggingOptions());
-            builder.SetMinimumLevel(loggingOptions.MinimumLevel ?? fileOptions.MinimumLevel);
+            GlobalLoggingOptions globalOptions = configuration.Get("cyborg.services.logging", () => new GlobalLoggingOptions(LogLevel.Trace));
+            builder.SetMinimumLevel(globalOptions.MinimumLevel);
             foreach (ILoggingConfigurator configurator in configurators)
             {
                 configurator.Configure(builder);

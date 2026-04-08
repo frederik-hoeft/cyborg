@@ -3,10 +3,11 @@ using Cyborg.Core.Configuration;
 using Cyborg.Core.Logging;
 using Microsoft.Extensions.Logging;
 using ZLogger;
+using ZLogger.Providers;
 
 namespace Cyborg.Cli.Logging;
 
-internal sealed class ConsoleLoggingConfigurator(IConfiguration configuration) : ILoggingConfigurator
+internal sealed class ConsoleLoggingConfigurator(IConfiguration configuration, LoggingOptions loggingOptions) : ILoggingConfigurator
 {
     public void Configure(ILoggingBuilder builder)
     {
@@ -15,6 +16,10 @@ internal sealed class ConsoleLoggingConfigurator(IConfiguration configuration) :
         {
             return;
         }
+
+        LogLevel minimumLevel = loggingOptions.MinimumLevel ?? options.MinimumLevel;
+        builder.AddFilter<ZLoggerConsoleLoggerProvider>(null, minimumLevel);
+
         builder.AddZLoggerConsole(consoleOptions =>
         {
             consoleOptions.OutputEncodingToUtf8 = true;

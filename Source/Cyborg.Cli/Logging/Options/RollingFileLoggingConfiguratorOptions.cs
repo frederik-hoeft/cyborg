@@ -1,5 +1,6 @@
 using Cyborg.Cli.Logging.Options;
 using Cyborg.Core.Aot.Modules.Composition;
+using Microsoft.Extensions.Logging;
 using ZLogger.Providers;
 
 namespace Cyborg.Cli.Logging;
@@ -16,4 +17,6 @@ internal sealed partial record RollingFileLoggingConfiguratorOptions
 internal abstract record LoggingConfiguratorOptions
 {
     public bool Enabled { get; init; } = true;
+
+    public LogLevel MinimumLevel { get; init; } = LogLevel.Information;
 }
