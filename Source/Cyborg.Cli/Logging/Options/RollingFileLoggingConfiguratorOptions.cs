@@ -8,7 +8,6 @@ namespace Cyborg.Cli.Logging;
 [GeneratedDecomposition]
 internal sealed partial record RollingFileLoggingConfiguratorOptions
 (
-    LogLevel MinimumLevel = LogLevel.Information,
     string Path = "/var/log/cyborg",
     RollingInterval RollingInterval = RollingInterval.Day,
     int RollingSizeBytes = 10 * 1024 * 1024,
@@ -18,4 +17,6 @@ internal sealed partial record RollingFileLoggingConfiguratorOptions
 internal abstract record LoggingConfiguratorOptions
 {
     public bool Enabled { get; init; } = true;
+
+    public LogLevel MinimumLevel { get; init; } = LogLevel.Information;
 }

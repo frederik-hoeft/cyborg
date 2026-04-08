@@ -3,6 +3,7 @@ using Cyborg.Core.Configuration;
 using Cyborg.Core.Logging;
 using Microsoft.Extensions.Logging;
 using ZLogger;
+using ZLogger.Providers;
 
 namespace Cyborg.Cli.Logging;
 
@@ -17,15 +18,7 @@ internal sealed class ConsoleLoggingConfigurator(IConfiguration configuration, L
         }
 
         LogLevel minimumLevel = loggingOptions.MinimumLevel ?? options.MinimumLevel;
-        builder.AddFilter((providerName, _, level) =>
-        {
-            if (providerName?.Contains("Console", StringComparison.OrdinalIgnoreCase) is true)
-            {
-                return level >= minimumLevel;
-            }
-
-            return true;
-        });
+        builder.AddFilter<ZLoggerConsoleLoggerProvider>(null, minimumLevel);
 
         builder.AddZLoggerConsole(consoleOptions =>
         {

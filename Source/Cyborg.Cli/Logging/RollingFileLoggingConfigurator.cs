@@ -4,6 +4,7 @@ using Cyborg.Core.Logging;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using ZLogger;
+using ZLogger.Providers;
 
 namespace Cyborg.Cli.Logging;
 
@@ -17,15 +18,7 @@ internal sealed class RollingFileLoggingConfigurator(IConfiguration configuratio
             return;
         }
 
-        builder.AddFilter((providerName, _, level) =>
-        {
-            if (providerName?.Contains("Rolling", StringComparison.OrdinalIgnoreCase) is true)
-            {
-                return level >= options.MinimumLevel;
-            }
-
-            return true;
-        });
+        builder.AddFilter<ZLoggerRollingFileLoggerProvider>(null, options.MinimumLevel);
 
         builder.AddZLoggerRollingFile(rollingOptions =>
         {
