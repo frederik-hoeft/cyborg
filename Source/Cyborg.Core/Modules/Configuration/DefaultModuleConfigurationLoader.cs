@@ -1,10 +1,11 @@
-﻿using Cyborg.Core.Modules.Configuration.Model;
+﻿using Cyborg.Core.Configuration.Serialization;
+using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Configuration.Serialization;
 using System.Text.Json;
 
 namespace Cyborg.Core.Modules.Configuration;
 
-public sealed class DefaultModuleConfigurationLoader(IModuleLoaderContext configurationContext) : IModuleConfigurationLoader
+public sealed class DefaultModuleConfigurationLoader(IJsonLoaderContext configurationContext) : IModuleConfigurationLoader
 {
     public async Task<ModuleContext> LoadModuleAsync(string configurationFilePath, CancellationToken cancellationToken)
     {

@@ -1,7 +1,7 @@
 ﻿using Cyborg.Core.Aot.Modules.Validation;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
+using Cyborg.Core.Configuration.Model;
 using Cyborg.Core.Modules;
-using Cyborg.Core.Modules.Configuration.Model;
 using System.Text.RegularExpressions;
 
 namespace Cyborg.Modules.Template;

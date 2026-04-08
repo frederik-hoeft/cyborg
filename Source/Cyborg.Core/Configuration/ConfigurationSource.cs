@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Modules.Configuration.Model;
+﻿using Cyborg.Core.Configuration.Model;
 using System.Collections.Immutable;
 
 namespace Cyborg.Core.Configuration;

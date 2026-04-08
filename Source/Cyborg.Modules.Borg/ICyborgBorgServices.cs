@@ -1,6 +1,6 @@
-﻿using Cyborg.Core.Modules.Configuration;
+﻿using Cyborg.Core.Configuration.Serialization.Dynamics;
+using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
-using Cyborg.Core.Modules.Configuration.Serialization;
 using Cyborg.Modules.Borg.Compact;
 using Cyborg.Modules.Borg.Create;
 using Cyborg.Modules.Borg.Prune;
