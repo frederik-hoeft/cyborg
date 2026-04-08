@@ -1,11 +1,25 @@
-﻿using Cyborg.Core.Services.Security.Trust.Policies;
+﻿using Cyborg.Core.Services.Security.Trust.Configuration;
+using Cyborg.Core.Services.Security.Trust.Policies;
 
 namespace Cyborg.Core.Services.Security.Trust;
 
-public sealed class UnionConfigurationTrustMonitor(IConfigurationTrustPolicyProvider policyProvider) : IConfigurationTrustMonitor
+public sealed class UnionConfigurationTrustMonitor(IConfigurationTrustPolicyProvider policyProvider, IConfigurationTrustOptionsProvider optionsProvider) : IConfigurationTrustMonitor
 {
+    private static ConfigurationTrustDecision EnforcementDisabledDecision => field ??= new
+    (
+        IsTrusted: true,
+        Decisions:
+        [
+            new ConfigurationTrustPolicyDecision("cyborg.trust.policy.disabled", ConfigurationTrustDecisionKind.Abstain, Reason: "Trust evaluation is disabled by configuration.")
+        ]
+    );
+
     public async ValueTask<ConfigurationTrustDecision> EvaluateAsync(string path, CancellationToken cancellationToken = default)
     {
+        if (optionsProvider.Options.EnforcementMode is TrustEnforcementMode.Disabled)
+        {
+            return EnforcementDisabledDecision;
+        }
         ConfigurationTrustSubject subject = new(path);
 
         List<ConfigurationTrustPolicyDecision> decisions = [];

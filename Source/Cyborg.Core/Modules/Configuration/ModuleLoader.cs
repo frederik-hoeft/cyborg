@@ -1,6 +1,5 @@
 ﻿using Cyborg.Core.Aot.Contracts;
 using Cyborg.Core.Configuration.Serialization;
-using Cyborg.Core.Modules.Configuration.Serialization;
 using System.Text.Json;
 
 namespace Cyborg.Core.Modules.Configuration;
