@@ -16,8 +16,8 @@ public sealed class DefaultModuleConfigurationLoader
     {
         ConfigurationTrustDecision trustDecision = await trustMonitor.EvaluateAsync(configurationFilePath, cancellationToken);
         trustService.Enforce(trustDecision);
-        await using FileStream stream = File.OpenRead(configurationFilePath);
+        await using FileStream stream = File.OpenRead(trustDecision.Path);
         ModuleContext? moduleReference = await JsonSerializer.DeserializeAsync<ModuleContext>(stream, configurationContext, cancellationToken);
-        return moduleReference ?? throw new InvalidOperationException($"Failed to load module context from configuration file '{configurationFilePath}'.");
+        return moduleReference ?? throw new InvalidOperationException($"Failed to load module context from configuration file '{trustDecision.Path}'.");
     }
 }
