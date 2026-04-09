@@ -39,7 +39,7 @@ public static partial class ConfigurationTrustLog
         }
         if (logger.IsEnabled(LogLevel.Debug))
         {
-            string payloadJson = JsonSerializer.Serialize(decision, CyborgJsonLogContext.Default.IReadOnlyListConfigurationTrustPolicyDecision);
+            string payloadJson = JsonSerializer.Serialize(decision.Decisions, CyborgJsonLogContext.Default.IReadOnlyListConfigurationTrustPolicyDecision);
             logger.LogConfigurationTrustDetails(decision.Path, decision.IsTrusted, decision.Decisions.Count, payloadJson);
         }
         if (decision.IsTrusted)
