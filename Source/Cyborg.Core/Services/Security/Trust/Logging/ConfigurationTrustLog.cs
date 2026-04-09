@@ -40,7 +40,7 @@ public static partial class ConfigurationTrustLog
         }
         if (logger.IsEnabled(LogLevel.Debug))
         {
-            string payloadJson = JsonSerializer.Serialize(decision.Decisions, jsonContext);
+            string payloadJson = JsonSerializer.Serialize(decision.Decisions, jsonContext).Replace("\\u0027", "'"); // Unescape single quotes for better readability in logs
             logger.LogConfigurationTrustDetails(decision.Path, decision.IsTrusted, decision.Decisions.Count, payloadJson);
         }
         if (decision.IsTrusted)
