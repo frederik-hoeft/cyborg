@@ -1,5 +1,5 @@
-﻿using Mono.Unix;
 using System.Collections.Immutable;
+using System.Runtime.InteropServices;
 
 namespace Cyborg.Core.Services.Security.Trust.Policies;
 
@@ -8,22 +8,13 @@ public sealed record UnixOwnerTrustPolicy(ImmutableArray<string> AllowedUsers, I
     public override ValueTask<ConfigurationTrustPolicyDecision> EvaluateAsync(IServiceProvider serviceProvider, ConfigurationTrustSubject subject, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(subject);
-        if (OperatingSystem.IsWindows())
+        if (!OperatingSystem.IsLinux() || RuntimeInformation.OSArchitecture != Architecture.X64)
         {
             return ValueTaskOf(new ConfigurationTrustPolicyDecision
             (
                 Name,
                 ConfigurationTrustDecisionKind.Abstain,
-                Reason: $"{Name} is not supported on Windows."
-            ));
-        }
-        if (!UnixFileSystemInfo.TryGetFileSystemEntry(subject.CanonicalPath, out UnixFileSystemInfo? entry) || entry is not { OwnerUser: { } user, OwnerGroup: { } group })
-        {
-            return ValueTaskOf(new ConfigurationTrustPolicyDecision
-            (
-                Name,
-                ConfigurationTrustDecisionKind.Reject,
-                Reason: "Unable to retrieve file owner information."
+                Reason: $"{Name} is only supported on Linux x64."
             ));
         }
         if (AllowedUsers.IsDefaultOrEmpty && AllowedGroups.IsDefaultOrEmpty)
@@ -35,7 +26,18 @@ public sealed record UnixOwnerTrustPolicy(ImmutableArray<string> AllowedUsers, I
                 Reason: "No allowed users or groups specified."
             ));
         }
-        if (!AllowedUsers.IsDefaultOrEmpty && AllowedUsers.Contains(user.UserName, StringComparer.Ordinal) || !AllowedGroups.IsDefaultOrEmpty && AllowedGroups.Contains(group.GroupName, StringComparer.Ordinal))
+        if (!UnixFileOwnershipResolver.TryGetOwnerAndGroup(subject.CanonicalPath, out string? userName, out string? groupName))
+        {
+            return ValueTaskOf(new ConfigurationTrustPolicyDecision
+            (
+                Name,
+                ConfigurationTrustDecisionKind.Reject,
+                Reason: "Unable to retrieve file owner information."
+            ));
+        }
+        bool isAllowedUser = !AllowedUsers.IsDefaultOrEmpty && AllowedUsers.Contains(userName, StringComparer.Ordinal);
+        bool isAllowedGroup = !AllowedGroups.IsDefaultOrEmpty && AllowedGroups.Contains(groupName, StringComparer.Ordinal);
+        if (isAllowedUser || isAllowedGroup)
         {
             return ValueTaskOf(new ConfigurationTrustPolicyDecision
             (
@@ -48,7 +50,7 @@ public sealed record UnixOwnerTrustPolicy(ImmutableArray<string> AllowedUsers, I
         (
             Name,
             ConfigurationTrustDecisionKind.Reject,
-            Reason: $"Neither the file owner user '{user.UserName}' nor group '{group.GroupName}' is in the allowed lists."
+            Reason: $"Neither the file owner user '{userName}' nor group '{groupName}' is in the allowed lists."
         ));
     }
 }
