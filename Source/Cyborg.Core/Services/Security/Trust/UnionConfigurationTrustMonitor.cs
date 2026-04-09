@@ -3,10 +3,16 @@ using Cyborg.Core.Services.Security.Trust.Policies;
 
 namespace Cyborg.Core.Services.Security.Trust;
 
-public sealed class UnionConfigurationTrustMonitor(IConfigurationTrustPolicyProvider policyProvider, IConfigurationTrustOptionsProvider optionsProvider) : IConfigurationTrustMonitor
+public sealed class UnionConfigurationTrustMonitor
+(
+    IServiceProvider serviceProvider,
+    IConfigurationTrustPolicyProvider policyProvider,
+    IConfigurationTrustOptionsProvider optionsProvider
+) : IConfigurationTrustMonitor
 {
-    private static ConfigurationTrustDecision EnforcementDisabledDecision => field ??= new
+    private static ConfigurationTrustDecision EnforcementDisabled(string path) => new
     (
+        Path: path,
         IsTrusted: true,
         Decisions:
         [
@@ -18,20 +24,20 @@ public sealed class UnionConfigurationTrustMonitor(IConfigurationTrustPolicyProv
     {
         if (optionsProvider.Options.EnforcementMode is TrustEnforcementMode.Disabled)
         {
-            return EnforcementDisabledDecision;
+            return EnforcementDisabled(path);
         }
         ConfigurationTrustSubject subject = new(path);
 
         List<ConfigurationTrustPolicyDecision> decisions = [];
         foreach (IConfigurationTrustPolicy policy in policyProvider.GetPolicies())
         {
-            ConfigurationTrustPolicyDecision decision = await policy.EvaluateAsync(subject, cancellationToken);
+            ConfigurationTrustPolicyDecision decision = await policy.EvaluateAsync(serviceProvider, subject, cancellationToken);
             decisions.Add(decision);
             if (decision.Decision == ConfigurationTrustDecisionKind.Reject)
             {
-                return new ConfigurationTrustDecision(IsTrusted: false, decisions);
+                return new ConfigurationTrustDecision(path, IsTrusted: false, decisions);
             }
         }
-        return new ConfigurationTrustDecision(IsTrusted: true, decisions);
+        return new ConfigurationTrustDecision(path, IsTrusted: true, decisions);
     }
 }

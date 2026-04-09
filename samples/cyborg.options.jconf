@@ -1,6 +1,25 @@
 {
   "options": [
     {
+      "key": "cyborg.services.trust",
+      "cyborg.types.services.trust.options.v1": {
+        "enforcement_mode": "enforce",
+        "policies": [
+          {
+            "cyborg.trust.policy.unix.owner": {
+              "allowed_users": [ "root" ]
+            }
+          },
+          {
+            "cyborg.trust.policy.unix.permissions": {
+              "required_bits": [ "user_read" ],
+              "forbidden_bits": [ "group_write", "other_write", "set_group", "set_user" ]
+            }
+          }
+        ]
+      }
+    },
+    {
       "key": "cyborg.services.logging",
       "cyborg.types.services.logging.v1": {
         "minimum_level": "trace"

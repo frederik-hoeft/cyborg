@@ -4,5 +4,5 @@ public interface IConfigurationTrustPolicy
 {
     string Name { get; }
 
-    ValueTask<ConfigurationTrustPolicyDecision> EvaluateAsync(ConfigurationTrustSubject subject, CancellationToken cancellationToken = default);
+    ValueTask<ConfigurationTrustPolicyDecision> EvaluateAsync(IServiceProvider serviceProvider, ConfigurationTrustSubject subject, CancellationToken cancellationToken = default);
 }
