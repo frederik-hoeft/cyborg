@@ -1,4 +1,5 @@
-﻿using Cyborg.Core.Modules;
+﻿using Cyborg.Core.Configuration.Model;
+using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Extensions;

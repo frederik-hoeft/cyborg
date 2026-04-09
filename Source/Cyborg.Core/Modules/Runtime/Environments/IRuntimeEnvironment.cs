@@ -1,4 +1,5 @@
-﻿using Cyborg.Core.Modules.Configuration.Model;
+﻿using Cyborg.Core.Configuration.Model;
+using Cyborg.Core.Modules.Configuration.Model;
 using System.Runtime.CompilerServices;
 
 namespace Cyborg.Core.Modules.Runtime.Environments;

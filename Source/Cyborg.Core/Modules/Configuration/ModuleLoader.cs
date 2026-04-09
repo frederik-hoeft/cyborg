@@ -1,5 +1,5 @@
 ﻿using Cyborg.Core.Aot.Contracts;
-using Cyborg.Core.Modules.Configuration.Serialization;
+using Cyborg.Core.Configuration.Serialization;
 using System.Text.Json;
 
 namespace Cyborg.Core.Modules.Configuration;
@@ -11,7 +11,7 @@ public abstract class ModuleLoader<TModuleWorker, TModule>(IServiceProvider serv
 {
     public virtual string ModuleId => TModule.ModuleId;
 
-    public virtual bool TryCreateModule(ref Utf8JsonReader reader, IModuleLoaderContext context, [NotNullWhen(true)] out IModuleWorker? worker)
+    public virtual bool TryCreateModule(ref Utf8JsonReader reader, IJsonLoaderContext context, [NotNullWhen(true)] out IModuleWorker? worker)
     {
         TModule? module = JsonSerializer.Deserialize<TModule>(ref reader, context);
         if (module is not null)

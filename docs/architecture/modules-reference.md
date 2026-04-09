@@ -27,6 +27,8 @@ For details on the execution model, environment scoping semantics, variable reso
 - [Condition Modules](#condition-modules)
   - [IsTrue (`cyborg.modules.if.condition.is_true.v1`)](#istrue-cyborgmodulesifconditionis_truev1)
   - [IsSet (`cyborg.modules.if.condition.is_set.v1`)](#isset-cyborgmodulesifconditionis_setv1)
+  - [FileExists (`cyborg.modules.if.condition.file_exists.v1`)](#fileexists-cyborgmodulesifconditionfile_existsv1)
+  - [DirectoryExists (`cyborg.modules.if.condition.directory_exists.v1`)](#directoryexists-cyborgmodulesifconditiondirectory_existsv1)
 - [Execution Modules](#execution-modules)
   - [Subprocess (`cyborg.modules.subprocess.v1`)](#subprocess-cyborgmodulessubprocessv1)
   - [External (`cyborg.modules.external.v1`)](#external-cyborgmodulesexternalv1)
@@ -74,7 +76,7 @@ Modules are not invoked directly. They are wrapped in a **module context** which
 | `module` | module reference | Yes | -- | The module to execute. |
 | `environment` | object | No | `{ "scope": "inherit_parent" }` | Environment scoping for this execution. See [Environment Scoping](#environment-scoping). |
 | `configuration` | module reference | No | `null` | A configuration module to execute before the main module. Must implement the configuration module interface. |
-| `template` | object | No | `{ "namespace": null, "arguments": [] }` | Template metadata: a `namespace` string and an `arguments` list of expected parameter names. |
+| `requires` | object | No | `{ "argument_namespace": null, "arguments": [] }` | Module requirements: an `argument_namespace` string and an `arguments` list of expected parameter names. Used to declare required environment variables that must be present before execution. |
 
 When a module context is executed, the runtime first prepares an environment according to the `environment` settings, then executes the `configuration` module (if present) to populate that environment, and finally executes the main `module` within it. This sequencing ensures that configuration values are available to the main module and that environment scoping is fully established before any work begins.
 
@@ -158,8 +160,10 @@ Provides try/catch/finally semantics, guaranteeing cleanup execution.
 |----------|------|----------|---------|-------------|-------------|
 | `try` | module context | Yes | -- | -- | Primary module to execute. |
 | `catch` | module context | No | `null` | -- | Module to execute if `try` fails. |
-| `finally` | module context | Yes | -- | -- | Module that always executes, regardless of outcome. |
+| `finally` | module context | No | `null` | -- | Module that always executes, regardless of outcome. |
 | `behavior` | enum | No | `rethrow` | `rethrow` or `swallow` | How to handle errors when no `catch` is defined. |
+
+**Validation:** At least one of `catch` or `finally` must be defined.
 
 **Behavior:**
 
@@ -169,7 +173,7 @@ Provides try/catch/finally semantics, guaranteeing cleanup execution.
    - If no `catch` and `behavior` is `swallow`, resolves as `Success`.
    - If no `catch` and `behavior` is `rethrow`, resolves as `Failed`.
 3. If `catch` itself fails after a `try` failure, returns `Failed` immediately (prevents double-handling).
-4. The `finally` block always executes (unless cancelled), regardless of `try`/`catch` outcome.
+4. The `finally` block always executes (if defined and unless cancelled), regardless of `try`/`catch` outcome.
 
 A common scoping pattern: `try` creates a named environment (e.g., `"backup_session"` with `inherit_parent` scope), while `catch` and `finally` use `reference` scope to access that same environment.
 
@@ -186,12 +190,15 @@ Conditionally executes a branch based on a condition module's result.
 | `condition` | module reference | Yes | -- | A condition module that produces a boolean result. Must be a module returning a `ConditionalResult`. |
 | `then` | module context | Yes | -- | Module to execute when the condition is `true`. |
 | `else` | module context | No | `null` | Module to execute when the condition is `false`. |
+| `invert_condition` | bool | No | `false` | When `true`, swaps the evaluation: executes `else` when the condition is `true` and `then` when `false`. |
 
 **Behavior:**
 
 - Evaluates the `condition` in an isolated environment.
 - If the condition module fails, its status is propagated (the branches are not evaluated).
-- If the result is `true`, executes `then`; if `false`, executes `else` (or returns `Skipped` if `else` is not defined).
+- If `invert_condition` is `false` (default): executes `then` when `true`, `else` when `false`.
+- If `invert_condition` is `true`: executes `else` when `true`, `then` when `false`.
+- Returns `Skipped` if the selected branch is not defined.
 
 See [Condition Modules](#condition-modules) for built-in conditions.
 
@@ -317,6 +324,40 @@ Checks whether an environment variable is defined, regardless of its value.
 
 ---
 
+### FileExists (`cyborg.modules.if.condition.file_exists.v1`)
+
+Checks whether a file exists at a given path.
+
+**Properties:**
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `path` | string | Yes | File path to check for existence. |
+
+**Behavior:**
+
+- Returns `true` if the file exists, `false` otherwise.
+- Always succeeds.
+
+---
+
+### DirectoryExists (`cyborg.modules.if.condition.directory_exists.v1`)
+
+Checks whether a directory exists at a given path.
+
+**Properties:**
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `path` | string | Yes | Directory path to check for existence. |
+
+**Behavior:**
+
+- Returns `true` if the directory exists, `false` otherwise.
+- Always succeeds.
+
+---
+
 ## Execution Modules
 
 ### Subprocess (`cyborg.modules.subprocess.v1`)
@@ -351,7 +392,7 @@ Executes an external process with optional impersonation and output capture.
 
 | Property | Type | Required | Default | Constraints | Description |
 |----------|------|----------|---------|-------------|-------------|
-| `executable` | string | No | `"/usr/bin/runuser"` | Must exist on disk | Path to the user-switching utility. |
+| `executable` | string | No | `"/usr/sbin/runuser"` | Must exist on disk | Path to the user-switching utility. |
 | `user` | string | Yes | -- | -- | User to run the command as. |
 
 **Behavior:**
@@ -389,7 +430,7 @@ Loads and executes an external module, injecting namespaced arguments into the c
 
 | Property | Type | Required | Constraints | Description |
 |----------|------|----------|-------------|-------------|
-| `namespace` | string | Yes | Must match `^[A-Za-z0-9_](\.[A-Za-z0-9_\-]+)*$` | Prefix for argument variables. |
+| `namespace` | string | Yes | Must match `^[A-Za-z0-9_]+(\.[A-Za-z0-9_\-]+)*$` | Prefix for argument variables. |
 | `path` | string | Yes | Must exist on disk | Path to the template module configuration file. |
 | `arguments` | array of key-value pairs | No | -- | Typed arguments to inject, scoped under the namespace. Uses the same dynamic value system as ConfigMap entries (`"string"`, `"int"`, `"bool"`, registered custom types). |
 | `overrides` | array of key-value pairs | No | -- | Optional environment overrides to apply when executing the loaded module. Each entry has `key` (string) and `value` (string) properties. The `key` is the override key (e.g., `@my_template.target`) and the `value` is the override value. |

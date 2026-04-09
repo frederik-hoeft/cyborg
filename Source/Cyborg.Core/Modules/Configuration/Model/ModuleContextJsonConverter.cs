@@ -1,9 +1,9 @@
-﻿using Cyborg.Core.Modules.Configuration.Serialization;
+﻿using Cyborg.Core.Configuration.Serialization;
 using System.Text.Json;
 
 namespace Cyborg.Core.Modules.Configuration.Model;
 
-public sealed class ModuleContextJsonConverter(IModuleRegistry registry, IModuleLoaderContextProvider provider) : ModuleJsonConverter<ModuleContext>(provider)
+public sealed class ModuleContextJsonConverter(IModuleRegistry registry, IJsonLoaderContextProvider provider) : ExtendedJsonConverter<ModuleContext>(provider)
 {
     public override ModuleContext Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {

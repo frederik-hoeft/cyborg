@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Modules.Configuration.Serialization.Dynamics.ValueProviders;
+﻿using Cyborg.Core.Configuration.Serialization.Dynamics.Providers;
 
 namespace Cyborg.Modules.Subprocess;
 
