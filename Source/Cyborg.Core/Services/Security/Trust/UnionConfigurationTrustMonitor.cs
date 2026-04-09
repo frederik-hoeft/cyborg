@@ -1,4 +1,5 @@
-﻿using Cyborg.Core.Services.Security.Trust.Configuration;
+﻿using Cyborg.Core.Services.IO;
+using Cyborg.Core.Services.Security.Trust.Configuration;
 using Cyborg.Core.Services.Security.Trust.Policies;
 
 namespace Cyborg.Core.Services.Security.Trust;
@@ -7,12 +8,13 @@ public sealed class UnionConfigurationTrustMonitor
 (
     IServiceProvider serviceProvider,
     IConfigurationTrustPolicyProvider policyProvider,
-    IConfigurationTrustOptionsProvider optionsProvider
+    IConfigurationTrustOptionsProvider optionsProvider,
+    IPathCanonicalizationService pathCanonicalizationService
 ) : IConfigurationTrustMonitor
 {
-    private static ConfigurationTrustDecision EnforcementDisabled(string path) => new
+    private static ConfigurationTrustDecision EnforcementDisabled(string canonicalPath) => new
     (
-        Path: path,
+        Path: canonicalPath,
         IsTrusted: true,
         Decisions:
         [
@@ -22,11 +24,12 @@ public sealed class UnionConfigurationTrustMonitor
 
     public async ValueTask<ConfigurationTrustDecision> EvaluateAsync(string path, CancellationToken cancellationToken = default)
     {
+        string canonicalPath = pathCanonicalizationService.Canonicalize(path);
         if (optionsProvider.Options.EnforcementMode is TrustEnforcementMode.Disabled)
         {
-            return EnforcementDisabled(path);
+            return EnforcementDisabled(canonicalPath);
         }
-        ConfigurationTrustSubject subject = new(path);
+        ConfigurationTrustSubject subject = new(canonicalPath);
 
         List<ConfigurationTrustPolicyDecision> decisions = [];
         bool isTrusted = true;
@@ -39,6 +42,6 @@ public sealed class UnionConfigurationTrustMonitor
                 isTrusted = false;
             }
         }
-        return new ConfigurationTrustDecision(path, isTrusted, decisions);
+        return new ConfigurationTrustDecision(canonicalPath, isTrusted, decisions);
     }
 }

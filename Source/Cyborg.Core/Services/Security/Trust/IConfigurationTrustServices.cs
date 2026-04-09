@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Configuration.Serialization.Dynamics;
+using Cyborg.Core.Services.IO;
 using Cyborg.Core.Services.Security.Trust.Configuration;
 using Cyborg.Core.Services.Security.Trust.Policies;
 using Jab;
@@ -8,6 +9,7 @@ using System.Text.Json.Serialization;
 namespace Cyborg.Core.Services.Security.Trust;
 
 [ServiceProviderModule]
+[Singleton<IPathCanonicalizationService, DefaultPathCanonicalizationService>]
 [Singleton<IDynamicValueProvider, ConfigurationTrustOptionsDynamicProvider>]
 [Singleton<IDynamicValueProvider, UnixPermissionsTrustPolicyDynamicProvider>]
 [Singleton<IDynamicValueProvider, UnixOwnerTrustPolicyDynamicProvider>]
