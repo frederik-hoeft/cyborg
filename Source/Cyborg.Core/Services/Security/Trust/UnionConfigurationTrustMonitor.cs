@@ -29,15 +29,16 @@ public sealed class UnionConfigurationTrustMonitor
         ConfigurationTrustSubject subject = new(path);
 
         List<ConfigurationTrustPolicyDecision> decisions = [];
+        bool isTrusted = true;
         foreach (IConfigurationTrustPolicy policy in policyProvider.GetPolicies())
         {
             ConfigurationTrustPolicyDecision decision = await policy.EvaluateAsync(serviceProvider, subject, cancellationToken);
             decisions.Add(decision);
             if (decision.Decision == ConfigurationTrustDecisionKind.Reject)
             {
-                return new ConfigurationTrustDecision(path, IsTrusted: false, decisions);
+                isTrusted = false;
             }
         }
-        return new ConfigurationTrustDecision(path, IsTrusted: true, decisions);
+        return new ConfigurationTrustDecision(path, isTrusted, decisions);
     }
 }

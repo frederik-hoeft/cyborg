@@ -26,7 +26,7 @@ public static partial class ConfigurationTrustLog
 
         foreach (ConfigurationTrustPolicyDecision policyDecision in decision.Decisions)
         {
-            if (policyDecision.Decision is not ConfigurationTrustDecisionKind.Accept)
+            if (policyDecision.Decision is ConfigurationTrustDecisionKind.Reject)
             {
                 ++rejectedCount;
 

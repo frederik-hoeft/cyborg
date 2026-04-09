@@ -24,5 +24,7 @@ public sealed class DefaultConfigurationTrustService(IConfigurationTrustOptionsP
 
     [DoesNotReturn]
     private static void ThrowNotTrustedException(ConfigurationTrustDecision decision) => 
-        throw new SecurityException($"Audit failed: configuration at path '{decision.Path}' is not trusted. Context: '{decision}'");
+        throw new SecurityException($"Audit failed: configuration at path '{decision.Path}' is not trusted. Decisions: '{string.Join(", ", decision.Decisions
+            .Where(static d => d.Decision is ConfigurationTrustDecisionKind.Reject)
+            .Select(static d => d.ToString()))}'");
 }

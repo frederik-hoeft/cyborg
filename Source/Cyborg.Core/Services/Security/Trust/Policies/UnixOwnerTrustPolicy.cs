@@ -26,6 +26,15 @@ public sealed record UnixOwnerTrustPolicy(ImmutableArray<string> AllowedUsers, I
                 Reason: "Unable to retrieve file owner information."
             ));
         }
+        if (AllowedUsers.IsDefaultOrEmpty && AllowedGroups.IsDefaultOrEmpty)
+        {
+            return ValueTaskOf(new ConfigurationTrustPolicyDecision
+            (
+                Name,
+                ConfigurationTrustDecisionKind.Abstain,
+                Reason: "No allowed users or groups specified."
+            ));
+        }
         if (!AllowedUsers.IsDefaultOrEmpty && AllowedUsers.Contains(user.UserName, StringComparer.Ordinal) || !AllowedGroups.IsDefaultOrEmpty && AllowedGroups.Contains(group.GroupName, StringComparer.Ordinal))
         {
             return ValueTaskOf(new ConfigurationTrustPolicyDecision
