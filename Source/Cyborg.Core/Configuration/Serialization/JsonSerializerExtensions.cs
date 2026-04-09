@@ -9,7 +9,7 @@ namespace Cyborg.Core.Configuration.Serialization;
 [SuppressMessage("Design", CA1034, Justification = CA1034_JUSTIFY_EXTENSION_SYNTAX_CSHARP_14)]
 public static class JsonSerializerExtensions
 {
-    extension (JsonSerializer)
+    extension(JsonSerializer)
     {
         public static ValueTask<TValue?> DeserializeAsync<TValue>(Stream utf8Json, IJsonLoaderContext context, CancellationToken cancellationToken = default)
         {
@@ -21,6 +21,12 @@ public static class JsonSerializerExtensions
         {
             ArgumentNullException.ThrowIfNull(context);
             return JsonSerializer.Deserialize<TValue>(ref reader, context.JsonSerializerOptions);
+        }
+
+        public static string Serialize<TValue>(TValue value, IJsonLoaderContext context)
+        {
+            ArgumentNullException.ThrowIfNull(context);
+            return JsonSerializer.Serialize(value, context.JsonSerializerOptions);
         }
     }
 }

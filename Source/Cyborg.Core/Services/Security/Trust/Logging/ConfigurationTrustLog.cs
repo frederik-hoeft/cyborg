@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Cyborg.Core.Configuration.Serialization;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using ZLogger;
 
@@ -15,7 +16,7 @@ public static partial class ConfigurationTrustLog
     [ZLoggerMessage(LogLevel.Debug, "Audited configuration at path '{path}'. Trusted: {success}. Total policies evaluated: {policyCount}. Decisions: {decisionJson}")]
     public static partial void LogConfigurationTrustDetails(this ILogger logger, string path, bool success, int policyCount, string decisionJson);
 
-    public static void LogConfigurationTrustDecision(this ILogger logger, ConfigurationTrustDecision decision)
+    public static void LogConfigurationTrustDecision(this ILogger logger, IJsonLoaderContext jsonContext, ConfigurationTrustDecision decision)
     {
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(decision);
@@ -39,7 +40,7 @@ public static partial class ConfigurationTrustLog
         }
         if (logger.IsEnabled(LogLevel.Debug))
         {
-            string payloadJson = JsonSerializer.Serialize(decision.Decisions, CyborgJsonLogContext.Default.IReadOnlyListConfigurationTrustPolicyDecision);
+            string payloadJson = JsonSerializer.Serialize(decision.Decisions, jsonContext);
             logger.LogConfigurationTrustDetails(decision.Path, decision.IsTrusted, decision.Decisions.Count, payloadJson);
         }
         if (decision.IsTrusted)

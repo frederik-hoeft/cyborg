@@ -9,4 +9,5 @@ namespace Cyborg.Core.Services.Security.Trust;
 [JsonSerializable(typeof(ConfigurationTrustOptions))]
 [JsonSerializable(typeof(UnixPermissionsTrustPolicy))]
 [JsonSerializable(typeof(UnixOwnerTrustPolicy))]
+[JsonSerializable(typeof(IReadOnlyList<ConfigurationTrustPolicyDecision>))]
 public sealed partial class ConfigurationTrustJsonSerializerContext : JsonSerializerContext;

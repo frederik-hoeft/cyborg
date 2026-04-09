@@ -1,11 +1,17 @@
-﻿using Cyborg.Core.Services.Security.Trust.Configuration;
+﻿using Cyborg.Core.Configuration.Serialization;
+using Cyborg.Core.Services.Security.Trust.Configuration;
 using Cyborg.Core.Services.Security.Trust.Logging;
 using Microsoft.Extensions.Logging;
 using System.Security;
 
 namespace Cyborg.Core.Services.Security.Trust;
 
-public sealed class DefaultConfigurationTrustService(IConfigurationTrustOptionsProvider optionsProvider, ILoggerFactory loggerFactory) : IConfigurationTrustService
+public sealed class DefaultConfigurationTrustService
+(
+    IConfigurationTrustOptionsProvider optionsProvider,
+    ILoggerFactory loggerFactory,
+    IJsonLoaderContext jsonContext
+) : IConfigurationTrustService
 {
     private readonly ILogger _logger = loggerFactory.CreateLogger("cyborg.core.trust");
 
@@ -15,7 +21,7 @@ public sealed class DefaultConfigurationTrustService(IConfigurationTrustOptionsP
         {
             return;
         }
-        _logger.LogConfigurationTrustDecision(decision);
+        _logger.LogConfigurationTrustDecision(jsonContext, decision);
         if (!decision.IsTrusted && optionsProvider.Options.EnforcementMode is TrustEnforcementMode.Enforce)
         {
             ThrowNotTrustedException(decision);

@@ -19,12 +19,15 @@ namespace Cyborg.Core.Services.Security.Trust;
 [Singleton<IConfigurationTrustService, DefaultConfigurationTrustService>]
 [Singleton<JsonConverter>(Factory = nameof(CreateTrustEnforcementModeConverter))]
 [Singleton<JsonConverter>(Factory = nameof(CreateUnixFileModeConverter))]
+[Singleton<JsonConverter>(Factory = nameof(CreateConfigurationTrustDecisionKindConverter))]
 [Singleton<JsonSerializerContext>(Factory = nameof(GetConfigurationTrustJsonSerializerContext))]
 public interface IConfigurationTrustServices
 {
     static JsonConverter CreateTrustEnforcementModeConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<TrustEnforcementMode>(namingPolicy);
 
     static JsonConverter CreateUnixFileModeConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<UnixFileMode>(namingPolicy);
+
+    static JsonConverter CreateConfigurationTrustDecisionKindConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<ConfigurationTrustDecisionKind>(namingPolicy);
 
     static ConfigurationTrustJsonSerializerContext GetConfigurationTrustJsonSerializerContext() => ConfigurationTrustJsonSerializerContext.Default;
 }
