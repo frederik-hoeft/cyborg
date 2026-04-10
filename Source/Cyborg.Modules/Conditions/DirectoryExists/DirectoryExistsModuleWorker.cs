@@ -1,8 +1,8 @@
-﻿using Cyborg.Core.Modules;
+using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Runtime;
 using System.Diagnostics.CodeAnalysis;
 
-namespace Cyborg.Modules.If.Conditions.DirectoryExists;
+namespace Cyborg.Modules.Conditions.DirectoryExists;
 
 public sealed class DirectoryExistsModuleWorker(IWorkerContext<DirectoryExistsModule> context) : ModuleWorker<DirectoryExistsModule>(context)
 {

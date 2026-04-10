@@ -4,6 +4,7 @@ using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Runtime.Environments.Artifacts;
 using Cyborg.Core.Modules.Runtime.Environments.Syntax;
+using Cyborg.Modules.Conditions;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Modules.If;

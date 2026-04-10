@@ -1,8 +1,8 @@
-﻿using Cyborg.Core.Modules;
+using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Runtime;
 using System.Diagnostics.CodeAnalysis;
 
-namespace Cyborg.Modules.If.Conditions.IsSet;
+namespace Cyborg.Modules.Conditions.IsSet;
 
 public sealed class IsSetModuleWorker(IWorkerContext<IsSetModule> context) : ModuleWorker<IsSetModule>(context)
 {
