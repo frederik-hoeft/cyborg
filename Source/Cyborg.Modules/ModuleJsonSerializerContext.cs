@@ -1,4 +1,11 @@
 ﻿using Cyborg.Modules.Assert;
+using Cyborg.Modules.Conditions.And;
+using Cyborg.Modules.Conditions.DirectoryExists;
+using Cyborg.Modules.Conditions.FileExists;
+using Cyborg.Modules.Conditions.IsSet;
+using Cyborg.Modules.Conditions.IsTrue;
+using Cyborg.Modules.Conditions.Not;
+using Cyborg.Modules.Conditions.Or;
 using Cyborg.Modules.Configuration.ConfigCollection;
 using Cyborg.Modules.Configuration.ConfigMap;
 using Cyborg.Modules.Configuration.ExternalConfig;
@@ -10,10 +17,6 @@ using Cyborg.Modules.Foreach;
 using Cyborg.Modules.Glob;
 using Cyborg.Modules.Guard;
 using Cyborg.Modules.If;
-using Cyborg.Modules.If.Conditions.DirectoryExists;
-using Cyborg.Modules.If.Conditions.FileExists;
-using Cyborg.Modules.If.Conditions.IsSet;
-using Cyborg.Modules.If.Conditions.IsTrue;
 using Cyborg.Modules.Named;
 using Cyborg.Modules.Network.SshShutdown;
 using Cyborg.Modules.Network.WakeOnLan;
@@ -21,6 +24,7 @@ using Cyborg.Modules.Sequence;
 using Cyborg.Modules.Subprocess;
 using Cyborg.Modules.Switch;
 using Cyborg.Modules.Template;
+using Cyborg.Modules.While;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -37,10 +41,14 @@ namespace Cyborg.Modules;
 [JsonSerializable(typeof(ForeachModule))]
 [JsonSerializable(typeof(WakeOnLanModule))]
 [JsonSerializable(typeof(IfModule))]
+[JsonSerializable(typeof(WhileModule))]
 [JsonSerializable(typeof(IsTrueModule))]
 [JsonSerializable(typeof(IsSetModule))]
 [JsonSerializable(typeof(FileExistsModule))]
 [JsonSerializable(typeof(DirectoryExistsModule))]
+[JsonSerializable(typeof(AndModule))]
+[JsonSerializable(typeof(OrModule))]
+[JsonSerializable(typeof(NotModule))]
 [JsonSerializable(typeof(GlobModule))]
 [JsonSerializable(typeof(ExternalModule))]
 [JsonSerializable(typeof(EnvironmentDefinitionsModule))]

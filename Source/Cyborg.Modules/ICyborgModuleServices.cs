@@ -1,6 +1,13 @@
 ﻿using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Modules.Assert;
+using Cyborg.Modules.Conditions.And;
+using Cyborg.Modules.Conditions.DirectoryExists;
+using Cyborg.Modules.Conditions.FileExists;
+using Cyborg.Modules.Conditions.IsSet;
+using Cyborg.Modules.Conditions.IsTrue;
+using Cyborg.Modules.Conditions.Not;
+using Cyborg.Modules.Conditions.Or;
 using Cyborg.Modules.Configuration.ConfigCollection;
 using Cyborg.Modules.Configuration.ConfigMap;
 using Cyborg.Modules.Configuration.ExternalConfig;
@@ -12,10 +19,6 @@ using Cyborg.Modules.Foreach;
 using Cyborg.Modules.Glob;
 using Cyborg.Modules.Guard;
 using Cyborg.Modules.If;
-using Cyborg.Modules.If.Conditions.DirectoryExists;
-using Cyborg.Modules.If.Conditions.FileExists;
-using Cyborg.Modules.If.Conditions.IsSet;
-using Cyborg.Modules.If.Conditions.IsTrue;
 using Cyborg.Modules.Named;
 using Cyborg.Modules.Network.SshShutdown;
 using Cyborg.Modules.Network.WakeOnLan;
@@ -23,6 +26,7 @@ using Cyborg.Modules.Sequence;
 using Cyborg.Modules.Subprocess;
 using Cyborg.Modules.Switch;
 using Cyborg.Modules.Template;
+using Cyborg.Modules.While;
 using Jab;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -43,10 +47,14 @@ namespace Cyborg.Modules;
 [Singleton<IModuleLoader, ForeachModuleLoader>]
 [Singleton<IModuleLoader, WakeOnLanModuleLoader>]
 [Singleton<IModuleLoader, IfModuleLoader>]
+[Singleton<IModuleLoader, WhileModuleLoader>]
 [Singleton<IModuleLoader, IsTrueModuleLoader>]
 [Singleton<IModuleLoader, IsSetModuleLoader>]
 [Singleton<IModuleLoader, FileExistsModuleLoader>]
 [Singleton<IModuleLoader, DirectoryExistsModuleLoader>]
+[Singleton<IModuleLoader, AndModuleLoader>]
+[Singleton<IModuleLoader, OrModuleLoader>]
+[Singleton<IModuleLoader, NotModuleLoader>]
 [Singleton<IModuleLoader, GuardModuleLoader>]
 [Singleton<IModuleLoader, GlobModuleLoader>]
 [Singleton<IModuleLoader, ExternalModuleLoader>]

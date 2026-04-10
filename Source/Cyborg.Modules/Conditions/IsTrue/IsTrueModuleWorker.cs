@@ -1,8 +1,8 @@
-﻿using Cyborg.Core.Modules;
+using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Runtime;
 using System.Diagnostics.CodeAnalysis;
 
-namespace Cyborg.Modules.If.Conditions.IsTrue;
+namespace Cyborg.Modules.Conditions.IsTrue;
 
 public sealed class IsTrueModuleWorker(IWorkerContext<IsTrueModule> context) : ModuleWorker<IsTrueModule>(context)
 {

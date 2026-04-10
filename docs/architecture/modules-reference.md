@@ -20,15 +20,19 @@ For details on the execution model, environment scoping semantics, variable reso
   - [ForEach (`cyborg.modules.foreach.v1`)](#foreach-cyborgmodulesforeachv1)
   - [Guard (`cyborg.modules.guard.v1`)](#guard-cyborgmodulesguardv1)
   - [If (`cyborg.modules.if.v1`)](#if-cyborgmodulesifv1)
+  - [While (`cyborg.modules.while.v1`)](#while-cyborgmoduleswhilev1)
   - [Assert (`cyborg.modules.assert.v1`)](#assert-cyborgmodulesassertv1)
   - [Switch (`cyborg.modules.switch.v1`)](#switch-cyborgmodulesswitchv1)
   - [Dynamic (`cyborg.modules.dynamic.v1`)](#dynamic-cyborgmodulesdynamicv1)
   - [Empty (`cyborg.modules.empty.v1`)](#empty-cyborgmodulesemptyv1)
 - [Condition Modules](#condition-modules)
-  - [IsTrue (`cyborg.modules.if.condition.is_true.v1`)](#istrue-cyborgmodulesifconditionis_truev1)
-  - [IsSet (`cyborg.modules.if.condition.is_set.v1`)](#isset-cyborgmodulesifconditionis_setv1)
-  - [FileExists (`cyborg.modules.if.condition.file_exists.v1`)](#fileexists-cyborgmodulesifconditionfile_existsv1)
-  - [DirectoryExists (`cyborg.modules.if.condition.directory_exists.v1`)](#directoryexists-cyborgmodulesifconditiondirectory_existsv1)
+  - [IsTrue (`cyborg.modules.condition.is_true.v1`)](#istrue-cyborgmodulesconditionis_truev1)
+  - [IsSet (`cyborg.modules.condition.is_set.v1`)](#isset-cyborgmodulesconditionis_setv1)
+  - [And (`cyborg.modules.condition.and.v1`)](#and-cyborgmodulesconditionandv1)
+  - [Or (`cyborg.modules.condition.or.v1`)](#or-cyborgmodulesconditionorv1)
+  - [Not (`cyborg.modules.condition.not.v1`)](#not-cyborgmodulesconditionnotv1)
+  - [FileExists (`cyborg.modules.condition.file_exists.v1`)](#fileexists-cyborgmodulesconditionfile_existsv1)
+  - [DirectoryExists (`cyborg.modules.condition.directory_exists.v1`)](#directoryexists-cyborgmodulesconditiondirectory_existsv1)
 - [Execution Modules](#execution-modules)
   - [Subprocess (`cyborg.modules.subprocess.v1`)](#subprocess-cyborgmodulessubprocessv1)
   - [External (`cyborg.modules.external.v1`)](#external-cyborgmodulesexternalv1)
@@ -194,11 +198,36 @@ Conditionally executes a branch based on a condition module's result.
 
 **Behavior:**
 
-- Evaluates the `condition` in an isolated environment.
+- Evaluates the `condition` in a child environment with `inherit_parent` scope (inherits parent variables, but writes are isolated to the child scope).
 - If the condition module fails, its status is propagated (the branches are not evaluated).
 - If `invert_condition` is `false` (default): executes `then` when `true`, `else` when `false`.
 - If `invert_condition` is `true`: executes `else` when `true`, `then` when `false`.
 - Returns `Skipped` if the selected branch is not defined.
+
+See [Condition Modules](#condition-modules) for built-in conditions.
+
+---
+
+### While (`cyborg.modules.while.v1`)
+
+Repeatedly executes a `body` module as long as a `condition` module evaluates to `true`.
+
+**Properties:**
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `condition` | module reference | Yes | -- | A condition module that produces a boolean result. Must be a module returning a `ConditionalResult`. |
+| `body` | module context | Yes | -- | Module to execute on each iteration while the condition holds. |
+| `invert_condition` | bool | No | `false` | When `true`, continues looping while the condition is `false` instead of `true` (i.e., loops until the condition becomes `true`). |
+
+**Behavior:**
+
+- Evaluates the `condition` in a child environment with `inherit_parent` scope (inherits parent variables, but writes are isolated to the child scope) before each iteration.
+- If the condition module fails, its status is propagated and the loop aborts.
+- If `invert_condition` is `false` (default): continues looping while condition is `true`, exits when `false`.
+- If `invert_condition` is `true`: continues looping while condition is `false`, exits when `true`.
+- If the `body` module does not succeed, its status is propagated and the loop aborts.
+- Returns `Success` when the loop exits normally (condition no longer met).
 
 See [Condition Modules](#condition-modules) for built-in conditions.
 
@@ -287,9 +316,9 @@ None.
 
 ## Condition Modules
 
-Condition modules are used with `If` and `Assert`. They produce a `ConditionalResult` containing a boolean `result` property.
+Condition modules are used with `If`, `While`, and `Assert`. They produce a `ConditionalResult` containing a boolean `result` property.
 
-### IsTrue (`cyborg.modules.if.condition.is_true.v1`)
+### IsTrue (`cyborg.modules.condition.is_true.v1`)
 
 Checks whether an environment variable resolves to a boolean `true` value.
 
@@ -307,7 +336,7 @@ Checks whether an environment variable resolves to a boolean `true` value.
 
 ---
 
-### IsSet (`cyborg.modules.if.condition.is_set.v1`)
+### IsSet (`cyborg.modules.condition.is_set.v1`)
 
 Checks whether an environment variable is defined, regardless of its value.
 
@@ -324,7 +353,63 @@ Checks whether an environment variable is defined, regardless of its value.
 
 ---
 
-### FileExists (`cyborg.modules.if.condition.file_exists.v1`)
+### And (`cyborg.modules.condition.and.v1`)
+
+Evaluates multiple condition modules and returns `true` only if all conditions evaluate to `true`.
+
+**Properties:**
+
+| Property | Type | Required | Constraints | Description |
+|----------|------|----------|-------------|-------------|
+| `conditions` | array of module references | Yes | Minimum 1 element | Condition modules to evaluate in order. Each must return a `ConditionalResult`. |
+
+**Behavior:**
+
+- Evaluates conditions in order and short-circuits on the first condition that evaluates to `false`.
+- Returns `Success` with `result = true` only if every condition evaluates to `true`.
+- If any condition returns `Canceled`, returns `Canceled`.
+- If any condition returns a non-`Success` status (including `Failed` and `Skipped`) or does not publish a readable boolean `result`, returns `Failed`.
+
+---
+
+### Or (`cyborg.modules.condition.or.v1`)
+
+Evaluates multiple condition modules and returns `true` if any condition evaluates to `true`.
+
+**Properties:**
+
+| Property | Type | Required | Constraints | Description |
+|----------|------|----------|-------------|-------------|
+| `conditions` | array of module references | Yes | Minimum 1 element | Condition modules to evaluate in order. Each must return a `ConditionalResult`. |
+
+**Behavior:**
+
+- Evaluates conditions in order and short-circuits on the first condition that evaluates to `true`.
+- Returns `Success` with `result = false` only if all conditions evaluate to `false`.
+- If any condition returns `Canceled`, returns `Canceled`.
+- If any condition returns a non-`Success` status (including `Failed` and `Skipped`) or does not publish a readable boolean `result`, returns `Failed`.
+
+---
+
+### Not (`cyborg.modules.condition.not.v1`)
+
+Negates the boolean result of a single condition module.
+
+**Properties:**
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `condition` | module reference | Yes | Condition module to evaluate. Must return a `ConditionalResult`. |
+
+**Behavior:**
+
+- Evaluates `condition` and returns `Success` with the inverted boolean result.
+- If `condition` returns `Canceled`, returns `Canceled`.
+- If `condition` returns a non-`Success` status (including `Failed` and `Skipped`) or does not publish a readable boolean `result`, returns `Failed`.
+
+---
+
+### FileExists (`cyborg.modules.condition.file_exists.v1`)
 
 Checks whether a file exists at a given path.
 
@@ -341,7 +426,7 @@ Checks whether a file exists at a given path.
 
 ---
 
-### DirectoryExists (`cyborg.modules.if.condition.directory_exists.v1`)
+### DirectoryExists (`cyborg.modules.condition.directory_exists.v1`)
 
 Checks whether a directory exists at a given path.
 
