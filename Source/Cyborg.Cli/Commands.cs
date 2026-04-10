@@ -19,6 +19,20 @@ internal sealed class Commands
 {
     private const string CYBORG_ROOT = "/etc/cyborg";
 
+    /// <summary>
+    /// Executes a backup run for the specified target using the provided configuration and options.
+    /// </summary>
+    /// <remarks>
+    /// This method loads configuration, sets up the runtime environment, executes the specified backup module, and writes metrics output. Logging and metrics behavior can be customized via parameters or configuration files. If the run fails and file logging is enabled, the log file is written to standard output.
+    /// </remarks>
+    /// <param name="target">The name of the backup target to execute. This value is used to select the configuration and environment for the run.</param>
+    /// <param name="dryRun">true to perform a dry run without making changes; otherwise, false. When set to true, actions are simulated but not executed.</param>
+    /// <param name="mainModulePath">The file path to the main module configuration. Defaults to the primary configuration file if not specified.</param>
+    /// <param name="optionsPath">The file path to the options configuration. Defaults to the standard options file if not specified.</param>
+    /// <param name="metricsOutputPath">The file path where metrics output will be written. If null, the default metrics file path from configuration is used.</param>
+    /// <param name="logLevel">The minimum log level to use for console output. If null, the default log level from configuration is used.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     [Command("run")]
     public async Task RunAsync([Argument] string target,
         bool dryRun = false,
