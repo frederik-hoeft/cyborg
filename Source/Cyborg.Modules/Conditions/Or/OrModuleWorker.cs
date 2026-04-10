@@ -3,7 +3,6 @@ using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments.Syntax;
 using System.Diagnostics.CodeAnalysis;
-using System.Net.NetworkInformation;
 
 namespace Cyborg.Modules.Conditions.Or;
 
