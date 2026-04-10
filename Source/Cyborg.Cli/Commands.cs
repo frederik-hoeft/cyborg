@@ -19,6 +19,8 @@ internal sealed class Commands
 {
     private const string CYBORG_ROOT = "/etc/cyborg";
 
+    private static string QuoteArg(string arg) => $"\"{arg.Replace("\\", "\\\\").Replace("\"", "\\\"")}\"";
+
     [Command("run")]
     public async Task RunAsync([Argument] string target,
         bool dryRun = false,
@@ -40,7 +42,7 @@ internal sealed class Commands
         }
 
         ILogger logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("cyborg.cli.main");
-        logger.LogStartup(string.Join(' ', Environment.GetCommandLineArgs()[1..]));
+        logger.LogStartup(string.Join(' ', Array.ConvertAll(Environment.GetCommandLineArgs()[1..], QuoteArg)));
         GlobalRuntimeEnvironment globalEnvironment = services.GetRequiredService<GlobalRuntimeEnvironment>();
         globalEnvironment.SetVariable("target", target);
         if (dryRun)
