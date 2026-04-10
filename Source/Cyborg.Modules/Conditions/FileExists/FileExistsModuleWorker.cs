@@ -1,8 +1,8 @@
-﻿using Cyborg.Core.Modules;
+using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Runtime;
 using System.Diagnostics.CodeAnalysis;
 
-namespace Cyborg.Modules.If.Conditions.FileExists;
+namespace Cyborg.Modules.Conditions.FileExists;
 
 public sealed class FileExistsModuleWorker(IWorkerContext<FileExistsModule> context) : ModuleWorker<FileExistsModule>(context)
 {

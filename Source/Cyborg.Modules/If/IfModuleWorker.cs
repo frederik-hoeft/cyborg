@@ -4,6 +4,7 @@ using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Runtime.Environments.Artifacts;
 using Cyborg.Core.Modules.Runtime.Environments.Syntax;
+using Cyborg.Modules.Conditions;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Modules.If;
@@ -27,11 +28,15 @@ public sealed class IfModuleWorker(IWorkerContext<IfModule> context) : ModuleWor
         string conditionModuleId = Module.Condition.Module.ModuleId;
         Logger.LogIfConditionEvaluating(conditionModuleId);
         IModuleExecutionResult result = await runtime.ExecuteAsync(Module.Condition.Module, environment, cancellationToken);
+        if (result.Status is ModuleExitStatus.Canceled)
+        {
+            return runtime.Exit(WithStatus(ModuleExitStatus.Canceled));
+        }
         if (result.Status is not ModuleExitStatus.Success)
         {
-            // this was unexpected
+            // Skipped is not a valid result for condition modules; treat all remaining non-success statuses as failure
             Logger.LogIfConditionFailed(conditionModuleId, result.Status.ToString());
-            return runtime.Exit(WithStatus(result.Status));
+            return runtime.Exit(WithStatus(ModuleExitStatus.Failed));
         }
         // ${@}.result, via ${@} self reference
         string resultAccessExpression = environment.SyntaxFactory.Self().Ref().Member(nameof(ConditionalResult.Result));
