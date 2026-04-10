@@ -28,6 +28,9 @@ For details on the execution model, environment scoping semantics, variable reso
 - [Condition Modules](#condition-modules)
   - [IsTrue (`cyborg.modules.condition.is_true.v1`)](#istrue-cyborgmodulesconditionis_truev1)
   - [IsSet (`cyborg.modules.condition.is_set.v1`)](#isset-cyborgmodulesconditionis_setv1)
+  - [And (`cyborg.modules.condition.and.v1`)](#and-cyborgmodulesconditionandv1)
+  - [Or (`cyborg.modules.condition.or.v1`)](#or-cyborgmodulesconditionorv1)
+  - [Not (`cyborg.modules.condition.not.v1`)](#not-cyborgmodulesconditionnotv1)
   - [FileExists (`cyborg.modules.condition.file_exists.v1`)](#fileexists-cyborgmodulesconditionfile_existsv1)
   - [DirectoryExists (`cyborg.modules.condition.directory_exists.v1`)](#directoryexists-cyborgmodulesconditiondirectory_existsv1)
 - [Execution Modules](#execution-modules)
@@ -347,6 +350,62 @@ Checks whether an environment variable is defined, regardless of its value.
 
 - Returns `true` if the variable is defined in the environment, `false` otherwise.
 - Always succeeds.
+
+---
+
+### And (`cyborg.modules.condition.and.v1`)
+
+Evaluates multiple condition modules and returns `true` only if all conditions evaluate to `true`.
+
+**Properties:**
+
+| Property | Type | Required | Constraints | Description |
+|----------|------|----------|-------------|-------------|
+| `conditions` | array of module references | Yes | Minimum 1 element | Condition modules to evaluate in order. Each must return a `ConditionalResult`. |
+
+**Behavior:**
+
+- Evaluates conditions in order and short-circuits on the first condition that evaluates to `false`.
+- Returns `Success` with `result = true` only if every condition evaluates to `true`.
+- If any condition returns `Canceled`, returns `Canceled`.
+- If any condition returns a non-`Success` status (including `Failed` and `Skipped`) or does not publish a readable boolean `result`, returns `Failed`.
+
+---
+
+### Or (`cyborg.modules.condition.or.v1`)
+
+Evaluates multiple condition modules and returns `true` if any condition evaluates to `true`.
+
+**Properties:**
+
+| Property | Type | Required | Constraints | Description |
+|----------|------|----------|-------------|-------------|
+| `conditions` | array of module references | Yes | Minimum 1 element | Condition modules to evaluate in order. Each must return a `ConditionalResult`. |
+
+**Behavior:**
+
+- Evaluates conditions in order and short-circuits on the first condition that evaluates to `true`.
+- Returns `Success` with `result = false` only if all conditions evaluate to `false`.
+- If any condition returns `Canceled`, returns `Canceled`.
+- If any condition returns a non-`Success` status (including `Failed` and `Skipped`) or does not publish a readable boolean `result`, returns `Failed`.
+
+---
+
+### Not (`cyborg.modules.condition.not.v1`)
+
+Negates the boolean result of a single condition module.
+
+**Properties:**
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `condition` | module reference | Yes | Condition module to evaluate. Must return a `ConditionalResult`. |
+
+**Behavior:**
+
+- Evaluates `condition` and returns `Success` with the inverted boolean result.
+- If `condition` returns `Canceled`, returns `Canceled`.
+- If `condition` returns a non-`Success` status (including `Failed` and `Skipped`) or does not publish a readable boolean `result`, returns `Failed`.
 
 ---
 
