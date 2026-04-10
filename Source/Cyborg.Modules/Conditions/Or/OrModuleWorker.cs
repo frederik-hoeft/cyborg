@@ -7,7 +7,7 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Modules.Conditions.Or;
 
-public sealed class OrModuleWorker(IWorkerContext<OrModule> context) : ConditionalCombinatorModuleWorkerBase<OrModule>(context)
+public sealed class OrModuleWorker(IWorkerContext<OrModule> context) : ConditionalModuleWorkerBase<OrModule>(context)
 {
     protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {

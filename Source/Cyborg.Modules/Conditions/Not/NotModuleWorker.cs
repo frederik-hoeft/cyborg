@@ -7,7 +7,7 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Modules.Conditions.Not;
 
-public sealed class NotModuleWorker(IWorkerContext<NotModule> context) : ConditionalCombinatorModuleWorkerBase<NotModule>(context)
+public sealed class NotModuleWorker(IWorkerContext<NotModule> context) : ConditionalModuleWorkerBase<NotModule>(context)
 {
     protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {

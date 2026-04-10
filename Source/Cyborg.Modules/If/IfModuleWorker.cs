@@ -5,26 +5,17 @@ using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Runtime.Environments.Artifacts;
 using Cyborg.Core.Modules.Runtime.Environments.Syntax;
 using Cyborg.Modules.Conditions;
+using System.Data;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Modules.If;
 
-public sealed class IfModuleWorker(IWorkerContext<IfModule> context) : ModuleWorker<IfModule>(context)
+public sealed class IfModuleWorker(IWorkerContext<IfModule> context) : ConditionalModuleWorkerBase<IfModule>(context)
 {
     protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
-        ModuleArtifacts childArtifacts = ModuleArtifacts.Default with
-        {
-            Namespace = runtime.Environment.Namespace,
-            DecompositionStrategy = DecompositionStrategy.LeavesOnly,
-            Environment = ArtifactModuleEnvironment.Default with { Scope = EnvironmentScope.Parent } // need artifacts to be accessible to us
-        };
-        // don't need a customizable environment for the if condition
-        IRuntimeEnvironment environment = runtime.PrepareEnvironment(ModuleEnvironment.Default);
-        // force if condition to write its artifacts to a known location in the parent environment so we can read it after execution
-        // @<child_module_id>.artifacts via @ override of child property
-        string artifactsOverride = environment.SyntaxFactory.Path(environment.NamespaceOf(Module.Condition)).Property(Module.Artifacts).Override();
-        environment.SetVariable(artifactsOverride, childArtifacts);
+        PathSyntax childNamespace = runtime.Environment.SyntaxFactory.Path(runtime.Environment.Namespace);
+        IRuntimeEnvironment environment = CreateChildEnvironment(runtime, Module.Condition, childNamespace);
         string conditionModuleId = Module.Condition.Module.ModuleId;
         Logger.LogConditionEvaluating(conditionModuleId);
         IModuleExecutionResult result = await runtime.ExecuteAsync(Module.Condition.Module, environment, cancellationToken);
@@ -38,9 +29,7 @@ public sealed class IfModuleWorker(IWorkerContext<IfModule> context) : ModuleWor
             Logger.LogConditionFailed(conditionModuleId, result.Status.ToString());
             return runtime.Exit(WithStatus(ModuleExitStatus.Failed));
         }
-        // ${@}.result, via ${@} self reference
-        string resultAccessExpression = environment.SyntaxFactory.Self().Ref().Member(nameof(ConditionalResult.Result));
-        string resultVariable = runtime.Environment.Interpolate(resultAccessExpression);
+        string resultVariable = childNamespace.Member(nameof(ConditionalResult.Result));
         if (!result.Artifacts.TryResolveVariable(resultVariable, out bool condition))
         {
             // this is not a valid result from the condition module

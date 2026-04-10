@@ -8,7 +8,7 @@ using Cyborg.Core.Modules.Validation;
 
 namespace Cyborg.Modules.Conditions;
 
-public abstract class ConditionalCombinatorModuleWorkerBase<TModule>(IWorkerContext<TModule> context)
+public abstract class ConditionalModuleWorkerBase<TModule>(IWorkerContext<TModule> context)
     : ModuleWorker<TModule>(context) where TModule : ModuleBase, IModule<TModule>
 {
     protected IRuntimeEnvironment CreateChildEnvironment(IModuleRuntime runtime, ModuleReference child, PathSyntax childNamespace)
