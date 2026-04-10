@@ -4,7 +4,7 @@ This document covers the configuration and behavior of all Cyborg modules. Modul
 
 Every module is identified by a versioned ID (e.g., `cyborg.modules.sequence.v1`) which serves as both the JSON discriminator key and the version identifier. Modules communicate through a hierarchical environment of typed variables, where each module can read from and publish to scoped environments. Module properties support runtime overrides from the environment, enabling data-driven composition patterns.
 
-For details on the execution model, environment scoping semantics, variable resolution, the property override system, and artifact publishing, see [Runtime Infrastructure](runtime.md).
+For details on the execution model, environment scoping semantics, variable resolution, the property override system, and artifact publishing, see [Runtime Infrastructure](../architecture.md).
 
 <!-- @import "[TOC]" {cmd="toc" depthFrom=2 depthTo=6 orderedList=false} -->
 
@@ -86,11 +86,11 @@ The `environment` property on a module context controls variable scope inheritan
 
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
-| `scope` | enum | No | `inherit_parent` | Scoping strategy, see [Runtime Infrastructure -- Environment Scoping](runtime.md#environment-scoping) for available strategies and detailed semantics. |
+| `scope` | enum | No | `inherit_parent` | Scoping strategy, see [Runtime Infrastructure -- Environment Scoping](../architecture.md#environment-scoping) for available strategies and detailed semantics. |
 | `name` | string | No | `null` | Optional scope name. Required for `reference` scope; used to create named scopes with other strategies. |
 | `transient` | bool | No | `false` | Whether the scope is transient (not persisted beyond execution). |
 
-Environments declared with an explicit `name` (and not marked `transient`) are registered globally. Any subsequent module can access them via `reference` scope. This is the primary mechanism for cross-step state sharing. For a detailed overview of environment semantics, see [Runtime Infrastructure -- Environment Scoping](runtime.md#environment-scoping).
+Environments declared with an explicit `name` (and not marked `transient`) are registered globally. Any subsequent module can access them via `reference` scope. This is the primary mechanism for cross-step state sharing. For a detailed overview of environment semantics, see [Runtime Infrastructure -- Environment Scoping](../architecture.md#environment-scoping).
 
 ### Artifacts
 
@@ -104,7 +104,7 @@ The `artifacts` property controls how a module's execution results are decompose
 | `decomposition_strategy` | enum | No | `leaves_only` | Controls how deeply result objects are flattened into variables. `leaves_only`: only leaf (non-decomposable) values are published. `shallow`: top-level properties are published. `full_hierarchy`: the root and all nested levels are published. |
 | `publish_null_values` | bool | No | `false` | Whether null-valued result properties are published. |
 
-For more details on artifact lifecycle and exposure patterns, see [Runtime Infrastructure -- Artifact Publishing](runtime.md#artifact-publishing).
+For more details on artifact lifecycle and exposure patterns, see [Runtime Infrastructure -- Artifact Publishing](../architecture.md#artifact-publishing).
 
 ---
 
@@ -261,7 +261,7 @@ Executes a child module context, allowing the target to be replaced at runtime v
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
 | `target` | module context | Yes | -- | The module context to execute. Like all module properties, this can be overridden from the environment using the `@<name>.target` convention, which is what makes the module "dynamic" -- a parent module can inject a different module context at runtime. |
-| `tags` | array of strings | No | `null` | Override resolution tags applied to the child environment. Tags extend the override lookup chain beyond the standard `name` / `group` / `module_id` sequence, allowing ambient overrides keyed by tag to apply to any module executing in that environment. See [Runtime Infrastructure -- Override Resolution Tags](runtime.md#override-resolution-tags). |
+| `tags` | array of strings | No | `null` | Override resolution tags applied to the child environment. Tags extend the override lookup chain beyond the standard `name` / `group` / `module_id` sequence, allowing ambient overrides keyed by tag to apply to any module executing in that environment. See [Runtime Infrastructure -- Override Resolution Tags](../architecture.md#override-resolution-tags). |
 
 **Behavior:**
 
@@ -467,7 +467,7 @@ Each entry is a JSON object with a `key` and exactly one type-tagged value. The 
 { "key": "hosts", "collection<cyborg.types.borg.remote.v1.4>": [{ ... }] }
 ```
 
-Built-in types include `string`, `int`, `bool`, and `collection<T>`. Custom types register a versioned type name (e.g., `cyborg.types.borg.remote.v1.4`) and are resolved through the dynamic value provider registry. See [Runtime Infrastructure -- Dynamic Value System](runtime.md#dynamic-value-system) for details.
+Built-in types include `string`, `int`, `bool`, and `collection<T>`. Custom types register a versioned type name (e.g., `cyborg.types.borg.remote.v1.4`) and are resolved through the dynamic value provider registry. See [Runtime Infrastructure -- Dynamic Value System](../architecture.md#dynamic-value-system) for details.
 
 **Behavior:**
 

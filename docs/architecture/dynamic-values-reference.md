@@ -1,33 +1,41 @@
 # Dynamic Values Reference
 
-This document covers all dynamic value types currently supported by Cyborg configuration deserialization.
+This document lists the dynamic value types that are part of Cyborg's current configuration surface.
 
-Dynamic values are primarily used by configuration modules (for example, ConfigMap and ConfigCollection) to publish typed values into the runtime environment. Each dynamic value entry has a `key` and exactly one typed value property.
+Dynamic values are used in two places:
 
-For runtime behavior (resolution, scoping, interpolation, decomposition), see [Runtime Infrastructure](runtime.md).
+- service options loaded into the application configuration store,
+- configuration modules that publish typed values into runtime environments.
+
+For runtime semantics such as scoping, interpolation, decomposition, and override resolution, see [Cyborg Architecture](../architecture.md).
 
 <!-- @import "[TOC]" {cmd="toc" depthFrom=2 depthTo=6 orderedList=false} -->
 
 <!-- code_chunk_output -->
 
 - [Dynamic Value Format](#dynamic-value-format)
-  - [Key-Value Entry Shape](#key-value-entry-shape)
+  - [Entry Shape](#entry-shape)
   - [Type Name Syntax](#type-name-syntax)
-- [Supported Scalar Types](#supported-scalar-types)
-- [Supported Structural Types](#supported-structural-types)
-  - [Module Reference (`cyborg.types.module.reference.v1`)](#module-reference-cyborgtypesmodulereferencev1)
-  - [Module Environment (`cyborg.types.module.environment.v1`)](#module-environment-cyborgtypesmoduleenvironmentv1)
-  - [Module Context (`cyborg.types.module.context.v1`)](#module-context-cyborgtypesmodulecontextv1)
-- [Supported Borg Types](#supported-borg-types)
-  - [Borg Remote (`cyborg.types.borg.remote.v1.4`)](#borg-remote-cyborgtypesborgremotev14)
-  - [Borg Repository (`cyborg.types.borg.repository.v1.4`)](#borg-repository-cyborgtypesborgrepositoryv14)
-- [Generic Collection Type](#generic-collection-type)
-  - [Collection (`collection<T>`)](#collection-collectiont)
-- [Usage Patterns](#usage-patterns)
-  - [Typed Scalar Variable](#typed-scalar-variable)
-  - [Late-Bound Module Injection](#late-bound-module-injection)
-  - [Collection of Structured Values](#collection-of-structured-values)
-- [Compatibility Note](#compatibility-note)
+- [Scalar Types](#scalar-types)
+- [Runtime Composition Types](#runtime-composition-types)
+  - [`cyborg.types.module.reference.v1`](#cyborgtypesmodulereferencev1)
+  - [`cyborg.types.module.environment.v1`](#cyborgtypesmoduleenvironmentv1)
+  - [`cyborg.types.module.context.v1`](#cyborgtypesmodulecontextv1)
+- [Borg Types](#borg-types)
+  - [`cyborg.types.borg.remote.v1.4`](#cyborgtypesborgremotev14)
+  - [`cyborg.types.borg.repository.v1.4`](#cyborgtypesborgrepositoryv14)
+- [Service Option Types](#service-option-types)
+  - [`cyborg.types.services.trust.options.v1`](#cyborgtypesservicestrustoptionsv1)
+  - [`cyborg.trust.policy.unix.owner`](#cyborgtrustpolicyunixowner)
+  - [`cyborg.trust.policy.unix.permissions`](#cyborgtrustpolicyunixpermissions)
+  - [`cyborg.types.services.logging.v1`](#cyborgtypesservicesloggingv1)
+  - [`cyborg.types.services.logging.console.v1`](#cyborgtypesservicesloggingconsolev1)
+  - [`cyborg.types.services.logging.file.v1`](#cyborgtypesservicesloggingfilev1)
+  - [`cyborg.types.services.logging.rolling.v1`](#cyborgtypesservicesloggingrollingv1)
+  - [`cyborg.types.services.metrics.v1`](#cyborgtypesservicesmetricsv1)
+- [Generic Types](#generic-types)
+  - [`collection<T>`](#collectiont)
+- [Notes](#notes)
 
 <!-- /code_chunk_output -->
 
@@ -35,353 +43,248 @@ For runtime behavior (resolution, scoping, interpolation, decomposition), see [R
 
 ## Dynamic Value Format
 
-### Key-Value Entry Shape
+### Entry Shape
 
-A dynamic entry is an object with:
+A dynamic value entry is an object containing:
 
-- `key`: the environment variable name to publish.
-- one additional property: the dynamic type name.
+- `key`: the variable or option name,
+- exactly one additional property whose name is the dynamic type name.
 
 Example:
 
 ```json
 {
-  "key": "max_retries",
-  "int": 3
+  "key": "target",
+  "string": "daily"
 }
 ```
-
-Only one typed value property is allowed per entry.
 
 ### Type Name Syntax
 
-Dynamic type names support:
+Type names are either:
 
-- simple names (for example, `string`, `int`, `cyborg.types.module.context.v1`)
-- generic names with type arguments (for example, `collection<string>`, `collection<cyborg.types.borg.remote.v1.4>`)
-- nested generic composition (for example, `collection<collection<int>>`)
+- simple names such as `string` or `cyborg.types.module.context.v1`, or
+- generic names such as `collection<string>` or `collection<cyborg.types.borg.remote.v1.4>`.
 
----
+Generic type names are parsed recursively, so nested generic composition is allowed.
 
-## Supported Scalar Types
+## Scalar Types
 
-The following scalar type names are currently supported:
+The following scalar types are registered by the core runtime:
 
-| Type Name | JSON Value Kind | Notes |
-|----------|------------------|-------|
-| `string` | string | Text value |
-| `bool` | boolean | `true` / `false` |
-| `sbyte` | number | Signed 8-bit integer |
-| `byte` | number | Unsigned 8-bit integer |
-| `short` | number | Signed 16-bit integer |
-| `ushort` | number | Unsigned 16-bit integer |
-| `int` | number | Signed 32-bit integer |
-| `uint` | number | Unsigned 32-bit integer |
-| `long` | number | Signed 64-bit integer |
-| `ulong` | number | Unsigned 64-bit integer |
-| `float` | number | 32-bit floating point |
-| `double` | number | 64-bit floating point |
-| `decimal` | number | High-precision decimal |
+| Type name | JSON value kind |
+|-----------|-----------------|
+| `string` | string |
+| `bool` | boolean |
+| `sbyte` | number |
+| `byte` | number |
+| `short` | number |
+| `ushort` | number |
+| `int` | number |
+| `uint` | number |
+| `long` | number |
+| `ulong` | number |
+| `float` | number |
+| `double` | number |
+| `decimal` | number |
 
----
+## Runtime Composition Types
 
-## Supported Structural Types
+### `cyborg.types.module.reference.v1`
 
-### Module Reference (`cyborg.types.module.reference.v1`)
+Represents a module definition as data.
 
-Represents a module reference value. Use this when a variable should hold a full module definition that can be executed later (for example, by the Dynamic module).
-
-**Value shape:** module-discriminator object.
-
-Example:
+The value is a normal module-discriminator object such as:
 
 ```json
 {
-  "key": "selected_step",
+  "key": "borg_create",
   "cyborg.types.module.reference.v1": {
-    "cyborg.modules.subprocess.v1": {
-      "command": {
-        "executable": "/usr/bin/echo",
-        "arguments": ["hello"]
-      },
-      "output": {
-        "read_stdout": true,
-        "read_stderr": false
-      },
-      "check_exit_code": true
+    "cyborg.modules.borg.create.v1.4": {
+      "archive_name": "${container_name}-{now}",
+      "source_path": "${volume_root}"
     }
   }
 }
 ```
 
----
+Use this type when a value should hold a module worker that will be executed later through another module such as `dynamic`.
 
-### Module Environment (`cyborg.types.module.environment.v1`)
+### `cyborg.types.module.environment.v1`
 
-Represents environment scoping settings for module execution.
+Represents environment scoping configuration.
 
-**Properties:**
-
-| Property | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `scope` | enum | No | `inherit_parent` | Environment scope strategy |
-| `name` | string | No | `null` | Optional scope name |
-| `transient` | bool | No | `false` | If true, environment is not globally registered |
+| Property | Type | Required | Default |
+|----------|------|----------|---------|
+| `scope` | enum | No | `inherit_parent` |
+| `name` | string | No | `null` |
+| `transient` | bool | No | `false` |
 
 Example:
 
 ```json
 {
-  "key": "target_environment",
+  "key": "cleanup_environment",
   "cyborg.types.module.environment.v1": {
     "scope": "reference",
-    "name": "backup_session",
-    "transient": false
+    "name": "jobs"
   }
 }
 ```
 
----
+### `cyborg.types.module.context.v1`
 
-### Module Context (`cyborg.types.module.context.v1`)
+Represents a full executable `ModuleContext`.
 
-Represents a full executable context (`module` + `environment` + optional `configuration` + template metadata).
+| Property | Type | Required | Default |
+|----------|------|----------|---------|
+| `module` | module reference | Yes | - |
+| `environment` | module environment | No | `inherit_parent` |
+| `configuration` | module reference | No | `null` |
+| `requires` | requirements object | No | no argument requirements |
 
-**Properties:**
+This is the main type used by template arguments that supply executable workflows as data.
 
-| Property | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `module` | module reference | Yes | -- | Main module to execute |
-| `environment` | module environment | No | `{ "scope": "inherit_parent" }` | Scope for this execution |
-| `configuration` | module reference | No | `null` | Optional pre-configuration module |
-| `template` | object | No | `{ "namespace": null, "arguments": [] }` | Template metadata |
+## Borg Types
 
-Example:
+### `cyborg.types.borg.remote.v1.4`
 
-```json
-{
-  "key": "fallback_step",
-  "cyborg.types.module.context.v1": {
-    "module": {
-      "cyborg.modules.subprocess.v1": {
-        "command": {
-          "executable": "/usr/bin/echo",
-          "arguments": ["fallback"]
-        },
-        "output": {
-          "read_stdout": true,
-          "read_stderr": false
-        },
-        "check_exit_code": true
-      }
-    },
-    "environment": {
-      "scope": "inherit_parent"
-    },
-    "template": {
-      "namespace": null,
-      "arguments": []
-    }
-  }
-}
-```
+Represents a backup host entry.
 
----
+| Property | Type | Required |
+|----------|------|----------|
+| `hostname` | string | Yes |
+| `port` | int | Yes |
+| `wake_on_lan_mac` | string | No |
+| `borg_repo_root` | string | Yes |
+| `borg_user` | string | Yes |
+| `remote_shell` | Borg SSH options | Yes |
 
-## Supported Borg Types
+`remote_shell` can contain:
 
-### Borg Remote (`cyborg.types.borg.remote.v1.4`)
+| Property | Type | Required | Default |
+|----------|------|----------|---------|
+| `executable` | string | No | `/usr/bin/ssh` |
+| `ssh_pass` | object | No | `null` |
 
-Represents a remote host target used in Borg workflows.
+`ssh_pass` can contain:
 
-**Properties:**
+| Property | Type | Required | Default |
+|----------|------|----------|---------|
+| `executable` | string | No | `/usr/bin/sshpass` |
+| `file_path` | string | Yes | - |
+| `match_prompt` | string | No | `null` |
 
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `hostname` | string | Yes | Remote host name |
-| `port` | int | Yes | SSH port |
-| `wake_on_lan_mac` | string | No | Optional WoL MAC address |
-| `borg_repo_root` | string | Yes | Root path for repositories on remote |
-| `borg_user` | string | Yes | Remote user for Borg operations |
-| `remote_shell` | object | Yes | SSH execution options |
+### `cyborg.types.borg.repository.v1.4`
 
-`remote_shell` supports:
+Represents a fully qualified Borg repository target.
 
-| Property | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `executable` | string | No | `/usr/bin/ssh` | SSH client executable |
-| `ssh_pass` | object | No | `null` | Optional sshpass settings |
+| Property | Type | Required | Default |
+|----------|------|----------|---------|
+| `protocol` | string | No | `ssh://` |
+| `username` | string | Yes | - |
+| `hostname` | string | Yes | - |
+| `port` | int | Yes | - |
+| `repository_root` | string | No | `null` |
+| `repository_name` | string | Yes | - |
 
-`ssh_pass` supports:
+This is usually injected through overrides inside the reusable backup templates rather than authored directly in every job.
 
-| Property | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `executable` | string | No | `/usr/bin/sshpass` | sshpass executable |
-| `file_path` | string | Yes | -- | Password file path |
-| `match_prompt` | string | No | `null` | Optional prompt matcher |
+## Service Option Types
 
-Example:
+### `cyborg.types.services.trust.options.v1`
 
-```json
-{
-  "key": "backup_target",
-  "cyborg.types.borg.remote.v1.4": {
-    "hostname": "nas-01",
-    "port": 22,
-    "wake_on_lan_mac": "00:11:22:33:44:55",
-    "borg_repo_root": "/srv/borg",
-    "borg_user": "borg",
-    "remote_shell": {
-      "executable": "/usr/bin/ssh",
-      "ssh_pass": {
-        "executable": "/usr/bin/sshpass",
-        "file_path": "/run/secrets/ssh_password",
-        "match_prompt": null
-      }
-    }
-  }
-}
-```
+Represents the root trust-service options object.
 
----
+| Property | Type | Required | Default |
+|----------|------|----------|---------|
+| `policies` | array of dynamic policy values | No | empty |
+| `enforcement_mode` | `enforce`, `log_only`, or `disabled` | No | `enforce` |
 
-### Borg Repository (`cyborg.types.borg.repository.v1.4`)
+### `cyborg.trust.policy.unix.owner`
 
-Represents a concrete repository location tuple used by Borg modules.
+Represents the Unix owner/group trust policy.
 
-**Properties:**
+| Property | Type | Required |
+|----------|------|----------|
+| `allowed_users` | array of strings | No |
+| `allowed_groups` | array of strings | No |
 
-| Property | Type | Required | Default | Constraints | Description |
-|----------|------|----------|---------|-------------|-------------|
-| `protocol` | string | No | `ssh://` | -- | URI protocol prefix |
-| `username` | string | Yes | -- | -- | Repository user |
-| `hostname` | string | Yes | -- | -- | Repository host |
-| `port` | int | Yes | -- | `1` to `65535` | Repository port |
-| `repository_root` | string | No | `null` | -- | Optional base directory |
-| `repository_name` | string | Yes | -- | -- | Repository name |
+### `cyborg.trust.policy.unix.permissions`
 
-Example:
+Represents the Unix file-mode trust policy.
 
-```json
-{
-  "key": "primary_repo",
-  "cyborg.types.borg.repository.v1.4": {
-    "protocol": "ssh://",
-    "username": "borg",
-    "hostname": "nas-01",
-    "port": 22,
-    "repository_root": "/srv/borg",
-    "repository_name": "daily"
-  }
-}
-```
+| Property | Type | Required |
+|----------|------|----------|
+| `required_bits` | array of Unix file-mode enum names | No |
+| `forbidden_bits` | array of Unix file-mode enum names | No |
 
----
+### `cyborg.types.services.logging.v1`
 
-## Generic Collection Type
+Represents global logging defaults.
 
-### Collection (`collection<T>`)
+| Property | Type | Required | Default |
+|----------|------|----------|---------|
+| `minimum_level` | `LogLevel` enum name | No | `information` |
 
-Represents a typed list. `T` can be any supported dynamic type, including structured or generic types.
+### `cyborg.types.services.logging.console.v1`
 
-Example scalar collection:
+Represents console logging configuration.
 
-```json
-{
-  "key": "ports",
-  "collection<int>": [22, 443, 8080]
-}
-```
+| Property | Type | Required | Default |
+|----------|------|----------|---------|
+| `enabled` | bool | No | `true` |
+| `minimum_level` | `LogLevel` enum name | No | `information` |
+| `format` | `json` or `text` | No | `text` |
 
-Example structured collection:
+### `cyborg.types.services.logging.file.v1`
 
-```json
-{
-  "key": "backup_hosts",
-  "collection<cyborg.types.borg.remote.v1.4>": [
-    {
-      "hostname": "nas-01",
-      "port": 22,
-      "wake_on_lan_mac": null,
-      "borg_repo_root": "/srv/borg",
-      "borg_user": "borg",
-      "remote_shell": {
-        "executable": "/usr/bin/ssh",
-        "ssh_pass": null
-      }
-    },
-    {
-      "hostname": "nas-02",
-      "port": 22,
-      "wake_on_lan_mac": null,
-      "borg_repo_root": "/srv/borg",
-      "borg_user": "borg",
-      "remote_shell": {
-        "executable": "/usr/bin/ssh",
-        "ssh_pass": null
-      }
-    }
-  ]
-}
-```
+Represents single-file logging configuration.
 
----
+| Property | Type | Required | Default |
+|----------|------|----------|---------|
+| `enabled` | bool | No | `true` |
+| `minimum_level` | `LogLevel` enum name | No | `information` |
+| `path` | string | No | `/var/log/cyborg/latest.log` |
+| `format` | `json` or `text` | No | `json` |
 
-## Usage Patterns
+### `cyborg.types.services.logging.rolling.v1`
 
-### Typed Scalar Variable
+Represents rolling file logging configuration.
 
-```json
-{
-  "key": "max_parallel_jobs",
-  "int": 4
-}
-```
+| Property | Type | Required | Default |
+|----------|------|----------|---------|
+| `enabled` | bool | No | `true` |
+| `minimum_level` | `LogLevel` enum name | No | `information` |
+| `path` | string | No | `/var/log/cyborg` |
+| `rolling_interval` | `RollingInterval` enum name | No | `day` |
+| `rolling_size_bytes` | int | No | `10485760` |
+| `format` | `json` or `text` | No | `json` |
 
-### Late-Bound Module Injection
+### `cyborg.types.services.metrics.v1`
 
-```json
-{
-  "key": "dynamic_target",
-  "cyborg.types.module.context.v1": {
-    "module": {
-      "cyborg.modules.named.ref.v1": {
-        "name": "nightly_backup"
-      }
-    },
-    "environment": {
-      "scope": "inherit_parent"
-    },
-    "template": {
-      "namespace": null,
-      "arguments": []
-    }
-  }
-}
-```
+Represents metrics output configuration.
 
-### Collection of Structured Values
+| Property | Type | Required | Default |
+|----------|------|----------|---------|
+| `namespace` | string | No | `cyborg` |
+| `file_path` | string | No | `/var/log/cyborg/metrics.prom` |
 
-```json
-{
-  "key": "repositories",
-  "collection<cyborg.types.borg.repository.v1.4>": [
-    {
-      "protocol": "ssh://",
-      "username": "borg",
-      "hostname": "nas-01",
-      "port": 22,
-      "repository_root": "/srv/borg",
-      "repository_name": "daily"
-    }
-  ]
-}
-```
+## Generic Types
 
----
+### `collection<T>`
 
-## Compatibility Note
+Represents a typed read-only collection. `T` can be any registered dynamic value type, including another generic type.
 
-This reference lists types currently supported by the active dynamic value provider registration in the runtime service composition.
+Common examples:
 
-Provider classes that exist in source but are not registered are intentionally not listed as supported here.
+- `collection<string>`
+- `collection<int>`
+- `collection<cyborg.types.borg.remote.v1.4>`
+- `collection<cyborg.types.module.context.v1>`
+
+## Notes
+
+- The public dynamic type surface is defined by the providers registered in the service provider modules.
+- A type helper existing in source code is not part of the supported configuration contract unless its provider is registered.
+- Per-module nested records such as `SubprocessCommand` or `BorgExcludeOptions` are regular JSON object shapes inside their parent modules, not standalone dynamic value types.
