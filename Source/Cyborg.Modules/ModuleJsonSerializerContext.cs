@@ -1,8 +1,11 @@
 ﻿using Cyborg.Modules.Assert;
+using Cyborg.Modules.Conditions.And;
 using Cyborg.Modules.Conditions.DirectoryExists;
 using Cyborg.Modules.Conditions.FileExists;
 using Cyborg.Modules.Conditions.IsSet;
 using Cyborg.Modules.Conditions.IsTrue;
+using Cyborg.Modules.Conditions.Not;
+using Cyborg.Modules.Conditions.Or;
 using Cyborg.Modules.Configuration.ConfigCollection;
 using Cyborg.Modules.Configuration.ConfigMap;
 using Cyborg.Modules.Configuration.ExternalConfig;
@@ -43,6 +46,9 @@ namespace Cyborg.Modules;
 [JsonSerializable(typeof(IsSetModule))]
 [JsonSerializable(typeof(FileExistsModule))]
 [JsonSerializable(typeof(DirectoryExistsModule))]
+[JsonSerializable(typeof(AndModule))]
+[JsonSerializable(typeof(OrModule))]
+[JsonSerializable(typeof(NotModule))]
 [JsonSerializable(typeof(GlobModule))]
 [JsonSerializable(typeof(ExternalModule))]
 [JsonSerializable(typeof(EnvironmentDefinitionsModule))]

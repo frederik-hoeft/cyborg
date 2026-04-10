@@ -26,7 +26,7 @@ public sealed class IfModuleWorker(IWorkerContext<IfModule> context) : ModuleWor
         string artifactsOverride = environment.SyntaxFactory.Path(environment.NamespaceOf(Module.Condition)).Property(Module.Artifacts).Override();
         environment.SetVariable(artifactsOverride, childArtifacts);
         string conditionModuleId = Module.Condition.Module.ModuleId;
-        Logger.LogIfConditionEvaluating(conditionModuleId);
+        Logger.LogConditionEvaluating(conditionModuleId);
         IModuleExecutionResult result = await runtime.ExecuteAsync(Module.Condition.Module, environment, cancellationToken);
         if (result.Status is ModuleExitStatus.Canceled)
         {
@@ -35,7 +35,7 @@ public sealed class IfModuleWorker(IWorkerContext<IfModule> context) : ModuleWor
         if (result.Status is not ModuleExitStatus.Success)
         {
             // Skipped is not a valid result for condition modules; treat all remaining non-success statuses as failure
-            Logger.LogIfConditionFailed(conditionModuleId, result.Status.ToString());
+            Logger.LogConditionFailed(conditionModuleId, result.Status.ToString());
             return runtime.Exit(WithStatus(ModuleExitStatus.Failed));
         }
         // ${@}.result, via ${@} self reference
@@ -44,7 +44,7 @@ public sealed class IfModuleWorker(IWorkerContext<IfModule> context) : ModuleWor
         if (!result.Artifacts.TryResolveVariable(resultVariable, out bool condition))
         {
             // this is not a valid result from the condition module
-            Logger.LogIfConditionResultUnreadable(conditionModuleId);
+            Logger.LogConditionResultUnreadable(conditionModuleId);
             return runtime.Exit(WithStatus(ModuleExitStatus.Failed));
         }
         ModuleContext? branchToExecute = condition != Module.InvertCondition ? Module.Then : Module.Else;

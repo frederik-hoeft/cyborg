@@ -1,10 +1,13 @@
 ﻿using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Modules.Assert;
+using Cyborg.Modules.Conditions.And;
 using Cyborg.Modules.Conditions.DirectoryExists;
 using Cyborg.Modules.Conditions.FileExists;
 using Cyborg.Modules.Conditions.IsSet;
 using Cyborg.Modules.Conditions.IsTrue;
+using Cyborg.Modules.Conditions.Not;
+using Cyborg.Modules.Conditions.Or;
 using Cyborg.Modules.Configuration.ConfigCollection;
 using Cyborg.Modules.Configuration.ConfigMap;
 using Cyborg.Modules.Configuration.ExternalConfig;
@@ -49,6 +52,9 @@ namespace Cyborg.Modules;
 [Singleton<IModuleLoader, IsSetModuleLoader>]
 [Singleton<IModuleLoader, FileExistsModuleLoader>]
 [Singleton<IModuleLoader, DirectoryExistsModuleLoader>]
+[Singleton<IModuleLoader, AndModuleLoader>]
+[Singleton<IModuleLoader, OrModuleLoader>]
+[Singleton<IModuleLoader, NotModuleLoader>]
 [Singleton<IModuleLoader, GuardModuleLoader>]
 [Singleton<IModuleLoader, GlobModuleLoader>]
 [Singleton<IModuleLoader, ExternalModuleLoader>]
