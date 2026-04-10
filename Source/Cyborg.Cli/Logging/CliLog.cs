@@ -5,6 +5,9 @@ namespace Cyborg.Cli.Logging;
 
 internal static partial class CliLog
 {
+    [ZLoggerMessage(LogLevel.Information, "Cyborg started with arguments: {args}")]
+    public static partial void LogStartup(this ILogger logger, string args);
+
     [ZLoggerMessage(LogLevel.Information, "Starting execution of backup target: {target}")]
     public static partial void LogRunStarted(this ILogger logger, string target);
 

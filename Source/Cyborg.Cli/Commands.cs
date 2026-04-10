@@ -40,6 +40,7 @@ internal sealed class Commands
         }
 
         ILogger logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("cyborg.cli.main");
+        logger.LogStartup(string.Join(' ', Environment.GetCommandLineArgs()[1..]));
         GlobalRuntimeEnvironment globalEnvironment = services.GetRequiredService<GlobalRuntimeEnvironment>();
         globalEnvironment.SetVariable("target", target);
         if (dryRun)
