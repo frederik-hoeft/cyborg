@@ -195,7 +195,7 @@ Conditionally executes a branch based on a condition module's result.
 
 **Behavior:**
 
-- Evaluates the `condition` in an isolated environment.
+- Evaluates the `condition` in a child environment with `inherit_parent` scope (inherits parent variables, but writes are isolated to the child scope).
 - If the condition module fails, its status is propagated (the branches are not evaluated).
 - If `invert_condition` is `false` (default): executes `then` when `true`, `else` when `false`.
 - If `invert_condition` is `true`: executes `else` when `true`, `then` when `false`.
@@ -219,7 +219,7 @@ Repeatedly executes a `body` module as long as a `condition` module evaluates to
 
 **Behavior:**
 
-- Evaluates the `condition` in an isolated environment before each iteration.
+- Evaluates the `condition` in a child environment with `inherit_parent` scope (inherits parent variables, but writes are isolated to the child scope) before each iteration.
 - If the condition module fails, its status is propagated and the loop aborts.
 - If `invert_condition` is `false` (default): continues looping while condition is `true`, exits when `false`.
 - If `invert_condition` is `true`: continues looping while condition is `false`, exits when `true`.

@@ -32,11 +32,15 @@ public sealed class WhileModuleWorker(IWorkerContext<WhileModule> context) : Mod
             environment.SetVariable(artifactsOverride, childArtifacts);
             Logger.LogWhileConditionEvaluating(conditionModuleId);
             IModuleExecutionResult result = await runtime.ExecuteAsync(Module.Condition.Module, environment, cancellationToken);
+            if (result.Status is ModuleExitStatus.Canceled)
+            {
+                return runtime.Exit(WithStatus(ModuleExitStatus.Canceled));
+            }
             if (result.Status is not ModuleExitStatus.Success)
             {
-                // this was unexpected
+                // Skipped is not a valid result for condition modules; treat all remaining non-success statuses as failure
                 Logger.LogWhileConditionFailed(conditionModuleId, result.Status.ToString());
-                return runtime.Exit(WithStatus(result.Status));
+                return runtime.Exit(WithStatus(ModuleExitStatus.Failed));
             }
             // ${@}.result, via ${@} self reference
             string resultAccessExpression = environment.SyntaxFactory.Self().Ref().Member(nameof(ConditionalResult.Result));
