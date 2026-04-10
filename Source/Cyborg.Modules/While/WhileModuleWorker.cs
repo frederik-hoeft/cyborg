@@ -14,16 +14,16 @@ public sealed class WhileModuleWorker(IWorkerContext<WhileModule> context) : Mod
     protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
         string conditionModuleId = Module.Condition.Module.ModuleId;
+        ModuleArtifacts childArtifacts = ModuleArtifacts.Default with
+        {
+            Namespace = runtime.Environment.Namespace,
+            DecompositionStrategy = DecompositionStrategy.LeavesOnly,
+            Environment = ArtifactModuleEnvironment.Default with { Scope = EnvironmentScope.Parent } // need artifacts to be accessible to us
+        };
         // loop exits via return statements: either when the condition is no longer met (Success),
         // or when the condition or body module fails (propagated status)
         while (true)
         {
-            ModuleArtifacts childArtifacts = ModuleArtifacts.Default with
-            {
-                Namespace = runtime.Environment.Namespace,
-                DecompositionStrategy = DecompositionStrategy.LeavesOnly,
-                Environment = ArtifactModuleEnvironment.Default with { Scope = EnvironmentScope.Parent } // need artifacts to be accessible to us
-            };
             // don't need a customizable environment for the while condition
             IRuntimeEnvironment environment = runtime.PrepareEnvironment(ModuleEnvironment.Default);
             // force condition to write its artifacts to a known location in the parent environment so we can read it after execution
