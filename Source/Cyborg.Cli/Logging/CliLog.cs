@@ -16,4 +16,10 @@ internal static partial class CliLog
 
     [ZLoggerMessage(LogLevel.Warning, "Backup target {target} execution completed with status: {status}")]
     public static partial void LogRunCompletedWithStatus(this ILogger logger, string target, string status);
+
+    [ZLoggerMessage(LogLevel.Error, "Environment variable definition '{env}' is invalid. Expected format: 'key[:type]=value', where key must be a valid variable identifier and the optional type must be a valid registered dynamic value provider type name.")]
+    public static partial void LogInvalidEnvironmentVariable(this ILogger logger, string env);
+
+    [ZLoggerMessage(LogLevel.Error, "Environment variable definition '{env}' has an invalid type specification '{typeName}'. Expected format: 'key:type=value', where type must be a valid registered dynamic value provider type name.")]
+    public static partial void LogUnknownEnvironmentVariableType(this ILogger logger, string env, string typeName);
 }
