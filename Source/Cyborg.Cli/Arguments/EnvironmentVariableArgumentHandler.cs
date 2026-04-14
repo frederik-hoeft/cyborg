@@ -25,13 +25,13 @@ internal sealed class EnvironmentVariableArgumentHandler
         ILogger logger = loggerFactory.CreateLogger("cyborg.cli.argument-handling");
         foreach (string env in environmentVariables)
         {
-            if (!TryParseSplit(env, '=', out ReadOnlySpan<char> keyPart, out ReadOnlySpan<char> value))
+            if (!TryParseSplit(env, '=', out ReadOnlySpan<char> keyPart, out ReadOnlySpan<char> value, enforceSingleDelimiter: false))
             {
                 logger.LogInvalidEnvironmentVariable(env);
                 return false;
             }
             object valueObj;
-            if (TryParseSplit(keyPart, ':', out ReadOnlySpan<char> key, out ReadOnlySpan<char> dataType))
+            if (TryParseSplit(keyPart, ':', out ReadOnlySpan<char> key, out ReadOnlySpan<char> dataType, enforceSingleDelimiter: true))
             {
                 string typeName = dataType.ToString();
                 if (!providerRegistry.TryGetProvider(typeName, out IDynamicValueProvider? provider))
@@ -64,11 +64,11 @@ internal sealed class EnvironmentVariableArgumentHandler
         return true;
     }
 
-    private static bool TryParseSplit(ReadOnlySpan<char> input, char delimiter, out ReadOnlySpan<char> left, out ReadOnlySpan<char> right)
+    private static bool TryParseSplit(ReadOnlySpan<char> input, char delimiter, out ReadOnlySpan<char> left, out ReadOnlySpan<char> right, bool enforceSingleDelimiter)
     {
         int splitIndex = input.IndexOf(delimiter);
         int splitCheckIndex = input.LastIndexOf(delimiter);
-        if (splitIndex <= 0 || splitIndex != splitCheckIndex)
+        if (splitIndex <= 0 || enforceSingleDelimiter && splitIndex != splitCheckIndex)
         {
             left = right = default;
             return false;
