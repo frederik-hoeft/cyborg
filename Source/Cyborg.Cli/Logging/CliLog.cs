@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using System.Reflection.Metadata;
 using ZLogger;
 
 namespace Cyborg.Cli.Logging;
