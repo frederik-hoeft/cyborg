@@ -1,4 +1,5 @@
 using ConsoleAppFramework;
+using Cyborg.Cli.Arguments;
 using Cyborg.Cli.Logging;
 using Cyborg.Cli.Metrics;
 using Cyborg.Core.Configuration;
@@ -29,7 +30,7 @@ internal sealed class Commands
     /// </remarks>
     /// <param name="mainModulePath">The file path to the main module configuration. Defaults to the primary configuration file if not specified.</param>
     /// <param name="optionsPath">The file path to the options configuration. Defaults to the standard options file if not specified.</param>
-    /// <param name="environmentVariables">-e, An optional array of environment variable assignments to inject into the global environment, with each entry in the format "KEY=VALUE".</param>
+    /// <param name="environmentVariables">-e, An optional array of environment variable assignments to inject into the global environment, in the format "key1[:datatype1]=value1,key2[:datatype1]=value2", where datatype is optional and must be an identifier of a supported dynamic value provider. If no datatype is specified, the value is treated as a literal string.</param>
     /// <param name="metricsOutputPath">The file path where metrics output will be written. If null, the default metrics file path from configuration is used.</param>
     /// <param name="logLevel">The minimum log level to use for console output. If null, the default log level from configuration is used.</param>
     /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
@@ -57,26 +58,13 @@ internal sealed class Commands
         ILogger logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("cyborg.cli.main");
         logger.LogStartup(string.Join(' ', Array.ConvertAll(Environment.GetCommandLineArgs()[1..], QuoteArg)));
         GlobalRuntimeEnvironment globalEnvironment = services.GetRequiredService<GlobalRuntimeEnvironment>();
-        if (environmentVariables is [_, ..])
+
+        IEnvironmentVariableArgumentHandler environmentVariableService = services.GetRequiredService<IEnvironmentVariableArgumentHandler>();
+        if (!environmentVariableService.TryProcessArgument(environmentVariables, globalEnvironment))
         {
-            foreach (string env in environmentVariables)
-            {
-                int splitIndex = env.IndexOf('=');
-                int splitCheckIndex = env.LastIndexOf('=');
-                if (splitIndex <= 0 || splitIndex != splitCheckIndex)
-                {
-                    logger.LogInvalidEnvironmentVariable(env);
-                    return 1;
-                }
-                ReadOnlySpan<char> key = env.AsSpan()[..splitIndex];
-                ReadOnlySpan<char> value = env.AsSpan()[(splitIndex + 1)..];
-                if (!globalEnvironment.SyntaxFactory.IsValidIdentifier(key))
-                {
-                    logger.LogInvalidEnvironmentVariable(env);
-                    return 1;
-                }
-            }
+            return 1;
         }
+
         MetricsOptions metricsOptions = configuration.Get("cyborg.services.metrics", () => new MetricsOptions());
 
         services.GetRequiredService<MetricsCollectorOptions>().Namespace = metricsOptions.Namespace;
