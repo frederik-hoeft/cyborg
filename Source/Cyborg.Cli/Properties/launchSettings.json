@@ -2,7 +2,7 @@
   "profiles": {
     "Cyborg.Cli": {
       "commandName": "Project",
-      "commandLineArgs": "run daily --main-module-path cyborg.dev.jconf --options-path cyborg.options.dev.jconf"
+      "commandLineArgs": "run -e target=daily,dry_run:bool=true --main-module-path cyborg.dev.jconf --options-path cyborg.options.dev.jconf"
     },
     "Container (Dockerfile)": {
       "commandName": "Docker"
