@@ -27,11 +27,16 @@ public sealed class SubprocessModuleWorker(IWorkerContext<SubprocessModule> cont
         }
         ProcessStartInfo startInfo = new(executable, arguments)
         {
-            RedirectStandardOutput = Module.Output.ReadStdout,
-            RedirectStandardError = Module.Output.ReadStderr,
+            // always redirect stdout/stderr to prevent subprocess output from being mirrored to Cyborg's own stdout/stderr
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
         };
         ChildProcessResult executionResult = await dispatcher.ExecuteAsync(startInfo, cancellationToken);
-        SubprocessModuleResult result = new(executionResult.ExitCode, executionResult.StandardOutput, executionResult.StandardError);
+        // only expose captured output if explicitly requested via the output configuration
+        SubprocessModuleResult result = new(
+            executionResult.ExitCode,
+            Module.Output.ReadStdout ? executionResult.StandardOutput : null,
+            Module.Output.ReadStderr ? executionResult.StandardError : null);
         if (Module.CheckExitCode && result.ExitCode != 0)
         {
             Logger.LogSubprocessFailed(executable, result.ExitCode);
