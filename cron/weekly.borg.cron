@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-export BACKUP_SCHEDULED_JOB=1
-
 BACKUP_SCRIPT_HOME="$(/usr/bin/dirname "$(/usr/bin/realpath "${BASH_SOURCE[0]}")")"
 
-"${BACKUP_SCRIPT_HOME}/borg-run.sh" weekly
+"${BACKUP_SCRIPT_HOME}/cyborg" run --main /etc/cyborg/cyborg.jconf --options /etc/cyborg/cyborg.options.jconf -e target=weekly
