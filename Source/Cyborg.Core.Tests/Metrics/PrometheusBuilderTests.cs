@@ -15,9 +15,12 @@ public sealed class PrometheusBuilderTests
         await builder.WriteToAsync(stream, CancellationToken.None);
 
         byte[] bytes = stream.ToArray();
-        Assert.IsTrue(bytes.Length >= 3, "Output should not be empty.");
+        Assert.IsTrue(bytes.Length > 0, "Output should not be empty.");
 
-        bool hasBom = bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF;
+        bool hasBom = bytes.Length >= 3
+            && bytes[0] == 0xEF
+            && bytes[1] == 0xBB
+            && bytes[2] == 0xBF;
         Assert.IsFalse(hasBom, "Prometheus .prom output must not start with a UTF-8 BOM (EF BB BF).");
     }
 }
