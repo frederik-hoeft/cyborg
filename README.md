@@ -1,20 +1,63 @@
-# Borg Backup Automation
+# Cyborg
 
-## Cyborg
+Cyborg is a .NET 10 workflow orchestration engine that composes complex, multi-step workflows from declarative JSON configuration. It compiles to a single native AOT binary with no runtime dependencies, designed for unattended operation on Linux servers. While its core engine is fully domain-agnostic, the current distribution includes a module library for BorgBackup orchestration as its primary use case.
 
-Cyborg is the next-generation .NET 10 backup orchestration system that will replace the legacy `borg/` shell scripts. It compiles to a single native AOT binary with no .NET runtime dependency.
+## Overview
 
-### Building with Docker
+Cyborg provides a Turing-complete module system where every operation — from executing subprocesses to orchestrating multi-host backup workflows — is expressed as a composable module in JSON. Modules can be nested, parameterized, and reused through templates, enabling complex workflows without writing code. All core APIs (module composition, environment scoping, variable resolution, validation, artifact publishing) are domain-agnostic and designed to be extended with custom module libraries for any orchestration task.
 
-Build the native AOT binary inside a Docker container and export it to the host (requires [Docker](https://docs.docker.com/get-docker/) with BuildKit enabled):
+Key capabilities:
+
+- **Declarative workflows** — Jobs are defined as JSON configuration files that compose built-in modules for sequencing, conditionals, loops, subprocess execution, and domain-specific operations.
+- **Template system** — Reusable workflow templates with parameterized overrides, enabling shared patterns across services (e.g., a common Docker or systemd backup template applied to different containers or services).
+- **Borg module library** — Built-in support for borg archive creation, pruning, and compaction across multiple remote repositories, with Wake-on-LAN for cold backup targets.
+- **Prometheus metrics** — Automatic export of operational statistics in Prometheus exposition format.
+- **Native AOT binary** — Compiles to a self-contained executable with no .NET runtime dependency, minimal startup time, and low memory footprint.
+- **Configuration trust** — File ownership and permission auditing on configuration files to prevent privilege escalation through tampered workflows.
+
+## Use Cases
+
+Cyborg's core engine is domain-agnostic — any workflow that can be expressed as a composition of subprocess calls, conditionals, loops, and environment variable passing can be orchestrated through JSON configuration. The included `Cyborg.Modules.Borg` library provides a ready-made solution for BorgBackup orchestration.
+
+### BorgBackup Orchestration
+
+The sample configuration in `samples/` demonstrates a deployment where backup targets may be powered down when idle and must be woken on demand. A typical workflow involves a Linux server that:
+
+1. Wakes remote backup hosts via Wake-on-LAN.
+2. Stops dependent services (Docker containers, systemd units) to ensure data consistency.
+3. Creates borg archives across one or more remote repositories.
+4. Prunes and compacts repositories according to retention policies.
+5. Restarts services and optionally shuts down remote hosts.
+6. Exports Prometheus metrics for monitoring.
+
+All of these steps are expressed as a single JSON workflow file referencing shared templates, with host-specific configuration and secrets loaded from separate files.
+
+## Getting Started
+
+### Prerequisites
+
+- Docker (for containerized builds), or .NET 10 SDK (for building from source)
+- For borg workflows: BorgBackup installed on the backup host(s) and SSH access to remote repositories
+
+### Building
+
+**Using the build script** (recommended):
 
 ```bash
-docker build --target artifact --output type=local,dest=./dist .
+# Build inside Docker and output to Source/artifacts/
+Source/docker-build.sh
+
+# Build and output to a custom directory
+Source/docker-build.sh -o /usr/local/bin
 ```
 
-The compiled binary will be written to `./dist/Cyborg.Cli`.
+**Manually with Docker**:
 
-### Building locally
+```bash
+docker build --target artifact --output type=local,dest=./dist Source/
+```
+
+**Manually with the .NET SDK**:
 
 ```bash
 cd Source
@@ -24,66 +67,109 @@ dotnet publish Cyborg.Cli/Cyborg.Cli.csproj \
     --self-contained true
 ```
 
-Artifacts are output to `Source/artifacts/`.
+Build artifacts are output to `Source/artifacts/`.
 
----
+### Configuration
 
+Cyborg is configured through jconf files, which are JSON with support for comments.
 
-A cron-based backup automation system using BorgBackup with support for multiple remote destinations and Wake-on-LAN functionality. Intended for setups where backup target hosts and repositories stay powered down or disconnected when idle (cold backups) to reduce energy usage. The system wakes remote hosts via WoL, performs snapshot creation to repositories that may only be reachable briefly, then allows them to return to an offline or low-power state. Designed for use in home or small office environments where backup target hosts are preferred to remain off when not in use. Ensures availability on demand while minimizing energy consumption and prolonging hardware lifespan.
+Cyborg expects its configuration in `/etc/cyborg/` by default. The `samples/` directory provides a complete reference configuration:
 
-## Architecture
+| File | Purpose |
+|------|---------|
+| `cyborg.jconf` | Main workflow entry point — defines the top-level module to execute |
+| `cyborg.options.jconf` | Runtime options: logging, metrics, trust policies |
+| `cyborg.hosts.jsecrets` | Host definitions and secrets (borg passphrases, SSH settings, WoL MACs) |
+| `jobs/` | Per-frequency job definitions (daily, weekly) |
+| `templates/` | Reusable workflow templates (Docker backup, systemd backup) |
 
-The system consists of three main components:
+Copy the sample files to `/etc/cyborg/`, adjust host definitions and secrets for your environment, and ensure configuration files are owned by root with restrictive permissions (see [Security](#security) below).
 
-- **Core scripts**: `borg-run.sh` orchestrates backup jobs by frequency (daily/weekly/monthly)
-- **Job scripts**: Individual backup tasks in `jobs/` directories handle specific services or data
-- **Cron wrappers**: Simple scripts that set environment variables and invoke the main runner
+### Running
 
-## Configuration
+```bash
+# Execute the daily backup target
+cyborg run -e target=daily
 
-### Host Configuration
+# Execute with a custom configuration path
+cyborg run --main /path/to/cyborg.jconf -e target=daily
 
-Copy `borg.hosts.json.template` to `borg.hosts.json` and configure remote backup hosts:
-
-```json
-[
-    {
-        "hostname": "backup-server.domain",
-        "port": 22,
-        "wake_on_lan_mac": "00:11:22:33:44:55",
-        "borg_rsh": "/usr/bin/sshpass -f/root/.ssh/pass -P assphrase /usr/bin/ssh",
-        "borg_repo_root": "/path/to/borg/repo"
-    }
-]
+# Override the console log level
+cyborg run -e target=daily --log-level information
 ```
 
-### Secrets
+The `target` environment variable selects which job to run (e.g., `daily`, `weekly`). Additional environment variables can be injected via `-e` with optional type annotations (e.g., `-e port:int=2222`).
 
-Copy `borg.secrets.template` to `borg.secrets` and configure global configurations shared across jobs (e.g., paths and options shared across your jobs). In addition to shared configurations, each job script likely requires its own specific secrets (e.g., borg repository passphrases). Ensure that sensitive information is protected with appropriate 600 file permissions. All executable scripts should be root-owned and non-world-writable.
+## Configuration Model
 
-## Wake-on-LAN Setup
+Workflows are defined as JSON files using versioned module IDs and snake_case property names:
 
-For remote hosts that need to be woken up before backup:
+```json
+{
+  "module": {
+    "cyborg.modules.sequence.v1": {
+      "steps": [
+        {
+          "module": {
+            "cyborg.modules.subprocess.v1": {
+              "command": { "executable": "/usr/bin/borg", "arguments": ["create", "::daily"] }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+```
 
-1. **Target Host**: Enable Wake-on-LAN in BIOS and network interface settings and configure borg backup to serve over SSH. You may opt to choose a dockerized borg server setup for easier management, e.g., using the 3rd party provided [`borg-backup`](https://hub.docker.com/r/tgbyte/borg-backup) docker image. Server-side setup is outside the scope of this documentation.
-2. **Router/Switch**: Depending on your network architecture, you may need to add static ARP entries to allow WoL packets to be routed correctly. This step is specific to your network setup and operating environment. For example, if using a Linux-based router you might add the following to the post-up section of the relevant network interface:
-    ```bash
-    post-up /usr/sbin/ip neighbor replace to <backup host IP> dev <egressing network interface to backup host IP> lladdr <backup host MAC>
-    ```
-    The above ensures that the upstream router can correctly forward the WoL packets to the target host.
+Each module invocation is wrapped in a `ModuleContext` envelope that can declare environment scoping, configuration modules for variable injection, and pre-execution requirements. Modules compose arbitrarily — a sequence can contain conditionals, each branch can run loops over parameterized templates, and templates can reference external configuration files.
 
-3. **Source Host**: Ensure `wakeonlan` package is installed and that you have a way to automatically shut down the target host after backup if desired (e.g., via SSH with command execution restricted to shutdown in `authorized_keys`). Ensure firewalls allow WoL packets and shutdown commands to reach the target host.
+For details on the configuration model and all available modules, see the [Module Reference](docs/architecture/modules-reference.md).
 
-## Cron Scheduling
+## Security
 
-Symlink the cron wrapper scripts (`borg/*.borg.cron`) to your system's cron directory (e.g., `/etc/cron.daily/`, `/etc/cron.weekly/`, `/etc/cron.monthly/`) to schedule automatic backups.
+Cyborg workflows can execute subprocesses with elevated privileges. To prevent privilege escalation through tampered configuration files, the trust subsystem audits file ownership and permissions before any configuration file is deserialized. The default policy requires configuration files to be owned by root and not writable by group or other users.
 
-## Job Structure
+Trust enforcement is configurable in `cyborg.options.jconf` and supports three modes: `enforce` (block untrusted files), `log_only` (warn but continue), and `disabled`. See the [Security Design Principles](docs/architecture/architecture-overview.md#security-design-principles) section of the architecture documentation for details.
 
-Backup jobs are organized by frequency in `jobs/daily/`, `jobs/weekly/`, and `jobs/monthly/`. Each job script backs up a specific service or data set to a distinct borg repository and follows the pattern:
+## Documentation
 
-1. Source required helper modules (see provided example jobs for reference)
-2. Stop services if necessary
-3. Perform backup using borg helpers
-4. Restore services
-5. Clean up resources
+| Document | Description |
+|----------|-------------|
+| [Architecture Overview](docs/architecture/architecture-overview.md) | System architecture: module system, runtime, environment scoping, parsing, security |
+| [Module Reference](docs/architecture/modules-reference.md) | Complete documentation of all built-in modules |
+| [Dynamic Values Reference](docs/architecture/dynamic-values-reference.md) | Dynamic value providers and typed configuration |
+| [Templates Reference](docs/architecture/templates-reference.md) | Template module usage and patterns |
+| [Source Generators](docs/architecture/source-generators.md) | Roslyn source generators for AOT-compatible code generation |
+| [Validation Attributes Reference](docs/architecture/validation-attributes-reference.md) | Validation, defaulting, and override control attributes |
+
+## Project Structure
+
+```
+Source/
+  Cyborg.Cli/           Application entry point and CLI routing
+  Cyborg.Core/           Core abstractions: modules, runtime, parsing, services
+  Cyborg.Core.Aot/       Roslyn source generators for AOT compatibility
+  Cyborg.Modules/        Built-in modules (sequence, subprocess, template, etc.)
+  Cyborg.Modules.Borg/   Borg-specific modules (create, prune, compact)
+samples/                 Reference configuration files and templates
+docs/                    Architecture and reference documentation
+```
+
+## Extending Cyborg
+
+Cyborg's architecture separates the domain-agnostic engine (`Cyborg.Core`, `Cyborg.Modules`) from domain-specific module libraries (`Cyborg.Modules.Borg`). Cyborg is licensed under the MIT License. To adapt Cyborg for a different orchestration domain, fork the repository and replace or extend the domain-specific layer:
+
+1. **Create a new module library** — Add a project alongside or in place of `Cyborg.Modules.Borg`. Each module follows the three-part pattern (module record, worker, loader) described in the [Architecture Overview](docs/architecture/architecture-overview.md#three-part-module-pattern). Annotate the module record with `[GeneratedModuleValidation]` and the loader with `[GeneratedModuleLoaderFactory]` to have the source generators produce the validation pipeline and deserialization factory.
+
+2. **Register modules via a service interface** — Expose a Jab `[ServiceProviderModule]` interface that registers your module loaders (as `IModuleLoader` singletons), dynamic value providers, and any supporting services. This follows the same pattern as `ICyborgBorgServices`.
+
+3. **Import into the CLI composition root** — Add an `[Import<IYourModuleServices>]` attribute to `DefaultServiceProvider` in `Cyborg.Cli` and register any additional `JsonSerializerContext` instances required by your module types.
+
+4. **Provide JSON configuration** — Define workflow files using your module IDs. All engine-level modules (sequence, if/else, foreach, template, subprocess, guard, etc.) remain available and compose freely with custom modules.
+
+The core engine, built-in flow-control modules, environment scoping, variable resolution, override system, and validation infrastructure require no modification. Custom modules participate in all of these subsystems automatically through the source-generated interfaces.
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.

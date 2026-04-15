@@ -63,7 +63,7 @@ internal static class LoaderFactoryRenderer
             {
                 // we need to explicitly construct the worker context here
                 INamedTypeSymbol boundModelContextType = model.ContractInfo.ModuleWorkerContextImplementationT.Construct(model.ModuleType);
-                builder.AppendLine($"new {boundModelContextType.ToDisplayString(s_fullyQualifiedFormat)}(");
+                builder.Append($"new {boundModelContextType.ToDisplayString(s_fullyQualifiedFormat)}(");
                 BuildConstructorArguments(model, builder.IncreaseIndent(), boundModelContextType.InstanceConstructors[0]);
                 builder.Append(")");
             }
