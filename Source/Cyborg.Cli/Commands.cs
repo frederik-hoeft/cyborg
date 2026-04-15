@@ -30,7 +30,7 @@ internal sealed class Commands
     /// </remarks>
     /// <param name="main">The file path to the main module configuration. Defaults to the primary configuration file if not specified.</param>
     /// <param name="options">The file path to the options configuration. Defaults to the standard options file if not specified.</param>
-    /// <param name="environmentVariables">-e, An optional array of environment variable assignments to inject into the global environment, in the format "key1[:datatype1]=value1,key2[:datatype1]=value2", where datatype is optional and must be an identifier of a supported dynamic value provider. If no datatype is specified, the value is treated as a literal string.</param>
+    /// <param name="environmentVariables">-e, An optional array of environment variable assignments to inject into the global environment, where each element must be in the format "key[:type]=value". The type is optional and must be an identifier of a supported dynamic value provider. If no type is specified, the value is treated as a literal string. When a type is specified, the value must be a valid JSON literal for the selected provider.</param>
     /// <param name="metrics">The file path where metrics output will be written. If null, the default metrics file path from configuration is used.</param>
     /// <param name="logLevel">The minimum log level to use for console output. If null, the default log level from configuration is used.</param>
     /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
