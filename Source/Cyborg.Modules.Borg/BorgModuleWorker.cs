@@ -35,12 +35,17 @@ public abstract class BorgModuleWorker<TModule>
         startInfo.Environment[BORG_PASSPHRASE_ENV_VAR] = Module.Passphrase;
     }
 
-    protected virtual IMetricsLabelCollection AddDefaultLabels(IMetricsLabelCollection labels)
+    protected virtual IMetricsLabelCollection AddDefaultLabels(IModuleRuntime runtime, IMetricsLabelCollection labels)
     {
+        ArgumentNullException.ThrowIfNull(runtime);
         ArgumentNullException.ThrowIfNull(labels);
         if (Module.RemoteRepository.RepositoryRoot is not null)
         {
             labels = labels.AddLabel("repository_root", Module.RemoteRepository.RepositoryRoot);
+        }
+        if (runtime.Environment.TryResolveVariable(BorgWellKnownVariables.FREQUENCY, out string? frequency))
+        {
+            labels = labels.AddLabel("frequency", frequency);
         }
         return labels
             .AddLabel("cyborg_module", TModule.ModuleId)
