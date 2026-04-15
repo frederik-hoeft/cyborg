@@ -8,6 +8,7 @@ For detailed reference material, see:
 - [Dynamic Values Reference](dynamic-values-reference.md) — Dynamic value providers and typed configuration
 - [Templates Reference](templates-reference.md) — Template module usage and patterns
 - [Source Generators](source-generators.md) — Roslyn source generators for AOT-compatible code generation
+- [Validation Attributes Reference](validation-attributes-reference.md) — Validation, defaulting, and override control attributes
 
 **Table of Contents**
 

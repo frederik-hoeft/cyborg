@@ -92,7 +92,7 @@ Copy the sample files to `/etc/cyborg/`, adjust host definitions and secrets for
 cyborg run -e target=daily
 
 # Execute with a custom configuration path
-cyborg run --main-module-path /path/to/cyborg.jconf -e target=daily
+cyborg run --main /path/to/cyborg.jconf -e target=daily
 
 # Override the console log level
 cyborg run -e target=daily --log-level information
@@ -141,6 +141,7 @@ Trust enforcement is configurable in `cyborg.options.jconf` and supports three m
 | [Dynamic Values Reference](docs/architecture/dynamic-values-reference.md) | Dynamic value providers and typed configuration |
 | [Templates Reference](docs/architecture/templates-reference.md) | Template module usage and patterns |
 | [Source Generators](docs/architecture/source-generators.md) | Roslyn source generators for AOT-compatible code generation |
+| [Validation Attributes Reference](docs/architecture/validation-attributes-reference.md) | Validation, defaulting, and override control attributes |
 
 ## Project Structure
 
