@@ -83,7 +83,7 @@ internal sealed partial class PrometheusBuilder
     public async Task WriteToAsync(Stream outputStream, CancellationToken cancellationToken)
     {
         StringBuilder builder = Finalize();
-        using StreamWriter writer = new(outputStream, Encoding.UTF8, leaveOpen: true);
+        using StreamWriter writer = new(outputStream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), leaveOpen: true);
         await writer.WriteAsync(builder, cancellationToken);
     }
 }
