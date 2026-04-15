@@ -58,6 +58,7 @@ For detailed reference material, see:
   - [Metrics Collection](#metrics-collection)
 - [Cross-Cutting Concerns](#cross-cutting-concerns)
   - [Security Design Principles](#security-design-principles)
+    - [Configuration File Trust](#configuration-file-trust)
     - [Subprocess Safety](#subprocess-safety)
     - [Input Validation](#input-validation)
     - [Privilege Boundaries](#privilege-boundaries)
@@ -380,6 +381,31 @@ Modules contribute metrics during execution. The CLI entry point writes collecte
 The following architectural constraints and design principles apply across all subsystems. They are not localized to any single component but instead shape the overall system design and inform implementation decisions throughout the codebase.
 
 ### Security Design Principles
+
+Cyborg executes backup workflows defined in JSON configuration files that may reference external templates, module definitions, and dynamically discovered paths. Because these workflows can invoke subprocesses with elevated privileges, the security model must address both the integrity of configuration inputs and the safety of subprocess execution. The following principles govern how the system defends against injection, privilege escalation, and unauthorized configuration.
+
+#### Configuration File Trust
+
+Cyborg workflows are composable — a top-level job can reference external module files, load templates by path, pull in configuration fragments, or enumerate files via glob patterns. Any of these external files, if writable by an unprivileged user, could be used to inject arbitrary subprocess commands or alter backup behavior. To mitigate this, Cyborg enforces a configuration file trust model that audits every external configuration file before it is deserialized.
+
+Whenever the module configuration loader reads a file from disk — whether triggered by the CLI entry point, a template module, an external module, or an external configuration module — the trust subsystem evaluates the file against a set of configurable trust policies before deserialization proceeds. The evaluation produces a trust decision for the file, which aggregates individual policy decisions.
+
+Each trust policy inspects a property of the file and returns one of three outcomes: accept (the file satisfies the policy), reject (the file violates the policy), or abstain (the policy is not applicable in the current environment, for example a Unix permissions policy running on Windows). A file is considered trusted only if no policy rejects it. All policies are evaluated regardless of earlier rejections, so the trust decision captures the complete set of violations for diagnostic purposes.
+
+The built-in policies target Unix environments, where file ownership and permission bits are the primary access control mechanism:
+
+- **Owner policy** — Verifies that the file is owned by a user or group from an explicit allow list (e.g., only `root`). Abstains on non-Linux platforms.
+- **Permissions policy** — Verifies that specific permission bits are present (e.g., owner-readable) and that specific bits are absent (e.g., group-writable, other-writable, setuid, setgid). Abstains on Windows.
+
+The trust subsystem operates in one of three enforcement modes, configured globally:
+
+| Mode | Behavior |
+|------|----------|
+| `Enforce` | A rejected file causes a security exception, halting execution before the file is deserialized. |
+| `LogOnly` | Rejected files are logged but execution continues. Useful during initial deployment to audit existing file permissions without breaking workflows. |
+| `Disabled` | Trust evaluation is skipped entirely. |
+
+Trust policies are themselves configured through the dynamic value system, allowing deployments to define custom policy sets with environment-specific allowed owners and permission requirements.
 
 #### Subprocess Safety
 
