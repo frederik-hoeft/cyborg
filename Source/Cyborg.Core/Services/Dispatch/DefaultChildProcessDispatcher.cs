@@ -12,13 +12,17 @@ public sealed class DefaultChildProcessDispatcher(ILoggerFactory loggerFactory) 
         ArgumentNullException.ThrowIfNull(processStartInfo);
         // always disable shell execution to ensure that we can redirect streams and kill the process tree if needed
         processStartInfo.UseShellExecute = false;
+        bool readStdout = processStartInfo.RedirectStandardOutput;
+        bool readStderr = processStartInfo.RedirectStandardError;
+        // always redirect both streams to prevent subprocess output from being inherited by Cyborg's process
+        processStartInfo.RedirectStandardOutput = true;
+        processStartInfo.RedirectStandardError = true;
         using Process process = new()
         {
             StartInfo = processStartInfo,
         };
-        bool readStdout = processStartInfo.RedirectStandardOutput;
-        bool readStderr = processStartInfo.RedirectStandardError;
         List<Task<CommandOutput>> ioTasks = [];
+        List<Task> drainTasks = [];
         string executable = processStartInfo.FileName;
         // join for display only — individual arguments are passed unmodified to the OS
         string arguments = string.Join(" ", processStartInfo.ArgumentList);
@@ -39,12 +43,21 @@ public sealed class DefaultChildProcessDispatcher(ILoggerFactory loggerFactory) 
             {
                 ioTasks.Add(ReadStreamAsync(process.StandardOutput, static (result, data) => result.StandardOutput = data, cancellationToken));
             }
+            else
+            {
+                drainTasks.Add(DiscardStreamAsync(process.StandardOutput, cancellationToken));
+            }
             if (readStderr)
             {
                 ioTasks.Add(ReadStreamAsync(process.StandardError, static (result, data) => result.StandardError = data, cancellationToken));
             }
+            else
+            {
+                drainTasks.Add(DiscardStreamAsync(process.StandardError, cancellationToken));
+            }
             await process.WaitForExitAsync(cancellationToken);
             await Task.WhenAll(ioTasks);
+            await Task.WhenAll(drainTasks);
         }
         catch (OperationCanceledException)
         {
@@ -98,6 +111,9 @@ public sealed class DefaultChildProcessDispatcher(ILoggerFactory loggerFactory) 
         string data = await reader.ReadToEndAsync(cancellationToken);
         return new CommandOutput(data, setResult);
     }
+
+    private static Task DiscardStreamAsync(StreamReader reader, CancellationToken cancellationToken) =>
+        reader.BaseStream.CopyToAsync(Stream.Null, cancellationToken);
 
     private sealed class SubprocessResultBuilder
     {
