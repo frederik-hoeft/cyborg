@@ -1,4 +1,4 @@
-﻿namespace Cyborg.Modules.Borg.Prune.Metrics.Model;
+namespace Cyborg.Modules.Borg.Prune.Metrics.Model;
 
 public enum BorgPruneActionType
 {

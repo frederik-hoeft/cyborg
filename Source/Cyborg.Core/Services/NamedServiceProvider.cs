@@ -1,4 +1,4 @@
-﻿using Jab;
+using Jab;
 
 namespace Cyborg.Core.Services;
 

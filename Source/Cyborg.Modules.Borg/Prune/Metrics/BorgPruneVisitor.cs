@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Parsing.Visitors;
+using Cyborg.Core.Parsing.Visitors;
 using Cyborg.Modules.Borg.Prune.Metrics.Model;
 using Cyborg.Modules.Borg.Prune.Metrics.SyntaxNodes;
 

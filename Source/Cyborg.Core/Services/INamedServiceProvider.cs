@@ -1,4 +1,4 @@
-﻿namespace Cyborg.Core.Services;
+namespace Cyborg.Core.Services;
 
 public interface INamedServiceProvider
 {

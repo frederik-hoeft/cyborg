@@ -1,3 +1,3 @@
-﻿namespace Cyborg.Core.Parsing.Visitors;
+namespace Cyborg.Core.Parsing.Visitors;
 
 public interface INodeVisitor;

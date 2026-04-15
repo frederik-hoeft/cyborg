@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Parsing.Visitors;
+using Cyborg.Core.Parsing.Visitors;
 
 namespace Cyborg.Core.Parsing.SyntaxNodes;
 

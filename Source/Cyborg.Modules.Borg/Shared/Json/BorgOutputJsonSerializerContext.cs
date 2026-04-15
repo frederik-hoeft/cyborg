@@ -1,4 +1,4 @@
-﻿using Cyborg.Modules.Borg.Create.Metrics;
+using Cyborg.Modules.Borg.Create.Metrics;
 using Cyborg.Modules.Borg.Shared.Json.Logging;
 using System.Text.Json.Serialization;
 

@@ -1,4 +1,4 @@
-﻿using System.Net.Sockets;
+using System.Net.Sockets;
 
 namespace Cyborg.Core.Services.Network.Probe;
 

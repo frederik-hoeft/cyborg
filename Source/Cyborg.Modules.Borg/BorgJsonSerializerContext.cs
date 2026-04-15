@@ -1,4 +1,4 @@
-﻿using Cyborg.Modules.Borg.Compact;
+using Cyborg.Modules.Borg.Compact;
 using Cyborg.Modules.Borg.Create;
 using Cyborg.Modules.Borg.Prune;
 using System.Text.Json;

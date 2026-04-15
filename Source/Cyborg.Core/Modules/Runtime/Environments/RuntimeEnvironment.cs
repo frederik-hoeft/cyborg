@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Modules.Configuration.Model;
+using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime.Environments.Syntax;
 using System.Collections;
 using System.Collections.Immutable;

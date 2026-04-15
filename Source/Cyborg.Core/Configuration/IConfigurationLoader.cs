@@ -1,4 +1,4 @@
-﻿namespace Cyborg.Core.Configuration;
+namespace Cyborg.Core.Configuration;
 
 public interface IConfigurationLoader
 {

@@ -1,4 +1,4 @@
-﻿namespace Cyborg.Core.Metrics;
+namespace Cyborg.Core.Metrics;
 
 internal static class PrometheusExtensions
 {

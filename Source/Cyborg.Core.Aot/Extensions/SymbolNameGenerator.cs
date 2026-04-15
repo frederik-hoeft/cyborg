@@ -1,4 +1,4 @@
-﻿namespace Cyborg.Core.Aot.Extensions;
+namespace Cyborg.Core.Aot.Extensions;
 
 internal static class SymbolNameGenerator
 {

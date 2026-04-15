@@ -1,4 +1,4 @@
-﻿namespace Cyborg.Core.Configuration.Serialization.Dynamics;
+namespace Cyborg.Core.Configuration.Serialization.Dynamics;
 
 public interface IDynamicValueProviderRegistry
 {

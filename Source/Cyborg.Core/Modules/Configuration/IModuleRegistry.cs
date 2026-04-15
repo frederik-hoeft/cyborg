@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Modules.Configuration.Model;
+using Cyborg.Core.Modules.Configuration.Model;
 
 namespace Cyborg.Core.Modules.Configuration;
 

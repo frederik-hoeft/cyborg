@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Configuration;
+using Cyborg.Core.Configuration;
 using Cyborg.Core.Configuration.Model;
 using Cyborg.Core.Configuration.Serialization;
 using Cyborg.Core.Configuration.Serialization.Dynamics;

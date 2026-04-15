@@ -1,4 +1,4 @@
-﻿namespace Cyborg.Core.Modules.Configuration;
+namespace Cyborg.Core.Modules.Configuration;
 
 public interface IModuleWorkerFactory
 {

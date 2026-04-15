@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Parsing.SyntaxNodes;
+using Cyborg.Core.Parsing.SyntaxNodes;
 using Cyborg.Core.Parsing.Visitors;
 using System.Text.RegularExpressions;
 
