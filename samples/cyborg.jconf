@@ -138,7 +138,7 @@
                       "module": {
                         "cyborg.modules.if.v1": {
                           "condition": {
-                            "cyborg.modules.if.condition.is_true.v1": {
+                            "cyborg.modules.condition.is_true.v1": {
                               "variable": "my_wol.${host.hostname}.woke_up"
                             }
                           },
