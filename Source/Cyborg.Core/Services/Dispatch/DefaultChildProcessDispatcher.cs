@@ -21,8 +21,8 @@ public sealed class DefaultChildProcessDispatcher(ILoggerFactory loggerFactory) 
         {
             StartInfo = processStartInfo,
         };
-        List<Task<CommandOutput>> ioTasks = [];
-        List<Task> drainTasks = [];
+        SubprocessResultBuilder builder = new();
+        List<Task> streamTasks = [];
         string executable = processStartInfo.FileName;
         // join for display only — individual arguments are passed unmodified to the OS
         string arguments = string.Join(" ", processStartInfo.ArgumentList);
@@ -41,23 +41,22 @@ public sealed class DefaultChildProcessDispatcher(ILoggerFactory loggerFactory) 
             _logger.LogProcessStarted(executable);
             if (readStdout)
             {
-                ioTasks.Add(ReadStreamAsync(process.StandardOutput, static (result, data) => result.StandardOutput = data, cancellationToken));
+                streamTasks.Add(CaptureStreamAsync(process.StandardOutput, data => builder.StandardOutput = data, cancellationToken));
             }
             else
             {
-                drainTasks.Add(DiscardStreamAsync(process.StandardOutput, cancellationToken));
+                streamTasks.Add(DiscardStreamAsync(process.StandardOutput, cancellationToken));
             }
             if (readStderr)
             {
-                ioTasks.Add(ReadStreamAsync(process.StandardError, static (result, data) => result.StandardError = data, cancellationToken));
+                streamTasks.Add(CaptureStreamAsync(process.StandardError, data => builder.StandardError = data, cancellationToken));
             }
             else
             {
-                drainTasks.Add(DiscardStreamAsync(process.StandardError, cancellationToken));
+                streamTasks.Add(DiscardStreamAsync(process.StandardError, cancellationToken));
             }
             await process.WaitForExitAsync(cancellationToken);
-            await Task.WhenAll(ioTasks);
-            await Task.WhenAll(drainTasks);
+            await Task.WhenAll(streamTasks);
         }
         catch (OperationCanceledException)
         {
@@ -74,11 +73,6 @@ public sealed class DefaultChildProcessDispatcher(ILoggerFactory loggerFactory) 
                 // The process has already exited, so we can ignore this exception.
             }
             throw;
-        }
-        SubprocessResultBuilder builder = new();
-        foreach (CommandOutput io in ioTasks.Select(t => t.Result))
-        {
-            io.CollectResult(builder);
         }
         ChildProcessResult childProcessResult = builder.Build(process.ExitCode);
         _logger.LogProcessExited(executable, childProcessResult.ExitCode);
@@ -106,10 +100,10 @@ public sealed class DefaultChildProcessDispatcher(ILoggerFactory loggerFactory) 
             .Replace("\n", "\\n", StringComparison.Ordinal);
     }
 
-    private static async Task<CommandOutput> ReadStreamAsync(StreamReader reader, Action<SubprocessResultBuilder, string> setResult, CancellationToken cancellationToken)
+    private static async Task CaptureStreamAsync(StreamReader reader, Action<string> setResult, CancellationToken cancellationToken)
     {
         string data = await reader.ReadToEndAsync(cancellationToken);
-        return new CommandOutput(data, setResult);
+        setResult(data);
     }
 
     private static Task DiscardStreamAsync(StreamReader reader, CancellationToken cancellationToken) =>
@@ -122,10 +116,5 @@ public sealed class DefaultChildProcessDispatcher(ILoggerFactory loggerFactory) 
         public string? StandardError { get; set; }
 
         public ChildProcessResult Build(int exitCode) => new(exitCode, StandardOutput, StandardError);
-    }
-
-    private sealed class CommandOutput(string data, Action<SubprocessResultBuilder, string> setResult)
-    {
-        public void CollectResult(SubprocessResultBuilder builder) => setResult(builder, data);
     }
 }
