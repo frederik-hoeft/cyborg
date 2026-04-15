@@ -1,4 +1,4 @@
-﻿using ConsoleAppFramework;
+using ConsoleAppFramework;
 using Cyborg.Cli;
 
 ConsoleApp.ConsoleAppBuilder app = ConsoleApp.Create();

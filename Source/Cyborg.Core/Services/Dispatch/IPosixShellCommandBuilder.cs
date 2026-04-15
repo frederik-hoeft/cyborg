@@ -1,4 +1,4 @@
-﻿namespace Cyborg.Core.Services.Dispatch;
+namespace Cyborg.Core.Services.Dispatch;
 
 public interface IPosixShellCommandBuilder
 {

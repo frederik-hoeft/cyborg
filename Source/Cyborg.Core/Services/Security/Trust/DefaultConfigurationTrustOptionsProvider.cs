@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Configuration;
+using Cyborg.Core.Configuration;
 using Cyborg.Core.Services.Security.Trust.Configuration;
 
 namespace Cyborg.Core.Services.Security.Trust;

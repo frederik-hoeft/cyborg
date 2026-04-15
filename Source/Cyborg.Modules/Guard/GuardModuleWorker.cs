@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Modules;
+using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Validation;
 using System.Diagnostics.CodeAnalysis;

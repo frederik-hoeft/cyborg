@@ -1,4 +1,4 @@
-﻿namespace Cyborg.Core.Services.Metrics;
+namespace Cyborg.Core.Services.Metrics;
 
 public interface IMetricSampleCollection
 {

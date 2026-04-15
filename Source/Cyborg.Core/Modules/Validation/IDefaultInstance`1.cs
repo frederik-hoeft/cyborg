@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Aot.Contracts;
+using Cyborg.Core.Aot.Contracts;
 
 namespace Cyborg.Core.Modules.Validation;
 

@@ -1,4 +1,4 @@
-﻿using Cyborg.Modules.Borg.Shared.Json;
+using Cyborg.Modules.Borg.Shared.Json;
 using Cyborg.Modules.Borg.Shared.Json.Logging;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;

@@ -1,4 +1,4 @@
-﻿namespace Cyborg.Core.Services.Security.Trust.Policies;
+namespace Cyborg.Core.Services.Security.Trust.Policies;
 
 public interface IConfigurationTrustPolicy
 {

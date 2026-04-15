@@ -1,4 +1,4 @@
-﻿using Cyborg.Modules.Borg.Shared.Output.Deserializers;
+using Cyborg.Modules.Borg.Shared.Output.Deserializers;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Modules.Borg.Shared.Output;

@@ -1,4 +1,4 @@
-﻿using System.Collections.Immutable;
+using System.Collections.Immutable;
 using System.Text.Json;
 
 namespace Cyborg.Modules.Borg.Create.Metrics;

@@ -1,4 +1,4 @@
-﻿using System.Net.NetworkInformation;
+using System.Net.NetworkInformation;
 
 namespace Cyborg.Core.Services.Network.Probe;
 

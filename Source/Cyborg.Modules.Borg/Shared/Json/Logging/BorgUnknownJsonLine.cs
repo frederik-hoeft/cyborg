@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 
 namespace Cyborg.Modules.Borg.Shared.Json.Logging;
 

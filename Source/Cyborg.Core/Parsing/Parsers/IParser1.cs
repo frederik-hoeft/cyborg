@@ -1,4 +1,4 @@
-﻿namespace Cyborg.Core.Parsing.Parsers;
+namespace Cyborg.Core.Parsing.Parsers;
 
 public interface IParser<TParser> : IParser where TParser : class, IParser<TParser>
 {

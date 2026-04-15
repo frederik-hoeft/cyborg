@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Configuration.Serialization;
+using Cyborg.Core.Configuration.Serialization;
 using Cyborg.Core.Services.Security.Trust.Configuration;
 using Cyborg.Core.Services.Security.Trust.Logging;
 using Microsoft.Extensions.Logging;

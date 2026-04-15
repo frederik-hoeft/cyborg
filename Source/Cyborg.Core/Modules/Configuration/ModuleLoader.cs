@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Aot.Contracts;
+using Cyborg.Core.Aot.Contracts;
 using Cyborg.Core.Configuration.Serialization;
 using System.Text.Json;
 

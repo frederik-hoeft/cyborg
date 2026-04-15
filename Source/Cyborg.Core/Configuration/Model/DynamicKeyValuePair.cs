@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Aot.Contracts;
+using Cyborg.Core.Aot.Contracts;
 using System.Text.Json.Serialization;
 
 namespace Cyborg.Core.Configuration.Model;

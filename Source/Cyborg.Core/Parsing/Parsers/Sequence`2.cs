@@ -1,4 +1,4 @@
-﻿namespace Cyborg.Core.Parsing.Parsers;
+namespace Cyborg.Core.Parsing.Parsers;
 
 public sealed class Sequence<T1, T2>(string? name = null) : Sequence
 (

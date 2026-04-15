@@ -1,4 +1,4 @@
-﻿namespace Cyborg.Core.Modules.Configuration.Model;
+namespace Cyborg.Core.Modules.Configuration.Model;
 
 public enum EnvironmentScopeReference
 {

@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Aot.Modules.Validation;
+using Cyborg.Core.Aot.Modules.Validation;
 using Cyborg.Core.Modules;
 
 namespace Cyborg.Modules.Empty;

@@ -1,4 +1,4 @@
-﻿namespace Cyborg.Modules.Borg.Create.Metrics;
+namespace Cyborg.Modules.Borg.Create.Metrics;
 
 public sealed record BorgEncryptionInfo(
     string Mode,

@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using Cyborg.Core.Aot.Extensions;
 using Microsoft.CodeAnalysis;
 

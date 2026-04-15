@@ -1,4 +1,4 @@
-﻿using Cyborg.Cli.Logging;
+using Cyborg.Cli.Logging;
 using Cyborg.Core.Configuration.Model;
 using Cyborg.Core.Configuration.Serialization;
 using Cyborg.Core.Configuration.Serialization.Dynamics;

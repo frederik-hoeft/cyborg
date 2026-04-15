@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Parsing.Grammars.Builders;
+using Cyborg.Core.Parsing.Grammars.Builders;
 using Cyborg.Core.Parsing.Parsers;
 
 namespace Cyborg.Core.Parsing.Grammars;

@@ -1,4 +1,4 @@
-﻿namespace Cyborg.Core.Aot.Modules.Composition;
+namespace Cyborg.Core.Aot.Modules.Composition;
 
 [AttributeUsage(AttributeTargets.Class)]
 internal sealed class GeneratedDecompositionAttribute : Attribute
