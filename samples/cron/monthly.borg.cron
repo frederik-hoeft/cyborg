@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+BACKUP_SCRIPT_HOME="$(/usr/bin/dirname "$(/usr/bin/realpath "${BASH_SOURCE[0]}")")"
+
+"${BACKUP_SCRIPT_HOME}/cyborg" run --main /etc/cyborg/cyborg.jconf --options /etc/cyborg/cyborg.options.jconf -e target=monthly
