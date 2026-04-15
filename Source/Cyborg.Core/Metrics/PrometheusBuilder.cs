@@ -5,6 +5,8 @@ namespace Cyborg.Core.Metrics;
 
 internal sealed partial class PrometheusBuilder
 {
+    private static readonly Encoding s_utf8NoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+
     private readonly int _initialCapacity;
     private readonly string _prometheusNamespace;
 
@@ -83,7 +85,7 @@ internal sealed partial class PrometheusBuilder
     public async Task WriteToAsync(Stream outputStream, CancellationToken cancellationToken)
     {
         StringBuilder builder = Finalize();
-        using StreamWriter writer = new(outputStream, Encoding.UTF8, leaveOpen: true);
+        using StreamWriter writer = new(outputStream, s_utf8NoBom, leaveOpen: true);
         await writer.WriteAsync(builder, cancellationToken);
     }
 }
