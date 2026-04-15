@@ -210,6 +210,6 @@ Each generator defines its own set of diagnostic descriptors with unique IDs:
 | `CYBORG` | Contract bootstrap | Missing or duplicate contract registrations |
 | `CYBORGMLF` | Loader factory | Invalid base type, missing constructor, incorrect method signature |
 | `CYBORGCOMP` | Decomposition | Non-partial type, invalid naming policy configuration |
-| (validation) | Validation | Non-partial record, invalid attribute usage |
+| `CYBORGVAL` | Validation | Non-partial record, invalid attribute usage |
 
 Diagnostics are reported through `DiagnosticsReporter` (validation) or directly via the source production context. All diagnostics include the source location of the triggering declaration.
