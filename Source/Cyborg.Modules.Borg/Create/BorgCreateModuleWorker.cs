@@ -73,7 +73,7 @@ public sealed class BorgCreateModuleWorker
         ChildProcessResult executionResult = await processDispatcher.ExecuteAsync(startInfo, cancellationToken);
         _stopwatch.Stop();
 
-        CollectMetrics(executionResult);
+        CollectMetrics(runtime, executionResult);
 
         if (executionResult.ExitCode != 0)
         {
@@ -83,17 +83,17 @@ public sealed class BorgCreateModuleWorker
         return runtime.Exit(Success());
     }
 
-    protected override IMetricsLabelCollection AddDefaultLabels(IMetricsLabelCollection labels)
+    protected override IMetricsLabelCollection AddDefaultLabels(IModuleRuntime runtime, IMetricsLabelCollection labels)
     {
-        IMetricsLabelCollection labelsWithDefaults = base.AddDefaultLabels(labels);
+        IMetricsLabelCollection labelsWithDefaults = base.AddDefaultLabels(runtime, labels);
         labelsWithDefaults.AddLabel("compression", Module.Compression);
         labelsWithDefaults.AddLabel("exclude_caches", Module.Exclude.Caches ? "true" : "false");
         return labelsWithDefaults;
     }
 
-    private void CollectMetrics(ChildProcessResult executionResult)
+    private void CollectMetrics(IModuleRuntime runtime, ChildProcessResult executionResult)
     {
-        IMetricsLabelCollection defaultLabels = AddDefaultLabels(metricsCollector.CreateLabels());
+        IMetricsLabelCollection defaultLabels = AddDefaultLabels(runtime, metricsCollector.CreateLabels());
         int lastRunSuccess = executionResult.ExitCode == 0 ? 1 : 0;
 
         metricsCollector.AddGauge(BORG_CREATE_LAST_EXIT_CODE, "Exit code of the borg create command", samples => samples

@@ -80,7 +80,7 @@ public sealed class BorgPruneModuleWorker
         ChildProcessResult executionResult = await processDispatcher.ExecuteAsync(startInfo, cancellationToken);
         _stopwatch.Stop();
 
-        CollectMetrics(executionResult);
+        CollectMetrics(runtime, executionResult);
 
         if (executionResult.ExitCode != 0)
         {
@@ -89,9 +89,9 @@ public sealed class BorgPruneModuleWorker
         return runtime.Exit(Success());
     }
 
-    protected override IMetricsLabelCollection AddDefaultLabels(IMetricsLabelCollection labels)
+    protected override IMetricsLabelCollection AddDefaultLabels(IModuleRuntime runtime, IMetricsLabelCollection labels)
     {
-        IMetricsLabelCollection labelsWithDefaults = base.AddDefaultLabels(labels);
+        IMetricsLabelCollection labelsWithDefaults = base.AddDefaultLabels(runtime, labels);
         labelsWithDefaults.AddLabel("save_space", Module.SaveSpace ? "true" : "false");
         if (!string.IsNullOrEmpty(Module.GlobArchives))
         {
@@ -100,9 +100,9 @@ public sealed class BorgPruneModuleWorker
         return labelsWithDefaults;
     }
 
-    private void CollectMetrics(ChildProcessResult executionResult)
+    private void CollectMetrics(IModuleRuntime runtime, ChildProcessResult executionResult)
     {
-        IMetricsLabelCollection defaultLabels = AddDefaultLabels(metricsCollector.CreateLabels());
+        IMetricsLabelCollection defaultLabels = AddDefaultLabels(runtime, metricsCollector.CreateLabels());
         int lastRunSuccess = executionResult.ExitCode == 0 ? 1 : 0;
         int deletedArchives = 0;
         DateTime? latestRetainedArchive = null;
