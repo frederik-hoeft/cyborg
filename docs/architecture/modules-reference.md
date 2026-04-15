@@ -50,6 +50,7 @@ For details on the execution model, environment scoping semantics, variable reso
   - [Wake-on-LAN (`cyborg.modules.network.wol.v1`)](#wake-on-lan-cyborgmodulesnetworkwolv1)
   - [SSH Shutdown (`cyborg.modules.network.ssh_shutdown.v1`)](#ssh-shutdown-cyborgmodulesnetworkssh_shutdownv1)
 - [Borg Modules](#borg-modules)
+  - [Well-Known Environment Variables](#well-known-environment-variables)
   - [Borg v1.4.X Modules](#borg-v14x-modules)
     - [Borg Create (`cyborg.modules.borg.create.v1.4`)](#borg-create-cyborgmodulesborgcreatev14)
     - [Borg Prune (`cyborg.modules.borg.prune.v1.4`)](#borg-prune-cyborgmodulesborgprunev14)
@@ -724,6 +725,17 @@ Shuts down a remote host by executing a command over SSH.
 ## Borg Modules
 
 Borg modules integrate with [BorgBackup](https://borgbackup.readthedocs.io/) for repository management. They share a common set of properties inherited from a Borg-specific base type, in addition to the standard [module base properties](#module-base-properties). All shared Borg properties support the standard override mechanism, so values like `executable`, `passphrase`, and `remote_repository` can be injected from the environment at runtime -- typically via a ConfigMap or Template at the job level.
+
+### Well-Known Environment Variables
+
+Borg modules recognize the following environment variables at runtime. These are not module properties — they are resolved from the current environment scope and affect all Borg modules uniformly.
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| `borg.dry-run` | bool | When `true`, borg create and prune pass `--dry-run` to the borg process; borg compact skips execution entirely (borg compact has no dry-run mode). |
+| `borg.frequency` | string | If set, added as a `frequency` label to all Prometheus metrics emitted by Borg modules. Typically injected via a ConfigMap or `-e` argument to identify the job schedule (e.g., `daily`, `weekly`). |
+
+Both variables are optional. They can be injected at any level of the environment hierarchy — globally via the CLI (`-e borg.dry-run:bool=true`), or scoped to a specific workflow section via a ConfigMap or Environment Definitions module.
 
 ### Borg v1.4.X Modules
 

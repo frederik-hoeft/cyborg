@@ -47,7 +47,7 @@ public sealed partial class BorgCompactModuleWorker
         ChildProcessResult executionResult = await processDispatcher.ExecuteAsync(startInfo, cancellationToken);
         _stopwatch.Stop();
 
-        CollectMetrics(executionResult);
+        CollectMetrics(runtime, executionResult);
 
         if (executionResult.ExitCode != 0)
         {
@@ -56,16 +56,16 @@ public sealed partial class BorgCompactModuleWorker
         return runtime.Exit(Success());
     }
 
-    protected override IMetricsLabelCollection AddDefaultLabels(IMetricsLabelCollection labels)
+    protected override IMetricsLabelCollection AddDefaultLabels(IModuleRuntime runtime, IMetricsLabelCollection labels)
     {
-        IMetricsLabelCollection labelsWithDefaults = base.AddDefaultLabels(labels);
+        IMetricsLabelCollection labelsWithDefaults = base.AddDefaultLabels(runtime, labels);
         labelsWithDefaults.AddLabel("threshold", Module.Threshold.ToString(CultureInfo.InvariantCulture));
         return labelsWithDefaults;
     }
 
-    private void CollectMetrics(ChildProcessResult executionResult)
+    private void CollectMetrics(IModuleRuntime runtime, ChildProcessResult executionResult)
     {
-        IMetricsLabelCollection defaultLabels = AddDefaultLabels(metricsCollector.CreateLabels());
+        IMetricsLabelCollection defaultLabels = AddDefaultLabels(runtime, metricsCollector.CreateLabels());
         int lastRunSuccess = executionResult.ExitCode == 0 ? 1 : 0;
 
         metricsCollector.AddGauge(BORG_COMPACT_LAST_EXIT_CODE, "Exit code of the borg compact command", samples => samples
