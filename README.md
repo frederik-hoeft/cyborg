@@ -1,4 +1,4 @@
-# Cyborg
+# Cyborg Workflow Engine
 
 Cyborg is a .NET 10 workflow orchestration engine that composes complex, multi-step workflows from declarative JSON configuration. It compiles to a single native AOT binary with no runtime dependencies, designed for unattended operation on Linux servers. While its core engine is fully domain-agnostic, the current distribution includes a module library for BorgBackup orchestration as its primary use case.
 
