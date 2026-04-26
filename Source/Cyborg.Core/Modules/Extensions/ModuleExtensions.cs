@@ -1,9 +1,9 @@
-namespace Cyborg.Core.Modules.Extensions;
+﻿namespace Cyborg.Core.Modules.Extensions;
 
 [SuppressMessage("Design", CA1034, Justification = CA1034_JUSTIFY_EXTENSION_SYNTAX_CSHARP_14)]
 public static class ModuleExtensions
 {
-    extension<T> (T self) where T : ModuleBase, IModule
+    extension<T>(T self) where T : ModuleBase, IModule
     {
         public string ToDisplayString() => self switch
         {

@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Configuration.Serialization;
+﻿namespace Cyborg.Core.Configuration.Serialization;
 
 public interface IJsonLoaderContextProvider
 {

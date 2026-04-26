@@ -1,4 +1,4 @@
-using Cyborg.Core.Metrics;
+﻿using Cyborg.Core.Metrics;
 using Cyborg.Core.Metrics.Factory;
 
 namespace Cyborg.Core.Services.Metrics;
@@ -9,10 +9,10 @@ public sealed class MetricsCollector(MetricsCollectorOptions options) : IMetrics
 
     public IMetricsLabelCollection CreateLabels() => new MetricsLabelCollection();
 
-    public void AddCounter(string metricName, string description, Action<IMetricSampleCollection> buildSamples) => 
+    public void AddCounter(string metricName, string description, Action<IMetricSampleCollection> buildSamples) =>
         AddMetric(metricName, Prometheus.Counter(description), buildSamples);
 
-    public void AddGauge(string metricName, string description, Action<IMetricSampleCollection> buildSamples) => 
+    public void AddGauge(string metricName, string description, Action<IMetricSampleCollection> buildSamples) =>
         AddMetric(metricName, Prometheus.Gauge(description), buildSamples);
 
     public void AddUntyped(string metricName, string description, Action<IMetricSampleCollection> buildSamples) =>
@@ -27,6 +27,6 @@ public sealed class MetricsCollector(MetricsCollectorOptions options) : IMetrics
         buildSamples(samples);
     }
 
-    public Task WriteToAsync(Stream outputStream, CancellationToken cancellationToken) => 
+    public Task WriteToAsync(Stream outputStream, CancellationToken cancellationToken) =>
         _builder.WriteToAsync(outputStream, cancellationToken);
 }

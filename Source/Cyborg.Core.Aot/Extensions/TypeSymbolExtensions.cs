@@ -1,10 +1,10 @@
-using Microsoft.CodeAnalysis;
+﻿using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Extensions;
 
 internal static class TypeSymbolExtensions
 {
-    extension (ITypeSymbol self)
+    extension(ITypeSymbol self)
     {
         /// <summary>
         /// Attempts to unwrap a nullable type, returning the underlying type if successful.

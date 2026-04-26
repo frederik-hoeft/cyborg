@@ -1,4 +1,4 @@
-using Cyborg.Core.Configuration.Serialization;
+﻿using Cyborg.Core.Configuration.Serialization;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Services.Security.Trust;
 using System.Text.Json;

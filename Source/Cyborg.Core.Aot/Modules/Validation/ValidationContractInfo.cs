@@ -1,10 +1,10 @@
-using Cyborg.Core.Aot.Contracts;
+﻿using Cyborg.Core.Aot.Contracts;
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
 
 namespace Cyborg.Core.Aot.Modules.Validation;
 
-internal sealed class ValidationContractInfo(Dictionary<ModuleValidationGeneratorContract, INamedTypeSymbol> contractTypes, Compilation compilation) 
+internal sealed class ValidationContractInfo(Dictionary<ModuleValidationGeneratorContract, INamedTypeSymbol> contractTypes, Compilation compilation)
     : ContractInfoBase<ModuleValidationGeneratorContract>(contractTypes, compilation)
 {
     private static readonly ImmutableArray<ModuleValidationGeneratorContract> s_allContracts =

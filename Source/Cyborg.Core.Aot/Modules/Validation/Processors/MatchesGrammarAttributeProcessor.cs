@@ -1,4 +1,4 @@
-using Cyborg.Core.Aot.Extensions;
+﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Microsoft.CodeAnalysis;
 
@@ -34,9 +34,9 @@ internal sealed class MatchesGrammarAttributeProcessor : IPropertyAttributeProce
         }
         if (context.ContainingType.GetMembers(valueExpression).FirstOrDefault(m => m.Kind is SymbolKind.Property) is not IPropertySymbol { Type: INamedTypeSymbol namedType } parserProperty)
         {
-            context.Report(ValidationGeneratorDiagnostics.MemberNotFound, 
-                context.Property.Name, 
-                context.ContainingType.Name, 
+            context.Report(ValidationGeneratorDiagnostics.MemberNotFound,
+                context.Property.Name,
+                context.ContainingType.Name,
                 nameof(MatchesGrammarAttribute),
                 valueExpression);
             return false;

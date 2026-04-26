@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Modules.Runtime;
+﻿namespace Cyborg.Core.Modules.Runtime;
 
 public enum ModuleExitStatus
 {

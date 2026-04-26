@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Metrics;
+﻿namespace Cyborg.Core.Metrics;
 
 public enum PrometheusMetricType
 {

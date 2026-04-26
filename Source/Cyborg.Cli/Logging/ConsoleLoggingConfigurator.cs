@@ -1,4 +1,4 @@
-using Cyborg.Cli.Logging.Options;
+﻿using Cyborg.Cli.Logging.Options;
 using Cyborg.Core.Configuration;
 using Cyborg.Core.Logging;
 using Microsoft.Extensions.Logging;

@@ -1,4 +1,4 @@
-using Cyborg.Modules.Assert;
+﻿using Cyborg.Modules.Assert;
 using Cyborg.Modules.Conditions.And;
 using Cyborg.Modules.Conditions.DirectoryExists;
 using Cyborg.Modules.Conditions.FileExists;

@@ -1,4 +1,4 @@
-using Cyborg.Core.Configuration.Serialization.Dynamics.Providers;
+﻿using Cyborg.Core.Configuration.Serialization.Dynamics.Providers;
 
 namespace Cyborg.Modules.Borg.Shared.Model;
 

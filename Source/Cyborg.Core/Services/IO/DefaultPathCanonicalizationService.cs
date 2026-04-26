@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Services.IO;
+﻿namespace Cyborg.Core.Services.IO;
 
 public sealed class DefaultPathCanonicalizationService : IPathCanonicalizationService
 {

@@ -1,11 +1,11 @@
-using Cyborg.Core.Modules.Configuration.Model;
+﻿using Cyborg.Core.Modules.Configuration.Model;
 
 namespace Cyborg.Core.Modules.Runtime.Environments;
 
 [SuppressMessage("Design", CA1034, Justification = CA1034_JUSTIFY_EXTENSION_SYNTAX_CSHARP_14)]
 public static class RuntimeEnvironmentExtensions
 {
-    extension (IRuntimeEnvironment environment)
+    extension(IRuntimeEnvironment environment)
     {
         public string NamespaceOf(ModuleReference moduleReference)
         {

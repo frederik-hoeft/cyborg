@@ -1,4 +1,4 @@
-global using System.Diagnostics.CodeAnalysis;
+﻿global using System.Diagnostics.CodeAnalysis;
 global using static Cyborg.Core.GlobalUsings;
 
 namespace Cyborg.Core;

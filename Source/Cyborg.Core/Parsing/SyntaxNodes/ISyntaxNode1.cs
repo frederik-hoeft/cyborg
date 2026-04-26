@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Parsing.SyntaxNodes;
+﻿namespace Cyborg.Core.Parsing.SyntaxNodes;
 
 public interface ISyntaxNode<out TResult> : ISyntaxNode
 {

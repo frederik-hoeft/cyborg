@@ -1,4 +1,4 @@
-using Cyborg.Core.Aot.Contracts;
+﻿using Cyborg.Core.Aot.Contracts;
 
 namespace Cyborg.Core.Modules.Validation;
 
@@ -29,7 +29,7 @@ public sealed record ValidationResult<TSelf>(TSelf? Module, IReadOnlyList<Valida
     }
 
     public static ValidationResult<TSelf> Valid(TSelf module) => new(module, Array.Empty<ValidationError>());
-    
-    public static ValidationResult<TSelf> Invalid(IEnumerable<ValidationError> errors) => 
+
+    public static ValidationResult<TSelf> Invalid(IEnumerable<ValidationError> errors) =>
         new(default, errors is IReadOnlyList<ValidationError> list ? list : new List<ValidationError>(errors));
 }

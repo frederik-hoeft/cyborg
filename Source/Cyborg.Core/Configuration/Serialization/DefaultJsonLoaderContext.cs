@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 
@@ -54,7 +54,7 @@ public sealed class DefaultJsonLoaderContext
         {
             [] => options.TypeInfoResolver,
             [{ } single] => single,
-            _ => JsonTypeInfoResolver.Combine([.._jsonSerializerContexts.Cast<IJsonTypeInfoResolver>()])
+            _ => JsonTypeInfoResolver.Combine([.. _jsonSerializerContexts.Cast<IJsonTypeInfoResolver>()])
         };
 
         return options;

@@ -1,4 +1,4 @@
-using Microsoft.CodeAnalysis;
+﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Runtime.CompilerServices;
@@ -7,7 +7,7 @@ namespace Cyborg.Core.Aot.Extensions;
 
 internal static class NamedTypeSymbolExtensions
 {
-    extension (INamedTypeSymbol self)
+    extension(INamedTypeSymbol self)
     {
         /// <summary>
         /// Enumerates the most derived members of the current type, optionally filtering by visibility context.
@@ -92,7 +92,7 @@ internal static class NamedTypeSymbolExtensions
         /// number of generic parameters.</exception>
         public string RenderGlobalWithGenerics(string typeArg, params string[] typeArgs)
         {
-            List<string> allTypeArgs = [typeArg, ..typeArgs];
+            List<string> allTypeArgs = [typeArg, .. typeArgs];
             if (!self.IsGenericType)
             {
                 throw new InvalidOperationException($"Expected a generic type symbol, but got '{self.Name}' which is not generic.");

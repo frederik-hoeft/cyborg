@@ -1,4 +1,4 @@
-namespace Cyborg.Modules.Borg;
+﻿namespace Cyborg.Modules.Borg;
 
 public static class BorgWellKnownVariables
 {

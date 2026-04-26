@@ -1,4 +1,4 @@
-using System.Collections.Frozen;
+﻿using System.Collections.Frozen;
 using System.Collections.Immutable;
 
 namespace Cyborg.Core.Configuration.Serialization.Dynamics;

@@ -1,4 +1,4 @@
-using Cyborg.Core.Modules;
+﻿using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Services.Dispatch;
 using System.Diagnostics;
@@ -14,8 +14,8 @@ public sealed class SshShutdownModuleWorker(IWorkerContext<SshShutdownModule> co
         List<string> sshArguments = ["-p", Module.Port.ToString(), $"{Module.Username}@{Module.Hostname}", Module.ShutdownCommand];
         (string executable, List<string> arguments) = Module.SshPass switch
         {
-            { MatchPrompt: not null } sshPass => (sshPass.Executable, [ $"-f{sshPass.FilePath}", "-P", sshPass.MatchPrompt, Module.Executable, ..sshArguments]),
-            { MatchPrompt: null } sshPass => (sshPass.Executable, [ $"-f{sshPass.FilePath}", Module.Executable, ..sshArguments]),
+            { MatchPrompt: not null } sshPass => (sshPass.Executable, [$"-f{sshPass.FilePath}", "-P", sshPass.MatchPrompt, Module.Executable, .. sshArguments]),
+            { MatchPrompt: null } sshPass => (sshPass.Executable, [$"-f{sshPass.FilePath}", Module.Executable, .. sshArguments]),
             _ => (Module.Executable, sshArguments),
         };
         ProcessStartInfo startInfo = new(executable, arguments);

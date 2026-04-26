@@ -1,4 +1,4 @@
-using Cyborg.Core.Configuration.Serialization.Dynamics.Providers;
+﻿using Cyborg.Core.Configuration.Serialization.Dynamics.Providers;
 using Jab;
 
 namespace Cyborg.Core.Configuration.Serialization.Dynamics;

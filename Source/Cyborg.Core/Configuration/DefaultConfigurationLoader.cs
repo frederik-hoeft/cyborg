@@ -1,4 +1,4 @@
-using Cyborg.Core.Configuration.Serialization;
+﻿using Cyborg.Core.Configuration.Serialization;
 using System.Text.Json;
 
 namespace Cyborg.Core.Configuration;

@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Aot.Modules.Validation.Models;
+﻿namespace Cyborg.Core.Aot.Modules.Validation.Models;
 
 internal enum CollectionMaterializationKind
 {

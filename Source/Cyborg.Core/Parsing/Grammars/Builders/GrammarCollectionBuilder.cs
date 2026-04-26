@@ -1,4 +1,4 @@
-using Cyborg.Core.Parsing.Parsers;
+﻿using Cyborg.Core.Parsing.Parsers;
 
 namespace Cyborg.Core.Parsing.Grammars.Builders;
 
@@ -20,7 +20,7 @@ public abstract class GrammarCollectionBuilder : GrammarBuilder
 
     protected T AddAlternative<T>(T instance, Action<GrammarAlternativeBuilder> buildAlternative)
     {
-         Children.Add(CreateAlternative(buildAlternative));
+        Children.Add(CreateAlternative(buildAlternative));
         return instance;
     }
 
