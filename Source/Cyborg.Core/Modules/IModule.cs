@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Modules;
+﻿namespace Cyborg.Core.Modules;
 
 public interface IModule
 {

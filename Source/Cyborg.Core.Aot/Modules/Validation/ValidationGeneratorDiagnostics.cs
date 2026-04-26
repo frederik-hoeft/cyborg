@@ -1,4 +1,4 @@
-using Microsoft.CodeAnalysis;
+﻿using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation;
 
@@ -140,7 +140,7 @@ internal static class ValidationGeneratorDiagnostics
         messageFormat: "Property '{0}' on '{1}' has a '{2}' whose precondition is not met: '{3}'",
         category: CATEGORY,
         defaultSeverity: DiagnosticSeverity.Error,
-        isEnabledByDefault : true);
+        isEnabledByDefault: true);
 
     public static DiagnosticDescriptor UnsupportedValidatableCollectionShape { get; } = new(
         id: "CYBORGVAL018",

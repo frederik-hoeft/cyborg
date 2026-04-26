@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Aot.Contracts;
+﻿namespace Cyborg.Core.Aot.Contracts;
 
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface, AllowMultiple = false, Inherited = false)]
 internal sealed class GeneratorContractRegistrationAttribute<T>(T type) : Attribute where T : unmanaged, Enum

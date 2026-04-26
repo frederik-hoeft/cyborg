@@ -1,4 +1,4 @@
-using Cyborg.Core.Aot.Contracts;
+﻿using Cyborg.Core.Aot.Contracts;
 using Cyborg.Core.Aot.Extensions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;

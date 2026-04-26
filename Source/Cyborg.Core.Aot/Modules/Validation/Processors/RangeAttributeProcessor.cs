@@ -1,4 +1,4 @@
-using Cyborg.Core.Aot.Extensions;
+﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Microsoft.CodeAnalysis;
 
@@ -17,7 +17,7 @@ internal sealed class RangeAttributeProcessor : IPropertyAttributeProcessor
         {
             return true;
         }
-        
+
         if (!SymbolEqualityComparer.Default.Equals(context.Property.Type, attributeClass.TypeArguments[0]))
         {
             context.Report(ValidationGeneratorDiagnostics.GenericTypeMismatch, context.Property.Name, context.ContainingType.Name, nameof(RangeAttribute<>));

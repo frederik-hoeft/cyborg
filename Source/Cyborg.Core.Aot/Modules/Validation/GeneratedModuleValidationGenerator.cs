@@ -1,4 +1,4 @@
-using Cyborg.Core.Aot.Contracts;
+﻿using Cyborg.Core.Aot.Contracts;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using Cyborg.Core.Aot.Modules.Validation.Rendering;
 using Microsoft.CodeAnalysis;

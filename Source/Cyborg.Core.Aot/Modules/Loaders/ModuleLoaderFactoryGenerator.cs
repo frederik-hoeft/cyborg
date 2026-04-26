@@ -1,4 +1,4 @@
-using Cyborg.Core.Aot.Contracts;
+﻿using Cyborg.Core.Aot.Contracts;
 using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Loaders.Configuration;
 using Microsoft.CodeAnalysis;

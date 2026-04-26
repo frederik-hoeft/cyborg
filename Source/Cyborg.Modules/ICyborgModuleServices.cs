@@ -1,4 +1,4 @@
-using Cyborg.Core.Modules.Configuration;
+﻿using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Modules.Assert;
 using Cyborg.Modules.Conditions.And;

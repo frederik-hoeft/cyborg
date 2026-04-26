@@ -1,4 +1,4 @@
-using Cyborg.Core.Aot.Extensions;
+﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Processors;
 using Microsoft.CodeAnalysis;
 using System.Collections.Frozen;
@@ -8,7 +8,7 @@ namespace Cyborg.Core.Aot.Modules.Validation;
 
 internal static class ValidationProcessorRegistry
 {
-    internal static ImmutableArray<IPropertyProcessor> All { get; } = 
+    internal static ImmutableArray<IPropertyProcessor> All { get; } =
     [
         new RequiredAttributeProcessor(),
         new DefaultValueAttributeProcessor(),
@@ -29,7 +29,7 @@ internal static class ValidationProcessorRegistry
         new DefaultInstanceFactoryAttributeProcessor(),
     ];
 
-    private static FrozenDictionary<string, IPropertyAttributeProcessor> ByMetadataName => 
+    private static FrozenDictionary<string, IPropertyAttributeProcessor> ByMetadataName =>
         field ??= All.OfType<IPropertyAttributeProcessor>().ToFrozenDictionary(processor => processor.AttributeMetadataName, processor => processor, StringComparer.Ordinal);
 
     private static ImmutableArray<IDynamicPropertyProcessor> DynamicProcessors =>

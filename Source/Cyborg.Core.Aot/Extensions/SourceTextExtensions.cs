@@ -1,4 +1,4 @@
-using Microsoft.CodeAnalysis.Text;
+﻿using Microsoft.CodeAnalysis.Text;
 using System.Text;
 
 namespace Cyborg.Core.Aot.Extensions;

@@ -1,4 +1,4 @@
-using Cyborg.Core.Aot.Modules.Composition;
+﻿using Cyborg.Core.Aot.Modules.Composition;
 using Microsoft.Extensions.Logging;
 
 namespace Cyborg.Cli.Logging;

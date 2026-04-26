@@ -1,4 +1,4 @@
-using Cyborg.Core.Parsing.SyntaxNodes;
+﻿using Cyborg.Core.Parsing.SyntaxNodes;
 using System.Collections.Immutable;
 
 namespace Cyborg.Core.Parsing.Parsers;

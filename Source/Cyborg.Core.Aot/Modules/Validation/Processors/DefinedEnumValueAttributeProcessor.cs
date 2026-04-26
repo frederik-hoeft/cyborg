@@ -1,4 +1,4 @@
-using Cyborg.Core.Aot.Extensions;
+﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Microsoft.CodeAnalysis;
 using System.Diagnostics.CodeAnalysis;
@@ -42,14 +42,14 @@ internal sealed class DefinedEnumValueAttributeProcessor : IPropertyAttributePro
             return true;
         }
         if (type is INamedTypeSymbol
-        {
-            IsGenericType: true,
-            ConstructedFrom.SpecialType: SpecialType.System_Nullable_T,
-            TypeArguments:
+            {
+                IsGenericType: true,
+                ConstructedFrom.SpecialType: SpecialType.System_Nullable_T,
+                TypeArguments:
             [
-                { TypeKind: TypeKind.Enum } nullableEnum
+            { TypeKind: TypeKind.Enum } nullableEnum
             ]
-        })
+            })
         {
             enumType = nullableEnum;
             isNullableEnum = true;

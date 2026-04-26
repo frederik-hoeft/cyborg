@@ -1,4 +1,4 @@
-using Cyborg.Core.Parsing.SyntaxNodes;
+﻿using Cyborg.Core.Parsing.SyntaxNodes;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Modules.Borg.Prune.Metrics.SyntaxNodes;

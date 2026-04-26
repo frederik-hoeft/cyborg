@@ -1,11 +1,11 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 
 namespace Cyborg.Core.Modules.Runtime.Environments.Syntax;
 
 [SuppressMessage("Design", CA1034, Justification = CA1034_JUSTIFY_EXTENSION_SYNTAX_CSHARP_14)]
 public static class MemberSyntaxExtensions
 {
-    extension<T> (T syntax) where T : struct, IChildSyntaxProvider<T>
+    extension<T>(T syntax) where T : struct, IChildSyntaxProvider<T>
     {
         public T Member(string memberName) => syntax.Child(syntax.NamingPolicy.ConvertName(VariableSyntaxHelpers.NormalizeMemberName(memberName, nameof(memberName))));
 

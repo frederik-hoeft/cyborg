@@ -1,6 +1,6 @@
-using System.Text;
-using Cyborg.Core.Aot.Extensions;
+﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
+using System.Text;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
 

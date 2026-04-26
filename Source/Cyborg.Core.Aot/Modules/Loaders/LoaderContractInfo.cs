@@ -1,10 +1,10 @@
-using Cyborg.Core.Aot.Contracts;
+﻿using Cyborg.Core.Aot.Contracts;
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
 
 namespace Cyborg.Core.Aot.Modules.Loaders;
 
-internal sealed class LoaderContractInfo(Dictionary<ModuleLoaderFactoryGeneratorContract, INamedTypeSymbol> contractTypes, Compilation compilation) 
+internal sealed class LoaderContractInfo(Dictionary<ModuleLoaderFactoryGeneratorContract, INamedTypeSymbol> contractTypes, Compilation compilation)
     : ContractInfoBase<ModuleLoaderFactoryGeneratorContract>(contractTypes, compilation)
 {
     private static readonly ImmutableArray<ModuleLoaderFactoryGeneratorContract> s_allContracts =

@@ -1,4 +1,4 @@
-using Cyborg.Core.Services.Security.Trust.Configuration;
+﻿using Cyborg.Core.Services.Security.Trust.Configuration;
 using Cyborg.Core.Services.Security.Trust.Policies;
 using System.Text.Json;
 using System.Text.Json.Serialization;

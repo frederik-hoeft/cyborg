@@ -1,4 +1,4 @@
-using Cyborg.Cli.Logging;
+﻿using Cyborg.Cli.Logging;
 using Cyborg.Cli.Logging.Options;
 using Cyborg.Cli.Metrics;
 using Cyborg.Core.Configuration;

@@ -1,4 +1,4 @@
-using Cyborg.Core.Common.Pipelines;
+﻿using Cyborg.Core.Common.Pipelines;
 using Cyborg.Modules.Borg.Shared.Json;
 using Cyborg.Modules.Borg.Shared.Json.Logging;
 using Cyborg.Modules.Borg.Shared.Output.Deserializers;

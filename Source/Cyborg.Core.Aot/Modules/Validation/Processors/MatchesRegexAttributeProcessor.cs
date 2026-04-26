@@ -1,4 +1,4 @@
-using Cyborg.Core.Aot.Extensions;
+﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -37,9 +37,9 @@ internal sealed class MatchesRegexAttributeProcessor : IPropertyAttributeProcess
         if (context.ContainingType.GetMembers(valueExpression).FirstOrDefault(m => m.Kind is SymbolKind.Property) is not IPropertySymbol { Type: INamedTypeSymbol namedType } regexProperty
             || !namedType.GetFullMetadataName().Equals(typeof(Regex).FullName, StringComparison.Ordinal))
         {
-            context.Report(ValidationGeneratorDiagnostics.MemberTypeMismatch, 
-                context.Property.Name, 
-                context.ContainingType.Name, 
+            context.Report(ValidationGeneratorDiagnostics.MemberTypeMismatch,
+                context.Property.Name,
+                context.ContainingType.Name,
                 nameof(MatchesRegexAttribute),
                 valueExpression,
                 nameof(Regex));
@@ -50,8 +50,8 @@ internal sealed class MatchesRegexAttributeProcessor : IPropertyAttributeProcess
             {
                 ConstructorArguments:
                 [
-                    { Value: string pattern }, ..
-                ] 
+                { Value: string pattern }, ..
+                ]
             })
         {
             context.Report(ValidationGeneratorDiagnostics.PropertyAttributePreconditionNotMet,

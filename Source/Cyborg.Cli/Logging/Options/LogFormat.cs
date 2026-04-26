@@ -1,4 +1,4 @@
-namespace Cyborg.Cli.Logging.Options;
+﻿namespace Cyborg.Cli.Logging.Options;
 
 internal enum LogFormat
 {

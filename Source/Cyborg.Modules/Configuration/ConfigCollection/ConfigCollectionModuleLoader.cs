@@ -1,5 +1,5 @@
+﻿using Cyborg.Core.Aot.Modules.Loaders.Configuration;
 using Cyborg.Core.Modules.Configuration;
-using Cyborg.Core.Aot.Modules.Loaders.Configuration;
 
 namespace Cyborg.Modules.Configuration.ConfigCollection;
 

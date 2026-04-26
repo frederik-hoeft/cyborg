@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 
 namespace Cyborg.Core.Metrics;
 
@@ -23,7 +23,7 @@ internal sealed class PrometheusMetricBuilder(PrometheusMetric metric, bool incl
     {
         StringBuilder builder = metric._builder;
         builder.Append(metric.Namespace).Append('_').Append(metric.Name);
-        
+
         if (labels.Count > 0)
         {
             builder.Append('{');
@@ -35,7 +35,7 @@ internal sealed class PrometheusMetricBuilder(PrometheusMetric metric, bool incl
                     builder.Append(',');
                 }
                 first = false;
-                
+
                 (string label, string labelValue) = labels[i];
                 if (!PrometheusBuilder.PrometheusNameRegex.IsMatch(label))
                 {

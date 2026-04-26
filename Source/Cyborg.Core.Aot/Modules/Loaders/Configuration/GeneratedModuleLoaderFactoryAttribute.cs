@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Aot.Modules.Loaders.Configuration;
+﻿namespace Cyborg.Core.Aot.Modules.Loaders.Configuration;
 
 [AttributeUsage(AttributeTargets.Class)]
 internal sealed class GeneratedModuleLoaderFactoryAttribute : Attribute

@@ -1,4 +1,4 @@
-using Cyborg.Cli.Logging;
+﻿using Cyborg.Cli.Logging;
 using Cyborg.Cli.Metrics;
 using System.Text.Json;
 using System.Text.Json.Serialization;

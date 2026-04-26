@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using ZLogger;
 
 namespace Cyborg.Modules.Network.SshShutdown;

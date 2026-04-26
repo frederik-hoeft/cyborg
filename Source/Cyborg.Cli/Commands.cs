@@ -1,4 +1,4 @@
-using ConsoleAppFramework;
+﻿using ConsoleAppFramework;
 using Cyborg.Cli.Arguments;
 using Cyborg.Cli.Logging;
 using Cyborg.Cli.Metrics;
@@ -70,7 +70,7 @@ internal sealed class Commands
         services.GetRequiredService<MetricsCollectorOptions>().Namespace = metricsOptions.Namespace;
         IModuleConfigurationLoader moduleLoader = services.GetService<IModuleConfigurationLoader>();
         ModuleContext module = await moduleLoader.LoadModuleAsync(main, cancellationToken);
-        module = module with 
+        module = module with
         {
             Environment = module.Environment ?? ModuleEnvironment.Default,
         };

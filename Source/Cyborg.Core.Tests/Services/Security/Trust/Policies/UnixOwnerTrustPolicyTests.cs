@@ -1,5 +1,5 @@
+﻿using Cyborg.Core.Services.Security.Trust;
 using Cyborg.Core.Services.Security.Trust.Policies;
-using Cyborg.Core.Services.Security.Trust;
 using System.Collections.Immutable;
 using System.Runtime.InteropServices;
 

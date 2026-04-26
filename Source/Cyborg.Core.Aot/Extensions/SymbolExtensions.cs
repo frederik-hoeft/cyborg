@@ -1,10 +1,10 @@
-using Microsoft.CodeAnalysis;
+﻿using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Extensions;
 
 internal static class SymbolExtensions
 {
-    extension (ISymbol self)
+    extension(ISymbol self)
     {
         /// <summary>
         /// Determines whether the current object has an attribute of the specified type.

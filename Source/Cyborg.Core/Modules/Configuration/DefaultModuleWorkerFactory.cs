@@ -1,4 +1,4 @@
-using System.Collections.Frozen;
+﻿using System.Collections.Frozen;
 
 namespace Cyborg.Core.Modules.Configuration;
 
@@ -19,8 +19,8 @@ public sealed class DefaultModuleWorkerFactory(IModuleLoaderRegistry moduleLoade
         throw new InvalidOperationException($"No module loader found for module type {typeof(TModule).FullName} with loader id '{loader}'.");
     }
 
-    public IModuleWorker CreateModule<TModuleLoader, TModule>(TModule module) 
-        where TModuleLoader : IModuleLoader<TModule> 
+    public IModuleWorker CreateModule<TModuleLoader, TModule>(TModule module)
+        where TModuleLoader : IModuleLoader<TModule>
         where TModule : class, IModule
     {
         if (_moduleLoadersByType.TryGetValue(typeof(TModuleLoader), out IModuleLoader? moduleLoader) && moduleLoader is IModuleLoader<TModule> typedLoader)

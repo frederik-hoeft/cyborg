@@ -1,6 +1,6 @@
-using System.Globalization;
-using Cyborg.Core.Aot.Extensions;
+﻿using Cyborg.Core.Aot.Extensions;
 using Microsoft.CodeAnalysis;
+using System.Globalization;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 

@@ -1,4 +1,4 @@
-using Cyborg.Core.Aot.Extensions;
+﻿using Cyborg.Core.Aot.Extensions;
 using Microsoft.CodeAnalysis;
 using System.Text;
 
@@ -57,7 +57,7 @@ internal static class LoaderFactoryRenderer
             {
                 builder.Append("module");
             }
-            else if (parameter.Type is INamedTypeSymbol { IsGenericType: true, TypeArguments: [{ } typeArg] } namedType 
+            else if (parameter.Type is INamedTypeSymbol { IsGenericType: true, TypeArguments: [{ } typeArg] } namedType
                 && SymbolEqualityComparer.Default.Equals(namedType.OriginalDefinition, model.ContractInfo.IModuleWorkerContextT)
                 && SymbolEqualityComparer.Default.Equals(typeArg, model.ModuleType))
             {
