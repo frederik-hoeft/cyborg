@@ -21,16 +21,11 @@ Cyborg's core engine is domain-agnostic — any workflow that can be expressed a
 
 ### BorgBackup Orchestration
 
-The sample configuration in `samples/` demonstrates a deployment where backup targets may be powered down when idle and must be woken on demand. A typical workflow involves a Linux server that:
+The [`samples/`](samples/) directory contains a production-ready reference deployment that orchestrates BorgBackup across multiple remote repositories with Wake-on-LAN for cold backup targets, automatic service lifecycle management (Docker and systemd), retention policy enforcement, and Prometheus metrics with a Grafana dashboard.
 
-1. Wakes remote backup hosts via Wake-on-LAN.
-2. Stops dependent services (Docker containers, systemd units) to ensure data consistency.
-3. Creates borg archives across one or more remote repositories.
-4. Prunes and compacts repositories according to retention policies.
-5. Restarts services and optionally shuts down remote hosts.
-6. Exports Prometheus metrics for monitoring.
+![Grafana Dashboard](samples/grafana/cyborg-borg-backup-dashboard.png)
 
-All of these steps are expressed as a single JSON workflow file referencing shared templates, with host-specific configuration and secrets loaded from separate files.
+See the [samples README](samples/README.md) for the full walkthrough, configuration reference, and setup guide.
 
 ## Getting Started
 
