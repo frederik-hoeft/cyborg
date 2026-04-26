@@ -160,7 +160,7 @@ Cyborg's trust subsystem requires configuration files to be root-owned and not g
 sudo chown -R root:root /etc/cyborg
 sudo chmod -R go-w /etc/cyborg
 sudo chmod 600 /etc/cyborg/cyborg.hosts.jsecrets
-sudo chmod 600 /etc/cyborg/jobs/**/*.jsecrets
+sudo find /etc/cyborg/jobs -type f -name '*.jsecrets' -exec chmod 600 {} +
 ```
 
 ### 4. Initialize Repositories
