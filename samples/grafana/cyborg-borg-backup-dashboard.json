@@ -3,8 +3,6 @@
   "kind": "Dashboard",
   "metadata": {
     "name": "cyborg-backup-health",
-    "generation": 65,
-    "creationTimestamp": "2026-04-15T16:17:02Z",
     "labels": {},
     "annotations": {}
   },
