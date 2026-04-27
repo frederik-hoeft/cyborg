@@ -13,7 +13,6 @@ insert_final_newline = true
 
 # Indentation and spacing
 indent_size = 4
-tab_width = 4
 
 # C# files
 [*.cs]
@@ -153,7 +152,7 @@ insert_final_newline = false
 trim_trailing_whitespace = false
 
 # Data serialization
-[*.{json,yaml,yml}]
+[*.{json,yaml,yml,jconf,jsecrets}]
 indent_size = 2
 
 # Shell scripts
@@ -208,7 +207,7 @@ dotnet_style_prefer_simplified_interpolation = true:warning
 dotnet_style_readonly_field = true:suggestion
 
 # Parameter preferences
-dotnet_code_quality_unused_parameters = all:suggestion
+dotnet_code_quality_unused_parameters = all
 
 # Suppression preferences
 dotnet_remove_unnecessary_suppression_exclusions = CA2000
