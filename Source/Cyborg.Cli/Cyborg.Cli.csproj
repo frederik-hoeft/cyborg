@@ -9,9 +9,12 @@
         <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
         <IsAotCompatible>true</IsAotCompatible>
         <PublishTrimmed>true</PublishTrimmed>
+        <AssemblyName>cyborg</AssemblyName>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)' == 'Release'">
         <Optimize>true</Optimize>
         <OptimizationPreference>speed</OptimizationPreference>
-        <AssemblyName>cyborg</AssemblyName>
     </PropertyGroup>
     
     <ItemGroup>
