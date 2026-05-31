@@ -674,12 +674,12 @@ Sends a Wake-on-LAN magic packet and waits for the target host to become reachab
 | `mac_address` | string | Yes | -- | Format: `XX:XX:XX:XX:XX:XX` or `XX-XX-XX-XX-XX-XX` | MAC address of the target NIC. |
 | `liveness_probe_port` | int | Yes | -- | 1 -- 65535 | TCP port to probe for host readiness. |
 | `max_wait_time` | timespan | No | `"00:05:00"` | -- | Maximum time to wait for the host to come online. |
-| `host_discovery_timeout` | timespan | No | `"00:00:30"` | -- | Timeout for the initial reachability check (ping). |
+| `host_discovery_timeout` | timespan | No | `"00:00:05"` | -- | Timeout for the initial reachability check (TCP). |
 | `executable` | string | No | `"/usr/bin/wakeonlan"` | Must exist on disk | Path to the wakeonlan utility. |
 
 **Behavior:**
 
-1. Pings the target host with `host_discovery_timeout`.
+1. Probes `liveness_probe_port` on the target host repeatedly with `host_discovery_timeout`.
 2. If already reachable, returns `Success` (no wake needed).
 3. If unreachable, sends a WoL packet via the wakeonlan utility.
 4. Probes `liveness_probe_port` repeatedly until the host responds or `max_wait_time` expires.
