@@ -7,12 +7,12 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Modules.Network.WakeOnLan;
 
-public sealed class WakeOnLanModuleWorker(IWorkerContext<WakeOnLanModule> context, IChildProcessDispatcher dispatcher, IPingService pingService, IPortProbeService portProbeService) : ModuleWorker<WakeOnLanModule>(context)
+public sealed class WakeOnLanModuleWorker(IWorkerContext<WakeOnLanModule> context, IChildProcessDispatcher dispatcher, IPortProbeService portProbeService) : ModuleWorker<WakeOnLanModule>(context)
 {
     protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
-        Logger.LogWolCheckingReachability(Module.TargetHost, Module.HostDiscoveryTimeout.ToString());
-        bool isUp = await pingService.PingAsync(Module.TargetHost, Module.HostDiscoveryTimeout, cancellationToken);
+        Logger.LogWolCheckingReachability(Module.TargetHost, Module.LivenessProbePort, Module.HostDiscoveryTimeout.ToString());
+        bool isUp = await portProbeService.ProbePortAsync(Module.TargetHost, Module.LivenessProbePort, Module.HostDiscoveryTimeout, cancellationToken);
         if (isUp)
         {
             Logger.LogWolHostAlreadyUp(Module.TargetHost);
