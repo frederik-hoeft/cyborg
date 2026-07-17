@@ -1,4 +1,5 @@
-﻿using System.Globalization;
+﻿using Cyborg.Core.Aot.Modules.Validation.Attributes;
+using System.Globalization;
 
 namespace Cyborg.Core.Aot;
 
@@ -30,11 +31,15 @@ internal static class KnownTypes
 
     public static string GeneratedRegexAttribute => "global::System.Text.RegularExpressions.GeneratedRegexAttribute";
 
-    public static string Directory => "global::System.IO.Directory";
+    public static string Directory => $"global::System.IO.Directory";
 
-    public static string File => "global::System.IO.File";
+    public static string File => $"global::System.IO.File";
+
+    public static string Path => field ??= $"global::{typeof(Path).FullName}";
 
     public static string InvariantCulture => field ??= $"global::{typeof(CultureInfo).FullName}.{nameof(CultureInfo.InvariantCulture)}";
+
+    public static string ValidationRuntimeHelpers => field ??= $"global::{typeof(ValidationRuntimeHelpers).FullName}";
 
     public static string DefaultEqualityComparerOfT(string typeArgument) => $"global::{typeof(EqualityComparer<>).Namespace}.{nameof(EqualityComparer<>)}<{typeArgument}>.{nameof(EqualityComparer<>.Default)}";
 }

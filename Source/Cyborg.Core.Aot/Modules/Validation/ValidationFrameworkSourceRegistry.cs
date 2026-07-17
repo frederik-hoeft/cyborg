@@ -9,6 +9,7 @@ internal static class ValidationFrameworkSourceRegistry
 {
     private static readonly ImmutableArray<Action<IncrementalGeneratorPostInitializationContext>> s_emitters =
     [
+        static context => context.AddEmbeddedSource(typeof(ValidationRuntimeHelpers)),
         static context => context.AddEmbeddedSource<GeneratedModuleValidationAttribute>(),
         static context => context.AddEmbeddedSource<RequiredAttribute>(),
         static context => context.AddEmbeddedSource<DefaultTimeSpanAttribute>(),
@@ -27,6 +28,10 @@ internal static class ValidationFrameworkSourceRegistry
         static context => context.AddEmbeddedSource<DirectoryExistsAttribute>(),
         static context => context.AddEmbeddedSource<MatchesGrammarAttribute>(),
         static context => context.AddEmbeddedSource<DefaultInstanceFactoryAttribute>(),
+        static context => context.AddEmbeddedSource<FileNameAttribute>(),
+        static context => context.AddEmbeddedSource<UnrootedPathAttribute>(),
+        static context => context.AddEmbeddedSource<RootedPathAttribute>(),
+        static context => context.AddEmbeddedSource<NormalizedPathAttribute>(),
     ];
 
     public static void Emit(IncrementalGeneratorPostInitializationContext context)

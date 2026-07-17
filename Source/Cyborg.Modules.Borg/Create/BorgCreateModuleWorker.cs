@@ -66,6 +66,17 @@ public sealed class BorgCreateModuleWorker
         arguments.Add($"{Module.RemoteRepository.GetRepositoryUri()}::{Module.ArchiveName}");
         arguments.Add(Module.SourcePath);
 
+        using LazyTempDirectory tempDirectory = new(ModuleId);
+        if (Module.FilesCacheSentinel.Enabled)
+        {
+            string sentinelPath = Path.Combine(tempDirectory.Directory.FullName, Module.FilesCacheSentinel.ArchivePath, Module.FilesCacheSentinel.SentinelFileName);
+            FileInfo sentinelFile = new(sentinelPath);
+            sentinelFile.Directory?.Create();
+            await using FileStream emptySentinel = sentinelFile.Create();
+            string sentinelSlashDotPath = Path.Combine(tempDirectory.Directory.FullName, ".", Module.FilesCacheSentinel.ArchivePath, Module.FilesCacheSentinel.SentinelFileName);
+            arguments.Add(sentinelSlashDotPath);
+        }
+
         ProcessStartInfo startInfo = new(Module.Executable, arguments);
         AddDefaults(startInfo);
 
@@ -183,6 +194,28 @@ public sealed class BorgCreateModuleWorker
         {
             createResult = null;
             return false;
+        }
+    }
+}
+
+file sealed class LazyTempDirectory(string prefix) : IDisposable
+{
+    private DirectoryInfo? _directory;
+
+    public DirectoryInfo Directory => _directory ??= System.IO.Directory.CreateTempSubdirectory(prefix);
+
+    public void Dispose()
+    {
+        if (_directory is not null && _directory.Exists)
+        {
+            try
+            {
+                _directory.Delete(recursive: true);
+            }
+            catch
+            {
+                // best effort cleanup
+            }
         }
     }
 }

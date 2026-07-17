@@ -788,6 +788,7 @@ Creates a new archive in a borg v1.4.X repository.
 | `source_path` | string | Yes | -- | Must exist on disk (directory) | Directory to back up. |
 | `compression` | string | No | `"lz4"` | Must match borg compression grammar: `none`, `lz4`, `zstd[,1-22]`, `zlib[,0-9]`, `lzma[,0-9]`, or `auto,<method>` | Compression algorithm. |
 | `exclude` | object | No | `{ "caches": false, "paths": [] }` | -- | Exclusion options. |
+| `files_cache_sentinel` | object | No | `{ "enabled": false, "archive_path": ".cyborg", "sentinel_file_name": "borg_files_cache.sentinel" }` | -- | Borg files-cache sentinel options. |
 
 **Exclude Options:**
 
@@ -796,10 +797,27 @@ Creates a new archive in a borg v1.4.X repository.
 | `caches` | bool | `false` | Exclude directories tagged as caches. |
 | `paths` | array of strings | `[]` | File patterns to exclude. |
 
+**Files Cache Sentinel Options:**
+
+Borg intentionally excludes files whose timestamp matches the newest timestamp in a created archive from its local files cache. This protects against missing changes made within the filesystem timestamp granularity window. A problematic side effect is that when the newest timestamp is shared by one or more large files, borg re-reads and re-chunks those files on every subsequent backup even when they have not changed. Repository deduplication still prevents the unchanged data from being stored again, but the repeated source I/O and CPU work can significantly increase backup duration.
+
+Borg's documented workaround is to ensure that a small or empty sentinel file holds the newest timestamp in the source set. When the empty sentinel is always recreated, it owns the newest-timestamp slot and large data files are served from the files cache normally.
+
+This feature manages the sentinel lifecycle inside the module so that backup workflows do not need ad-hoc `touch` commands and do not need to write into user-facing source trees. The sentinel is placed in a temporary directory and included in the `borg create` source set using borg's `/./ ` path-prefix notation, which causes borg to store the file under `<archive_path>/<sentinel_file_name>` (e.g., `.cyborg/borg_files_cache.sentinel`) in the archive rather than under the full temporary path.
+
+| Property | Type | Default | Constraints | Description |
+|----------|------|---------|-------------|-------------|
+| `enabled` | bool | `false` | -- | Enables the sentinel mechanism. |
+| `archive_path` | string | `".cyborg"` | Must be an unrooted (relative) path with no `.` or `..` segments and no consecutive separators | Subdirectory path under which the sentinel file is placed, both in the temporary directory and in the archive. |
+| `sentinel_file_name` | string | `"borg_files_cache.sentinel"` | Must be a valid file name (no path separators) | Name of the zero-byte sentinel file. |
+
+When enabled, a temporary directory is created and a zero-byte sentinel file is written inside it at `<archive_path>/<sentinel_file_name>`. The path to that file — using borg's `/./ ` prefix notation to strip the temporary directory from the in-archive path — is appended as an additional source to the `borg create` command, so the file is stored in the archive under `<archive_path>/<sentinel_file_name>` (e.g., `.cyborg/borg_files_cache.sentinel`). The temporary directory is deleted when the module completes, whether the backup succeeds or fails.
+
 **Behavior:**
 
 - Runs `borg create` with `--stats --json --compression <compression>`.
 - Applies exclusion flags and paths if configured.
+- If `files_cache_sentinel.enabled` is `true`, appends a sentinel source path to keep the borg files cache warm.
 - Returns `Failed` on non-zero exit code, `Success` otherwise.
 
 ---

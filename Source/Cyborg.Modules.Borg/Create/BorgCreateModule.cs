@@ -14,7 +14,8 @@ public sealed partial record BorgCreateModule
     [property: Required] string ArchiveName,
     [property: Required][property: DirectoryExists] string SourcePath,
     [property: Required][property: DefaultValue<string>("lz4")][property: MatchesGrammar(nameof(BorgCreateModule.CompressionGrammar))] string Compression,
-    [property: Required][property: DefaultInstance] BorgExcludeOptions Exclude
+    [property: Required][property: DefaultInstance] BorgExcludeOptions Exclude,
+    [property: Required][property: DefaultInstance] BorgFilesCacheSentinelOptions FilesCacheSentinel
 ) : BorgModuleBase, IModule
 {
     public static string ModuleId => "cyborg.modules.borg.create.v1.4";
@@ -60,4 +61,18 @@ public sealed record BorgExcludeOptions
 ) : IDefaultInstance<BorgExcludeOptions>
 {
     public static BorgExcludeOptions Default { get; } = new(Caches: false, Paths: []);
+}
+
+[Validatable]
+public sealed record BorgFilesCacheSentinelOptions
+(
+    bool Enabled,
+    [property: Required][property: UnrootedPath][property: NormalizedPath][property: DefaultValue<string>(BorgFilesCacheSentinelOptions.DEFAULT_ARCHIVE_PATH)] string ArchivePath,
+    [property: Required][property: FileName][property: DefaultValue<string>(BorgFilesCacheSentinelOptions.DEFAULT_SENTINEL_FILE_NAME)] string SentinelFileName
+) : IDefaultInstance<BorgFilesCacheSentinelOptions>
+{
+    private const string DEFAULT_ARCHIVE_PATH = ".cyborg";
+    private const string DEFAULT_SENTINEL_FILE_NAME = "borg_files_cache.sentinel";
+
+    public static BorgFilesCacheSentinelOptions Default { get; } = new(Enabled: false, ArchivePath: DEFAULT_ARCHIVE_PATH, SentinelFileName: DEFAULT_SENTINEL_FILE_NAME);
 }
