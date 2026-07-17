@@ -121,7 +121,7 @@ internal sealed class Commands
     private static async Task WriteMetricsAsync(IMetricsCollector metricsCollector, string metricsDestinationPath, CancellationToken cancellationToken)
     {
         string tempDestination = $"{metricsDestinationPath}.tmp";
-        await using (Stream metricsOutput = File.OpenWrite(tempDestination))
+        await using (Stream metricsOutput = File.Create(tempDestination))
         {
             await metricsCollector.WriteToAsync(metricsOutput, cancellationToken);
         }
