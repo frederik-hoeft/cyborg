@@ -66,6 +66,22 @@ public sealed class BorgCreateModuleWorker
         arguments.Add($"{Module.RemoteRepository.GetRepositoryUri()}::{Module.ArchiveName}");
         arguments.Add(Module.SourcePath);
 
+        string? tempDirectory = null;
+        if (Module.FilesCacheSentinel.Enabled)
+        {
+            DirectoryInfo sentinelRoot = Directory.CreateTempSubdirectory(ModuleId);
+            tempDirectory = sentinelRoot.FullName;
+            string sentinelPath = Path.Combine(sentinelRoot.FullName, Module.FilesCacheSentinel.ArchivePath, Module.FilesCacheSentinel.SentinelFileName);
+            FileInfo sentinelFile = new(sentinelPath);
+            sentinelFile.Directory?.Create();
+            {
+                await using FileStream emptySentinel = sentinelFile.Create();
+            }
+            string sentinelSlashDotPath = Path.Combine(sentinelRoot.FullName, ".", Module.FilesCacheSentinel.ArchivePath, Module.FilesCacheSentinel.SentinelFileName);
+            arguments.Add(sentinelSlashDotPath);
+        }
+        using ScopedTemporaryDirectory _ = new(tempDirectory);
+
         ProcessStartInfo startInfo = new(Module.Executable, arguments);
         AddDefaults(startInfo);
 
@@ -183,6 +199,17 @@ public sealed class BorgCreateModuleWorker
         {
             createResult = null;
             return false;
+        }
+    }
+}
+
+file readonly struct ScopedTemporaryDirectory(string? directory) : IDisposable
+{
+    public void Dispose()
+    {
+        if (directory is not null && Directory.Exists(directory))
+        {
+            Directory.Delete(directory, recursive: true);
         }
     }
 }

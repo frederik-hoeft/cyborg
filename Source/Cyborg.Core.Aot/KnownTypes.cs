@@ -30,9 +30,11 @@ internal static class KnownTypes
 
     public static string GeneratedRegexAttribute => "global::System.Text.RegularExpressions.GeneratedRegexAttribute";
 
-    public static string Directory => "global::System.IO.Directory";
+    public static string Directory => $"global::System.IO.Directory";
 
-    public static string File => "global::System.IO.File";
+    public static string File => $"global::System.IO.File";
+
+    public static string Path => field ??= $"global::{typeof(Path).FullName}";
 
     public static string InvariantCulture => field ??= $"global::{typeof(CultureInfo).FullName}.{nameof(CultureInfo.InvariantCulture)}";
 
