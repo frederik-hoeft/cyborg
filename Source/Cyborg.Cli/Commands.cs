@@ -19,6 +19,7 @@ namespace Cyborg.Cli;
 internal sealed class Commands
 {
     private const string CYBORG_ROOT = "/etc/cyborg";
+    private const string LAST_RUN_SUCCESS = "last_run_success";
 
     private static string QuoteArg(string arg) => $"\"{arg.Replace("\\", "\\\\").Replace("\"", "\\\"")}\"";
 
@@ -49,59 +50,80 @@ internal sealed class Commands
         IConfigurationLoader configurationLoader = services.GetRequiredService<IConfigurationLoader>();
         await configurationLoader.AddSourceAsync(configuration, options, cancellationToken);
 
-        // CLI --log-level overrides only the console sink minimum level.
-        if (logLevel.HasValue)
-        {
-            services.GetRequiredService<LoggingOptions>().MinimumLevel = logLevel.Value;
-        }
-
-        ILogger logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("cyborg.cli.main");
-        logger.LogStartup(string.Join(' ', Array.ConvertAll(Environment.GetCommandLineArgs()[1..], QuoteArg)));
-        GlobalRuntimeEnvironment globalEnvironment = services.GetRequiredService<GlobalRuntimeEnvironment>();
-
-        IEnvironmentVariableArgumentHandler environmentVariableService = services.GetRequiredService<IEnvironmentVariableArgumentHandler>();
-        if (!environmentVariableService.TryProcessArgument(environmentVariables, globalEnvironment))
-        {
-            return 1;
-        }
-
         MetricsOptions metricsOptions = configuration.Get("cyborg.services.metrics", () => new MetricsOptions());
-
         services.GetRequiredService<MetricsCollectorOptions>().Namespace = metricsOptions.Namespace;
-        IModuleConfigurationLoader moduleLoader = services.GetService<IModuleConfigurationLoader>();
-        ModuleContext module = await moduleLoader.LoadModuleAsync(main, cancellationToken);
-        module = module with
-        {
-            Environment = module.Environment ?? ModuleEnvironment.Default,
-        };
-        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
-        string target = globalEnvironment.ResolveVariableOrDefault("target", "<unspecified>");
-        logger.LogRunStarted(target);
-        IModuleExecutionResult result = await runtime.ExecuteAsync(module, cancellationToken);
-        if (result.Status is ModuleExitStatus.Success or ModuleExitStatus.Skipped)
-        {
-            logger.LogRunCompleted(target);
-        }
-        else
-        {
-            logger.LogRunCompletedWithStatus(target, result.Status.ToString());
-            if (!(configuration.TryGetValue("cyborg.services.logging.console:enabled", out bool enabled) && enabled)
-                && configuration.TryGetValue("cyborg.services.logging.file:enabled", out enabled) && enabled)
-            {
-                string logFile = configuration.Get("cyborg.services.logging.file:path", defaultValue: "/var/log/cyborg/latest.log");
-                await using Stream logStream = File.OpenRead(logFile);
-                using Stream stdout = Console.OpenStandardOutput();
-                await logStream.CopyToAsync(stdout, cancellationToken);
-            }
-        }
         IMetricsCollector metricsCollector = services.GetRequiredService<IMetricsCollector>();
         string metricsDestinationPath = metrics ?? metricsOptions.FilePath;
+        bool runSucceeded = false;
+
+        try
+        {
+            // CLI --log-level overrides only the console sink minimum level.
+            if (logLevel.HasValue)
+            {
+                services.GetRequiredService<LoggingOptions>().MinimumLevel = logLevel.Value;
+            }
+
+            ILogger logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("cyborg.cli.main");
+            logger.LogStartup(string.Join(' ', Array.ConvertAll(Environment.GetCommandLineArgs()[1..], QuoteArg)));
+            GlobalRuntimeEnvironment globalEnvironment = services.GetRequiredService<GlobalRuntimeEnvironment>();
+
+            IEnvironmentVariableArgumentHandler environmentVariableService = services.GetRequiredService<IEnvironmentVariableArgumentHandler>();
+            if (!environmentVariableService.TryProcessArgument(environmentVariables, globalEnvironment))
+            {
+                return 1;
+            }
+
+            IModuleConfigurationLoader moduleLoader = services.GetService<IModuleConfigurationLoader>();
+            ModuleContext module = await moduleLoader.LoadModuleAsync(main, cancellationToken);
+            module = module with
+            {
+                Environment = module.Environment ?? ModuleEnvironment.Default,
+            };
+            IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+            string target = globalEnvironment.ResolveVariableOrDefault("target", "<unspecified>");
+            logger.LogRunStarted(target);
+            IModuleExecutionResult result = await runtime.ExecuteAsync(module, cancellationToken);
+            if (result.Status is ModuleExitStatus.Success or ModuleExitStatus.Skipped)
+            {
+                logger.LogRunCompleted(target);
+            }
+            else
+            {
+                logger.LogRunCompletedWithStatus(target, result.Status.ToString());
+                if (!(configuration.TryGetValue("cyborg.services.logging.console:enabled", out bool enabled) && enabled)
+                    && configuration.TryGetValue("cyborg.services.logging.file:enabled", out enabled) && enabled)
+                {
+                    string logFile = configuration.Get("cyborg.services.logging.file:path", defaultValue: "/var/log/cyborg/latest.log");
+                    await using Stream logStream = File.OpenRead(logFile);
+                    using Stream stdout = Console.OpenStandardOutput();
+                    await logStream.CopyToAsync(stdout, cancellationToken);
+                }
+            }
+
+            runSucceeded = result.Status == ModuleExitStatus.Success;
+            return runSucceeded ? 0 : 2;
+        }
+        finally
+        {
+            CollectRunMetrics(metricsCollector, runSucceeded);
+            await WriteMetricsAsync(metricsCollector, metricsDestinationPath, CancellationToken.None);
+        }
+    }
+
+    private static void CollectRunMetrics(IMetricsCollector metricsCollector, bool runSucceeded)
+    {
+        metricsCollector.AddGauge(LAST_RUN_SUCCESS, "Whether the most recent Cyborg run completed successfully (1 for success, 0 for failure)", samples => samples
+            .Add(runSucceeded ? 1 : 0));
+    }
+
+    private static async Task WriteMetricsAsync(IMetricsCollector metricsCollector, string metricsDestinationPath, CancellationToken cancellationToken)
+    {
         string tempDestination = $"{metricsDestinationPath}.tmp";
         await using (Stream metricsOutput = File.OpenWrite(tempDestination))
         {
             await metricsCollector.WriteToAsync(metricsOutput, cancellationToken);
         }
         File.Move(tempDestination, metricsDestinationPath, overwrite: true);
-        return result.Status == ModuleExitStatus.Success ? 0 : 2;
     }
 }
