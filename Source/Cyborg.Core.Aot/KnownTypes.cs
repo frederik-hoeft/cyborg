@@ -1,4 +1,5 @@
-﻿using System.Globalization;
+﻿using Cyborg.Core.Aot.Modules.Validation.Attributes;
+using System.Globalization;
 
 namespace Cyborg.Core.Aot;
 
@@ -38,7 +39,7 @@ internal static class KnownTypes
 
     public static string InvariantCulture => field ??= $"global::{typeof(CultureInfo).FullName}.{nameof(CultureInfo.InvariantCulture)}";
 
-    public static string StringComparison => field ??= $"global::{typeof(StringComparison).FullName}";
+    public static string ValidationRuntimeHelpers => field ??= $"global::{typeof(ValidationRuntimeHelpers).FullName}";
 
     public static string DefaultEqualityComparerOfT(string typeArgument) => $"global::{typeof(EqualityComparer<>).Namespace}.{nameof(EqualityComparer<>)}<{typeArgument}>.{nameof(EqualityComparer<>.Default)}";
 }

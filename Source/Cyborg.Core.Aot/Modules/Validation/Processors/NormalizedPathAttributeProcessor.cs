@@ -32,7 +32,7 @@ internal sealed class NormalizedPathAttributeProcessor : IPropertyAttributeProce
         {
             builder.AppendBlock(
             $$"""
-            if ({{model.AccessExpression}} is not null && !{{KnownTypes.Path}}.GetFullPath({{model.AccessExpression}}).Equals({{model.AccessExpression}}, {{KnownTypes.StringComparison}}.Ordinal))
+            if ({{model.AccessExpression}} is not null && !{{KnownTypes.ValidationRuntimeHelpers}}.IsNormalizedPath({{model.AccessExpression}}))
             {
                 errors.Add({{CreateValidationError(model, rule: "normalized_path", $"Property '{{nameof({model.AccessExpression})}}' must be a normalized path, but was '{{{model.AccessExpression}}}'")}});
             }

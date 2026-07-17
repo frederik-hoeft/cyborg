@@ -9,6 +9,7 @@ internal static class ValidationFrameworkSourceRegistry
 {
     private static readonly ImmutableArray<Action<IncrementalGeneratorPostInitializationContext>> s_emitters =
     [
+        static context => context.AddEmbeddedSource(typeof(ValidationRuntimeHelpers)),
         static context => context.AddEmbeddedSource<GeneratedModuleValidationAttribute>(),
         static context => context.AddEmbeddedSource<RequiredAttribute>(),
         static context => context.AddEmbeddedSource<DefaultTimeSpanAttribute>(),

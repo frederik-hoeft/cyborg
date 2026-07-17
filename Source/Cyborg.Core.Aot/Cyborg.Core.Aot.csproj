@@ -41,6 +41,7 @@
         <EmbeddedResource Include="Modules\Validation\Attributes\MatchesRegexAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\RangeAttribute`1.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\RequiredAttribute.cs" />
+        <EmbeddedResource Include="Modules\Validation\Attributes\ValidationRuntimeHelpers.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\UnrootedPathAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\NormalizedPathAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\RootedPathAttribute.cs" />
