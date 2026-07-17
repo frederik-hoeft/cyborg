@@ -74,7 +74,7 @@ internal sealed class Commands
                 return 1;
             }
 
-            IModuleConfigurationLoader moduleLoader = services.GetService<IModuleConfigurationLoader>();
+            IModuleConfigurationLoader moduleLoader = services.GetRequiredService<IModuleConfigurationLoader>();
             ModuleContext module = await moduleLoader.LoadModuleAsync(main, cancellationToken);
             module = module with
             {
@@ -113,8 +113,9 @@ internal sealed class Commands
 
     private static void CollectRunMetrics(IMetricsCollector metricsCollector, bool runSucceeded)
     {
+        IMetricsLabelCollection labels = metricsCollector.CreateLabels();
         metricsCollector.AddGauge(LAST_RUN_SUCCESS, "Whether the most recent Cyborg run completed successfully (1 for success, 0 for failure)", samples => samples
-            .Add(runSucceeded ? 1 : 0));
+            .Add(runSucceeded ? 1 : 0, labels));
     }
 
     private static async Task WriteMetricsAsync(IMetricsCollector metricsCollector, string metricsDestinationPath, CancellationToken cancellationToken)
