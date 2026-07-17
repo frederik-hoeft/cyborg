@@ -808,7 +808,7 @@ This feature manages the sentinel lifecycle inside the module so that backup wor
 | Property | Type | Default | Constraints | Description |
 |----------|------|---------|-------------|-------------|
 | `enabled` | bool | `false` | -- | Enables the sentinel mechanism. |
-| `archive_path` | string | `".cyborg"` | Must be an unrooted (relative) path | Subdirectory path under which the sentinel file is placed, both in the temporary directory and in the archive. |
+| `archive_path` | string | `".cyborg"` | Must be an unrooted (relative) path with no `.`, `..`, or redundant separators | Subdirectory path under which the sentinel file is placed, both in the temporary directory and in the archive. |
 | `sentinel_file_name` | string | `"borg_files_cache.sentinel"` | Must be a valid file name (no path separators) | Name of the zero-byte sentinel file. |
 
 When enabled, a temporary directory is created and a zero-byte sentinel file is written inside it at `<archive_path>/<sentinel_file_name>`. The path to that file — using borg's `/./ ` prefix notation to strip the temporary directory from the in-archive path — is appended as an additional source to the `borg create` command, so the file is stored in the archive under `<archive_path>/<sentinel_file_name>` (e.g., `.cyborg/borg_files_cache.sentinel`). The temporary directory is deleted when the module completes, whether the backup succeeds or fails.

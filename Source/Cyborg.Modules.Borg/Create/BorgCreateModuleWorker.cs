@@ -66,21 +66,18 @@ public sealed class BorgCreateModuleWorker
         arguments.Add($"{Module.RemoteRepository.GetRepositoryUri()}::{Module.ArchiveName}");
         arguments.Add(Module.SourcePath);
 
-        string? tempDirectory = null;
+        using LazyTempDirectory tempDirectory = new(ModuleId);
         if (Module.FilesCacheSentinel.Enabled)
         {
-            DirectoryInfo sentinelRoot = Directory.CreateTempSubdirectory(ModuleId);
-            tempDirectory = sentinelRoot.FullName;
-            string sentinelPath = Path.Combine(sentinelRoot.FullName, Module.FilesCacheSentinel.ArchivePath, Module.FilesCacheSentinel.SentinelFileName);
+            string sentinelPath = Path.Combine(tempDirectory.Directory.FullName, Module.FilesCacheSentinel.ArchivePath, Module.FilesCacheSentinel.SentinelFileName);
             FileInfo sentinelFile = new(sentinelPath);
             sentinelFile.Directory?.Create();
             {
                 await using FileStream emptySentinel = sentinelFile.Create();
             }
-            string sentinelSlashDotPath = Path.Combine(sentinelRoot.FullName, ".", Module.FilesCacheSentinel.ArchivePath, Module.FilesCacheSentinel.SentinelFileName);
+            string sentinelSlashDotPath = Path.Combine(tempDirectory.Directory.FullName, ".", Module.FilesCacheSentinel.ArchivePath, Module.FilesCacheSentinel.SentinelFileName);
             arguments.Add(sentinelSlashDotPath);
         }
-        using ScopedTemporaryDirectory _ = new(tempDirectory);
 
         ProcessStartInfo startInfo = new(Module.Executable, arguments);
         AddDefaults(startInfo);
@@ -203,13 +200,24 @@ public sealed class BorgCreateModuleWorker
     }
 }
 
-file readonly struct ScopedTemporaryDirectory(string? directory) : IDisposable
+file sealed class LazyTempDirectory(string prefix) : IDisposable
 {
+    private DirectoryInfo? _directory;
+
+    public DirectoryInfo Directory => _directory ??= System.IO.Directory.CreateTempSubdirectory(prefix);
+
     public void Dispose()
     {
-        if (directory is not null && Directory.Exists(directory))
+        if (_directory is not null && _directory.Exists)
         {
-            Directory.Delete(directory, recursive: true);
+            try
+            {
+                _directory.Delete(recursive: true);
+            }
+            catch
+            {
+                // best effort cleanup
+            }
         }
     }
 }

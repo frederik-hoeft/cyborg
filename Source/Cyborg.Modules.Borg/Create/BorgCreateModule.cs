@@ -67,7 +67,7 @@ public sealed record BorgExcludeOptions
 public sealed record BorgFilesCacheSentinelOptions
 (
     bool Enabled,
-    [property: Required][property: UnrootedPath][property: DefaultValue<string>(BorgFilesCacheSentinelOptions.DEFAULT_ARCHIVE_PATH)] string ArchivePath,
+    [property: Required][property: UnrootedPath][property: NormalizedPath][property: DefaultValue<string>(BorgFilesCacheSentinelOptions.DEFAULT_ARCHIVE_PATH)] string ArchivePath,
     [property: Required][property: FileName][property: DefaultValue<string>(BorgFilesCacheSentinelOptions.DEFAULT_SENTINEL_FILE_NAME)] string SentinelFileName
 ) : IDefaultInstance<BorgFilesCacheSentinelOptions>
 {

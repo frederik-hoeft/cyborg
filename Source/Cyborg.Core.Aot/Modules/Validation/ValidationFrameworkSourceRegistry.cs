@@ -30,6 +30,7 @@ internal static class ValidationFrameworkSourceRegistry
         static context => context.AddEmbeddedSource<FileNameAttribute>(),
         static context => context.AddEmbeddedSource<UnrootedPathAttribute>(),
         static context => context.AddEmbeddedSource<RootedPathAttribute>(),
+        static context => context.AddEmbeddedSource<NormalizedPathAttribute>(),
     ];
 
     public static void Emit(IncrementalGeneratorPostInitializationContext context)

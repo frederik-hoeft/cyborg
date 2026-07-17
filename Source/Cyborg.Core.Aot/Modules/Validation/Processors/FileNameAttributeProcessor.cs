@@ -32,7 +32,7 @@ internal sealed class FileNameAttributeProcessor : IPropertyAttributeProcessor
         {
             builder.AppendBlock(
             $$"""
-            if ({{model.AccessExpression}} is not null && (!{{KnownTypes.Path}}.GetFileName({{model.AccessExpression}}).Equals({{model.AccessExpression}}, StringComparison.Ordinal) || {{model.AccessExpression}}.IndexOfAny({{KnownTypes.Path}}.GetInvalidPathChars()) != -1))
+            if ({{model.AccessExpression}} is not null && (!{{KnownTypes.Path}}.GetFileName({{model.AccessExpression}}).Equals({{model.AccessExpression}}, {{KnownTypes.StringComparison}}.Ordinal) || {{model.AccessExpression}}.IndexOfAny({{KnownTypes.Path}}.GetInvalidFileNameChars()) != -1))
             {
                 errors.Add({{CreateValidationError(model, rule: "file_name", $"Property '{{nameof({model.AccessExpression})}}' must be a valid file name, but was '{{{model.AccessExpression}}}'")}});
             }

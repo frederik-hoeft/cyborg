@@ -38,5 +38,7 @@ internal static class KnownTypes
 
     public static string InvariantCulture => field ??= $"global::{typeof(CultureInfo).FullName}.{nameof(CultureInfo.InvariantCulture)}";
 
+    public static string StringComparison => field ??= $"global::{typeof(StringComparison).FullName}";
+
     public static string DefaultEqualityComparerOfT(string typeArgument) => $"global::{typeof(EqualityComparer<>).Namespace}.{nameof(EqualityComparer<>)}<{typeArgument}>.{nameof(EqualityComparer<>.Default)}";
 }

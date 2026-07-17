@@ -30,6 +30,7 @@ internal static class ValidationProcessorRegistry
         new FileNameAttributeProcessor(),
         new RootedPathAttributeProcessor(),
         new UnrootedPathAttributeProcessor(),
+        new NormalizedPathAttributeProcessor(),
     ];
 
     private static FrozenDictionary<string, IPropertyAttributeProcessor> ByMetadataName =>

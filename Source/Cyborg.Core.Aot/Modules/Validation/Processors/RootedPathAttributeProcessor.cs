@@ -32,7 +32,7 @@ internal sealed class RootedPathAttributeProcessor : IPropertyAttributeProcessor
         {
             builder.AppendBlock(
             $$"""
-            if ({{model.AccessExpression}} is not null && {{KnownTypes.Path}}.IsPathRooted({{model.AccessExpression}}))
+            if ({{model.AccessExpression}} is not null && !{{KnownTypes.Path}}.IsPathRooted({{model.AccessExpression}}))
             {
                 errors.Add({{CreateValidationError(model, rule: "rooted_path", $"Property '{{nameof({model.AccessExpression})}}' must be a rooted path, but was '{{{model.AccessExpression}}}'")}});
             }

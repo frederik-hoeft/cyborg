@@ -29,6 +29,7 @@ For how these attributes are processed by the source generators, see [Source Gen
   - [FileName](#filename)
   - [RootedPath](#rootedpath)
   - [UnrootedPath](#unrootedpath)
+  - [NormalizedPath](#normalizedpath)
   - [DefinedEnumValue](#definedenumvalue)
 - [Default Value Attributes](#default-value-attributes)
   - [DefaultValue](#defaultvalue)
@@ -170,6 +171,12 @@ Validates that a string property contains a rooted (absolute) path. Uses `Path.I
 ### UnrootedPath
 
 Validates that a string property contains an unrooted (relative) path — i.e., that `Path.IsPathRooted` returns `false`.
+
+**Applies to:** `string` properties only.
+
+### NormalizedPath
+
+Validates that a string property contains a normalized path — one with no `.` or `..` segments and no redundant directory separators. The check is equivalent to `Path.GetFullPath(value) == value`.
 
 **Applies to:** `string` properties only.
 
