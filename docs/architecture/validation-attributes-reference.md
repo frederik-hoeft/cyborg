@@ -26,6 +26,9 @@ For how these attributes are processed by the source generators, see [Source Gen
   - [MatchesGrammar](#matchesgrammar)
   - [FileExists](#fileexists)
   - [DirectoryExists](#directoryexists)
+  - [FileName](#filename)
+  - [RootedPath](#rootedpath)
+  - [UnrootedPath](#unrootedpath)
   - [DefinedEnumValue](#definedenumvalue)
 - [Default Value Attributes](#default-value-attributes)
   - [DefaultValue](#defaultvalue)
@@ -151,6 +154,24 @@ Validates that the string property contains a path to an existing file. Checked 
 ### DirectoryExists
 
 Validates that the string property contains a path to an existing directory. Checked at validation time against the file system.
+
+### FileName
+
+Validates that a string property contains a valid file name — one with no directory separators and no invalid file-name characters. The check is equivalent to `Path.GetFileName(value) == value && value.IndexOfAny(Path.GetInvalidFileNameChars()) == -1`.
+
+**Applies to:** `string` properties only.
+
+### RootedPath
+
+Validates that a string property contains a rooted (absolute) path. Uses `Path.IsPathRooted` semantics.
+
+**Applies to:** `string` properties only.
+
+### UnrootedPath
+
+Validates that a string property contains an unrooted (relative) path — i.e., that `Path.IsPathRooted` returns `false`.
+
+**Applies to:** `string` properties only.
 
 ### DefinedEnumValue
 
