@@ -72,9 +72,7 @@ public sealed class BorgCreateModuleWorker
             string sentinelPath = Path.Combine(tempDirectory.Directory.FullName, Module.FilesCacheSentinel.ArchivePath, Module.FilesCacheSentinel.SentinelFileName);
             FileInfo sentinelFile = new(sentinelPath);
             sentinelFile.Directory?.Create();
-            {
-                await using FileStream emptySentinel = sentinelFile.Create();
-            }
+            await using FileStream emptySentinel = sentinelFile.Create();
             string sentinelSlashDotPath = Path.Combine(tempDirectory.Directory.FullName, ".", Module.FilesCacheSentinel.ArchivePath, Module.FilesCacheSentinel.SentinelFileName);
             arguments.Add(sentinelSlashDotPath);
         }

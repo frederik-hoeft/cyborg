@@ -158,7 +158,7 @@ Validates that the string property contains a path to an existing directory. Che
 
 ### FileName
 
-Validates that a string property contains a valid file name — one with no directory separators and no invalid file-name characters. The check is equivalent to `Path.GetFileName(value) == value && value.IndexOfAny(Path.GetInvalidFileNameChars()) == -1`.
+Validates that a string property contains a valid file name: non-empty, not `.` or `..`, and containing no characters in `Path.GetInvalidFileNameChars()`.
 
 **Applies to:** `string` properties only.
 
@@ -176,7 +176,7 @@ Validates that a string property contains an unrooted (relative) path — i.e., 
 
 ### NormalizedPath
 
-Validates that a string property contains a normalized path — one with no `.` or `..` segments and no redundant directory separators. The check is equivalent to `Path.GetFullPath(value) == value`.
+Validates that a string property contains a normalized path — one where no segment is `.` or `..` and there are no consecutive directory separators (empty segments). Works on both absolute and relative paths without resolving against the current working directory.
 
 **Applies to:** `string` properties only.
 

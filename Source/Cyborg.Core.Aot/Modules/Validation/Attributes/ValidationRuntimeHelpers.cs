@@ -23,7 +23,7 @@ internal static class ValidationRuntimeHelpers
                 return pathSpan[start..] is not "." and not "..";
             }
             next = start + next;
-            if (next == start || pathSpan[start..next] is "." or "..")
+            if (next == start && start != 0 || pathSpan[start..next] is "." or "..")
             {
                 return false;
             }
