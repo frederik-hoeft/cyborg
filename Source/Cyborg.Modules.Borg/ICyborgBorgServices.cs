@@ -3,6 +3,7 @@ using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Modules.Borg.Compact;
 using Cyborg.Modules.Borg.Create;
+using Cyborg.Modules.Borg.Create.Model;
 using Cyborg.Modules.Borg.Prune;
 using Cyborg.Modules.Borg.Shared.Json;
 using Cyborg.Modules.Borg.Shared.Model;
@@ -21,6 +22,8 @@ namespace Cyborg.Modules.Borg;
 [Singleton<JsonNamingPolicy>(Factory = nameof(GetModuleJsonNamingPolicy))]
 [Singleton<IDynamicValueProvider, BorgRemoteValueProvider>]
 [Singleton<IDynamicValueProvider, BorgRemoteRepositoryValueProvider>]
+[Singleton<IDynamicValueProvider, BorgExcludeOptionsValueProvider>]
+[Singleton<IDynamicValueProvider, BorgFilesCacheSentinelOptionsValueProvider>]
 [Singleton<IModuleLoader, BorgCreateModuleLoader>]
 [Singleton<IModuleLoader, BorgPruneModuleLoader>]
 [Singleton<IModuleLoader, BorgCompactModuleLoader>]
