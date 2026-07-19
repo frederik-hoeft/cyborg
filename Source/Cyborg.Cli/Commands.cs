@@ -5,6 +5,8 @@ using Cyborg.Cli.Metrics;
 using Cyborg.Core.Configuration;
 using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
+using Cyborg.Core.Modules.Descriptors.Builders;
+using Cyborg.Core.Modules.Descriptors.Model;
 using Cyborg.Core.Modules.Extensions;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
@@ -21,7 +23,44 @@ internal sealed class Commands
     private const string CYBORG_ROOT = "/etc/cyborg";
     private const string LAST_RUN_SUCCESS = "last_run_success";
 
-    private static string QuoteArg(string arg) => $"\"{arg.Replace("\\", "\\\\").Replace("\"", "\\\"")}\"";
+    //public async Task<int> CheckAsync([Argument] string file,
+    //    string[]? environmentVariables = null,
+    //    LogLevel? logLevel = null,
+    //    CancellationToken cancellationToken = default)
+    //{
+    //    using DefaultServiceProvider services = new();
+    //    IConfiguration configuration = services.GetRequiredService<IConfiguration>();
+    //    IConfigurationLoader configurationLoader = services.GetRequiredService<IConfigurationLoader>();
+
+    //    // CLI --log-level overrides only the console sink minimum level.
+    //    if (logLevel.HasValue)
+    //    {
+    //        services.GetRequiredService<LoggingOptions>().MinimumLevel = logLevel.Value;
+    //    }
+    //    GlobalRuntimeEnvironment globalEnvironment = services.GetRequiredService<GlobalRuntimeEnvironment>();
+
+    //    IEnvironmentVariableArgumentHandler environmentVariableService = services.GetRequiredService<IEnvironmentVariableArgumentHandler>();
+    //    if (!environmentVariableService.TryProcessArgument(environmentVariables, globalEnvironment))
+    //    {
+    //        return 1;
+    //    }
+
+    //    IModuleConfigurationLoader moduleLoader = services.GetRequiredService<IModuleConfigurationLoader>();
+    //    ModuleContext module = await moduleLoader.LoadModuleAsync(file, cancellationToken);
+    //    module = module with
+    //    {
+    //        Environment = module.Environment ?? ModuleEnvironment.Default,
+    //    };
+    //    IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+    //    string target = globalEnvironment.ResolveVariableOrDefault("target", "<unspecified>");
+    //    IModuleDescriptor result = await runtime.PrepareAsync(module, cancellationToken);
+    //    ObjectDescriptionBuilder builder = new(new DefaultDescriptionComponentFactory());
+    //    result.Describe(builder);
+    //    IndentedStringBuilder sb = new(new StringBuilder());
+    //    await builder.Build().AcceptAsync(new TextModuleDescriptionComponentWriter(sb), cancellationToken);
+    //    Console.WriteLine(sb.ToString());
+    //    return 0;
+    //}
 
     /// <summary>
     /// Executes a backup run using the provided configuration and command-line options.
@@ -50,20 +89,20 @@ internal sealed class Commands
         IConfigurationLoader configurationLoader = services.GetRequiredService<IConfigurationLoader>();
         await configurationLoader.AddSourceAsync(configuration, options, cancellationToken);
 
+        // CLI --log-level overrides only the console sink minimum level.
+        if (logLevel.HasValue)
+        {
+            services.GetRequiredService<LoggingOptions>().MinimumLevel = logLevel.Value;
+        }
         MetricsOptions metricsOptions = configuration.Get("cyborg.services.metrics", () => new MetricsOptions());
         services.GetRequiredService<MetricsCollectorOptions>().Namespace = metricsOptions.Namespace;
+
         IMetricsCollector metricsCollector = services.GetRequiredService<IMetricsCollector>();
         string metricsDestinationPath = metrics ?? metricsOptions.FilePath;
-        bool runSucceeded = false;
 
+        bool runSucceeded = false;
         try
         {
-            // CLI --log-level overrides only the console sink minimum level.
-            if (logLevel.HasValue)
-            {
-                services.GetRequiredService<LoggingOptions>().MinimumLevel = logLevel.Value;
-            }
-
             ILogger logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("cyborg.cli.main");
             logger.LogStartup(string.Join(' ', Array.ConvertAll(Environment.GetCommandLineArgs()[1..], QuoteArg)));
             GlobalRuntimeEnvironment globalEnvironment = services.GetRequiredService<GlobalRuntimeEnvironment>();
@@ -127,4 +166,6 @@ internal sealed class Commands
         }
         File.Move(tempDestination, metricsDestinationPath, overwrite: true);
     }
+
+    private static string QuoteArg(string arg) => $"\"{arg.Replace("\\", "\\\\").Replace("\"", "\\\"")}\"";
 }

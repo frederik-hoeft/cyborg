@@ -8,7 +8,7 @@ internal sealed class DefaultInstanceFactoryAttributeProcessor : IPropertyAttrib
 {
     public string AttributeMetadataName => typeof(DefaultInstanceFactoryAttribute).FullName;
 
-    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyAspect? aspect)
     {
         aspect = null;
 
@@ -66,10 +66,8 @@ internal sealed class DefaultInstanceFactoryAttributeProcessor : IPropertyAttrib
             || context.Compilation.ClassifyConversion(returnType, propertyType).IsImplicit;
     }
 
-    private sealed class DefaultInstanceFactoryAspect(string factoryMember) : PropertyValidationAspect
+    private sealed class DefaultInstanceFactoryAspect(string factoryMember) : PropertyAspect(ensuresDefault: true)
     {
-        public override bool EnsuresDefault => true;
-
         public override string? RewriteDefaultAssignmentExpression(PropertyRewriteContext context, string? currentExpression)
         {
             _ = currentExpression;

@@ -44,7 +44,7 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
 
     private void AppendValidationForProperty(IndentedStringBuilder builder, PropertyModel property, string moduleVariableName, string propertyAccessExpression)
     {
-        foreach (PropertyValidationAspect aspect in property.Aspects)
+        foreach (PropertyAspect aspect in property.Aspects)
         {
             aspect.EmitValidation(builder, contractInfo, diagnosticsReporter, property, moduleVariableName, propertyAccessExpression);
         }

@@ -10,7 +10,7 @@ internal sealed record PropertyModel(
     string NonNullableTypeName,
     bool IsNullable,
     bool IsValidatableType,
-    ImmutableArray<PropertyValidationAspect> Aspects,
+    ImmutableArray<PropertyAspect> Aspects,
     ImmutableArray<PropertyModel> Children,
     CollectionModel? Collection)
 {

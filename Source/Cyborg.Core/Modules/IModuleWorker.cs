@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Aot.Contracts;
+using Cyborg.Core.Modules.Descriptors;
 using Cyborg.Core.Modules.Runtime;
 using System.Text.Json.Serialization;
 
@@ -11,6 +12,8 @@ public interface IModuleWorker
 
     [JsonIgnore]
     IModule Module { get; }
+
+    internal Task<IModuleDescriptor> PrepareAsync(IModuleRuntime runtime, CancellationToken cancellationToken);
 
     internal Task<IModuleExecutionResult> ExecuteAsync(IModuleRuntime runtime, CancellationToken cancellationToken);
 }

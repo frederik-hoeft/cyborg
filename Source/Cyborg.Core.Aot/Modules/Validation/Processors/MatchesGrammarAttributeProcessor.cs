@@ -8,7 +8,7 @@ internal sealed class MatchesGrammarAttributeProcessor : IPropertyAttributeProce
 {
     public string AttributeMetadataName => typeof(MatchesGrammarAttribute).FullName;
 
-    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyAspect? aspect)
     {
         aspect = null;
 
@@ -45,10 +45,8 @@ internal sealed class MatchesGrammarAttributeProcessor : IPropertyAttributeProce
         return true;
     }
 
-    private sealed class GrammarValidationAspect(IPropertySymbol parserProperty, string valueExpression) : PropertyValidationAspect
+    private sealed class GrammarValidationAspect(IPropertySymbol parserProperty, string valueExpression) : PropertyAspect
     {
-        public override bool EnsuresDefault => false;
-
         protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
         {
             if (!SymbolEqualityComparer.Default.Equals(parserProperty.Type, model.ContractInfo.IParser))

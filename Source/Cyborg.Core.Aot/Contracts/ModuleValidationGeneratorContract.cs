@@ -8,4 +8,5 @@ internal enum ModuleValidationGeneratorContract
     ValidationError,
     IDefaultValueT,
     IParser,
+    IObjectDescriptionBuilder
 }

@@ -9,7 +9,7 @@ internal sealed class DefaultTimeSpanAttributeProcessor : IPropertyAttributeProc
 {
     public string AttributeMetadataName => typeof(DefaultTimeSpanAttribute).FullName;
 
-    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyAspect? aspect)
     {
         aspect = null;
 
@@ -44,10 +44,8 @@ internal sealed class DefaultTimeSpanAttributeProcessor : IPropertyAttributeProc
         return true;
     }
 
-    private sealed class DefaultValueValidationAspect(string valueExpression) : PropertyValidationAspect
+    private sealed class DefaultValueValidationAspect(string valueExpression) : PropertyAspect(ensuresDefault: true)
     {
-        public override bool EnsuresDefault => true;
-
         public override string? RewriteDefaultAssignmentExpression(PropertyRewriteContext context, string? currentExpression)
         {
             string propertyAccessExpression = context.PropertyAccessExpression;

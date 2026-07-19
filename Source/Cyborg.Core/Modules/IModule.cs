@@ -1,6 +1,8 @@
-﻿namespace Cyborg.Core.Modules;
+﻿using Cyborg.Core.Modules.Descriptors;
 
-public interface IModule
+namespace Cyborg.Core.Modules;
+
+public interface IModule : IModuleDescriptor
 {
     string? Name { get; }
 

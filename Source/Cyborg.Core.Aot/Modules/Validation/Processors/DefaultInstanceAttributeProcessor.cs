@@ -8,7 +8,7 @@ internal sealed class DefaultInstanceAttributeProcessor : IPropertyAttributeProc
 {
     public string AttributeMetadataName => typeof(DefaultInstanceAttribute).FullName;
 
-    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyAspect? aspect)
     {
         _ = attribute;
         aspect = null;
@@ -34,10 +34,8 @@ internal sealed class DefaultInstanceAttributeProcessor : IPropertyAttributeProc
         // Nullable<T> value types are invalid anyway because IDefaultInstance<TSelf> has `where TSelf : class`.
         propertyType.WithNullableAnnotation(NullableAnnotation.None);
 
-    private sealed class DefaultInstanceValidationAspect(INamedTypeSymbol containingType, INamedTypeSymbol propertyType, IPropertySymbol property) : PropertyValidationAspect
+    private sealed class DefaultInstanceValidationAspect(INamedTypeSymbol containingType, INamedTypeSymbol propertyType, IPropertySymbol property) : PropertyAspect(ensuresDefault: true)
     {
-        public override bool EnsuresDefault => true;
-
         public override string? RewriteDefaultAssignmentExpression(PropertyRewriteContext context, string? currentExpression)
         {
             if (!ImplementsMatchingDefaultInstanceInterface(propertyType, context.ContractInfo))

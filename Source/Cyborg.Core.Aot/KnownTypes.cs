@@ -41,5 +41,7 @@ internal static class KnownTypes
 
     public static string ValidationRuntimeHelpers => field ??= $"global::{typeof(ValidationRuntimeHelpers).FullName}";
 
+    public static string ArgumentNullException => field ??= $"global::{typeof(ArgumentNullException).FullName}";
+
     public static string DefaultEqualityComparerOfT(string typeArgument) => $"global::{typeof(EqualityComparer<>).Namespace}.{nameof(EqualityComparer<>)}<{typeArgument}>.{nameof(EqualityComparer<>.Default)}";
 }

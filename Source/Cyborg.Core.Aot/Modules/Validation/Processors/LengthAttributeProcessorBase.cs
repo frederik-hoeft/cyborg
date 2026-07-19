@@ -8,7 +8,7 @@ internal abstract class LengthAttributeProcessorBase : IPropertyAttributeProcess
 {
     public abstract string AttributeMetadataName { get; }
 
-    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyAspect? aspect)
     {
         aspect = null;
 
@@ -214,10 +214,8 @@ internal abstract class LengthAttributeProcessorBase : IPropertyAttributeProcess
         INamedTypeSymbol? collectionInterface,
         string? minExpression,
         string? maxExpression,
-        bool requiresNullGuard) : PropertyValidationAspect
+        bool requiresNullGuard) : PropertyAspect
     {
-        public override bool EnsuresDefault => false;
-
         protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
         {
             string accessExpression;

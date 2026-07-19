@@ -2,5 +2,5 @@
 
 internal interface IDynamicPropertyProcessor : IPropertyProcessor
 {
-    bool TryProcess(PropertyProcessingContext context, out PropertyValidationAspect? aspect);
+    bool TryProcess(PropertyProcessingContext context, out PropertyAspect? aspect);
 }

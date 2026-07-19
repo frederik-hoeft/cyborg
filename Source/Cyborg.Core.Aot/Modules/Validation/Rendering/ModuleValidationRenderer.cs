@@ -24,6 +24,7 @@ internal static class ModuleValidationRenderer
             new DefaultsSectionRenderer(contractInfo, MODULE_VARIABLE, diagnosticsReporter),
             new OverrideSectionRenderer(contractInfo, MODULE_VARIABLE, diagnosticsReporter),
             new ValidationSectionRenderer(contractInfo, diagnosticsReporter),
+            new DescriptorSectionRenderer(contractInfo, diagnosticsReporter),
         ];
 
         StringBuilder builder = new();

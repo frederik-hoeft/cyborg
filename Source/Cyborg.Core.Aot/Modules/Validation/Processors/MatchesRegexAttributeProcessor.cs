@@ -10,7 +10,7 @@ internal sealed class MatchesRegexAttributeProcessor : IPropertyAttributeProcess
 {
     public string AttributeMetadataName => typeof(MatchesRegexAttribute).FullName;
 
-    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyAspect? aspect)
     {
         aspect = null;
 
@@ -65,10 +65,8 @@ internal sealed class MatchesRegexAttributeProcessor : IPropertyAttributeProcess
         return true;
     }
 
-    private sealed class RegexValidationAspect(string regexMember, string pattern) : PropertyValidationAspect
+    private sealed class RegexValidationAspect(string regexMember, string pattern) : PropertyAspect
     {
-        public override bool EnsuresDefault => false;
-
         protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
         {
             builder.AppendBlock(

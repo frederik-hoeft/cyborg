@@ -267,7 +267,7 @@ internal sealed class DefaultApplicationRenderer(ValidationContractInfo contract
     private static string? CreateDefaultAssignmentExpression(PropertyRewriteContext context)
     {
         string? expression = null;
-        foreach (PropertyValidationAspect aspect in context.Property.Aspects)
+        foreach (PropertyAspect aspect in context.Property.Aspects)
         {
             expression = aspect.RewriteDefaultAssignmentExpression(context, expression);
         }

@@ -8,7 +8,7 @@ internal sealed class RootedPathAttributeProcessor : IPropertyAttributeProcessor
 {
     public string AttributeMetadataName => typeof(RootedPathAttribute).FullName;
 
-    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyAspect? aspect)
     {
         aspect = null;
         if (attribute.AttributeClass is null)
@@ -24,10 +24,8 @@ internal sealed class RootedPathAttributeProcessor : IPropertyAttributeProcessor
         return true;
     }
 
-    private sealed class RootedPathValidationAspect : PropertyValidationAspect
+    private sealed class RootedPathValidationAspect : PropertyAspect
     {
-        public override bool EnsuresDefault => false;
-
         protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
         {
             builder.AppendBlock(

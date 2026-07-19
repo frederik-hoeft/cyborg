@@ -8,7 +8,7 @@ internal sealed class RangeAttributeProcessor : IPropertyAttributeProcessor
 {
     public string AttributeMetadataName => typeof(RangeAttribute<>).FullName;
 
-    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyAspect? aspect)
     {
         aspect = null;
 
@@ -55,10 +55,8 @@ internal sealed class RangeAttributeProcessor : IPropertyAttributeProcessor
         return true;
     }
 
-    private sealed class RangeValidationAspect(string? minExpression, string? maxExpression) : PropertyValidationAspect
+    private sealed class RangeValidationAspect(string? minExpression, string? maxExpression) : PropertyAspect
     {
-        public override bool EnsuresDefault => false;
-
         protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
         {
             if (minExpression is not null)

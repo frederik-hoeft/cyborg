@@ -1,5 +1,7 @@
 ﻿using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Configuration.Model;
+using Cyborg.Core.Modules.Descriptors;
+using Cyborg.Core.Modules.Descriptors.Builders;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Microsoft.Extensions.Logging;
@@ -49,11 +51,15 @@ public sealed class ModuleRuntimeBaseTests
             ContainerName = containerName;
             return Task.FromResult<IModuleExecutionResult>(new ProbeExecutionResult((ProbeModule)Module, ModuleExitStatus.Success, runtime.Environment.CreateArtifactCollection()));
         }
+
+        Task<IModuleDescriptor> IModuleWorker.PrepareAsync(IModuleRuntime runtime, CancellationToken cancellationToken) => throw new NotImplementedException();
     }
 
     private sealed record ProbeModule : ModuleBase, IModule
     {
         public static string ModuleId => "cyborg.tests.probe.v1";
+
+        public void Describe(IObjectDescriptionBuilder descriptionBuilder) => throw new NotImplementedException();
     }
 
     private sealed record ProbeExecutionResult(IModule Module, ModuleExitStatus Status, IVariableResolverScope Artifacts) : IModuleExecutionResult;

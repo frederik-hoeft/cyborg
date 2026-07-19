@@ -8,7 +8,7 @@ internal sealed class RequiredAttributeProcessor : IPropertyAttributeProcessor
 {
     public string AttributeMetadataName => typeof(RequiredAttribute).FullName;
 
-    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyAspect? aspect)
     {
         _ = context;
         _ = attribute;
@@ -16,10 +16,8 @@ internal sealed class RequiredAttributeProcessor : IPropertyAttributeProcessor
         return true;
     }
 
-    private sealed class RequiredValidationAspect : PropertyValidationAspect
+    private sealed class RequiredValidationAspect : PropertyAspect
     {
-        public override bool EnsuresDefault => false;
-
         protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
         {
             string comparer = KnownTypes.DefaultEqualityComparerOfT(model.Property.NullableTypeName);

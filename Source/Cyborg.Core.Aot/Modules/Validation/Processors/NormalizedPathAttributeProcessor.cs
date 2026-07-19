@@ -8,7 +8,7 @@ internal sealed class NormalizedPathAttributeProcessor : IPropertyAttributeProce
 {
     public string AttributeMetadataName => typeof(NormalizedPathAttribute).FullName;
 
-    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyAspect? aspect)
     {
         aspect = null;
         if (attribute.AttributeClass is null)
@@ -24,10 +24,8 @@ internal sealed class NormalizedPathAttributeProcessor : IPropertyAttributeProce
         return true;
     }
 
-    private sealed class NormalizedPathValidationAspect : PropertyValidationAspect
+    private sealed class NormalizedPathValidationAspect : PropertyAspect
     {
-        public override bool EnsuresDefault => false;
-
         protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
         {
             builder.AppendBlock(

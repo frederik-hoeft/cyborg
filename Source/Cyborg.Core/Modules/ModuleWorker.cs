@@ -1,9 +1,14 @@
 ﻿using Cyborg.Core.Configuration.Model;
+using Cyborg.Core.Modules.Descriptors;
+using Cyborg.Core.Modules.Descriptors.Builders;
+using Cyborg.Core.Modules.Descriptors.Model;
+using Cyborg.Core.Modules.Descriptors.Writers;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments.Artifacts;
 using Cyborg.Core.Modules.Validation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using System.Text;
 
 namespace Cyborg.Core.Modules;
 
@@ -52,13 +57,14 @@ public abstract class ModuleWorker<TModule>(IWorkerContext<TModule> context) : I
         return new ModuleExecutionResult<TModule>(Module, status, Artifacts);
     }
 
-    async Task<IModuleExecutionResult> IModuleWorker.ExecuteAsync(IModuleRuntime runtime, CancellationToken cancellationToken)
+    async Task<IModuleDescriptor> IModuleWorker.PrepareAsync(IModuleRuntime runtime, CancellationToken cancellationToken) => await PrepareAsync(runtime, cancellationToken);
+
+    private async Task<TModule> PrepareAsync(IModuleRuntime runtime, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(runtime);
         Logger.LogModuleValidationStarted(ModuleId);
         ValidationResult<TModule> result = await context.Module.ValidateAsync(runtime, ServiceProvider, cancellationToken);
         ValidationResult<TModule> overriddenResult = await ModuleValidationCallbackAsync(result, context.Module, cancellationToken);
-        IModuleArtifactsFactory artifactsFactory = ServiceProvider.GetRequiredService<IModuleArtifactsFactory>();
         if (!overriddenResult.IsValid)
         {
             if (Logger.IsEnabled(LogLevel.Warning))
@@ -68,7 +74,21 @@ public abstract class ModuleWorker<TModule>(IWorkerContext<TModule> context) : I
             overriddenResult.EnsureValid();
         }
         Logger.LogModuleValidationCompleted(ModuleId);
-        Module = overriddenResult.Module;
+        return overriddenResult.Module;
+    }
+
+    async Task<IModuleExecutionResult> IModuleWorker.ExecuteAsync(IModuleRuntime runtime, CancellationToken cancellationToken)
+    {
+        IModuleArtifactsFactory artifactsFactory = ServiceProvider.GetRequiredService<IModuleArtifactsFactory>();
+        Module = await PrepareAsync(runtime, cancellationToken);
+
+        ObjectDescriptionBuilder builder = new(new DefaultDescriptionComponentFactory());
+        Module.Describe(builder);
+        StringBuilder sb = new();
+        await builder.Build().AcceptAsync(new TextModuleDescriptionComponentWriter(new Common.Text.IndentedStringBuilder(sb)), cancellationToken);
+        string description = sb.ToString();
+        Console.WriteLine(description);
+
         Artifacts = artifactsFactory.CreateArtifacts(runtime, Module);
         return await ExecuteAsync(runtime, cancellationToken);
     }

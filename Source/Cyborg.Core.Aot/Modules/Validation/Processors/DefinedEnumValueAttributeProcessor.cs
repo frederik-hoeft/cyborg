@@ -9,7 +9,7 @@ internal sealed class DefinedEnumValueAttributeProcessor : IPropertyAttributePro
 {
     public string AttributeMetadataName => typeof(DefinedEnumValueAttribute).FullName!;
 
-    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyAspect? aspect)
     {
         _ = attribute;
         aspect = null;
@@ -59,10 +59,8 @@ internal sealed class DefinedEnumValueAttributeProcessor : IPropertyAttributePro
         return false;
     }
 
-    private sealed class DefinedEnumValueValidationAspect(string enumTypeName, bool isNullableEnum) : PropertyValidationAspect
+    private sealed class DefinedEnumValueValidationAspect(string enumTypeName, bool isNullableEnum) : PropertyAspect
     {
-        public override bool EnsuresDefault => false;
-
         protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
         {
             if (isNullableEnum)

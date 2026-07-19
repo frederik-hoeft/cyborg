@@ -15,7 +15,7 @@ internal abstract class FilesystemPathAttributeProcessor<TAttribute> : IProperty
 
     protected abstract string BuildExistsExpression();
 
-    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyAspect? aspect)
     {
         aspect = null;
         if (attribute.AttributeClass is null)
@@ -34,10 +34,8 @@ internal abstract class FilesystemPathAttributeProcessor<TAttribute> : IProperty
         return true;
     }
 
-    private sealed class FilesystemPathValidationAspect(string errorCode, string pathKindDisplayName, string existsExpression) : PropertyValidationAspect
+    private sealed class FilesystemPathValidationAspect(string errorCode, string pathKindDisplayName, string existsExpression) : PropertyAspect
     {
-        public override bool EnsuresDefault => false;
-
         protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
         {
             builder.AppendBlock(

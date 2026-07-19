@@ -8,7 +8,7 @@ internal sealed class DefaultValueAttributeProcessor : IPropertyAttributeProcess
 {
     public string AttributeMetadataName => typeof(DefaultValueAttribute<>).FullName;
 
-    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyAspect? aspect)
     {
         aspect = null;
 
@@ -55,10 +55,8 @@ internal sealed class DefaultValueAttributeProcessor : IPropertyAttributeProcess
         return true;
     }
 
-    private sealed class DefaultValueValidationAspect(string valueExpression, ImmutableArray<string> whenPresentExpressions) : PropertyValidationAspect
+    private sealed class DefaultValueValidationAspect(string valueExpression, ImmutableArray<string> whenPresentExpressions) : PropertyAspect(ensuresDefault: true)
     {
-        public override bool EnsuresDefault => true;
-
         public override string? RewriteDefaultAssignmentExpression(PropertyRewriteContext rewriteContext, string? currentExpression)
         {
             string propertyAccessExpression = rewriteContext.PropertyAccessExpression;
