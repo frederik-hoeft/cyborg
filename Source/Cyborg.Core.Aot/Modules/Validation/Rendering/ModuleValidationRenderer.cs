@@ -17,12 +17,15 @@ internal static class ModuleValidationRenderer
         public static string NullableRelax => "__NullableRelax";
     }
 
+    public static string ApplyInterpolation => "__ApplyInterpolation";
+
     public static string Render(ModuleModel model, ValidationContractInfo contractInfo, DiagnosticsReporter diagnosticsReporter)
     {
         ReadOnlySpan<ISectionRenderer> renderPipeline =
         [
             new DefaultsSectionRenderer(contractInfo, MODULE_VARIABLE, diagnosticsReporter),
             new OverrideSectionRenderer(contractInfo, MODULE_VARIABLE, diagnosticsReporter),
+            new InterpolationSectionRenderer(contractInfo),
             new ValidationSectionRenderer(contractInfo, diagnosticsReporter),
         ];
 

@@ -23,6 +23,8 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
                 {{contractInfo.IModuleT.RenderGlobalWithGenerics(qualifiedType)}} withOverrides = await withDefaults.ResolveOverridesAsync(runtime, serviceProvider, cancellationToken);
                 // ensure that defaults are also applied to values injected via overrides
                 {{qualifiedType}} module = await withOverrides.ApplyDefaultsAsync(runtime, serviceProvider, cancellationToken);
+                // interpolate all string members against the runtime environment
+                module = {{ModuleValidationRenderer.ApplyInterpolation}}(module, runtime);
                 {{KnownTypes.ListOfT(contractInfo.ValidationError.RenderGlobal())}} errors = [];
 
             """);
