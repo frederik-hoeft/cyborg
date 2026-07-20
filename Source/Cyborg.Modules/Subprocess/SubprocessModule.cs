@@ -31,7 +31,8 @@ public sealed record ImpersonationContext
 public sealed record SubprocessCommand
 (
     [property: Required][property: FileExists] string Executable,
-    [property: Required] IReadOnlyCollection<string> Arguments
+    [property: Required] IReadOnlyCollection<string> Arguments,
+    [property: RootedPath][property: NormalizedPath][property: DirectoryExists] string? WorkingDirectory
 );
 
 [Validatable]

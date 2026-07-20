@@ -30,6 +30,10 @@ public sealed class SubprocessModuleWorker(IWorkerContext<SubprocessModule> cont
             RedirectStandardOutput = Module.Output.ReadStdout,
             RedirectStandardError = Module.Output.ReadStderr,
         };
+        if (!string.IsNullOrEmpty(Module.Command.WorkingDirectory))
+        {
+            startInfo.WorkingDirectory = runtime.Environment.Interpolate(Module.Command.WorkingDirectory);
+        }
         ChildProcessResult executionResult = await dispatcher.ExecuteAsync(startInfo, cancellationToken);
         SubprocessModuleResult result = new(executionResult.ExitCode, executionResult.StandardOutput, executionResult.StandardError);
         if (Module.CheckExitCode && result.ExitCode != 0)
