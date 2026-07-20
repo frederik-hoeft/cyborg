@@ -54,6 +54,7 @@ internal sealed class Commands
         services.GetRequiredService<MetricsCollectorOptions>().Namespace = metricsOptions.Namespace;
         IMetricsCollector metricsCollector = services.GetRequiredService<IMetricsCollector>();
         string metricsDestinationPath = metrics ?? metricsOptions.FilePath;
+        GlobalRuntimeEnvironment globalEnvironment = services.GetRequiredService<GlobalRuntimeEnvironment>();
         bool runSucceeded = false;
 
         try
@@ -66,7 +67,6 @@ internal sealed class Commands
 
             ILogger logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("cyborg.cli.main");
             logger.LogStartup(string.Join(' ', Array.ConvertAll(Environment.GetCommandLineArgs()[1..], QuoteArg)));
-            GlobalRuntimeEnvironment globalEnvironment = services.GetRequiredService<GlobalRuntimeEnvironment>();
 
             IEnvironmentVariableArgumentHandler environmentVariableService = services.GetRequiredService<IEnvironmentVariableArgumentHandler>();
             if (!environmentVariableService.TryProcessArgument(environmentVariables, globalEnvironment))
@@ -81,7 +81,7 @@ internal sealed class Commands
                 Environment = module.Environment ?? ModuleEnvironment.Default,
             };
             IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
-            string target = globalEnvironment.ResolveVariableOrDefault("target", "<unspecified>");
+            string target = globalEnvironment.ResolveVariableOrDefault(WellKnownVariables.Target, "<unspecified>");
             logger.LogRunStarted(target);
             IModuleExecutionResult result = await runtime.ExecuteAsync(module, cancellationToken);
             if (result.Status is ModuleExitStatus.Success or ModuleExitStatus.Skipped)
@@ -106,14 +106,18 @@ internal sealed class Commands
         }
         finally
         {
-            CollectRunMetrics(metricsCollector, runSucceeded);
+            CollectRunMetrics(globalEnvironment, metricsCollector, runSucceeded);
             await WriteMetricsAsync(metricsCollector, metricsDestinationPath, CancellationToken.None);
         }
     }
 
-    private static void CollectRunMetrics(IMetricsCollector metricsCollector, bool runSucceeded)
+    private static void CollectRunMetrics(GlobalRuntimeEnvironment environment, IMetricsCollector metricsCollector, bool runSucceeded)
     {
         IMetricsLabelCollection labels = metricsCollector.CreateLabels();
+        if (environment.TryResolveVariable(WellKnownVariables.Target, out string? target))
+        {
+            labels.AddLabel("target", target);
+        }
         metricsCollector.AddGauge(LAST_RUN_SUCCESS, "Whether the most recent Cyborg run completed successfully (1 for success, 0 for failure)", samples => samples
             .Add(runSucceeded ? 1 : 0, labels));
     }
@@ -127,4 +131,9 @@ internal sealed class Commands
         }
         File.Move(tempDestination, metricsDestinationPath, overwrite: true);
     }
+}
+
+file static class WellKnownVariables
+{
+    public static string Target => "target";
 }
