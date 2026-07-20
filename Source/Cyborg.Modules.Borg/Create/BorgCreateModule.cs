@@ -1,10 +1,10 @@
 ﻿using Cyborg.Core.Aot.Modules.Validation;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Cyborg.Core.Modules;
-using Cyborg.Core.Modules.Validation;
 using Cyborg.Core.Parsing.Grammars;
 using Cyborg.Core.Parsing.Parsers;
 using Cyborg.Modules.Borg.Create.InputValidation;
+using Cyborg.Modules.Borg.Create.Model;
 
 namespace Cyborg.Modules.Borg.Create;
 
@@ -51,28 +51,4 @@ public sealed partial record BorgCreateModule
             return field = grammar;
         }
     }
-}
-
-[Validatable]
-public sealed record BorgExcludeOptions
-(
-    bool Caches,
-    [property: Required] IReadOnlyCollection<string> Paths
-) : IDefaultInstance<BorgExcludeOptions>
-{
-    public static BorgExcludeOptions Default { get; } = new(Caches: false, Paths: []);
-}
-
-[Validatable]
-public sealed record BorgFilesCacheSentinelOptions
-(
-    bool Enabled,
-    [property: Required][property: UnrootedPath][property: NormalizedPath][property: DefaultValue<string>(BorgFilesCacheSentinelOptions.DEFAULT_ARCHIVE_PATH)] string ArchivePath,
-    [property: Required][property: FileName][property: DefaultValue<string>(BorgFilesCacheSentinelOptions.DEFAULT_SENTINEL_FILE_NAME)] string SentinelFileName
-) : IDefaultInstance<BorgFilesCacheSentinelOptions>
-{
-    private const string DEFAULT_ARCHIVE_PATH = ".cyborg";
-    private const string DEFAULT_SENTINEL_FILE_NAME = "borg_files_cache.sentinel";
-
-    public static BorgFilesCacheSentinelOptions Default { get; } = new(Enabled: false, ArchivePath: DEFAULT_ARCHIVE_PATH, SentinelFileName: DEFAULT_SENTINEL_FILE_NAME);
 }

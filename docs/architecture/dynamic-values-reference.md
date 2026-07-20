@@ -24,6 +24,8 @@ For runtime semantics such as scoping, interpolation, decomposition, and overrid
 - [Borg Types](#borg-types)
   - [`cyborg.types.borg.remote.v1.4`](#cyborgtypesborgremotev14)
   - [`cyborg.types.borg.repository.v1.4`](#cyborgtypesborgrepositoryv14)
+  - [`cyborg.types.borg.exclude.v1.4`](#cyborgtypesborgexcludev14)
+  - [`cyborg.types.borg.files_cache_sentinel.v1.4`](#cyborgtypesborgfiles_cache_sentinelv14)
 - [Service Option Types](#service-option-types)
   - [`cyborg.types.services.trust.options.v1`](#cyborgtypesservicestrustoptionsv1)
   - [`cyborg.trust.policy.unix.owner`](#cyborgtrustpolicyunixowner)
@@ -190,6 +192,25 @@ Represents a fully qualified Borg repository target.
 
 This is usually injected through overrides inside the reusable backup templates rather than authored directly in every job.
 
+### `cyborg.types.borg.exclude.v1.4`
+
+Represents exclusion options for a Borg create operation.
+
+| Property | Type | Required | Default |
+|----------|------|----------|---------|
+| `caches` | bool | No | `false` |
+| `paths` | array of strings | No | `[]` |
+
+### `cyborg.types.borg.files_cache_sentinel.v1.4`
+
+Represents files-cache sentinel options for a Borg create operation. See [Borg Create](./modules-reference.md#borg-create-cyborgmodulesborgcreatev14) for a description of the sentinel mechanism.
+
+| Property | Type | Required | Default | Constraints |
+|----------|------|----------|---------|-------------|
+| `enabled` | bool | No | `false` | -- |
+| `archive_path` | string | No | `".cyborg"` | Unrooted, normalized path |
+| `sentinel_file_name` | string | No | `"borg_files_cache.sentinel"` | Valid file name |
+
 ## Service Option Types
 
 ### `cyborg.types.services.trust.options.v1`
@@ -287,4 +308,4 @@ Common examples:
 
 - The public dynamic type surface is defined by the providers registered in the service provider modules.
 - A type helper existing in source code is not part of the supported configuration contract unless its provider is registered.
-- Per-module nested records such as `SubprocessCommand` or `BorgExcludeOptions` are regular JSON object shapes inside their parent modules, not standalone dynamic value types.
+- Per-module nested records such as `SubprocessCommand` are regular JSON object shapes inside their parent modules, not standalone dynamic value types.
