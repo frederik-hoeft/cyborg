@@ -15,6 +15,7 @@ For runtime behavior such as environment scoping, overrides, artifacts, and vari
   - [Purpose](#purpose)
   - [Required Arguments](#required-arguments)
   - [Derived Variables](#derived-variables)
+  - [Working Directory and Impersonation](#working-directory-and-impersonation)
   - [Injected Override Surface](#injected-override-surface)
   - [Exposed Internal Override Targets](#exposed-internal-override-targets)
 - [Systemd Backup Template (`cyborg.template.backup-job.systemd.v1`)](#systemd-backup-template-cyborgtemplatebackup-jobsystemdv1)
@@ -87,6 +88,18 @@ In normal usage, `borg_passphrase` is also required at execution time. The templ
 
 `container_root` and `volume_root` are intentionally part of the practical contract because caller-supplied Borg create modules usually reference them.
 
+### Working Directory and Impersonation
+
+The Docker lifecycle subprocesses run through `runuser -u <docker_user>`, which preserves the subprocess working directory. Without an explicit `command.working_directory`, the command inherits Cyborg's current directory. That inherited directory may be inaccessible after privileges are dropped—for example, a root-started workflow running from `/root`—and Docker Compose may fail while inspecting `.` even when the Compose file is supplied through an absolute `-f` path.
+
+Configure both internal Docker subprocess commands with:
+
+```json
+"working_directory": "${container_root}"
+```
+
+The resolved path must be rooted, normalized, exist before execution, and be traversable by `docker_user`. Setting the working directory to the Compose project directory also makes execution independent of whether Cyborg was started interactively, by cron, or by another service manager.
+
 ### Injected Override Surface
 
 For each current `host`, the template injects ambient Borg overrides under the `borg_tasks` tag.
@@ -113,6 +126,7 @@ The template deliberately exposes a small override surface on its internal subpr
 Common override examples are:
 
 - `@docker_tasks.command.executable`
+- `@docker_tasks.command.working_directory`
 - `@docker_tasks.impersonation.user`
 - `@docker_tasks.down.command.arguments`
 - `@docker_tasks.up.command.arguments`
@@ -121,7 +135,7 @@ Common override examples are:
 
 ### Purpose
 
-This template is the systemd-oriented counterpart to the Docker backup template. It stops a service, runs Borg create/prune/compact for each backup host, and starts the service again in a `finally` block.
+This template is the systemd-oriented counterpart to the Docker backup template. It stops a service, runs Borg create/prune/compact for each configured backup host, and starts the service again in a `finally` block.
 
 ### Required Arguments
 
