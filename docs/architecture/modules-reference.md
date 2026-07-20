@@ -787,8 +787,8 @@ Creates a new archive in a borg v1.4.X repository.
 | `archive_name` | string | Yes | -- | -- | Name for the new archive. |
 | `source_path` | string | Yes | -- | Must exist on disk (directory) | Directory to back up. |
 | `compression` | string | No | `"lz4"` | Must match borg compression grammar: `none`, `lz4`, `zstd[,1-22]`, `zlib[,0-9]`, `lzma[,0-9]`, or `auto,<method>` | Compression algorithm. |
-| `exclude` | object | No | `{ "caches": false, "paths": [] }` | -- | Exclusion options. |
-| `files_cache_sentinel` | object | No | `{ "enabled": false, "archive_path": ".cyborg", "sentinel_file_name": "borg_files_cache.sentinel" }` | -- | Borg files-cache sentinel options. |
+| `exclude` | object | No | `{ "caches": false, "paths": [] }` | -- | Exclusion options. Dynamic value type: `cyborg.types.borg.exclude.v1.4`. |
+| `files_cache_sentinel` | object | No | `{ "enabled": false, "archive_path": ".cyborg", "sentinel_file_name": "borg_files_cache.sentinel" }` | -- | Borg files-cache sentinel options. Dynamic value type: `cyborg.types.borg.files_cache_sentinel.v1.4`. |
 
 **Exclude Options:**
 
