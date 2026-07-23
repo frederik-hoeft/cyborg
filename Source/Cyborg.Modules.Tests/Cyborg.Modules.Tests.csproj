@@ -16,5 +16,6 @@
     <ItemGroup>
         <ProjectReference Include="..\Cyborg.Core\Cyborg.Core.csproj" />
         <ProjectReference Include="..\Cyborg.Modules\Cyborg.Modules.csproj" />
+        <ProjectReference Include="..\Cyborg.Modules.Borg\Cyborg.Modules.Borg.csproj" />
     </ItemGroup>
 </Project>
