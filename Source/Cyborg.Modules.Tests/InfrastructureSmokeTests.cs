@@ -20,7 +20,7 @@ public sealed class InfrastructureSmokeTests : ModuleTestBase
     {
         await TestDeserializationAsync<EmptyModule>(
             EMPTY_MODULE_JSON,
-            async module => 
+            module => 
             {
                 MSAssert.AreEqual("cyborg.modules.empty.v1", EmptyModule.ModuleId);
             });
