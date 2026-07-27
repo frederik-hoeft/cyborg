@@ -12,3 +12,4 @@ Cyborg is a .NET 10 application providing modular, JSON-configured backup orches
 | [Templates Reference](architecture/templates-reference.md) | Template module usage and patterns |
 | [Source Generators](architecture/source-generators.md) | Roslyn source generators for AOT-compatible code generation |
 | [Validation Attributes Reference](architecture/validation-attributes-reference.md) | Complete reference for validation, defaulting, and override control attributes |
+| [Workflow Debugging](architecture/debugging.md) | Breakpoints, interactive REPL, module inspection, and debug adapter architecture |

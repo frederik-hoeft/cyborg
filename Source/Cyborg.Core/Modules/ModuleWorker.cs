@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Configuration.Model;
+using Cyborg.Core.Modules.Debugging;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments.Artifacts;
 using Cyborg.Core.Modules.Validation;
@@ -70,6 +71,20 @@ public abstract class ModuleWorker<TModule>(IWorkerContext<TModule> context) : I
         Logger.LogModuleValidationCompleted(ModuleId);
         Module = overriddenResult.Module;
         Artifacts = artifactsFactory.CreateArtifacts(runtime, Module);
+
+        // Debug boundary: after load/init/validation, before ExecuteAsync.
+        // Debugger is optional - hosts that never register it take the null path with no behavior change.
+        // When registered but idle (no breakpoints), IsEnabled is false and this is a single property read.
+        IWorkflowDebugger? debugger = ServiceProvider.GetService<IWorkflowDebugger>();
+        if (debugger is { IsEnabled: true })
+        {
+            DebugResumeAction resumeAction = await debugger.EvaluatePreExecutionAsync(Module, ModuleId, runtime, cancellationToken);
+            if (resumeAction is DebugResumeAction.Cancel)
+            {
+                return runtime.Exit(Canceled());
+            }
+        }
+
         return await ExecuteAsync(runtime, cancellationToken);
     }
 

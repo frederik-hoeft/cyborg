@@ -37,13 +37,13 @@
     </ItemGroup>
     
     <ItemGroup>
-      <None Update="*.dev.jconf">
+      <None Update="**/*.dev.jconf">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
     </ItemGroup>
     
     <ItemGroup>
-      <None Update="*.dev.jsecrets">
+      <None Update="**/*.dev.jsecrets">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
     </ItemGroup>

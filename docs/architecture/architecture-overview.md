@@ -9,6 +9,7 @@ For detailed reference material, see:
 - [Templates Reference](templates-reference.md) — Template module usage and patterns
 - [Source Generators](source-generators.md) — Roslyn source generators for AOT-compatible code generation
 - [Validation Attributes Reference](validation-attributes-reference.md) — Validation, defaulting, and override control attributes
+- [Workflow Debugging](debugging.md) — Breakpoints, interactive REPL, module inspection, and debug adapters
 
 **Table of Contents**
 

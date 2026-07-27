@@ -42,9 +42,10 @@ For the runtime architecture these generators integrate with, see [Architecture 
 
 `Cyborg.Core.Aot` is a Roslyn incremental generator assembly consumed by the module projects as an analyzer reference. It targets netstandard2.0 as required by the Roslyn analyzer hosting model. The generators produce the repetitive, reflection-equivalent code that would otherwise need to be written by hand for every module type.
 
-The generator layer covers three concerns:
+The generator layer covers four concerns:
 
 - **Module validation** — Generating the three-stage validation pipeline (`ApplyDefaultsAsync`, `ResolveOverridesAsync`, `ValidateAsync`) from annotated module records, transforming declarative attributes into executable validation, defaulting, and override resolution logic.
+- **Module inspection** — Generating `ToString` (short identity) and `IInspectable.Inspect` (full recursive state dump) on the same `[GeneratedModuleValidation]` partial records used for validation, so debugging works without per-module source changes. See [Workflow Debugging](debugging.md).
 - **Module loader factories** — Generating worker construction methods that resolve constructor dependencies from the DI container, eliminating boilerplate in module loaders.
 - **Model decomposition** — Generating `IDecomposable` implementations that project record properties into `DynamicKeyValuePair` collections for environment publishing and artifact flattening.
 
@@ -60,7 +61,7 @@ Each generator declares a contract enum whose members correspond to the runtime 
 
 | Contract | Members | Used By |
 |----------|---------|---------|
-| `ModuleValidationGeneratorContract` | `IModuleRuntime`, `IModuleT`, `ValidationResultT`, `ValidationError`, `IDefaultValueT`, `IParser` | Validation generator |
+| `ModuleValidationGeneratorContract` | `IModuleRuntime`, `IModuleT`, `ValidationResultT`, `ValidationError`, `IDefaultValueT`, `IParser`, `IInspectable` | Validation / inspection generator |
 | `ModuleLoaderFactoryGeneratorContract` | `IModuleWorker`, `ModuleLoaderT`, `IModuleWorkerContextT`, `ModuleWorkerContextImplementationT` | Loader factory generator |
 | `ModelDecompositionGeneratorContract` | `IDecomposable`, `DynamicKeyValuePair` | Decomposition generator |
 
@@ -135,7 +136,7 @@ The generator assembles its output through three section renderers, each impleme
 | `OverrideSectionRenderer` | `ResolveOverridesAsync` | Emits override resolution calls with aspect rewrite expressions |
 | `ValidationSectionRenderer` | `ValidateAsync` | Emits constraint checks from aspect validation logic |
 
-The `ModuleValidationRenderer` orchestrates these renderers sequentially into a single partial record declaration. It also emits file-scoped helper methods for default instance resolution and nullable relaxation.
+The `ModuleValidationRenderer` orchestrates these renderers sequentially into a single partial record declaration, and additionally runs `InspectionSectionRenderer` to emit `ToString` and `Inspect` while implementing `IInspectable`. It also emits file-scoped helper methods for default instance resolution and nullable relaxation.
 
 ### Nested and Collection Handling
 

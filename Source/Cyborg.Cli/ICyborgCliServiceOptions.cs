@@ -1,9 +1,12 @@
-﻿using Cyborg.Cli.Logging;
+﻿using Cyborg.Cli.Debugging;
+using Cyborg.Cli.Debugging.Commands;
+using Cyborg.Cli.Logging;
 using Cyborg.Cli.Logging.Options;
 using Cyborg.Cli.Metrics;
 using Cyborg.Core.Configuration;
 using Cyborg.Core.Configuration.Serialization.Dynamics;
 using Cyborg.Core.Logging;
+using Cyborg.Core.Modules.Debugging;
 using Jab;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
@@ -26,6 +29,14 @@ namespace Cyborg.Cli;
 [Singleton<JsonConverter>(Factory = nameof(CreateRollingIntervalConverter))]
 [Singleton<JsonConverter>(Factory = nameof(CreateLogFormatConverter))]
 [Singleton<JsonConverter>(Factory = nameof(CreateLogLevelConverter))]
+[Singleton<IDebugReplIo, ConsoleDebugReplIo>]
+[Singleton<IDebugReplCommand, ContinueCommand>]
+[Singleton<IDebugReplCommand, DetachCommand>]
+[Singleton<IDebugReplCommand, StepCommand>]
+[Singleton<IDebugReplCommand, InspectCommand>]
+[Singleton<IDebugReplCommand, CancelCommand>]
+[Singleton<IDebugReplCommand, BreakCommand>]
+[Singleton<IDebugFrontend, ConsoleDebugFrontend>]
 internal interface ICyborgCliServiceOptions
 {
     static ILoggerFactory CreateLoggerFactory(IConfiguration configuration, IEnumerable<ILoggingConfigurator> configurators) =>

@@ -91,7 +91,12 @@ cyborg run --main /path/to/cyborg.jconf -e target=daily
 
 # Override the console log level
 cyborg run -e target=daily --log-level information
+
+# Break before a named module and open the interactive debug REPL
+cyborg run -e target=daily --break-at 'my-step-name'
 ```
+
+When `--break-at` is set, execution pauses after the matching module is loaded, initialized, and validated, and before it runs. The debug REPL supports `continue`, `step`, `inspect`, breakpoint management, and `cancel`. See [Workflow Debugging](docs/architecture/debugging.md).
 
 The `target` environment variable selects which job to run (e.g., `daily`, `weekly`). Additional environment variables can be injected via `-e` with optional type annotations (e.g., `-e port:int=2222`).
 
@@ -137,6 +142,7 @@ Trust enforcement is configurable in `cyborg.options.jconf` and supports three m
 | [Templates Reference](docs/architecture/templates-reference.md) | Template module usage and patterns |
 | [Source Generators](docs/architecture/source-generators.md) | Roslyn source generators for AOT-compatible code generation |
 | [Validation Attributes Reference](docs/architecture/validation-attributes-reference.md) | Validation, defaulting, and override control attributes |
+| [Workflow Debugging](docs/architecture/debugging.md) | Breakpoints, interactive REPL, and module inspection |
 
 ## Project Structure
 

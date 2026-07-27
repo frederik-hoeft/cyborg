@@ -4,6 +4,7 @@ using Cyborg.Core.Configuration.Serialization;
 using Cyborg.Core.Configuration.Serialization.Dynamics;
 using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
+using Cyborg.Core.Modules.Debugging;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Runtime.Environments.Artifacts;
@@ -47,8 +48,10 @@ namespace Cyborg.Core;
 [Singleton<IPosixShellCommandBuilder, PosixShellCommandBuilder>]
 [Singleton<MetricsCollectorOptions>]
 [Singleton<IMetricsCollector, MetricsCollector>]
-[Singleton<JsonSerializerContext>(Factory = nameof(GetCoreJsonSerializerContext))]
+[Singleton<IBreakpointRegistry, BreakpointRegistry>]
+[Singleton<IWorkflowDebugger, WorkflowDebugger>]
 [Singleton<GlobalRuntimeEnvironment>]
+[Singleton<JsonSerializerContext>(Factory = nameof(GetCoreJsonSerializerContext))]
 public interface ICyborgCoreServices
 {
     static CoreJsonSerializerContext GetCoreJsonSerializerContext() => CoreJsonSerializerContext.Default;

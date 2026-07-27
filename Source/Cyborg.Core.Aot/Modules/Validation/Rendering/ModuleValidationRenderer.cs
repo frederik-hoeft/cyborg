@@ -24,6 +24,7 @@ internal static class ModuleValidationRenderer
             new DefaultsSectionRenderer(contractInfo, MODULE_VARIABLE, diagnosticsReporter),
             new OverrideSectionRenderer(contractInfo, MODULE_VARIABLE, diagnosticsReporter),
             new ValidationSectionRenderer(contractInfo, diagnosticsReporter),
+            new InspectionSectionRenderer(),
         ];
 
         StringBuilder builder = new();
@@ -42,7 +43,12 @@ internal static class ModuleValidationRenderer
             builder.AppendLine("{");
         }
 
-        builder.Append("partial record ").Append(model.TypeName).Append(" : ").Append(contractInfo.IModuleT.RenderGlobalWithGenerics(model.TypeName)).AppendLine();
+        builder.Append("partial record ").Append(model.TypeName)
+            .Append(" : ")
+            .Append(contractInfo.IModuleT.RenderGlobalWithGenerics(model.TypeName))
+            .Append(", ")
+            .Append(contractInfo.IInspectable.RenderGlobal())
+            .AppendLine();
         builder.AppendLine("{");
         IndentedStringBuilder indentedBuilder = new(builder, indentLevel: 1);
         for (int i = 0; i < renderPipeline.Length; ++i)
