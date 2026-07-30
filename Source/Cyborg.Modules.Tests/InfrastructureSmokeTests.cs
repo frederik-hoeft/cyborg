@@ -1,6 +1,5 @@
 ﻿using Cyborg.Core.Modules.Runtime;
 using Cyborg.Modules.Empty;
-using Cyborg.Modules.Tests.Infrastructure;
 
 namespace Cyborg.Modules.Tests;
 
@@ -16,42 +15,26 @@ public sealed class InfrastructureSmokeTests : ModuleTestBase
         """;
 
     [TestMethod]
-    public async Task TestDeserializationAsync_EmptyModule_DeserializesCorrectlyAsync()
-    {
-        await TestDeserializationAsync<EmptyModule>(
-            EMPTY_MODULE_JSON,
-            module => 
-            {
-                MSAssert.AreEqual("cyborg.modules.empty.v1", EmptyModule.ModuleId);
-            });
-    }
+    public Task TestDeserializationAsync_EmptyModule_DeserializesCorrectlyAsync() =>
+        TestDeserializationAsync<EmptyModule>(EMPTY_MODULE_JSON, module =>
+            MSAssert.AreEqual("cyborg.modules.empty.v1", EmptyModule.ModuleId));
 
     [TestMethod]
-    public async Task TestExecutionAsync_EmptyModule_ReturnsSuccessAsync()
-    {
-        await TestExecutionAsync(
-            EMPTY_MODULE_JSON,
-            result => MSAssert.AreEqual(ModuleExitStatus.Success, result.Status));
-    }
+    public Task TestValidationAsync_EmptyModule_ProducesValidResultAsync() =>
+        TestValidationAsync<EmptyModule>(EMPTY_MODULE_JSON, result =>
+            MSAssert.IsTrue(result.IsValid));
 
     [TestMethod]
-    public async Task TestValidationAsync_EmptyModule_ProducesValidResultAsync()
-    {
-        await TestValidationAsync<EmptyModule>(
-            EMPTY_MODULE_JSON,
-            result => MSAssert.IsTrue(result.IsValid));
-    }
+    public Task TestModuleAsync_EmptyModule_WorkerAndModuleAreAvailableAsync() =>
+        TestModuleAsync<EmptyModule, EmptyModuleWorker>(EMPTY_MODULE_JSON, (module, worker, result) =>
+        {
+            MSAssert.AreEqual(ModuleExitStatus.Success, result.Status);
+            MSAssert.IsNotNull(module);
+            MSAssert.IsNotNull(worker);
+        });
 
     [TestMethod]
-    public async Task TestModuleAsync_EmptyModule_WorkerAndModuleAreAvailableAsync()
-    {
-        await TestModuleAsync<EmptyModule, EmptyModuleWorker>(
-            EMPTY_MODULE_JSON,
-            (module, worker, result) =>
-            {
-                MSAssert.AreEqual(ModuleExitStatus.Success, result.Status);
-                MSAssert.IsNotNull(module);
-                MSAssert.IsNotNull(worker);
-            });
-    }
+    public Task TestExecutionAsync_EmptyModule_ReturnsSuccessAsync() =>
+        TestExecutionAsync(EMPTY_MODULE_JSON, result =>
+            MSAssert.AreEqual(ModuleExitStatus.Success, result.Status));
 }

@@ -84,11 +84,13 @@ The adapter is structured as a layered set of components, each with a single res
         │ Discovery            │             │
         │                      │   ┌─────────▼────────────────┐
         │  Reflects over Jab   │   │  Production runtime:     │
-        │  [Singleton<>] and   │   │  RootModuleRuntime,      │
-        │  [Import<>] attrs    │   │  GlobalRuntimeEnvironment│
-        │  to build MEDI       │   │  IJsonLoaderContext,     │
-        │  registrations       │   │  IModuleLoaderRegistry   │
-        └──────────────────────┘   └──────────────────────────┘
+        │  [Singleton<>],      │   │  RootModuleRuntime,      │
+        │  [Scoped<>],         │   │  GlobalRuntimeEnvironment│
+        │  [Transient<>] and   │   │  IJsonLoaderContext,     │
+        │  [Import<>] attrs    │   │  IModuleLoaderRegistry   │
+        │  to build MEDI       │   └──────────────────────────┘
+        │  registrations       │
+        └──────────────────────┘
 ```
 
 ### JabRegistrationDiscovery
@@ -99,8 +101,9 @@ Translates Jab's compile-time DI declarations into MEDI runtime registrations vi
 
 Key behaviors:
 - Recursively processes `[Import<TModule>]` references (depth-first) to capture the full service graph across module boundaries (`ICyborgCoreServices` → `IDynamicValueProviderServices`, `IConfigurationTrustServices`, etc.).
-- Handles factory-based singletons by invoking the static factory method on the declaring interface with parameters resolved from the service provider.
-- Handles constructor-based singletons via `ActivatorUtilities.CreateInstance`.
+- Supports all three Jab service lifetimes: `[Singleton<T>]`, `[Scoped<T>]`, and `[Transient<T>]` (each in one- and two-type-argument forms).
+- Handles factory-based registrations by invoking the static factory method on the declaring interface with parameters resolved from the service provider.
+- Handles constructor-based registrations via `ActivatorUtilities.CreateInstance`.
 
 ### TestServiceConfiguration
 
@@ -139,12 +142,21 @@ The public base class for per-module unit tests. It is a façade that exposes a 
 
 All HOF methods follow a consistent pattern: they accept an optional `moduleJson` string, a required assertion callback (lambda), and optional configuration overrides. The assertion lambda receives only the data relevant to the specific test scenario, keeping test code focused and free of boilerplate.
 
+Each HOF method provides two overloads:
+- **Async overload** — accepts a `Func<..., Task>` assertion; this is the primary implementation.
+- **Sync overload** — accepts an `Action<...>` assertion and delegates to the async overload; a convenience wrapper for simple test cases that don't require async assertions.
+
 ### Deserialization Testing
 
 ```csharp
 protected Task TestDeserializationAsync<TModule>(
     string? moduleJson,
-    Action<TModule> assertion,
+    Func<TModule, Task> assertion,          // async overload
+    Action<IServiceCollection>? configureServices = null)
+
+protected Task TestDeserializationAsync<TModule>(
+    string? moduleJson,
+    Action<TModule> assertion,              // sync overload
     Action<IServiceCollection>? configureServices = null)
 ```
 
@@ -153,7 +165,12 @@ Deserializes the module JSON and passes the typed module record to the assertion
 ```csharp
 protected Task TestContextDeserializationAsync(
     string? moduleContextJson,
-    Action<ModuleContext> assertion,
+    Func<ModuleContext, Task> assertion,    // async overload
+    Action<IServiceCollection>? configureServices = null)
+
+protected Task TestContextDeserializationAsync(
+    string? moduleContextJson,
+    Action<ModuleContext> assertion,        // sync overload
     Action<IServiceCollection>? configureServices = null)
 ```
 
@@ -164,7 +181,12 @@ Deserializes a full module context JSON and passes the `ModuleContext` to the as
 ```csharp
 protected Task TestValidationAsync<TModule>(
     string? moduleJson,
-    Action<ValidationResult<TModule>> assertion,
+    Func<ValidationResult<TModule>, Task> assertion,  // async overload
+    Action<IServiceCollection>? configureServices = null)
+
+protected Task TestValidationAsync<TModule>(
+    string? moduleJson,
+    Action<ValidationResult<TModule>> assertion,      // sync overload
     Action<IServiceCollection>? configureServices = null)
 ```
 
@@ -185,7 +207,13 @@ Validates the module and asserts validity, then passes the validated module and 
 protected Task TestOverridesAsync<TModule>(
     string? moduleJson,
     Action<IRuntimeEnvironment> environmentSetup,
-    Action<TModule> assertion,
+    Func<TModule, Task> assertion,          // async overload
+    Action<IServiceCollection>? configureServices = null)
+
+protected Task TestOverridesAsync<TModule>(
+    string? moduleJson,
+    Action<IRuntimeEnvironment> environmentSetup,
+    Action<TModule> assertion,              // sync overload
     Action<IServiceCollection>? configureServices = null)
 ```
 
@@ -196,19 +224,29 @@ Configures environment variables via the `environmentSetup` callback, then runs 
 ```csharp
 protected Task TestModuleAsync<TModule, TWorker>(
     string? moduleJson,
-    Func<TModule, TWorker, IModuleExecutionResult, Task> assertion,
+    Func<TModule, TWorker, IModuleExecutionResult, Task> assertion,  // async overload
+    Action<IRuntimeEnvironment>? environmentSetup = null,
+    Action<IServiceCollection>? configureServices = null)
+
+protected Task TestModuleAsync<TModule, TWorker>(
+    string? moduleJson,
+    Action<TModule, TWorker, IModuleExecutionResult> assertion,      // sync overload
     Action<IRuntimeEnvironment>? environmentSetup = null,
     Action<IServiceCollection>? configureServices = null)
 ```
 
 Deserializes, executes, and passes the module record, typed worker, and execution result to the assertion. This is the primary HOF for testing worker correctness, result publishing, and artifact exposure.
 
-A synchronous `Action<TModule, TWorker, IModuleExecutionResult>` overload is also provided for simpler test cases.
-
 ```csharp
 protected Task TestExecutionAsync(
     string? moduleJson,
-    Action<IModuleExecutionResult> assertion,
+    Func<IModuleExecutionResult, Task> assertion,  // async overload
+    Action<IRuntimeEnvironment>? environmentSetup = null,
+    Action<IServiceCollection>? configureServices = null)
+
+protected Task TestExecutionAsync(
+    string? moduleJson,
+    Action<IModuleExecutionResult> assertion,      // sync overload
     Action<IRuntimeEnvironment>? environmentSetup = null,
     Action<IServiceCollection>? configureServices = null)
 ```
@@ -220,7 +258,13 @@ Simplified variant that passes only the execution result to the assertion.
 ```csharp
 protected Task TestExecutionThrowsAsync<TException>(
     string? moduleJson,
-    Action<TException>? assertion = null,
+    Func<TException, Task>? assertion = null,  // async overload
+    Action<IRuntimeEnvironment>? environmentSetup = null,
+    Action<IServiceCollection>? configureServices = null)
+
+protected Task TestExecutionThrowsAsync<TException>(
+    string? moduleJson,
+    Action<TException>? assertion,             // sync overload
     Action<IRuntimeEnvironment>? environmentSetup = null,
     Action<IServiceCollection>? configureServices = null)
 ```

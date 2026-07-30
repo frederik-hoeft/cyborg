@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
-namespace Cyborg.Modules.Tests.Infrastructure;
+namespace Cyborg.Core.TestAdapter;
 
 /// <summary>
 /// Encapsulates the module runtime environment, service provider, and deserialization context
