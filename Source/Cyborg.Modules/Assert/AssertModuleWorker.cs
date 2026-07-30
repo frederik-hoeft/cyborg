@@ -27,8 +27,7 @@ public sealed class AssertModuleWorker(IWorkerContext<AssertModule> context) : C
         }
         if (!condition)
         {
-            string message = runtime.Environment.Interpolate(Module.Message);
-            AssertModuleResult failure = new(message);
+            AssertModuleResult failure = new(Module.Message);
             return runtime.Exit(Failed(failure));
         }
         return runtime.Exit(Success());
