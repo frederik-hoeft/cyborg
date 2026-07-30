@@ -1,6 +1,6 @@
 # Module Testing Architecture
 
-This document describes the design and architecture of the reusable unit testing adapter in `Cyborg.Modules.Tests`. The adapter provides a base test class for MSTest that abstracts away module loading, DI container construction, and runtime initialization, enabling per-module unit test classes with minimal boilerplate.
+This document describes the design and architecture of the reusable unit testing adapter. The adapter is split across two layers: `Cyborg.Core.TestAdapter` (a shared library providing the base class and DI infrastructure) and per-domain test projects (`Cyborg.Modules.Tests`, `Cyborg.Modules.Borg.Tests`) that extend it with domain-specific service registrations.
 
 **Table of Contents**
 
@@ -11,10 +11,11 @@ This document describes the design and architecture of the reusable unit testing
 - [Overview](#overview)
 - [Component Architecture](#component-architecture)
   - [Component Diagram](#component-diagram)
-  - [JabRegistrationDiscovery](#jabregistrationdiscovery)
+  - [JabServiceDiscovery](#jabservicediscovery)
   - [TestServiceConfiguration](#testserviceconfiguration)
   - [TestModuleRuntimeScope](#testmoduleruntimescope)
-  - [ModuleTestBase](#moduletestbase)
+  - [CyborgTestBase](#cyborgtestbase)
+  - [Per-Domain Test Base Classes](#per-domain-test-base-classes)
 - [Higher-Order Function API](#higher-order-function-api)
   - [Deserialization Testing](#deserialization-testing)
   - [Validation Testing](#validation-testing)
@@ -44,60 +45,73 @@ The testing adapter enables writing per-module unit tests that cover the followi
 4. **Worker execution and artifact publishing** — Asserting actual vs. expected module results, exit statuses, artifact paths, and published environment variables after execution.
 5. **Exception handling and error reporting** — Testing that execution produces expected exceptions or error states (validation failures, skipped/failed statuses).
 
-The adapter is structured as a layered set of components, each with a single responsibility, composed behind the `ModuleTestBase` façade class.
+The adapter is structured as a layered set of components, each with a single responsibility, composed behind the `CyborgTestBase` façade class in `Cyborg.Core.TestAdapter`.
 
 ## Component Architecture
 
 ### Component Diagram
 
 ```
-┌──────────────────────────────────────────────────────────────────────────┐
-│  Per-Module Test Class (extends ModuleTestBase)                         │
-│  ┌────────────────────────────────────────────────────────────────────┐  │
-│  │  TestMethod: calls HOF methods with module JSON + assertion       │  │
-│  └────────────────────────────────┬───────────────────────────────────┘  │
-└───────────────────────────────────┼──────────────────────────────────────┘
-                                    │
-                    ┌───────────────▼──────────────┐
-                    │       ModuleTestBase          │
-                    │  (HOF façade, public API)     │
-                    │                               │
-                    │  • TestDeserializationAsync   │
-                    │  • TestValidationAsync        │
-                    │  • TestOverridesAsync         │
-                    │  • TestModuleAsync            │
-                    │  • TestExecutionAsync         │
-                    │  • TestExecutionThrowsAsync   │
-                    │  • TestModuleContextAsync     │
-                    └──────┬────────────┬───────────┘
-                           │            │
-        ┌──────────────────▼──┐  ┌──────▼──────────────────────┐
-        │ TestService-         │  │ TestModuleRuntimeScope      │
-        │ Configuration        │  │                             │
-        │                      │  │  • Runtime + Environment    │
-        │  CreateDefault-      │  │  • DeserializeModule()      │
-        │    Services()        │  │  • ExecuteAsync()           │
-        └──────────┬───────────┘  │  • IAsyncDisposable         │
-                   │              └──────────┬──────────────────┘
-        ┌──────────▼───────────┐             │
-        │ JabRegistration-     │             │ uses
-        │ Discovery            │             │
-        │                      │   ┌─────────▼────────────────┐
-        │  Reflects over Jab   │   │  Production runtime:     │
-        │  [Singleton<>],      │   │  RootModuleRuntime,      │
-        │  [Scoped<>],         │   │  GlobalRuntimeEnvironment│
-        │  [Transient<>] and   │   │  IJsonLoaderContext,     │
-        │  [Import<>] attrs    │   │  IModuleLoaderRegistry   │
-        │  to build MEDI       │   └──────────────────────────┘
-        │  registrations       │
-        └──────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────────┐
+│  Per-Module Test Class (extends ModuleTestBase or BorgModuleTestBase)               │
+│  ┌────────────────────────────────────────────────────────────────────────────────┐  │
+│  │  TestMethod: calls HOF methods with module JSON + assertion                  │  │
+│  └─────────────────────────────────────┬──────────────────────────────────────────┘  │
+└────────────────────────────────────────┼─────────────────────────────────────────────┘
+                                         │
+         ┌───────────────────────────────┼──────────────────────────────┐
+         │                               │                              │
+┌────────▼──────────────┐    ┌───────────▼────────────────┐  ┌─────────▼────────────────┐
+│ ModuleTestBase         │    │ BorgModuleTestBase          │  │ (future domain base)     │
+│ (Cyborg.Modules.Tests) │    │ (Cyborg.Modules.Borg.Tests) │  │                          │
+│                        │    │                             │  │                          │
+│ + ICyborgModuleServices│    │ + ICyborgModuleServices     │  │ + domain-specific        │
+│   via ConfigureServices│    │ + ICyborgBorgServices       │  │   Jab modules            │
+└──────────┬─────────────┘    └─────────────┬───────────────┘  └─────────────┬────────────┘
+           └─────────────────────────────────┴──────────────────────────────┬─┘
+                                                                             │ extends
+                                                          ┌──────────────────▼──────────────────┐
+                                                          │         CyborgTestBase               │
+                                                          │  (Cyborg.Core.TestAdapter)           │
+                                                          │  (HOF façade, public API)            │
+                                                          │                                      │
+                                                          │  + ICyborgCoreServices               │
+                                                          │  • TestDeserializationAsync          │
+                                                          │  • TestValidationAsync               │
+                                                          │  • TestOverridesAsync                │
+                                                          │  • TestModuleAsync                   │
+                                                          │  • TestExecutionAsync                │
+                                                          │  • TestExecutionThrowsAsync          │
+                                                          │  • TestModuleContextAsync            │
+                                                          └────────┬──────────────┬──────────────┘
+                                                                   │              │
+                                          ┌────────────────────────▼──┐  ┌────────▼────────────────────┐
+                                          │ TestServiceConfiguration   │  │ TestModuleRuntimeScope      │
+                                          │                            │  │                             │
+                                          │  CreateDefaultServices()   │  │  • Runtime + Environment    │
+                                          │  returns empty             │  │  • DeserializeModule()      │
+                                          │  ServiceCollection         │  │  • ExecuteAsync()           │
+                                          └──────────┬─────────────────┘  │  • IAsyncDisposable         │
+                                                     │                    └──────────┬──────────────────┘
+                                          ┌──────────▼───────────┐                  │
+                                          │ IJabServiceDiscovery  │                  │ uses
+                                          │ JabServiceDiscovery   │       ┌──────────▼────────────────┐
+                                          │                       │       │  Production runtime:      │
+                                          │  Reflects over Jab    │       │  RootModuleRuntime,       │
+                                          │  [Singleton<>],       │       │  GlobalRuntimeEnvironment │
+                                          │  [Scoped<>],          │       │  IJsonLoaderContext,      │
+                                          │  [Transient<>] and    │       │  IModuleLoaderRegistry    │
+                                          │  [Import<>] attrs     │       └───────────────────────────┘
+                                          │  to build MEDI        │
+                                          │  registrations        │
+                                          └───────────────────────┘
 ```
 
-### JabRegistrationDiscovery
+### JabServiceDiscovery
 
-**File:** `Infrastructure/JabRegistrationDiscovery.cs`
+**File:** `Cyborg.Core.TestAdapter/JabServiceDiscovery.cs` (implements `IJabServiceDiscovery`)
 
-Translates Jab's compile-time DI declarations into MEDI runtime registrations via reflection. Jab generates its attribute types as `internal` within each project, so this class uses `CustomAttributeData` and matches attributes by their unbound generic name in the `Jab` namespace (e.g., `SingletonAttribute\`1`, `ImportAttribute\`1`) rather than direct type comparison.
+Translates Jab's compile-time DI declarations into MEDI runtime registrations via reflection. Jab generates its attribute types as `internal` within each project, so the test adapter references Jab directly and uses `typeof(SingletonAttribute<>).Name` etc. to obtain stable, compiler-checked attribute names. Matching is done by name and namespace against `CustomAttributeData` (not by type identity, since each assembly gets its own internal copy).
 
 Key behaviors:
 - Recursively processes `[Import<TModule>]` references (depth-first) to capture the full service graph across module boundaries (`ICyborgCoreServices` → `IDynamicValueProviderServices`, `IConfigurationTrustServices`, etc.).
@@ -107,13 +121,13 @@ Key behaviors:
 
 ### TestServiceConfiguration
 
-**File:** `Infrastructure/TestServiceConfiguration.cs`
+**File:** `Cyborg.Core.TestAdapter/TestServiceConfiguration.cs`
 
-Provides a single static factory method `CreateDefaultServices()` that builds an `IServiceCollection` pre-populated with all production Jab modules (`ICyborgCoreServices`, `ICyborgModuleServices`, `ICyborgBorgServices`) plus a default silent `ILoggerFactory`. The returned collection is mutable, enabling callers to override or extend registrations before the service provider is built.
+Provides a single static factory method `CreateDefaultServices()` that returns a new empty `IServiceCollection`. The actual service registrations happen through the `ConfigureServices` override chain (see [Service Configuration Model](#service-configuration-model)) rather than here. The returned collection is mutable, enabling callers to add services before the service provider is built.
 
 ### TestModuleRuntimeScope
 
-**File:** `Infrastructure/TestModuleRuntimeScope.cs`
+**File:** `Cyborg.Core.TestAdapter/TestModuleRuntimeScope.cs`
 
 Encapsulates the per-test lifecycle: builds a `ServiceProvider` from the configured `IServiceCollection`, constructs a `RootModuleRuntime` with a fresh `GlobalRuntimeEnvironment`, and provides methods for module deserialization and execution. Implements `IAsyncDisposable` for deterministic cleanup.
 
@@ -125,18 +139,31 @@ Key methods:
 - `ExecuteAsync(IModuleWorker, CancellationToken)` — Executes a module worker within the scope's runtime.
 - `ExecuteAsync(ModuleContext, CancellationToken)` — Executes a full module context (with environment setup, configuration, and requires).
 
-### ModuleTestBase
+### CyborgTestBase
 
-**File:** `Infrastructure/ModuleTestBase.cs`
+**File:** `Cyborg.Core.TestAdapter/CyborgTestBase.cs`
 
-The public base class for per-module unit tests. It is a façade that exposes a collection of higher-order function (HOF) methods as the primary test API. Each HOF method:
+The public base class for all module unit tests. It is a façade that exposes a collection of higher-order function (HOF) methods as the primary test API. Each HOF method:
 
 1. Resolves the module JSON source (explicit parameter or `GetDefaultModuleJsonAsync()` fallback).
-2. Builds a fresh `IServiceCollection` via `TestServiceConfiguration`, applies per-test-class overrides (`ConfigureServices`), then per-test-case overrides (optional lambda).
-3. Creates a `TestModuleRuntimeScope`.
-4. Executes the test-specific pipeline (deserialization, validation, execution, etc.).
-5. Invokes the caller-provided assertion lambda with the results.
-6. Disposes the scope.
+2. Creates an empty `IServiceCollection` via `TestServiceConfiguration.CreateDefaultServices()`.
+3. Calls `ConfigureServices(services, jabServiceDiscovery)`, which — via the override chain — registers the full production Jab DI graph for the domain under test.
+4. Applies per-test-case service overrides (optional lambda).
+5. Creates a `TestModuleRuntimeScope`.
+6. Executes the test-specific pipeline (deserialization, validation, execution, etc.).
+7. Invokes the caller-provided assertion lambda with the results.
+8. Disposes the scope.
+
+`CyborgTestBase.ConfigureServices` registers `ICyborgCoreServices` and a default silent `ILoggerFactory`. Domain-specific subclasses extend this by calling `base.ConfigureServices` and then registering their own Jab modules.
+
+### Per-Domain Test Base Classes
+
+Each test project provides a thin subclass of `CyborgTestBase` that registers the Jab modules relevant to that domain:
+
+| Class | Project | Registers |
+|-------|---------|----------|
+| `ModuleTestBase` | `Cyborg.Modules.Tests` | `ICyborgModuleServices` |
+| `BorgModuleTestBase` | `Cyborg.Modules.Borg.Tests` | `ICyborgModuleServices` + `ICyborgBorgServices` |
 
 ## Higher-Order Function API
 
@@ -287,13 +314,14 @@ Deserializes and executes a full module context (with environment scoping, confi
 
 ### Per-Test-Class Configuration
 
-Override `ConfigureServices(IServiceCollection)` in a derived test class to apply registrations that affect every test in the class:
+Override `ConfigureServices(IServiceCollection, IJabServiceDiscovery)` in a derived test class to apply registrations that affect every test in the class. Always call `base.ConfigureServices` to preserve the registration chain:
 
 ```csharp
 public sealed class MyModuleTests : ModuleTestBase
 {
-    protected override void ConfigureServices(IServiceCollection services)
+    protected override void ConfigureServices(IServiceCollection services, IJabServiceDiscovery jabServiceDiscovery)
     {
+        base.ConfigureServices(services, jabServiceDiscovery);
         // Replace the process dispatcher with a mock for all tests in this class
         services.AddSingleton<IChildProcessDispatcher, MockChildProcessDispatcher>();
     }
@@ -372,12 +400,13 @@ This ensures complete isolation between tests, even when running in parallel (as
 
 ### Reflection-Based Jab Discovery
 
-The production codebase uses [Jab](https://github.com/pakrym/jab) for compile-time dependency injection, which generates code for each `[ServiceProvider]` or `[ServiceProviderModule]` interface. Since Jab generates its attribute types as `internal` within each project, the test project cannot directly reference them. The `JabRegistrationDiscovery` class uses `CustomAttributeData` and string-based attribute type matching to scan the production interfaces and translate their declarations into MEDI registrations.
+The production codebase uses [Jab](https://github.com/pakrym/jab) for compile-time dependency injection, which generates code for each `[ServiceProvider]` or `[ServiceProviderModule]` interface. Jab generates its attribute types as `internal` within each referencing project — so `Cyborg.Core`'s `SingletonAttribute<T>` and `Cyborg.Modules`'s `SingletonAttribute<T>` are distinct CLR types even though they share the same name and namespace.
 
-This approach was chosen over alternatives:
-- **Manually duplicating registrations** — Brittle and error-prone; adding a new service to a Jab module would silently break tests.
-- **Adding Jab to the test project** — Would introduce unnecessary source generation and constraint the test project's DI to compile-time patterns.
-- **Using the production `DefaultServiceProvider`** — The Jab-generated service provider is `internal` and `sealed`, making it inaccessible from the test project without exposing production internals.
+The `JabServiceDiscovery` class works around this by:
+1. **Referencing Jab directly** in `Cyborg.Core.TestAdapter` to obtain stable, compiler-checked attribute names via `typeof(SingletonAttribute<>).Name` etc.
+2. **Matching by name and namespace** using `CustomAttributeData`, not by type identity, so scanned attributes from any assembly are correctly identified regardless of which assembly's internal copy they originate from.
+
+This approach was chosen over the alternative of manually duplicating registrations, which would be brittle and error-prone — adding a new service to a Jab module would silently break tests.
 
 ### Facade Pattern Over Monolith
 
@@ -385,13 +414,14 @@ This approach was chosen over alternatives:
 
 | Component | Responsibility |
 |-----------|----------------|
-| `JabRegistrationDiscovery` | Jab → MEDI attribute translation |
-| `TestServiceConfiguration` | Default service collection assembly |
+| `JabServiceDiscovery` | Jab → MEDI attribute translation |
+| `TestServiceConfiguration` | Empty service collection factory |
 | `TestModuleRuntimeScope` | Per-test runtime lifecycle management |
-| `ModuleTestBase` | HOF API and JSON resolution |
+| `CyborgTestBase` | HOF API, JSON resolution, core service registration |
+| `ModuleTestBase` / `BorgModuleTestBase` | Domain-specific Jab module registration |
 
 This separation ensures maintainability: changes to the DI translation logic do not affect the test API surface, and new HOF methods can be added to `ModuleTestBase` without touching the infrastructure components.
 
 ### InternalsVisibleTo
 
-A single `[assembly: InternalsVisibleTo("Cyborg.Modules.Tests")]` was added to `Cyborg.Core/_friends.cs` to grant the test project access to `internal` runtime APIs (e.g., `IModuleWorker.ExecuteAsync`, `ScopedRuntime`, `ModuleExecutionResult`). This is a minimal, non-breaking change that follows the existing pattern used for `Cyborg.Core.Tests`.
+`[assembly: InternalsVisibleTo("...")]` entries are declared in `Cyborg.Core/_friends.cs` for each test project (`Cyborg.Core.Tests`, `Cyborg.Modules.Tests`, `Cyborg.Modules.Borg.Tests`) to grant access to `internal` runtime APIs (e.g., `IModuleWorker.ExecuteAsync`, `ScopedRuntime`, `ModuleExecutionResult`). This follows the existing pattern already used for `Cyborg.Core.Tests`.

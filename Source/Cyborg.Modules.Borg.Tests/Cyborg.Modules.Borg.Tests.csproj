@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <IsTestProject>true</IsTestProject>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+        <PackageReference Include="MSTest.TestAdapter" Version="4.3.3" />
+        <PackageReference Include="MSTest.TestFramework" Version="4.3.3" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Cyborg.Core.TestAdapter\Cyborg.Core.TestAdapter.csproj" />
+        <ProjectReference Include="..\Cyborg.Core\Cyborg.Core.csproj" />
+        <ProjectReference Include="..\Cyborg.Modules\Cyborg.Modules.csproj" />
+        <ProjectReference Include="..\Cyborg.Modules.Borg\Cyborg.Modules.Borg.csproj" />
+    </ItemGroup>
+</Project>

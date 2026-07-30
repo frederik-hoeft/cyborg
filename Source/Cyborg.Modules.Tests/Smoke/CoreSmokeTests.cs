@@ -1,13 +1,13 @@
 ﻿using Cyborg.Core.Modules.Runtime;
 using Cyborg.Modules.Empty;
 
-namespace Cyborg.Modules.Tests;
+namespace Cyborg.Modules.Tests.Smoke;
 
 /// <summary>
 /// Smoke tests that verify the test infrastructure itself works correctly.
 /// </summary>
 [TestClass]
-public sealed class InfrastructureSmokeTests : ModuleTestBase
+public sealed class CoreSmokeTests : ModuleTestBase
 {
     private const string EMPTY_MODULE_JSON =
         """
