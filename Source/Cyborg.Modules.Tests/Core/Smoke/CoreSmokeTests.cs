@@ -1,7 +1,7 @@
 ﻿using Cyborg.Core.Modules.Runtime;
 using Cyborg.Modules.Empty;
 
-namespace Cyborg.Modules.Tests.Smoke;
+namespace Cyborg.Modules.Tests.Core.Smoke;
 
 /// <summary>
 /// Smoke tests that verify the test infrastructure itself works correctly.

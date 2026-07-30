@@ -44,7 +44,7 @@ For the runtime architecture these generators integrate with, see [Architecture 
 
 The generator layer covers three concerns:
 
-- **Module validation** — Generating the three-stage validation pipeline (`ApplyDefaultsAsync`, `ResolveOverridesAsync`, `ValidateAsync`) from annotated module records, transforming declarative attributes into executable validation, defaulting, and override resolution logic.
+- **Module validation** — Generating the four-stage validation pipeline (`ApplyDefaultsAsync`, `ResolveOverridesAsync`, `__ApplyInterpolation`, `ValidateAsync`) from annotated module records, transforming declarative attributes into executable validation, defaulting, override resolution, and auto-interpolation logic.
 - **Module loader factories** — Generating worker construction methods that resolve constructor dependencies from the DI container, eliminating boilerplate in module loaders.
 - **Model decomposition** — Generating `IDecomposable` implementations that project record properties into `DynamicKeyValuePair` collections for environment publishing and artifact flattening.
 
@@ -84,13 +84,15 @@ The generator is triggered by the `[GeneratedModuleValidation]` attribute on a `
 
 ### Generated Pipeline
 
-For each annotated record, the generator emits a partial record implementing `IModule<TModule>` with three async methods:
+For each annotated record, the generator emits a partial record implementing `IModule<TModule>` with three public async methods and one private static helper:
 
 1. **`ApplyDefaultsAsync`** — For each property carrying a default attribute (`[DefaultValue<T>]`, `[DefaultInstance]`, `[DefaultInstanceFactory]`, `[DefaultTimeSpan]`), emits a `with`-expression that replaces null or zero-valued properties with their declared defaults. Recursively applies defaults to nested records marked `[Validatable]` and to elements within collections.
 
 2. **`ResolveOverridesAsync`** — For each property not marked `[IgnoreOverrides]`, emits a call to `runtime.Environment.Resolve<TModule, T>()` to check for environment-driven overrides. The override resolution system (described in the architecture overview) uses `CallerArgumentExpression` to derive the property name, constructs lookup keys from the module's identifiers, and applies type conversion. Processors can customize the override resolution expression for specific property types (e.g., collections).
 
-3. **`ValidateAsync`** — For each property carrying a validation attribute, emits constraint checks and collects `ValidationError` instances. Returns `ValidationResult<TModule>.Valid(module)` if no errors were found, or `ValidationResult<TModule>.Invalid(module, errors)` otherwise. Validation recurses into nested validatable records and iterates collection elements.
+3. **`__ApplyInterpolation`** (private static helper) — Traverses every string-typed property on the module and its nested `[Validatable]` records and collections, replacing each string value with `runtime.Environment.Interpolate(value)` via `with`-expressions. Nullable strings that are `null` are left unchanged. This step runs inside `ValidateAsync` after defaults and overrides have been applied, so workers receive a fully resolved module and do not need to call `Interpolate` manually.
+
+4. **`ValidateAsync`** — Applies defaults, resolves overrides, re-applies defaults (to catch values injected by overrides), calls `__ApplyInterpolation`, then emits constraint checks and collects `ValidationError` instances. Returns `ValidationResult<TModule>.Valid(module)` if no errors were found, or `ValidationResult<TModule>.Invalid(errors)` otherwise. Validation recurses into nested validatable records and iterates collection elements.
 
 The generated code uses `with`-expressions throughout, ensuring that each stage produces a new record instance and that the original deserialized module is never mutated.
 
@@ -127,13 +129,14 @@ All attributes are defined in `Cyborg.Core.Aot` and emitted into the consuming c
 
 ### Rendering Pipeline
 
-The generator assembles its output through three section renderers, each implementing `ISectionRenderer`:
+The generator assembles its output through four section renderers, each implementing `ISectionRenderer`:
 
 | Renderer | Method Generated | Responsibility |
-|----------|-----------------|----------------|
+|----------|-----------------|-------------|
 | `DefaultsSectionRenderer` | `ApplyDefaultsAsync` | Emits default value assignments from aspect rewrite expressions |
 | `OverrideSectionRenderer` | `ResolveOverridesAsync` | Emits override resolution calls with aspect rewrite expressions |
-| `ValidationSectionRenderer` | `ValidateAsync` | Emits constraint checks from aspect validation logic |
+| `InterpolationSectionRenderer` | `__ApplyInterpolation` (private static) | Traverses all string-typed properties (including nested `[Validatable]` records and string collections) and rewrites them via `runtime.Environment.Interpolate()` using `with`-expressions; null values are preserved |
+| `ValidationSectionRenderer` | `ValidateAsync` | Applies defaults/overrides/interpolation, then emits constraint checks from aspect validation logic |
 
 The `ModuleValidationRenderer` orchestrates these renderers sequentially into a single partial record declaration. It also emits file-scoped helper methods for default instance resolution and nullable relaxation.
 

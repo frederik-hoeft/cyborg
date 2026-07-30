@@ -13,15 +13,15 @@ public sealed class SubprocessModuleWorker(IWorkerContext<SubprocessModule> cont
 {
     protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
-        string executable = runtime.Environment.Interpolate(Module.Command.Executable);
-        ImmutableArray<string> arguments = [.. Module.Command.Arguments.Select(runtime.Environment.Interpolate)];
+        string executable = Module.Command.Executable;
+        ImmutableArray<string> arguments = [.. Module.Command.Arguments];
         if (Module.Impersonation is { } runUser)
         {
-            executable = runtime.Environment.Interpolate(runUser.Executable);
+            executable = runUser.Executable;
             arguments =
             [
-                "-u", runtime.Environment.Interpolate(runUser.User),
-                "--", runtime.Environment.Interpolate(Module.Command.Executable),
+                "-u", runUser.User,
+                "--", Module.Command.Executable,
                 ..arguments
             ];
         }
@@ -32,7 +32,7 @@ public sealed class SubprocessModuleWorker(IWorkerContext<SubprocessModule> cont
         };
         if (!string.IsNullOrEmpty(Module.Command.WorkingDirectory))
         {
-            startInfo.WorkingDirectory = runtime.Environment.Interpolate(Module.Command.WorkingDirectory);
+            startInfo.WorkingDirectory = Module.Command.WorkingDirectory;
         }
         ChildProcessResult executionResult = await dispatcher.ExecuteAsync(startInfo, cancellationToken);
         SubprocessModuleResult result = new(executionResult.ExitCode, executionResult.StandardOutput, executionResult.StandardError);
