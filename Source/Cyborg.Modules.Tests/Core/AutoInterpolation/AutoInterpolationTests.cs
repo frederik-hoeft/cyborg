@@ -1,5 +1,4 @@
-﻿using Cyborg.Core.Modules.Runtime.Environments;
-using Cyborg.Modules.Named;
+﻿using Cyborg.Modules.Named;
 using Cyborg.Modules.Subprocess;
 
 namespace Cyborg.Modules.Tests.Core.AutoInterpolation;
