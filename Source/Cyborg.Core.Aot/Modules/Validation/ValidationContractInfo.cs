@@ -1,10 +1,12 @@
-﻿using Cyborg.Core.Aot.Contracts;
+using Cyborg.Core.Aot.Contracts;
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
 
 namespace Cyborg.Core.Aot.Modules.Validation;
 
-internal sealed class ValidationContractInfo(Dictionary<ModuleValidationGeneratorContract, INamedTypeSymbol> contractTypes, Compilation compilation)
+internal sealed class ValidationContractInfo(
+    Dictionary<ModuleValidationGeneratorContract, INamedTypeSymbol> contractTypes,
+    Compilation compilation)
     : ContractInfoBase<ModuleValidationGeneratorContract>(contractTypes, compilation)
 {
     private static readonly ImmutableArray<ModuleValidationGeneratorContract> s_allContracts =
@@ -16,6 +18,7 @@ internal sealed class ValidationContractInfo(Dictionary<ModuleValidationGenerato
         ModuleValidationGeneratorContract.IDefaultValueT,
         ModuleValidationGeneratorContract.IParser,
         ModuleValidationGeneratorContract.IInspectable,
+        ModuleValidationGeneratorContract.IObjectDescriptionBuilder,
     ];
 
     public INamedTypeSymbol IModuleRuntime => ContractTypes[ModuleValidationGeneratorContract.IModuleRuntime];
@@ -32,13 +35,20 @@ internal sealed class ValidationContractInfo(Dictionary<ModuleValidationGenerato
 
     public INamedTypeSymbol IInspectable => ContractTypes[ModuleValidationGeneratorContract.IInspectable];
 
-    public static ValidationContractInfo? Create(ContractExplorer contractExplorer, SourceProductionContext context)
+    public INamedTypeSymbol IObjectDescriptionBuilder =>
+        ContractTypes[ModuleValidationGeneratorContract.IObjectDescriptionBuilder];
+
+    public static ValidationContractInfo? Create(
+        ContractExplorer contractExplorer,
+        SourceProductionContext context)
     {
-        Dictionary<ModuleValidationGeneratorContract, INamedTypeSymbol>? contracts = FetchContracts(contractExplorer, context, s_allContracts);
+        Dictionary<ModuleValidationGeneratorContract, INamedTypeSymbol>? contracts =
+            FetchContracts(contractExplorer, context, s_allContracts);
         if (contracts is null)
         {
             return null;
         }
+
         return new ValidationContractInfo(contracts, contractExplorer.Compilation);
     }
 }

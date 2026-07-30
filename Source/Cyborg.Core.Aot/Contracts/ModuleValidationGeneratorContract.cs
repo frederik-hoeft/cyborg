@@ -1,4 +1,4 @@
-﻿namespace Cyborg.Core.Aot.Contracts;
+namespace Cyborg.Core.Aot.Contracts;
 
 internal enum ModuleValidationGeneratorContract
 {
@@ -9,4 +9,5 @@ internal enum ModuleValidationGeneratorContract
     IDefaultValueT,
     IParser,
     IInspectable,
+    IObjectDescriptionBuilder,
 }
