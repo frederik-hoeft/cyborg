@@ -51,7 +51,8 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
             TestContext.CancellationToken);
 
         MSAssert.IsTrue(result.IsValid);
-        MSAssert.IsTrue(result.Module.OptionalItems.IsDefault);
+        ValidationPipelineTestModule validatedModule = result.Module!;
+        MSAssert.IsTrue(validatedModule.OptionalItems.IsDefault);
     }
 
     [TestMethod]
@@ -71,15 +72,16 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
             TestContext.CancellationToken);
 
         MSAssert.IsTrue(result.IsValid);
-        MSAssert.IsTrue(result.Module.NullableItems.HasValue);
-        MSAssert.IsTrue(result.Module.NullableItems.Value.IsDefault);
+        ValidationPipelineTestModule validatedModule = result.Module!;
+        MSAssert.IsTrue(validatedModule.NullableItems.HasValue);
+        MSAssert.IsTrue(validatedModule.NullableItems.Value.IsDefault);
     }
 
     [TestMethod]
     public async Task TestValidationAsync_CollectionElementDefaultsAreAppliedBeforeInterpolationAsync()
     {
         ValidationPipelineTestModule module = new(
-            RequiredItems: [new(Value: null)],
+            RequiredItems: [new(Value: null!)],
             OptionalItems: [],
             NullableItems: null,
             InterpolatedValue: "literal",
@@ -93,7 +95,8 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
             TestContext.CancellationToken);
 
         MSAssert.IsTrue(result.IsValid);
-        MSAssert.AreEqual("resolved-default", result.Module.RequiredItems[0].Value);
+        ValidationPipelineTestModule validatedModule = result.Module!;
+        MSAssert.AreEqual("resolved-default", validatedModule.RequiredItems[0].Value);
     }
 
     [TestMethod]
@@ -121,10 +124,11 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
             TestContext.CancellationToken);
 
         MSAssert.IsTrue(result.IsValid);
-        MSAssert.AreEqual("resolved-value", result.Module.InterpolatedValue);
-        MSAssert.AreEqual("${deferred}", result.Module.DeferredValue);
-        MSAssert.AreEqual("${name}", result.Module.Name);
-        MSAssert.AreEqual("${group}", result.Module.Group);
+        ValidationPipelineTestModule validatedModule = result.Module!;
+        MSAssert.AreEqual("resolved-value", validatedModule.InterpolatedValue);
+        MSAssert.AreEqual("${deferred}", validatedModule.DeferredValue);
+        MSAssert.AreEqual("${name}", validatedModule.Name);
+        MSAssert.AreEqual("${group}", validatedModule.Group);
     }
 
     private TestModuleRuntimeScope CreateValidationScope()
@@ -153,5 +157,5 @@ public sealed record ValidationPipelineTestItem
 (
     [property: Required]
     [property: DefaultValue<string>("${fallback}")]
-    string? Value
+    string Value
 );
