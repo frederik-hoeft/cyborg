@@ -4,30 +4,20 @@ using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal sealed class RootedPathAttributeProcessor : IPropertyAttributeProcessor
+internal sealed class RootedPathAttributeProcessor : AttributeProcessorBase<RootedPathAttribute>
 {
-    public string AttributeMetadataName => typeof(RootedPathAttribute).FullName;
-
-    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {
-        aspect = null;
-        if (attribute.AttributeClass is null)
+        if (!ValidatePropertyType(attribute, in context, SpecialType.System_String))
         {
-            return true;
-        }
-        if (context.Property.Type.SpecialType is not SpecialType.System_String)
-        {
-            context.Report(ValidationGeneratorDiagnostics.TypeMismatch, context.Property.Name, context.ContainingType.Name, nameof(RootedPathAttribute), nameof(String));
-            return false;
+            return false.WithDefaults(out aspect);
         }
         aspect = new RootedPathValidationAspect();
         return true;
     }
 
-    private sealed class RootedPathValidationAspect : PropertyValidationAspect
+    private sealed class RootedPathValidationAspect : PropertyAspect
     {
-        public override bool EnsuresDefault => false;
-
         protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
         {
             builder.AppendBlock(

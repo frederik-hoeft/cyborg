@@ -1,41 +1,23 @@
-﻿using Cyborg.Core.Aot.Modules.Validation.Attributes;
+﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal sealed class DefaultInstanceFactoryAttributeProcessor : IPropertyAttributeProcessor
+internal sealed class DefaultInstanceFactoryAttributeProcessor : AttributeProcessorBase<DefaultInstanceFactoryAttribute>
 {
-    public string AttributeMetadataName => typeof(DefaultInstanceFactoryAttribute).FullName;
-
-    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {
-        aspect = null;
-
-        if (attribute.ConstructorArguments.Length == 0)
+        if (!TryGetConstructorArgumentValue(attribute, argumentIndex: 0, in context, out string? valueExpression))
         {
-            context.Report(
-                ValidationGeneratorDiagnostics.MissingArgument,
-                context.Property.Name,
-                context.ContainingType.Name,
-                nameof(DefaultInstanceFactoryAttribute));
-            return false;
+            return false.WithDefaults(out aspect);
         }
-
-        if (attribute.ConstructorArguments[0].Value is not string valueExpression)
-        {
-            context.Report(
-                ValidationGeneratorDiagnostics.UnsupportedAttributeLiteral,
-                context.Property.Name,
-                context.ContainingType.Name);
-            return false;
-        }
-
         IEnumerable<IMethodSymbol> candidateMethods = context.ContainingType
             .GetMembers(valueExpression)
             .OfType<IMethodSymbol>();
-
-        IMethodSymbol? factoryMethod = candidateMethods.FirstOrDefault(method => IsCompatibleFactoryMethod(context, method));
+        (Compilation compilation, _, IPropertySymbol? property, _) = context;
+        IMethodSymbol? factoryMethod = candidateMethods.FirstOrDefault(method => IsCompatibleFactoryMethod(property.Type, compilation, method));
         if (factoryMethod is null)
         {
             context.Report(
@@ -45,31 +27,26 @@ internal sealed class DefaultInstanceFactoryAttributeProcessor : IPropertyAttrib
                 nameof(DefaultInstanceFactoryAttribute),
                 valueExpression,
                 context.Property.Type);
-            return false;
+            return false.WithDefaults(out aspect);
         }
 
         aspect = new DefaultInstanceFactoryAspect(valueExpression);
         return true;
     }
 
-    private static bool IsCompatibleFactoryMethod(PropertyProcessingContext context, IMethodSymbol method)
+    private static bool IsCompatibleFactoryMethod(ITypeSymbol propertyType, Compilation compilation, IMethodSymbol method)
     {
         if (method is not { IsGenericMethod: false, Parameters: [] })
         {
             return false;
         }
-
         ITypeSymbol returnType = method.ReturnType;
-        ITypeSymbol propertyType = context.Property.Type;
-
         return SymbolEqualityComparer.Default.Equals(returnType, propertyType)
-            || context.Compilation.ClassifyConversion(returnType, propertyType).IsImplicit;
+            || compilation.ClassifyConversion(returnType, propertyType).IsImplicit;
     }
 
-    private sealed class DefaultInstanceFactoryAspect(string factoryMember) : PropertyValidationAspect
+    private sealed class DefaultInstanceFactoryAspect(string factoryMember) : PropertyAspect(ensuresDefault: true)
     {
-        public override bool EnsuresDefault => true;
-
         public override string? RewriteDefaultAssignmentExpression(PropertyRewriteContext context, string? currentExpression)
         {
             _ = currentExpression;

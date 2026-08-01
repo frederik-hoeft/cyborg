@@ -22,7 +22,7 @@ public sealed class DynamicKeyValuePairValidationTests : ModuleTestBase
     }
 
     [TestMethod]
-    public Task ValidateAsync_ConfigMap_KeyInterpolatesFromEnvironmentVariable() => TestOverridesAsync<ConfigMapModule>(
+    public Task Test_ConfigMap_KeyInterpolatesFromEnvironmentVariable() => TestOverridesAsync<ConfigMapModule>(
         """
         {
             "cyborg.modules.config.map.v1": {
@@ -40,7 +40,7 @@ public sealed class DynamicKeyValuePairValidationTests : ModuleTestBase
         });
 
     [TestMethod]
-    public Task ValidateAsync_ConfigMap_LiteralKeyPassesThrough() => TestOverridesAsync<ConfigMapModule>(
+    public Task Test_ConfigMap_LiteralKeyPassesThrough() => TestOverridesAsync<ConfigMapModule>(
         """
         {
             "cyborg.modules.config.map.v1": {
@@ -54,7 +54,7 @@ public sealed class DynamicKeyValuePairValidationTests : ModuleTestBase
         module => MSAssert.AreEqual("literal_key", module.Entries.First().Key));
 
     [TestMethod]
-    public Task ValidateAsync_ConfigMap_MultipleEntriesAllKeysInterpolated() => TestOverridesAsync<ConfigMapModule>(
+    public Task Test_ConfigMap_MultipleEntriesAllKeysInterpolated() => TestOverridesAsync<ConfigMapModule>(
         """
         {
             "cyborg.modules.config.map.v1": {
@@ -78,7 +78,7 @@ public sealed class DynamicKeyValuePairValidationTests : ModuleTestBase
         });
 
     [TestMethod]
-    public Task ValidateAsync_ConfigMap_MissingKeyProducesValidationError() => TestValidationAsync<ConfigMapModule>(
+    public Task Test_ConfigMap_MissingKeyProducesValidationError() => TestValidationAsync<ConfigMapModule>(
         """
         {
             "cyborg.modules.config.map.v1": {
@@ -95,7 +95,7 @@ public sealed class DynamicKeyValuePairValidationTests : ModuleTestBase
         });
 
     [TestMethod]
-    public Task ValidateAsync_Template_ArgumentKeyInterpolatesFromEnvironmentVariable() => TestOverridesAsync<TemplateModule>(
+    public Task Test_Template_ArgumentKeyInterpolatesFromEnvironmentVariable() => TestOverridesAsync<TemplateModule>(
         $$"""
         {
             "cyborg.modules.template.v1": {
@@ -115,7 +115,7 @@ public sealed class DynamicKeyValuePairValidationTests : ModuleTestBase
         });
 
     [TestMethod]
-    public Task ValidateAsync_Template_OverrideKeyInterpolatesFromEnvironmentVariable() => TestOverridesAsync<TemplateModule>(
+    public Task Test_Template_OverrideKeyInterpolatesFromEnvironmentVariable() => TestOverridesAsync<TemplateModule>(
         $$"""
         {
             "cyborg.modules.template.v1": {

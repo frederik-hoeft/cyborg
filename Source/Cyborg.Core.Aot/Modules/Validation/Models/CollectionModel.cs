@@ -3,7 +3,8 @@ using System.Collections.Immutable;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Models;
 
-internal sealed record CollectionModel(
+internal sealed record CollectionModel
+(
     ITypeSymbol ElementType,
     string ElementNullableTypeName,
     string ElementNonNullableTypeName,
@@ -12,7 +13,8 @@ internal sealed record CollectionModel(
     bool IsElementValidatableType,
     CollectionMaterializationKind MaterializationKind,
     string? MaterializationTypeName,
-    ImmutableArray<PropertyModel> ElementChildren)
+    ImmutableArray<PropertyModel> ElementChildren
+)
 {
     public bool SupportsElementRewrite => MaterializationKind != CollectionMaterializationKind.None;
 }

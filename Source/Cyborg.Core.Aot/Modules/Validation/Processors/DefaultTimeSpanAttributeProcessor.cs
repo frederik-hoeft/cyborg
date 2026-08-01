@@ -1,41 +1,31 @@
-﻿using Cyborg.Core.Aot.Modules.Validation.Attributes;
+﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System.Globalization;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal sealed class DefaultTimeSpanAttributeProcessor : IPropertyAttributeProcessor
+internal sealed class DefaultTimeSpanAttributeProcessor : AttributeProcessorBase<DefaultTimeSpanAttribute>
 {
-    public string AttributeMetadataName => typeof(DefaultTimeSpanAttribute).FullName;
-
-    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {
-        aspect = null;
-
-        INamedTypeSymbol? attributeClass = attribute.AttributeClass;
-        if (attributeClass is null)
-        {
-            return true;
-        }
-
         // ensure property is of type TimeSpan
         string actual = context.Property.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         if (!actual.Equals(KnownTypes.TimeSpan))
         {
             context.Report(ValidationGeneratorDiagnostics.TypeMismatch, context.Property.Name, context.ContainingType.Name, nameof(DefaultTimeSpanAttribute), nameof(TimeSpan));
-            return false;
+            return false.WithDefaults(out aspect);
         }
 
-        if (attribute.ConstructorArguments is not [{ Value: string literalValue }])
+        if (!TryGetConstructorArgumentValue(attribute, argumentIndex: 0, in context, out string? literalValue))
         {
-            context.Report(ValidationGeneratorDiagnostics.MissingArgument, context.Property.Name, context.ContainingType.Name, nameof(DefaultTimeSpanAttribute));
-            return false;
+            return false.WithDefaults(out aspect);
         }
         if (!TimeSpan.TryParseExact(literalValue, "c", CultureInfo.InvariantCulture, out _))
         {
             context.Report(ValidationGeneratorDiagnostics.InvalidTimeSpanLiteral, context.Property.Name, context.ContainingType.Name, nameof(DefaultTimeSpanAttribute), literalValue);
-            return false;
+            return false.WithDefaults(out aspect);
         }
 
         string? valueExpression = SymbolDisplay.FormatLiteral(literalValue, quote: true);
@@ -44,10 +34,8 @@ internal sealed class DefaultTimeSpanAttributeProcessor : IPropertyAttributeProc
         return true;
     }
 
-    private sealed class DefaultValueValidationAspect(string valueExpression) : PropertyValidationAspect
+    private sealed class DefaultValueValidationAspect(string valueExpression) : PropertyAspect(ensuresDefault: true)
     {
-        public override bool EnsuresDefault => true;
-
         public override string? RewriteDefaultAssignmentExpression(PropertyRewriteContext context, string? currentExpression)
         {
             string propertyAccessExpression = context.PropertyAccessExpression;

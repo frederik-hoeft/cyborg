@@ -4,22 +4,16 @@ using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal sealed class RequiredAttributeProcessor : IPropertyAttributeProcessor
+internal sealed class RequiredAttributeProcessor : AttributeProcessorBase<RequiredAttribute>
 {
-    public string AttributeMetadataName => typeof(RequiredAttribute).FullName;
-
-    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {
-        _ = context;
-        _ = attribute;
         aspect = new RequiredValidationAspect();
         return true;
     }
 
-    private sealed class RequiredValidationAspect : PropertyValidationAspect
+    private sealed class RequiredValidationAspect : PropertyAspect
     {
-        public override bool EnsuresDefault => false;
-
         protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
         {
             string comparer = KnownTypes.DefaultEqualityComparerOfT(model.Property.NullableTypeName);

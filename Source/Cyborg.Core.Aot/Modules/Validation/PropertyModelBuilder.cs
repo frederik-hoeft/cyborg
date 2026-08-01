@@ -40,7 +40,7 @@ internal sealed class PropertyModelBuilder(GenerationCandidateFactory factory, L
     private bool TryCreatePropertyModel(INamedTypeSymbol containingType, IPropertySymbol property, ImmutableHashSet<INamedTypeSymbol> traversalPath, [NotNullWhen(true)] out PropertyModel? propertyModel)
     {
         PropertyProcessingContext processingContext = new(factory.Context.SemanticModel.Compilation, containingType, property, diagnostics);
-        if (!ValidationProcessorRegistry.TryProcess(processingContext, out ImmutableArray<PropertyValidationAspect> aspects))
+        if (!ValidationProcessorRegistry.TryProcess(in processingContext, out ImmutableArray<PropertyAspect> aspects))
         {
             propertyModel = null;
             return false;

@@ -40,8 +40,9 @@ public sealed class DynamicKeyValuePairJsonConverter(IDynamicValueProviderRegist
             value = dynamicValue.Value;
         }
 
-        // key null check is handled by the pre-execution pipeline ([Required] attribute)
-        // we only check for null value here, because it is part of the JSON contract that the value must be present for a dynamic key-value pair.
+        // non-emptiness and whitespace checks via [Required] attribute in pre-execution validation
+        // explicit null checks here, since dynamic KVP is also used for config parsing
+        _ = key ?? throw new JsonException("Missing dynamic key in dynamic key-value pair.");
         _ = value ?? throw new JsonException("Missing dynamic value in dynamic key-value pair.");
         return new DynamicKeyValuePair(key!, value);
     }

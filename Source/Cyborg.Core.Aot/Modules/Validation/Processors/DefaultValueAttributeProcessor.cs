@@ -1,39 +1,20 @@
-﻿using Cyborg.Core.Aot.Modules.Validation.Attributes;
+﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal sealed class DefaultValueAttributeProcessor : IPropertyAttributeProcessor
+internal sealed class DefaultValueAttributeProcessor : AttributeProcessorBase
 {
-    public string AttributeMetadataName => typeof(DefaultValueAttribute<>).FullName;
+    public override string AttributeMetadataName => typeof(DefaultValueAttribute<>).FullName;
 
-    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {
-        aspect = null;
-
-        INamedTypeSymbol? attributeClass = attribute.AttributeClass;
-        if (attributeClass is null)
+        if (!ValidateTypeArguments(attribute, in context, context.Property.Type)
+            || !TryGetConstructorArgumentExpression(attribute, argumentIndex: 0, in context, out string? valueExpression))
         {
-            return true;
-        }
-
-        if (!SymbolEqualityComparer.Default.Equals(context.Property.Type, attributeClass.TypeArguments[0]))
-        {
-            context.Report(ValidationGeneratorDiagnostics.GenericTypeMismatch, context.Property.Name, context.ContainingType.Name);
-            return false;
-        }
-
-        if (attribute.ConstructorArguments.Length == 0)
-        {
-            context.Report(ValidationGeneratorDiagnostics.MissingArgument, context.Property.Name, context.ContainingType.Name, nameof(DefaultValueAttribute<>));
-            return false;
-        }
-
-        if (!LiteralExpressionFactory.TryGetLiteralExpression(attribute.ConstructorArguments[0], context.Property.Type, out string? valueExpression))
-        {
-            context.Report(ValidationGeneratorDiagnostics.UnsupportedAttributeLiteral, context.Property.Name, context.ContainingType.Name);
-            return false;
+            return false.WithDefaults(out aspect);
         }
 
         ImmutableArray<string>.Builder whenPresentExpressions = ImmutableArray.CreateBuilder<string>();
@@ -43,8 +24,8 @@ internal sealed class DefaultValueAttributeProcessor : IPropertyAttributeProcess
             {
                 if (!LiteralExpressionFactory.TryGetLiteralExpression(item, context.Property.Type, out string? itemExpression))
                 {
-                    context.Report(ValidationGeneratorDiagnostics.UnsupportedAttributeLiteral, context.Property.Name, context.ContainingType.Name);
-                    return false;
+                    context.Report(ValidationGeneratorDiagnostics.UnsupportedAttributeLiteral, context.Property.Name, context.ContainingType.Name, GetAttributeFriendlyName(attribute));
+                    return false.WithDefaults(out aspect);
                 }
 
                 whenPresentExpressions.Add(itemExpression!);
@@ -55,10 +36,8 @@ internal sealed class DefaultValueAttributeProcessor : IPropertyAttributeProcess
         return true;
     }
 
-    private sealed class DefaultValueValidationAspect(string valueExpression, ImmutableArray<string> whenPresentExpressions) : PropertyValidationAspect
+    private sealed class DefaultValueValidationAspect(string valueExpression, ImmutableArray<string> whenPresentExpressions) : PropertyAspect(ensuresDefault: true)
     {
-        public override bool EnsuresDefault => true;
-
         public override string? RewriteDefaultAssignmentExpression(PropertyRewriteContext rewriteContext, string? currentExpression)
         {
             string propertyAccessExpression = rewriteContext.PropertyAccessExpression;

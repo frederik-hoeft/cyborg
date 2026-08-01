@@ -1,18 +1,14 @@
-﻿using Cyborg.Core.Aot.Modules.Validation.Attributes;
+﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Cyborg.Core.Aot.Modules.Validation.Rendering;
 using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal sealed class DefaultInstanceAttributeProcessor : IPropertyAttributeProcessor
+internal sealed class DefaultInstanceAttributeProcessor : AttributeProcessorBase<DefaultInstanceAttribute>
 {
-    public string AttributeMetadataName => typeof(DefaultInstanceAttribute).FullName;
-
-    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {
-        _ = attribute;
-        aspect = null;
-
         ITypeSymbol propertyType = NormalizePropertyType(context.Property.Type);
 
         if (propertyType is not INamedTypeSymbol namedPropertyType || namedPropertyType.TypeKind == TypeKind.Interface)
@@ -22,8 +18,7 @@ internal sealed class DefaultInstanceAttributeProcessor : IPropertyAttributeProc
                 context.Property.Name,
                 context.ContainingType.Name,
                 context.Property.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat));
-
-            return false;
+            return false.WithDefaults(out aspect);
         }
         aspect = new DefaultInstanceValidationAspect(context.ContainingType, namedPropertyType, context.Property);
         return true;
@@ -34,10 +29,8 @@ internal sealed class DefaultInstanceAttributeProcessor : IPropertyAttributeProc
         // Nullable<T> value types are invalid anyway because IDefaultInstance<TSelf> has `where TSelf : class`.
         propertyType.WithNullableAnnotation(NullableAnnotation.None);
 
-    private sealed class DefaultInstanceValidationAspect(INamedTypeSymbol containingType, INamedTypeSymbol propertyType, IPropertySymbol property) : PropertyValidationAspect
+    private sealed class DefaultInstanceValidationAspect(INamedTypeSymbol containingType, INamedTypeSymbol propertyType, IPropertySymbol property) : PropertyAspect(ensuresDefault: true)
     {
-        public override bool EnsuresDefault => true;
-
         public override string? RewriteDefaultAssignmentExpression(PropertyRewriteContext context, string? currentExpression)
         {
             if (!ImplementsMatchingDefaultInstanceInterface(propertyType, context.ContractInfo))
@@ -60,11 +53,7 @@ internal sealed class DefaultInstanceAttributeProcessor : IPropertyAttributeProc
         {
             foreach (INamedTypeSymbol iface in propertyType.AllInterfaces)
             {
-                if (!iface.IsGenericType || iface.TypeArguments is not [{ } self])
-                {
-                    continue;
-                }
-                if (!SymbolEqualityComparer.Default.Equals(iface.OriginalDefinition, contractInfo.IDefaultValueT))
+                if (iface is not { IsGenericType: true, TypeArguments: [{ } self] } || !SymbolEqualityComparer.Default.Equals(iface.OriginalDefinition, contractInfo.IDefaultValueT))
                 {
                     continue;
                 }

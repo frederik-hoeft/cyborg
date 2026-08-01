@@ -10,6 +10,5 @@ internal sealed class FileExistsAttributeProcessor : FilesystemPathAttributeProc
 
     protected override string PathKindDisplayName => "file";
 
-    protected override string BuildExistsExpression() =>
-        $"{KnownTypes.File}.Exists";
+    protected override string BuildExistsExpression() => $"{KnownTypes.File}.Exists";
 }

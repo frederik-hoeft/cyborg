@@ -14,7 +14,8 @@ internal static class ValidationProcessorRegistry
         new DefaultValueAttributeProcessor(),
         new DefaultTimeSpanAttributeProcessor(),
         new RangeAttributeProcessor(),
-        new IgnoreOverridesAttributeProcessor(),
+        new IgnoreOverrideAttributeProcessor(),
+        new IgnoreInterpolationAttributeProcessor(),
         new LengthAttributeProcessor(),
         new MinLengthAttributeProcessor(),
         new MaxLengthAttributeProcessor(),
@@ -52,9 +53,9 @@ internal static class ValidationProcessorRegistry
         return ByMetadataName.TryGetValue(metadataName, out processor);
     }
 
-    public static bool TryProcess(PropertyProcessingContext context, out ImmutableArray<PropertyValidationAspect> aspects)
+    public static bool TryProcess(ref readonly PropertyProcessingContext context, out ImmutableArray<PropertyAspect> aspects)
     {
-        ImmutableArray<PropertyValidationAspect>.Builder aspectBuilder = ImmutableArray.CreateBuilder<PropertyValidationAspect>();
+        ImmutableArray<PropertyAspect>.Builder aspectBuilder = ImmutableArray.CreateBuilder<PropertyAspect>();
 
         foreach (AttributeData attribute in context.Property.GetAttributes())
         {
@@ -62,7 +63,7 @@ internal static class ValidationProcessorRegistry
             {
                 continue;
             }
-            if (!processor.TryProcess(context, attribute, out PropertyValidationAspect? aspect))
+            if (!processor.TryProcess(attribute, in context, out PropertyAspect? aspect))
             {
                 return false;
             }
@@ -73,7 +74,7 @@ internal static class ValidationProcessorRegistry
         }
         foreach (IDynamicPropertyProcessor processor in DynamicProcessors)
         {
-            if (!processor.TryProcess(context, out PropertyValidationAspect? aspect))
+            if (!processor.TryProcess(in context, out PropertyAspect? aspect))
             {
                 return false;
             }

@@ -32,21 +32,21 @@ public sealed class AutoInterpolationTests : ModuleTestBase
     // -----------------------------------------------------------------------
 
     [TestMethod]
-    public Task ValidateAsync_FlatStringProperty_ResolvesEnvironmentVariable() =>
+    public Task Test_FlatStringProperty_ResolvesEnvironmentVariable() =>
         TestOverridesAsync<NamedModuleReferenceModule>(
             """{ "cyborg.modules.named.ref.v1": { "target": "${resolved_target}" } }""",
             env => env.SetVariable("resolved_target", "my-module"),
             module => MSAssert.AreEqual("my-module", module.Target));
 
     [TestMethod]
-    public Task ValidateAsync_FlatStringProperty_LiteralValuePassesThrough() =>
+    public Task Test_FlatStringProperty_LiteralValuePassesThrough() =>
         TestOverridesAsync<NamedModuleReferenceModule>(
             """{ "cyborg.modules.named.ref.v1": { "target": "literal-module" } }""",
             static _ => { },
             module => MSAssert.AreEqual("literal-module", module.Target));
 
     [TestMethod]
-    public Task ValidateAsync_FlatStringProperty_MultipleVariablesInSingleString() =>
+    public Task Test_FlatStringProperty_MultipleVariablesInSingleString() =>
         TestOverridesAsync<NamedModuleReferenceModule>(
             """{ "cyborg.modules.named.ref.v1": { "target": "${ns}/${name}" } }""",
             env =>
@@ -61,7 +61,7 @@ public sealed class AutoInterpolationTests : ModuleTestBase
     // -----------------------------------------------------------------------
 
     [TestMethod]
-    public Task ValidateAsync_NestedRecordStringProperty_ResolvesEnvironmentVariable()
+    public Task Test_NestedRecordStringProperty_ResolvesEnvironmentVariable()
     {
         const string JSON = """
             {
@@ -84,7 +84,7 @@ public sealed class AutoInterpolationTests : ModuleTestBase
     // -----------------------------------------------------------------------
 
     [TestMethod]
-    public Task ValidateAsync_StringCollectionElements_AllElementsResolved()
+    public Task Test_StringCollectionElements_AllElementsResolved()
     {
         const string JSON = """
             {
@@ -115,7 +115,7 @@ public sealed class AutoInterpolationTests : ModuleTestBase
     }
 
     [TestMethod]
-    public Task ValidateAsync_EmptyStringCollection_RemainsEmpty()
+    public Task Test_EmptyStringCollection_RemainsEmpty()
     {
         const string JSON = """
             {
@@ -138,7 +138,7 @@ public sealed class AutoInterpolationTests : ModuleTestBase
     // -----------------------------------------------------------------------
 
     [TestMethod]
-    public Task ValidateAsync_NullableStringProperty_WhenAbsent_RemainsNull()
+    public Task Test_NullableStringProperty_WhenAbsent_RemainsNull()
     {
         const string JSON = """
             {
@@ -161,7 +161,7 @@ public sealed class AutoInterpolationTests : ModuleTestBase
     // -----------------------------------------------------------------------
 
     [TestMethod]
-    public Task ValidateAsync_CollectionOfValidatableRecords_StringPropertiesResolved()
+    public Task Test_CollectionOfValidatableRecords_StringPropertiesResolved()
     {
         const string JSON = """
             {
@@ -195,7 +195,7 @@ public sealed class AutoInterpolationTests : ModuleTestBase
     }
 
     [TestMethod]
-    public Task ValidateAsync_CollectionOfValidatableRecords_MultipleElementsEachResolved()
+    public Task Test_CollectionOfValidatableRecords_MultipleElementsEachResolved()
     {
         const string JSON = """
             {
@@ -234,7 +234,7 @@ public sealed class AutoInterpolationTests : ModuleTestBase
     }
 
     [TestMethod]
-    public Task ValidateAsync_NullOptionalCollection_RemainsNull()
+    public Task Test_NullOptionalCollection_RemainsNull()
     {
         const string JSON = """
             {
@@ -257,7 +257,7 @@ public sealed class AutoInterpolationTests : ModuleTestBase
     // -----------------------------------------------------------------------
 
     [TestMethod]
-    public Task ValidateAsync_OptionalNestedRecord_WhenAbsent_RemainsNull()
+    public Task Test_OptionalNestedRecord_WhenAbsent_RemainsNull()
     {
         const string JSON = """
             {
@@ -276,7 +276,7 @@ public sealed class AutoInterpolationTests : ModuleTestBase
     }
 
     [TestMethod]
-    public Task ValidateAsync_OptionalNestedRecord_WhenPresent_StringPropertiesResolved()
+    public async Task Test_OptionalNestedRecord_WhenPresent_StringPropertiesResolved()
     {
         string tempImpersonationExec = Path.GetTempFileName();
         try
@@ -295,7 +295,7 @@ public sealed class AutoInterpolationTests : ModuleTestBase
                   }
                 }
                 """;
-            return TestOverridesAsync<SubprocessModule>(
+            await TestOverridesAsync<SubprocessModule>(
                 JSON,
                 env =>
                 {

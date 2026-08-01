@@ -27,7 +27,9 @@ public sealed class AssertModuleWorker(IWorkerContext<AssertModule> context) : C
         }
         if (!condition)
         {
-            AssertModuleResult failure = new(Module.Message);
+            // must be interpolated after the assertion module has been executed, so that any variables it produces can be used in the message
+            string message = runtime.Environment.Interpolate(Module.Message);
+            AssertModuleResult failure = new(message);
             return runtime.Exit(Failed(failure));
         }
         return runtime.Exit(Success());

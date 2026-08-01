@@ -9,7 +9,7 @@ namespace Cyborg.Modules.Assert;
 public sealed partial record AssertModule
 (
     [property: Required] ModuleReference Assertion,
-    [property: Required] string Message
+    [property: Required][property: IgnoreInterpolation] string Message
 ) : ModuleBase, IModule
 {
     public static string ModuleId => "cyborg.modules.assert.v1";

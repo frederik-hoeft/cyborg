@@ -76,14 +76,14 @@ internal sealed class DefaultApplicationRenderer(ValidationContractInfo contract
     public void AppendCollectionDefaultApplicationForProperty(IndentedStringBuilder builder, PropertyModel property, string localName, string diagnosticsPhase)
     {
         CollectionModel collection = property.Collection!;
-        if (property.IsNullable || (!property.HasDefault && !property.Symbol.Type.IsValueType))
+        if (CollectionHelpers.TryConstructEnumerationGuardExpression(property, localName, out string? conditionExpression, out string valueExpression))
         {
             string collectionCurrentVariable = $"{localName}Current";
             builder.AppendBlock(
                 $$"""
-                if ({{localName}} is not null)
+                if ({{conditionExpression}})
                 {
-                    {{property.NonNullableTypeName}} {{collectionCurrentVariable}} = {{localName}};
+                    {{property.NonNullableTypeName}} {{collectionCurrentVariable}} = {{valueExpression}};
                 """);
             AppendCollectionDefaultApplicationBody(builder.IncreaseIndent(), collection, collectionCurrentVariable, diagnosticsPhase);
             builder.AppendBlock(
@@ -267,7 +267,7 @@ internal sealed class DefaultApplicationRenderer(ValidationContractInfo contract
     private static string? CreateDefaultAssignmentExpression(PropertyRewriteContext context)
     {
         string? expression = null;
-        foreach (PropertyValidationAspect aspect in context.Property.Aspects)
+        foreach (PropertyAspect aspect in context.Property.Aspects)
         {
             expression = aspect.RewriteDefaultAssignmentExpression(context, expression);
         }

@@ -4,49 +4,22 @@ using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal sealed class RangeAttributeProcessor : IPropertyAttributeProcessor
+internal sealed class RangeAttributeProcessor : AttributeProcessorBase
 {
-    public string AttributeMetadataName => typeof(RangeAttribute<>).FullName;
+    public override string AttributeMetadataName => typeof(RangeAttribute<>).FullName;
 
-    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {
-        aspect = null;
-
-        INamedTypeSymbol? attributeClass = attribute.AttributeClass;
-        if (attributeClass is null)
+        if (!ValidateTypeArguments(attribute, in context, context.Property.Type)
+            || !TryGetNamedArgumentExpressions(attribute, in context, out Dictionary<string, string?> namedArgumentExpressions) || namedArgumentExpressions.Count == 0)
         {
-            return true;
+            return false.WithDefaults(out aspect);
         }
-
-        if (!SymbolEqualityComparer.Default.Equals(context.Property.Type, attributeClass.TypeArguments[0]))
-        {
-            context.Report(ValidationGeneratorDiagnostics.GenericTypeMismatch, context.Property.Name, context.ContainingType.Name, nameof(RangeAttribute<>));
-            return false;
-        }
-
-        Dictionary<string, string?> namedArgumentExpressions = new(capacity: 2);
-        foreach (KeyValuePair<string, TypedConstant> named in attribute.NamedArguments)
-        {
-            if (!named.Value.IsNull)
-            {
-                if (!LiteralExpressionFactory.TryGetLiteralExpression(named.Value, context.Property.Type, out string? expression))
-                {
-                    context.Report(
-                        ValidationGeneratorDiagnostics.UnsupportedAttributeLiteral,
-                        context.Property.Name,
-                        context.ContainingType.Name);
-                    return false;
-                }
-                namedArgumentExpressions[named.Key] = expression;
-            }
-        }
-
         if (namedArgumentExpressions.Count == 0)
         {
             context.Report(ValidationGeneratorDiagnostics.MissingArgument, context.Property.Name, context.ContainingType.Name, nameof(RangeAttribute<>));
-            return false;
+            return false.WithDefaults(out aspect);
         }
-
         aspect = new RangeValidationAspect
         (
             namedArgumentExpressions.GetValueOrDefault(nameof(RangeAttribute<>.Min)),
@@ -55,10 +28,8 @@ internal sealed class RangeAttributeProcessor : IPropertyAttributeProcessor
         return true;
     }
 
-    private sealed class RangeValidationAspect(string? minExpression, string? maxExpression) : PropertyValidationAspect
+    private sealed class RangeValidationAspect(string? minExpression, string? maxExpression) : PropertyAspect
     {
-        public override bool EnsuresDefault => false;
-
         protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
         {
             if (minExpression is not null)

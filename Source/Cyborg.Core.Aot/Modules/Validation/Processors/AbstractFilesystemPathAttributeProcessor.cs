@@ -3,10 +3,8 @@ using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal abstract class FilesystemPathAttributeProcessor<TAttribute> : IPropertyAttributeProcessor where TAttribute : Attribute
+internal abstract class FilesystemPathAttributeProcessor<TAttribute> : AttributeProcessorBase<TAttribute> where TAttribute : Attribute
 {
-    public string AttributeMetadataName => typeof(TAttribute).FullName;
-
     protected abstract string AttributeName { get; }
 
     protected abstract string ErrorCode { get; }
@@ -15,17 +13,11 @@ internal abstract class FilesystemPathAttributeProcessor<TAttribute> : IProperty
 
     protected abstract string BuildExistsExpression();
 
-    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {
-        aspect = null;
-        if (attribute.AttributeClass is null)
+        if (!ValidatePropertyType(attribute, in context, SpecialType.System_String))
         {
-            return true;
-        }
-        if (context.Property.Type.SpecialType is not SpecialType.System_String)
-        {
-            context.Report(ValidationGeneratorDiagnostics.TypeMismatch, context.Property.Name, context.ContainingType.Name, AttributeName, nameof(String));
-            return false;
+            return false.WithDefaults(out aspect);
         }
         aspect = new FilesystemPathValidationAspect(
             ErrorCode,
@@ -34,10 +26,8 @@ internal abstract class FilesystemPathAttributeProcessor<TAttribute> : IProperty
         return true;
     }
 
-    private sealed class FilesystemPathValidationAspect(string errorCode, string pathKindDisplayName, string existsExpression) : PropertyValidationAspect
+    private sealed class FilesystemPathValidationAspect(string errorCode, string pathKindDisplayName, string existsExpression) : PropertyAspect
     {
-        public override bool EnsuresDefault => false;
-
         protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
         {
             builder.AppendBlock(

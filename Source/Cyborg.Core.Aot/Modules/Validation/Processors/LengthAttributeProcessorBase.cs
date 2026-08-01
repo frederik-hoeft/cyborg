@@ -4,11 +4,9 @@ using System.Globalization;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal abstract class LengthAttributeProcessorBase : IPropertyAttributeProcessor
+internal abstract class LengthAttributeProcessorBase<TAttribute> : AttributeProcessorBase<TAttribute> where TAttribute : Attribute
 {
-    public abstract string AttributeMetadataName { get; }
-
-    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {
         aspect = null;
 
@@ -24,7 +22,7 @@ internal abstract class LengthAttributeProcessorBase : IPropertyAttributeProcess
             return false;
         }
 
-        if (!TryGetBounds(context, attribute, out int? min, out int? max))
+        if (!TryGetBounds(attribute, in context, out int? min, out int? max))
         {
             return false;
         }
@@ -75,85 +73,7 @@ internal abstract class LengthAttributeProcessorBase : IPropertyAttributeProcess
         return true;
     }
 
-    protected abstract bool TryGetBounds(
-        PropertyProcessingContext context,
-        AttributeData attribute,
-        out int? min,
-        out int? max);
-
-    protected static bool TryGetSingleIntConstructorArgument(
-        PropertyProcessingContext context,
-        AttributeData attribute,
-        string attributeDisplayName,
-        out int value)
-    {
-        value = default;
-
-        if (attribute.ConstructorArguments.Length != 1)
-        {
-            context.Report(
-                ValidationGeneratorDiagnostics.MissingArgument,
-                context.Property.Name,
-                context.ContainingType.Name,
-                attributeDisplayName);
-
-            return false;
-        }
-
-        TypedConstant constant = attribute.ConstructorArguments[0];
-        if (constant.IsNull || constant.Value is not int intValue)
-        {
-            context.Report(
-                ValidationGeneratorDiagnostics.UnsupportedAttributeLiteral,
-                context.Property.Name,
-                context.ContainingType.Name);
-
-            return false;
-        }
-
-        value = intValue;
-        return true;
-    }
-
-    protected static bool TryGetTwoIntConstructorArguments(
-        PropertyProcessingContext context,
-        AttributeData attribute,
-        string attributeDisplayName,
-        out int min,
-        out int max)
-    {
-        min = default;
-        max = default;
-
-        if (attribute.ConstructorArguments.Length != 2)
-        {
-            context.Report(
-                ValidationGeneratorDiagnostics.MissingArgument,
-                context.Property.Name,
-                context.ContainingType.Name,
-                attributeDisplayName);
-
-            return false;
-        }
-
-        TypedConstant minConstant = attribute.ConstructorArguments[0];
-        TypedConstant maxConstant = attribute.ConstructorArguments[1];
-
-        if (minConstant.IsNull || minConstant.Value is not int minValue
-            || maxConstant.IsNull || maxConstant.Value is not int maxValue)
-        {
-            context.Report(
-                ValidationGeneratorDiagnostics.UnsupportedAttributeLiteral,
-                context.Property.Name,
-                context.ContainingType.Name);
-
-            return false;
-        }
-
-        min = minValue;
-        max = maxValue;
-        return true;
-    }
+    protected abstract bool TryGetBounds(AttributeData attribute, ref readonly PropertyProcessingContext context, out int? min, out int? max);
 
     private static bool RequiresNullGuard(ITypeSymbol propertyType) =>
         propertyType.IsReferenceType || propertyType.NullableAnnotation == NullableAnnotation.Annotated;
@@ -209,15 +129,15 @@ internal abstract class LengthAttributeProcessorBase : IPropertyAttributeProcess
         Collection
     }
 
-    private sealed class LengthValidationAspect(
+    private sealed class LengthValidationAspect
+    (
         LengthTargetKind targetKind,
         INamedTypeSymbol? collectionInterface,
         string? minExpression,
         string? maxExpression,
-        bool requiresNullGuard) : PropertyValidationAspect
+        bool requiresNullGuard
+    ) : PropertyAspect
     {
-        public override bool EnsuresDefault => false;
-
         protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
         {
             string accessExpression;

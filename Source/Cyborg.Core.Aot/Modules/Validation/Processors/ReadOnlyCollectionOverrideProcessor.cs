@@ -4,23 +4,20 @@ namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
 internal sealed class ReadOnlyCollectionOverrideProcessor : IDynamicPropertyProcessor
 {
-    public bool TryProcess(PropertyProcessingContext context, out PropertyValidationAspect? aspect)
+    public bool TryProcess(ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {
-        _ = context;
-        if (context.Property.Type is not INamedTypeSymbol { IsGenericType: true } propertyType || propertyType.ConstructedFrom.SpecialType != SpecialType.System_Collections_Generic_IReadOnlyCollection_T)
+        aspect = null;
+        if (context.Property.Type is INamedTypeSymbol { IsGenericType: true } propertyType && propertyType.ConstructedFrom.SpecialType == SpecialType.System_Collections_Generic_IReadOnlyCollection_T)
         {
-            aspect = null;
-            return true;
+            aspect = new ReadOnlyCollectionOverridesAspect();
         }
-        aspect = new ReadOnlyCollectionOverridesAspect();
+        // readonly collection overrides are optional, since not every property is a collection
         return true;
     }
 
-    private sealed class ReadOnlyCollectionOverridesAspect : PropertyValidationAspect
+    private sealed class ReadOnlyCollectionOverridesAspect : PropertyAspect
     {
-        public override bool EnsuresDefault => false;
-
-        public override string? RewriteOverrideResolutionExpression(PropertyRewriteContext context, string? currentExpression, string rootPathExpression) =>
+        public override string RewriteOverrideResolutionExpression(PropertyRewriteContext context, string currentExpression, string rootPathExpression) =>
             $"runtime.Environment.ResolveCollection({context.ModuleVariable}, {context.PropertyAccessExpression}, valueExpression: \"{rootPathExpression}\")";
     }
 }

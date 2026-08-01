@@ -1,28 +1,18 @@
-﻿using Cyborg.Core.Aot.Modules.Validation.Attributes;
+﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal sealed class ExactLengthAttributeProcessor : LengthAttributeProcessorBase
+internal sealed class ExactLengthAttributeProcessor : LengthAttributeProcessorBase<ExactLengthAttribute>
 {
-    public override string AttributeMetadataName => typeof(ExactLengthAttribute).FullName!;
-
-    protected override bool TryGetBounds(
-        PropertyProcessingContext context,
-        AttributeData attribute,
-        out int? min,
-        out int? max)
+    protected override bool TryGetBounds(AttributeData attribute, ref readonly PropertyProcessingContext context, out int? min, out int? max)
     {
-        min = null;
-        max = null;
-
-        if (!TryGetSingleIntConstructorArgument(context, attribute, nameof(ExactLengthAttribute), out int length))
+        if (TryGetConstructorArgumentValue(attribute, argumentIndex: 0, in context, out int length))
         {
-            return false;
+            min = max = length;
+            return true;
         }
-
-        min = length;
-        max = length;
-        return true;
+        return false.WithDefaults(out min, out max);
     }
 }

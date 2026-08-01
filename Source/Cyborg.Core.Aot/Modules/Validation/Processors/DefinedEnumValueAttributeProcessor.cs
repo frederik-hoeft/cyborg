@@ -5,15 +5,10 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal sealed class DefinedEnumValueAttributeProcessor : IPropertyAttributeProcessor
+internal sealed class DefinedEnumValueAttributeProcessor : AttributeProcessorBase<DefinedEnumValueAttribute>
 {
-    public string AttributeMetadataName => typeof(DefinedEnumValueAttribute).FullName!;
-
-    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {
-        _ = attribute;
-        aspect = null;
-
         if (!TryGetEnumShape(context.Property.Type, out ITypeSymbol? enumType, out bool isNullableEnum))
         {
             context.Report(
@@ -22,7 +17,7 @@ internal sealed class DefinedEnumValueAttributeProcessor : IPropertyAttributePro
                 context.ContainingType.Name,
                 context.Property.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat));
 
-            return false;
+            return false.WithDefaults(out aspect);
         }
 
         aspect = new DefinedEnumValueValidationAspect(
@@ -46,9 +41,9 @@ internal sealed class DefinedEnumValueAttributeProcessor : IPropertyAttributePro
                 IsGenericType: true,
                 ConstructedFrom.SpecialType: SpecialType.System_Nullable_T,
                 TypeArguments:
-            [
-            { TypeKind: TypeKind.Enum } nullableEnum
-            ]
+                [
+                    { TypeKind: TypeKind.Enum } nullableEnum
+                ]
             })
         {
             enumType = nullableEnum;
@@ -59,10 +54,8 @@ internal sealed class DefinedEnumValueAttributeProcessor : IPropertyAttributePro
         return false;
     }
 
-    private sealed class DefinedEnumValueValidationAspect(string enumTypeName, bool isNullableEnum) : PropertyValidationAspect
+    private sealed class DefinedEnumValueValidationAspect(string enumTypeName, bool isNullableEnum) : PropertyAspect
     {
-        public override bool EnsuresDefault => false;
-
         protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
         {
             if (isNullableEnum)

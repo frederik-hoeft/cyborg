@@ -1,14 +1,16 @@
 ﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation;
 
-internal abstract class PropertyValidationAspect
+internal abstract class PropertyAspect(bool ensuresDefault = false)
 {
-    public abstract bool EnsuresDefault { get; }
+    public virtual bool EnsuresDefault => ensuresDefault;
 
-    public virtual string? RewriteOverrideResolutionExpression(PropertyRewriteContext context, string? currentExpression, string rootPathExpression) => currentExpression;
+    public virtual string RewriteOverrideResolutionExpression(PropertyRewriteContext context, string currentExpression, string rootPathExpression) => currentExpression;
 
+    [return: NotNullIfNotNull(nameof(currentExpression))]
     public virtual string? RewriteDefaultAssignmentExpression(PropertyRewriteContext context, string? currentExpression) => currentExpression;
 
     protected virtual void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)

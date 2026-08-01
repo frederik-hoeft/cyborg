@@ -30,10 +30,10 @@ internal static class ValidationGeneratorDiagnostics
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
 
-    public static DiagnosticDescriptor GenericTypeMismatch { get; } = new(
+    public static DiagnosticDescriptor GenericTypesMismatch { get; } = new(
         id: "CYBORGVAL004",
         title: "Generic attribute type mismatch",
-        messageFormat: "Property '{0}' on '{1}' has a '{2}' whose generic type does not match the property type",
+        messageFormat: "Property '{0}' on '{1}' has a '{2}' whose generic type argument at position {3} does not match the expected types: '{4}'",
         category: CATEGORY,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
@@ -49,7 +49,7 @@ internal static class ValidationGeneratorDiagnostics
     public static DiagnosticDescriptor UnsupportedAttributeLiteral { get; } = new(
         id: "CYBORGVAL006",
         title: "Unsupported attribute literal",
-        messageFormat: "Property '{0}' on '{1}' uses an attribute value that the generator cannot re-emit as source",
+        messageFormat: "Property '{0}' on '{1}' passes a value to '{2}' that the generator cannot re-emit as source",
         category: CATEGORY,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);

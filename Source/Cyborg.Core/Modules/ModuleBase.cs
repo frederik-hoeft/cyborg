@@ -5,10 +5,12 @@ namespace Cyborg.Core.Modules;
 
 public abstract record ModuleBase
 {
-    [IgnoreOverrides]
+    [IgnoreOverride]
+    [IgnoreInterpolation]
     public virtual string? Name { get; init; }
 
-    [IgnoreOverrides]
+    [IgnoreOverride]
+    [IgnoreInterpolation]
     public virtual string? Group { get; init; }
 
     [Required]

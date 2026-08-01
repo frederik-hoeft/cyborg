@@ -16,7 +16,7 @@
         <DevelopmentDependency>true</DevelopmentDependency>
         <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     </PropertyGroup>
-    
+        
     <ItemGroup>
         <EmbeddedResource Include="Contracts\ModuleLoaderFactoryGeneratorContract.cs" />
         <EmbeddedResource Include="Contracts\ModuleValidationGeneratorContract.cs" />
@@ -33,7 +33,8 @@
         <EmbeddedResource Include="Modules\Validation\Attributes\ExactLengthAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\FileExistsAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\FileNameAttribute.cs" />
-        <EmbeddedResource Include="Modules\Validation\Attributes\IgnoreOverridesAttribute.cs" />
+        <EmbeddedResource Include="Modules\Validation\Attributes\IgnoreInterpolationAttribute.cs" />
+        <EmbeddedResource Include="Modules\Validation\Attributes\IgnoreOverrideAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\LengthAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\MaxLengthAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\MinLengthAttribute.cs" />

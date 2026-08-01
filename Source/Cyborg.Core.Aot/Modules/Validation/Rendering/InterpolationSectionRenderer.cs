@@ -1,5 +1,6 @@
-using Cyborg.Core.Aot.Extensions;
+﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
+using Cyborg.Core.Aot.Modules.Validation.Processors;
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
 
@@ -16,11 +17,14 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
             {
             """);
 
-        IndentedStringBuilder body = builder.IncreaseIndent();
-        AppendInterpolationForObject(body, model.Properties, "module");
-        body.AppendLine("return module;");
-
-        builder.AppendLine("}");
+        builder = builder.IncreaseIndent();
+        AppendInterpolationForObject(builder, model.Properties, "module");
+        builder = builder.DecreaseIndent();
+        builder.AppendBlock(
+            $$"""
+                return module;
+            }
+            """);
     }
 
     // Emits rewrite statements and a `with` reassignment for targetVariable. Returns true if any
@@ -41,14 +45,13 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
                 && (IsStringType(collection.ElementType)
                     || (collection.IsElementValidatableType && HasInterpolationWork(collection.ElementChildren)));
 
-            if (!isString && !hasNestedWork && !hasCollectionWork)
+            if (!hasNestedWork && (!isString && !hasCollectionWork || property.HasAspect<IgnoreInterpolationAspect>()))
             {
                 continue;
             }
 
             // Skip properties that cannot be rewritten via a 'with' expression.
-            if (property.Symbol.SetMethod is null
-                || !contractInfo.Compilation.IsSymbolAccessibleWithin(property.Symbol.SetMethod, property.Symbol.ContainingType))
+            if (property.Symbol.SetMethod is null || !contractInfo.Compilation.IsSymbolAccessibleWithin(property.Symbol.SetMethod, property.Symbol.ContainingType))
             {
                 continue;
             }
@@ -60,12 +63,10 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
             else
             {
                 builder.AppendLine($"{property.NullableTypeName} {localName} = {propertyAccess};");
-
                 if (hasNestedWork)
                 {
                     AppendNestedInterpolation(builder, property, localName);
                 }
-
                 if (hasCollectionWork)
                 {
                     AppendCollectionInterpolation(builder, property, collection!, localName);
@@ -130,14 +131,14 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
 
     private void AppendCollectionInterpolation(IndentedStringBuilder builder, PropertyModel property, CollectionModel collection, string localName)
     {
-        if (property.IsNullable || (!property.HasDefault && !property.Symbol.Type.IsValueType))
+        if (CollectionHelpers.TryConstructEnumerationGuardExpression(property, localName, out string? conditionExpression, out string valueExpression))
         {
             string collectionCurrentVar = $"{localName}Current";
             builder.AppendBlock(
                 $$"""
-                if ({{localName}} is not null)
+                if ({{conditionExpression}})
                 {
-                    {{property.NonNullableTypeName}} {{collectionCurrentVar}} = {{localName}};
+                    {{property.NonNullableTypeName}} {{collectionCurrentVar}} = {{valueExpression}};
                 """);
             AppendCollectionInterpolationBody(builder.IncreaseIndent(), collection, collectionCurrentVar);
             builder.AppendBlock(

@@ -13,7 +13,7 @@ internal static class ValidationFrameworkSourceRegistry
         static context => context.AddEmbeddedSource<GeneratedModuleValidationAttribute>(),
         static context => context.AddEmbeddedSource<RequiredAttribute>(),
         static context => context.AddEmbeddedSource<DefaultTimeSpanAttribute>(),
-        static context => context.AddEmbeddedSource<IgnoreOverridesAttribute>(),
+        static context => context.AddEmbeddedSource<IgnoreOverrideAttribute>(),
         static context => context.AddEmbeddedSource<ValidatableAttribute>(),
         static context => context.AddEmbeddedSource(typeof(DefaultValueAttribute<>)),
         static context => context.AddEmbeddedSource(typeof(RangeAttribute<>)),
@@ -32,6 +32,7 @@ internal static class ValidationFrameworkSourceRegistry
         static context => context.AddEmbeddedSource<UnrootedPathAttribute>(),
         static context => context.AddEmbeddedSource<RootedPathAttribute>(),
         static context => context.AddEmbeddedSource<NormalizedPathAttribute>(),
+        static context => context.AddEmbeddedSource<IgnoreInterpolationAttribute>(),
     ];
 
     public static void Emit(IncrementalGeneratorPostInitializationContext context)

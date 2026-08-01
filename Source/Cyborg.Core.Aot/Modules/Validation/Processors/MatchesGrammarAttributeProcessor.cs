@@ -4,33 +4,14 @@ using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal sealed class MatchesGrammarAttributeProcessor : IPropertyAttributeProcessor
+internal sealed class MatchesGrammarAttributeProcessor : AttributeProcessorBase<MatchesGrammarAttribute>
 {
-    public string AttributeMetadataName => typeof(MatchesGrammarAttribute).FullName;
-
-    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {
-        aspect = null;
-
-        INamedTypeSymbol? attributeClass = attribute.AttributeClass;
-        if (attributeClass is null)
+        if (!ValidatePropertyType(attribute, in context, SpecialType.System_String)
+            || !TryGetConstructorArgumentValue(attribute, argumentIndex: 0, in context, out string? valueExpression))
         {
-            return true;
-        }
-        if (context.Property.Type.SpecialType is not SpecialType.System_String)
-        {
-            context.Report(ValidationGeneratorDiagnostics.TypeMismatch, context.Property.Name, context.ContainingType.Name, nameof(MatchesGrammarAttribute), nameof(String));
-            return false;
-        }
-        if (attribute.ConstructorArguments.Length == 0)
-        {
-            context.Report(ValidationGeneratorDiagnostics.MissingArgument, context.Property.Name, context.ContainingType.Name, nameof(MatchesGrammarAttribute));
-            return false;
-        }
-        if (attribute.ConstructorArguments[0].Value is not string valueExpression)
-        {
-            context.Report(ValidationGeneratorDiagnostics.UnsupportedAttributeLiteral, context.Property.Name, context.ContainingType.Name);
-            return false;
+            return false.WithDefaults(out aspect);
         }
         if (context.ContainingType.GetMembers(valueExpression).FirstOrDefault(m => m.Kind is SymbolKind.Property) is not IPropertySymbol { Type: INamedTypeSymbol namedType } parserProperty)
         {
@@ -39,16 +20,14 @@ internal sealed class MatchesGrammarAttributeProcessor : IPropertyAttributeProce
                 context.ContainingType.Name,
                 nameof(MatchesGrammarAttribute),
                 valueExpression);
-            return false;
+            return false.WithDefaults(out aspect);
         }
         aspect = new GrammarValidationAspect(parserProperty, valueExpression);
         return true;
     }
 
-    private sealed class GrammarValidationAspect(IPropertySymbol parserProperty, string valueExpression) : PropertyValidationAspect
+    private sealed class GrammarValidationAspect(IPropertySymbol parserProperty, string valueExpression) : PropertyAspect
     {
-        public override bool EnsuresDefault => false;
-
         protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
         {
             if (!SymbolEqualityComparer.Default.Equals(parserProperty.Type, model.ContractInfo.IParser))
