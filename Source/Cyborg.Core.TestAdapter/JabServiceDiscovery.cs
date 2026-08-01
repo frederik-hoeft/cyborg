@@ -4,7 +4,7 @@ using System.Reflection;
 
 namespace Cyborg.Core.TestAdapter;
 
-internal sealed class JabServiceDiscovery : IJabServiceDiscovery
+public sealed class JabServiceDiscovery : IJabServiceDiscovery
 {
     // Names and namespace derived from typeof so they track Jab's actual declarations.
     private static readonly string s_jabNamespace = typeof(ImportAttribute<>).Namespace!;

@@ -95,6 +95,11 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
         string elementVariable = $"{safeIdentifier}Element";
         string elementCurrentVariable = $"{safeIdentifier}ElementCurrent";
         bool needsCollectionEnumerationGuard = CollectionHelpers.TryConstructEnumerationGuardExpression(property, propertyAccessExpression, out string? guardCondition, out string valueExpression);
+        if (!needsCollectionEnumerationGuard && property.Symbol.Type.IsReferenceType)
+        {
+            needsCollectionEnumerationGuard = true;
+            guardCondition = $"{propertyAccessExpression} is not null";
+        }
         int elementPropertyIndentLevel = 1;
         if (collection.ElementRequiresNullCheck)
         {
