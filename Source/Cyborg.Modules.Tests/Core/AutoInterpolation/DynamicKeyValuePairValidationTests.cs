@@ -2,7 +2,7 @@
 using Cyborg.Modules.Template;
 using DynamicKvp = Cyborg.Core.Configuration.Model.DynamicKeyValuePair;
 
-namespace Cyborg.Modules.Tests.Core.DynamicKeyValuePair;
+namespace Cyborg.Modules.Tests.Core.AutoInterpolation;
 
 [TestClass]
 public sealed class DynamicKeyValuePairValidationTests : ModuleTestBase
