@@ -1,6 +1,6 @@
 # Validation Attributes Reference
 
-This document provides a complete reference for the validation, defaulting, and override control attributes used by the Cyborg source generators. These attributes are declared in `Cyborg.Core.Aot` and emitted into consuming compilations. They are applied to properties on module records (marked with `[GeneratedModuleValidation]`) and on nested records (marked with `[Validatable]`).
+This document provides a complete reference for the validation, defaulting, override-control, and interpolation-control attributes used by the Cyborg source generators. These attributes are declared in `Cyborg.Core.Aot` and emitted into consuming compilations. They are applied to properties on module records (marked with `[GeneratedModuleValidation]`) and on nested records (marked with `[Validatable]`).
 
 For how these attributes are processed by the source generators, see [Source Generators](source-generators.md). For the runtime systems that consume the generated validation pipeline, see [Architecture Overview](architecture-overview.md#validation-pipeline).
 
@@ -36,8 +36,9 @@ For how these attributes are processed by the source generators, see [Source Gen
   - [DefaultInstance](#defaultinstance)
   - [DefaultInstanceFactory](#defaultinstancefactory)
   - [DefaultTimeSpan](#defaulttimespan)
-- [Override Control Attributes](#override-control-attributes)
-  - [IgnoreOverrides](#ignoreoverrides)
+- [Override and Interpolation Control Attributes](#override-and-interpolation-control-attributes)
+  - [IgnoreOverride](#ignoreoverride)
+  - [IgnoreInterpolation](#ignoreinterpolation)
 - [Decomposition Attributes](#decomposition-attributes)
   - [DecomposeIgnore](#decomposeignore)
 
@@ -50,13 +51,13 @@ These attributes trigger source generation on the annotated type. They are not a
 
 ### GeneratedModuleValidation
 
-Triggers the validation generator on a module record. The target must be a `partial record`. The generator emits implementations of `ApplyDefaultsAsync`, `ResolveOverridesAsync`, and `ValidateAsync` based on the attributes applied to the record's properties.
+Triggers the validation generator on a module record. The target must be a `partial record`. The generator emits `ApplyDefaultsAsync`, `ResolveOverridesAsync`, the private `__ApplyInterpolation` helper, and `ValidateAsync` based on the attributes applied to the record's properties.
 
 **Target:** `class` (record)
 
 ### Validatable
 
-Marks a nested record type for recursive validation. When a property on a `[GeneratedModuleValidation]` record has a type marked `[Validatable]`, the generated pipeline applies defaults, overrides, and validation recursively to that nested record's properties.
+Marks a nested record type for recursive validation. When a property on a `[GeneratedModuleValidation]` record has a type marked `[Validatable]`, the generated pipeline applies defaults, overrides, interpolation, and validation recursively to that nested record's properties.
 
 **Target:** `class` (record)
 
@@ -90,7 +91,7 @@ Validates that the property has a meaningful value. For strings, checks that the
 
 ### Range
 
-Validates that a comparable property value falls within specified bounds. Either or both bounds may be specified.
+Validates that a comparable property value falls within specified bounds. At least one bound must be specified; either bound may be omitted.
 
 **Parameters:**
 
@@ -158,25 +159,25 @@ Validates that the string property contains a path to an existing directory. Che
 
 ### FileName
 
-Validates that a string property contains a valid file name: non-empty, not `.` or `..`, and containing no characters in `Path.GetInvalidFileNameChars()`.
+Validates that a string contains a valid file name: it must be non-empty, must not be `.` or `..`, and must not contain characters returned by `Path.GetInvalidFileNameChars()`.
 
 **Applies to:** `string` properties only.
 
 ### RootedPath
 
-Validates that a string property contains a rooted (absolute) path. Uses `Path.IsPathRooted` semantics.
+Validates that a string contains a rooted (absolute) path according to `Path.IsPathRooted`.
 
 **Applies to:** `string` properties only.
 
 ### UnrootedPath
 
-Validates that a string property contains an unrooted (relative) path — i.e., that `Path.IsPathRooted` returns `false`.
+Validates that a string contains an unrooted (relative) path according to `Path.IsPathRooted`.
 
 **Applies to:** `string` properties only.
 
 ### NormalizedPath
 
-Validates that a string property contains a normalized path — one where no segment is `.` or `..` and there are no consecutive directory separators (empty segments). Works on both absolute and relative paths without resolving against the current working directory.
+Validates that a string contains a normalized path: no segment may be `.` or `..`, and consecutive directory separators may not create empty segments. The check does not resolve the path against the current working directory.
 
 **Applies to:** `string` properties only.
 
@@ -214,20 +215,32 @@ Provides a default by calling a named static factory method on the containing mo
 
 ### DefaultTimeSpan
 
-Provides a default `TimeSpan` value parsed from a string at compile time. The string must be in a format accepted by `TimeSpan.Parse` with invariant culture.
+Provides a default `TimeSpan` value parsed from a string at compile time. The string must use the invariant constant (`c`) format accepted by `TimeSpan.ParseExact`.
 
 **Parameters:**
 
 - `TimeSpan` — String representation of the default duration (e.g., `"00:30:00"` for 30 minutes).
 
 
-## Override Control Attributes
+## Override and Interpolation Control Attributes
 
-### IgnoreOverrides
+### IgnoreOverride
 
-Prevents the override resolution system from applying environment-driven overrides to the annotated property. The property retains its deserialized or defaulted value regardless of any matching override keys in the environment.
+Prevents environment-driven override resolution for the annotated property.
 
-This is typically applied to structural properties (such as `Name`, `Group`, or `Artifacts`) that should not be overridden at runtime, or to properties whose types are not compatible with the string-based override resolution mechanism.
+**Parameters:**
+
+- `Recurse` (optional, default `false`) — When `false`, only the annotated property itself ignores override resolution while eligible nested properties may still be processed. When `true`, the complete annotated subtree ignores overrides.
+
+`ModuleBase.Name` and `ModuleBase.Group` use this attribute because environment binding consumes their structural identity before validation begins.
+
+### IgnoreInterpolation
+
+Prevents the generated interpolation phase from calling `runtime.Environment.Interpolate(...)` for the annotated string property. The raw string is preserved so a worker can interpolate it later, after context-specific variables or child artifacts exist.
+
+**Applies to:** `string` properties only.
+
+This is used by `AssertModule.Message`, whose placeholders may refer to artifacts produced by the assertion module and therefore cannot be resolved during pre-execution validation. `ModuleBase.Name` and `ModuleBase.Group` also opt out because they define the environment namespace before interpolation runs.
 
 
 ## Decomposition Attributes
