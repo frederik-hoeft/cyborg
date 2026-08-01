@@ -44,7 +44,7 @@ For the runtime architecture these generators integrate with, see [Architecture 
 
 The generator layer covers three concerns:
 
-- **Module validation** — Generating the four-stage validation pipeline (`ApplyDefaultsAsync`, `ResolveOverridesAsync`, `__ApplyInterpolation`, `ValidateAsync`) from annotated module records, transforming declarative attributes into executable validation, defaulting, override resolution, and auto-interpolation logic.
+- **Module validation** — Generating the four-renderer validation pipeline (`ApplyDefaultsAsync`, `ResolveOverridesAsync`, `__ApplyInterpolation`, `ValidateAsync`) from annotated module records, transforming declarative attributes into executable validation, defaulting, override resolution, interpolation, and validation logic.
 - **Module loader factories** — Generating worker construction methods that resolve constructor dependencies from the DI container, eliminating boilerplate in module loaders.
 - **Model decomposition** — Generating `IDecomposable` implementations that project record properties into `DynamicKeyValuePair` collections for environment publishing and artifact flattening.
 
@@ -84,15 +84,15 @@ The generator is triggered by the `[GeneratedModuleValidation]` attribute on a `
 
 ### Generated Pipeline
 
-For each annotated record, the generator emits a partial record implementing `IModule<TModule>` with three public async methods and one private static helper:
+For each annotated record, the generator emits a partial record implementing `IModule<TModule>` with two explicit async interface methods, one public async validation method, and one private static interpolation helper:
 
 1. **`ApplyDefaultsAsync`** — For each property carrying a default attribute (`[DefaultValue<T>]`, `[DefaultInstance]`, `[DefaultInstanceFactory]`, `[DefaultTimeSpan]`), emits a `with`-expression that replaces null or zero-valued properties with their declared defaults. Recursively applies defaults to nested records marked `[Validatable]` and to elements within collections.
 
-2. **`ResolveOverridesAsync`** — For each property not marked `[IgnoreOverrides]`, emits a call to `runtime.Environment.Resolve<TModule, T>()` to check for environment-driven overrides. The override resolution system (described in the architecture overview) uses `CallerArgumentExpression` to derive the property name, constructs lookup keys from the module's identifiers, and applies type conversion. Processors can customize the override resolution expression for specific property types (e.g., collections).
+2. **`ResolveOverridesAsync`** — For each property not suppressed by `[IgnoreOverride]`, emits a call to `runtime.Environment.Resolve<TModule, T>()` or a collection-specific resolution expression. `[IgnoreOverride]` suppresses the annotated node; `Recurse = true` also suppresses descendants. Defaults are applied again after this phase so injected type-default values receive their declared defaults.
 
-3. **`__ApplyInterpolation`** (private static helper) — Traverses every string-typed property on the module and its nested `[Validatable]` records and collections, replacing each string value with `runtime.Environment.Interpolate(value)` via `with`-expressions. Nullable strings that are `null` are left unchanged. This step runs inside `ValidateAsync` after defaults and overrides have been applied, so workers receive a fully resolved module and do not need to call `Interpolate` manually.
+3. **`__ApplyInterpolation`** — Private static helper that recursively rewrites eligible string properties through `runtime.Environment.Interpolate(...)`, including strings in nested `[Validatable]` records and supported collections. `[IgnoreInterpolation]` leaves a string untouched for later context-specific interpolation.
 
-4. **`ValidateAsync`** — Applies defaults, resolves overrides, re-applies defaults (to catch values injected by overrides), calls `__ApplyInterpolation`, then emits constraint checks and collects `ValidationError` instances. Returns `ValidationResult<TModule>.Valid(module)` if no errors were found, or `ValidationResult<TModule>.Invalid(errors)` otherwise. Validation recurses into nested validatable records and iterates collection elements.
+4. **`ValidateAsync`** — Orchestrates defaults → overrides → defaults → interpolation → constraints, collects `ValidationError` instances, and returns `ValidationResult<TModule>.Valid(module)` or `ValidationResult<TModule>.Invalid(errors)`. Validation recurses into nested validatable records and supported collection elements.
 
 The generated code uses `with`-expressions throughout, ensuring that each stage produces a new record instance and that the original deserialized module is never mutated.
 
@@ -105,7 +105,7 @@ Two processor interfaces exist:
 - **`IPropertyAttributeProcessor`** — Triggered when its `AttributeMetadataName` matches an attribute on the property being processed. Handles attribute-driven behaviors like `[Required]`, `[Range<T>]`, and `[DefaultValue<T>]`.
 - **`IDynamicPropertyProcessor`** — Invoked for every property regardless of attributes. Handles context-dependent behaviors such as collection override resolution, where the processing logic depends on the property type rather than an attribute.
 
-Each processor returns a `PropertyValidationAspect` — an object that can contribute to one or more pipeline stages. An aspect exposes virtual methods for rewriting the default assignment expression, rewriting the override resolution expression, and emitting validation code. This design allows a single attribute to influence multiple stages of the pipeline. For example, a `[DefaultValue<T>]` attribute produces an aspect that contributes a default in the defaults stage but contributes nothing to validation.
+Each processor returns a `PropertyAspect` — an object that can contribute to one or more pipeline stages. An aspect exposes virtual methods for rewriting the default assignment expression, rewriting the override resolution expression, and emitting validation code. This design allows a single attribute to influence multiple stages of the pipeline. For example, a `[DefaultValue<T>]` attribute produces an aspect that contributes a default in the defaults stage but contributes nothing to validation.
 
 The `ValidationProcessorRegistry` holds the complete set of processors as a static immutable array, with a frozen dictionary for attribute-based lookup by metadata name.
 
@@ -122,7 +122,8 @@ The following attributes are recognized by the validation generator:
 | **Pattern matching** | `[MatchesRegex]`, `[MatchesGrammar]` |
 | **File system** | `[FileExists]`, `[DirectoryExists]` |
 | **Enum validation** | `[DefinedEnumValue]` |
-| **Override suppression** | `[IgnoreOverrides]` |
+| **Override suppression** | `[IgnoreOverride]` |
+| **Interpolation suppression** | `[IgnoreInterpolation]` |
 | **Nested validation** | `[Validatable]` (on nested record types) |
 
 All attributes are defined in `Cyborg.Core.Aot` and emitted into the consuming compilation, see [Validation Attributes Reference](validation-attributes-reference.md) for a complete reference of their parameters and behavior.
@@ -132,11 +133,11 @@ All attributes are defined in `Cyborg.Core.Aot` and emitted into the consuming c
 The generator assembles its output through four section renderers, each implementing `ISectionRenderer`:
 
 | Renderer | Method Generated | Responsibility |
-|----------|-----------------|-------------|
+|----------|-----------------|----------------|
 | `DefaultsSectionRenderer` | `ApplyDefaultsAsync` | Emits default value assignments from aspect rewrite expressions |
 | `OverrideSectionRenderer` | `ResolveOverridesAsync` | Emits override resolution calls with aspect rewrite expressions |
-| `InterpolationSectionRenderer` | `__ApplyInterpolation` (private static) | Traverses all string-typed properties (including nested `[Validatable]` records and string collections) and rewrites them via `runtime.Environment.Interpolate()` using `with`-expressions; null values are preserved |
-| `ValidationSectionRenderer` | `ValidateAsync` | Applies defaults/overrides/interpolation, then emits constraint checks from aspect validation logic |
+| `InterpolationSectionRenderer` | `__ApplyInterpolation` | Recursively rewrites eligible strings after defaults and overrides |
+| `ValidationSectionRenderer` | `ValidateAsync` | Orchestrates the full pipeline and emits constraint checks from aspect validation logic |
 
 The `ModuleValidationRenderer` orchestrates these renderers sequentially into a single partial record declaration. It also emits file-scoped helper methods for default instance resolution and nullable relaxation.
 
@@ -145,7 +146,7 @@ The `ModuleValidationRenderer` orchestrates these renderers sequentially into a 
 The generator supports recursive validation of nested record types and collection elements:
 
 - **Nested records** — Properties whose type is marked `[Validatable]` are processed recursively. The generator detects cycles in the type graph to prevent infinite recursion during generation.
-- **Collections** — Properties typed as `IReadOnlyCollection<T>`, `ImmutableArray<T>`, `List<T>`, or arrays are iterated element-by-element during validation. If the element type is itself validatable, each element is validated recursively. Collection materialization (converting between collection types after override resolution) is handled via `CollectionTypeInspector` and `CollectionMaterializationKind`.
+- **Collections** — Properties typed as supported enumerable shapes are rewritten and validated element-by-element when their element type requires work. `CollectionTypeInspector` selects a `CollectionMaterializationKind` for arrays, `List<T>`, `ImmutableArray<T>`, supported collection interfaces, and constructible concrete collections. Shared enumeration guards preserve collection absence semantics: null references are skipped, nullable value types are unwrapped only when present, and default `ImmutableArray<T>` values are never enumerated or silently converted to empty arrays.
 
 ## Module Loader Factory Generator
 
