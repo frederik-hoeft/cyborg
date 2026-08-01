@@ -65,13 +65,6 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
             }
         }
 
-        if (value is string stringValue)
-        {
-            // Handle indirection via string variables
-            string resolvedString = Interpolate(stringValue, entryPoint);
-            value = Unsafe.As<string, T>(ref resolvedString);
-        }
-
         return value;
     }
 
