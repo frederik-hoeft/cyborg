@@ -68,8 +68,8 @@ All modules inherit the following properties from `ModuleBase`:
 
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
-| `name` | string | No | `null` | Optional identifier. Named modules are registered in the module registry and can be referenced by the Named Reference module. |
-| `group` | string | No | `null` | Optional grouping tag for organizational purposes. |
+| `name` | string | No | `null` | Optional structural identifier. Named modules are registered in the module registry and can be referenced by the Named Reference module. It is not overridden or auto-interpolated because environment binding consumes it before validation. |
+| `group` | string | No | `null` | Optional structural grouping tag. Like `name`, it is not overridden or auto-interpolated. |
 | `artifacts` | object | No | See below | Controls how module results are published to the environment. |
 
 ### Module Context
@@ -243,12 +243,12 @@ Validates a condition and fails with a diagnostic message if the assertion is fa
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
 | `assertion` | module reference | Yes | -- | A condition module that produces a boolean result. |
-| `message` | string | Yes | -- | Failure message. Supports `${...}` variable interpolation, so the message can include resolved environment values for diagnostics. |
+| `message` | string | Yes | -- | Failure message. Supports `${...}` interpolation after the assertion child has executed, so the message may reference variables or artifacts produced by that child. |
 
 **Behavior:**
 
 - Executes the `assertion` module. If the assertion module itself fails, its status is propagated.
-- If the condition evaluates to `false`, returns `Failed` with the interpolated `message`.
+- If the condition evaluates to `false`, interpolates `message` against the parent runtime environment after child artifacts have been published, then returns `Failed` with that message.
 - If `true`, returns `Success`.
 
 **Result:** Publishes an `AssertModuleResult` with the `message` property on failure.
@@ -462,10 +462,11 @@ Executes an external process with optional impersonation and output capture.
 
 **Command:**
 
-| Property | Type | Required | Constraints | Description |
-|----------|------|----------|-------------|-------------|
-| `executable` | string | Yes | Must exist on disk | Path to the executable. |
-| `arguments` | array of strings | Yes | -- | Command-line arguments. |
+| Property | Type | Required | Default | Constraints | Description |
+|----------|------|----------|---------|-------------|-------------|
+| `executable` | string | Yes | -- | Must exist on disk | Path to the executable. |
+| `arguments` | array of strings | Yes | -- | -- | Command-line arguments. |
+| `working_directory` | string | No | `null` | Rooted, normalized path; directory must exist | Assigned to `ProcessStartInfo.WorkingDirectory` before dispatch. |
 
 **Output Options:**
 

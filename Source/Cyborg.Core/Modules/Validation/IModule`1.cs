@@ -34,9 +34,11 @@ public interface IModule<TSelf> : IModule where TSelf : class, IModule<TSelf>
     /// <summary>
     /// Validates the current instance asynchronously using the specified runtime environment and service provider.
     /// </summary>
-    /// <remarks>Performs in the following order: 1) apply overrides, 2) apply defaults, 3) validate the instance.
-    /// The validation process checks for any configuration errors or issues that would prevent the module from functioning correctly.
-    /// The runtime environment and service provider are used to access necessary context and services during validation, such as configuration settings, logging, or other dependencies required to perform comprehensive validation.</remarks>
+    /// <remarks>
+    /// Performs the generated preparation and validation pipeline in the following order: apply defaults, resolve overrides,
+    /// reapply defaults to overridden values, interpolate eligible strings, and validate constraints. The runtime environment
+    /// and service provider provide the context and services required by those phases.
+    /// </remarks>
     /// <param name="runtime">The runtime environment that provides context and resources required for the validation process. Cannot be null.</param>
     /// <param name="serviceProvider">The service provider used to resolve dependencies needed during validation. Cannot be null.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the validation operation.</param>

@@ -120,7 +120,7 @@ The following attributes are recognized by the validation generator:
 | **Length constraints** | `[MinLength]`, `[MaxLength]`, `[ExactLength]`, `[Length]` |
 | **Range constraints** | `[Range<T>]` |
 | **Pattern matching** | `[MatchesRegex]`, `[MatchesGrammar]` |
-| **File system** | `[FileExists]`, `[DirectoryExists]` |
+| **File system and paths** | `[FileExists]`, `[DirectoryExists]`, `[FileName]`, `[RootedPath]`, `[UnrootedPath]`, `[NormalizedPath]` |
 | **Enum validation** | `[DefinedEnumValue]` |
 | **Override suppression** | `[IgnoreOverride]` |
 | **Interpolation suppression** | `[IgnoreInterpolation]` |

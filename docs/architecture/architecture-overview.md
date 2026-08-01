@@ -1,160 +1,459 @@
 # Cyborg System Architecture
 
-Cyborg is a .NET 10, JSON-configured backup-orchestration application designed for native AOT publication. Its architecture separates immutable module configuration from execution logic, uses source generation for reflection-free runtime contracts, and communicates between modules through hierarchical runtime environments.
+This document provides a comprehensive overview of the Cyborg system architecture. It covers the module system, JSON deserialization, execution model, environment scoping, variable resolution, property overrides, artifact publishing, parsing infrastructure, process execution, metrics, and security. After reading this document, you should have a clear understanding of how the system is structured, how modules are loaded and executed, and how the major subsystems interact.
 
 For detailed reference material, see:
 
-- [Module Reference](modules-reference.md) — Built-in modules and their configuration
-- [Dynamic Values Reference](dynamic-values-reference.md) — Typed dynamic values and providers
-- [Templates Reference](templates-reference.md) — Template-module behavior and usage
-- [Source Generators](source-generators.md) — Generated validation, loading, and decomposition code
-- [Validation Attributes Reference](validation-attributes-reference.md) — Validation, defaulting, override, and interpolation controls
-- [Module Testing](module-testing.md) — Production-backed test infrastructure
+- [Module Reference](modules-reference.md) — Complete documentation of all built-in modules
+- [Dynamic Values Reference](dynamic-values-reference.md) — Dynamic value providers and typed configuration
+- [Templates Reference](templates-reference.md) — Template module usage and patterns
+- [Source Generators](source-generators.md) — Roslyn source generators for AOT-compatible code generation
+- [Validation Attributes Reference](validation-attributes-reference.md) — Validation, defaulting, override, and interpolation control attributes
+- [Module Testing](module-testing.md) — Production-backed test infrastructure and generator regression fixtures
 
-## Project structure
+**Table of Contents**
 
-| Project | Target | Responsibility |
-|---|---|---|
-| `Cyborg.Core` | net10.0 | Runtime abstractions, environments, configuration, validation contracts, parsing, security, and shared services |
-| `Cyborg.Core.Aot` | netstandard2.0 | Roslyn incremental generators distributed as analyzers |
-| `Cyborg.Modules` | net10.0 | Built-in domain-agnostic modules |
-| `Cyborg.Modules.Borg` | net10.0 | Borg-specific modules and parsers |
-| `Cyborg.Cli` | net10.0 | CLI entry point and application composition root |
+<!-- @import "[TOC]" {cmd="toc" depthFrom=2 depthTo=6 orderedList=false} -->
 
-`Cyborg.Core.Aot` discovers registered runtime contract symbols from the consuming compilation and emits code that references them through fully qualified names. `Cyborg.Modules` and `Cyborg.Modules.Borg` expose Jab service-provider modules that the CLI imports into its compile-time DI graph.
+<!-- code_chunk_output -->
 
-## Module model
+- [Overview](#overview)
+- [Project Structure](#project-structure)
+  - [Test Support Projects](#test-support-projects)
+- [Module System](#module-system)
+  - [Three-Part Module Pattern](#three-part-module-pattern)
+  - [ModuleContext Envelope](#modulecontext-envelope)
+  - [Module Composition via ModuleReference](#module-composition-via-modulereference)
+  - [Loading and Deserialization](#loading-and-deserialization)
+    - [Registry-Based Deserialization](#registry-based-deserialization)
+    - [Dynamic Value System](#dynamic-value-system)
+- [Module Execution](#module-execution)
+  - [Execution Lifecycle](#execution-lifecycle)
+    - [Validation Pipeline](#validation-pipeline)
+    - [Execution and Result](#execution-and-result)
+  - [Runtime Hierarchy](#runtime-hierarchy)
+  - [Environment Binding](#environment-binding)
+- [Runtime Environment](#runtime-environment)
+  - [Environment Scoping](#environment-scoping)
+    - [Scope Types](#scope-types)
+    - [Environment Types](#environment-types)
+    - [Named Environments](#named-environments)
+  - [Variable Resolution](#variable-resolution)
+    - [Resolution Semantics](#resolution-semantics)
+    - [Cycle Detection](#cycle-detection)
+    - [Variable Name Syntax](#variable-name-syntax)
+    - [Decomposable Objects](#decomposable-objects)
+  - [Module Property Overrides](#module-property-overrides)
+    - [Override Resolution](#override-resolution)
+    - [Override Use Case](#override-use-case)
+    - [Override Resolution Tags](#override-resolution-tags)
+  - [Artifact Publishing](#artifact-publishing)
+    - [Artifact Lifecycle](#artifact-lifecycle)
+    - [Artifact Configuration](#artifact-configuration)
+    - [Artifact Exposure Patterns](#artifact-exposure-patterns)
+- [Supporting Infrastructure](#supporting-infrastructure)
+  - [Parsing Infrastructure](#parsing-infrastructure)
+    - [Parser Combinators](#parser-combinators)
+    - [Terminal Parsers](#terminal-parsers)
+    - [Syntax Tree and Data Extraction](#syntax-tree-and-data-extraction)
+    - [Integration Points](#integration-points)
+  - [Process Execution](#process-execution)
+  - [Metrics Collection](#metrics-collection)
+- [Cross-Cutting Concerns](#cross-cutting-concerns)
+  - [Security Design Principles](#security-design-principles)
+    - [Configuration File Trust](#configuration-file-trust)
+    - [Subprocess Safety](#subprocess-safety)
+    - [Input Validation](#input-validation)
+    - [Privilege Boundaries](#privilege-boundaries)
+  - [AOT Compilation](#aot-compilation)
 
-Each module consists of three responsibilities:
+<!-- /code_chunk_output -->
 
-| Type | Responsibility |
-|---|---|
-| Module record | Immutable configuration; inherits `ModuleBase` and implements `IModule` |
-| Worker | Execution logic; inherits `ModuleWorker<TModule>` |
-| Loader | Polymorphic JSON deserialization and worker construction |
 
-A module record is never mutated in place. Before execution, generated preparation stages create transformed record copies containing defaults, runtime overrides, and interpolated values. Workers receive only the validated module instance.
+## Overview
 
-### Module references and contexts
+Cyborg is a .NET 10 application providing modular, JSON-configured backup orchestration with native AOT compilation support. It replaces legacy shell-based backup scripts with a type-safe, extensible module system. The architecture is driven by four design goals:
 
-A `ModuleReference` is encoded as a JSON object whose single property name is the versioned module ID. The loader registry uses that ID to select the corresponding `IModuleLoader` without reflection-based polymorphic deserialization.
+1. **AOT Compilation** — Native AOT publishing for minimal startup time and memory footprint on Linux servers, and minimal external dependencies (no .NET runtime requirement, no external dynamic libraries).
+2. **Extensibility** — A plugin-like module system allowing backup operations to be composed from JSON configuration without code changes.
+3. **Type Safety** — Compile-time verification of module registration, dependency injection, and JSON serialization through Roslyn source generators and the Jab DI container.
+4. **Structured Output Parsing** — Grammar-based parser combinators for extracting structured data and metrics from subprocess output.
 
-A `ModuleContext` wraps a module reference with execution context:
+## Project Structure
 
-- environment scope and optional environment name;
-- an optional configuration module that populates the environment;
-- optional requirements evaluated before the main module;
-- the module to execute.
+The production solution is organized into five primary projects, each with a specific role in the dependency hierarchy:
 
-Nested module references allow modules to compose execution trees without coupling to concrete child-module types.
+| Layer | Target | Purpose |
+|-------|--------|---------|
+| `Cyborg.Core` | net10.0 | Core abstractions: module interfaces, runtime, environment scoping, configuration, parsing, and cross-cutting services. Contains no module-specific logic. |
+| `Cyborg.Core.Aot` | netstandard2.0 | Roslyn incremental source generators distributed as analyzers. Targets netstandard2.0 as required by the Roslyn analyzer hosting model. |
+| `Cyborg.Modules` | net10.0 | Built-in, domain-agnostic module implementations supplemented by generated code from `Cyborg.Core.Aot`, e.g., for model validation and instance activation. |
+| `Cyborg.Modules.Borg` | net10.0 | Borg-specific modules (create, prune, compact) with JSON output parsing and borg-specific configuration types. |
+| `Cyborg.Cli` | net10.0 | Application entry point using ConsoleAppFramework for CLI routing, with Jab for compile-time dependency injection composition. |
 
-## Execution lifecycle
+`Cyborg.Core` defines the runtime interfaces and abstractions. `Cyborg.Core.Aot` generates code that implements those interfaces for specific module types. `Cyborg.Modules` and `Cyborg.Modules.Borg` provide the built-in module library. `Cyborg.Cli` composes everything into the final executable. Each module library exposes a Jab `[ServiceProviderModule]` interface (e.g., `ICyborgModuleServices`, `ICyborgBorgServices`) that the CLI project imports into its composition root.
 
-`ModuleWorker<TModule>` coordinates environment binding, generated preparation and validation, optional custom validation, execution, and artifact publication.
+### Test Support Projects
 
-### Generated preparation and validation pipeline
+The reusable test infrastructure is split by responsibility:
 
-`ValidateAsync` orchestrates the current generated pipeline in this order:
+| Project | Purpose |
+|---------|---------|
+| `Cyborg.Core.TestAdapter` | Builds production-equivalent runtime scopes for tests and exposes the higher-order test API. |
+| `Cyborg.TestModules` | Minimal non-test assembly containing source-generator-enrolled fixture models. It references `Cyborg.Core` and consumes `Cyborg.Core.Aot` as an analyzer. |
+| `Cyborg.Core.Tests` | Unit tests for core runtime and infrastructure behavior. |
+| `Cyborg.Modules.Tests` | Tests for domain-agnostic modules and generated validation behavior. References `Cyborg.TestModules` but does not itself consume the validation analyzer. |
+| `Cyborg.Modules.Borg.Tests` | Tests for Borg-specific modules, parsers, and metrics behavior. |
 
-1. **Apply defaults** — Apply `[DefaultValue<T>]`, `[DefaultInstance]`, `[DefaultInstanceFactory]`, and `[DefaultTimeSpan]` recursively to eligible properties, nested `[Validatable]` records, and supported collection elements.
-2. **Resolve overrides** — Replace eligible properties from runtime environment values. `[IgnoreOverride]` suppresses the annotated property; `Recurse = true` suppresses its complete subtree.
-3. **Reapply defaults** — Give values introduced by overrides the same default semantics as deserialized values.
-4. **Interpolate strings** — Apply `runtime.Environment.Interpolate(...)` to eligible strings, including strings in nested validatable records and supported collections. `[IgnoreInterpolation]` preserves strings that require later context-specific interpolation.
-5. **Validate constraints** — Evaluate required, range, length, filesystem, enum, regex, grammar, and related validation aspects and return a `ValidationResult<TModule>`.
+Keeping generated fixture models in `Cyborg.TestModules` avoids exposing the analyzer-generated framework types directly inside friend test assemblies. `Cyborg.Modules.Tests` is an `InternalsVisibleTo` target of `Cyborg.Core`; enrolling that same compilation for source generation would make both the internal framework types from `Cyborg.Core` and newly emitted copies visible, creating conflicting type definitions.
 
-The generator emits two explicit `IModule<TModule>` methods (`ApplyDefaultsAsync` and `ResolveOverridesAsync`), the private static `__ApplyInterpolation` helper, and public `ValidateAsync` orchestration.
+## Module System
 
-`ModuleBase.Name` and `ModuleBase.Group` opt out of both override resolution and interpolation because runtime environment binding consumes these structural identity values before validation begins. `AssertModule.Message` opts out of generated interpolation and is interpolated by its worker only after the assertion child has executed, allowing the message to reference child artifacts.
+The module system is the central architectural pattern in Cyborg. Every unit of work — from executing a subprocess to orchestrating a multi-step backup workflow — is represented as a module.
 
-### Collection semantics
+### Three-Part Module Pattern
 
-Generated collection traversal uses a common enumeration guard based on the actual collection shape:
+Each module consists of three types serving distinct responsibilities:
 
-- null reference collections are skipped;
-- nullable value-type collections are unwrapped only when present;
-- default `ImmutableArray<T>` values are not enumerated;
-- `default(ImmutableArray<T>)` remains distinct from `ImmutableArray<T>.Empty`;
-- invalid required collections can therefore produce validation errors instead of throwing during recursive element validation.
+| Type | Responsibility | Lifetime |
+|------|----------------|----------|
+| Module (record) | Immutable configuration data holder. Pure data, safe to cache or transform. Inherits from `ModuleBase` and implements `IModule`. | Per-configuration |
+| Worker | Execution logic. Inherits from `ModuleWorker<TModule>`, receives injected services, and implements module behavior through the abstract `ExecuteAsync` method. | Per-configuration, stateless |
+| Loader | JSON deserialization. Inherits from `ModuleLoader<TWorker, TModule>` with a source-generated factory method that constructs the worker from the deserialized module record and dependency-injected services. | Singleton |
 
-Supported collection rewrites materialize arrays, lists, immutable arrays, supported collection interfaces, and compatible concrete collection types according to `CollectionMaterializationKind`.
+Before execution, the immutable module record is copied and transformed through the generated preparation and validation pipeline, applying defaults, per-execution overrides, string interpolation, and constraints. The worker operates on the fully validated module instance, ensuring that execution logic never encounters invalid configuration and that deserialized module definitions remain immutable and free of execution-time side effects.
 
-### Custom validation and execution
+The separation of module from worker ensures that configuration data remains immutable and free of side effects. Workers are instantiated per configuration, receive the validated module record, and have access to dependency-injected services. Loaders are singletons registered in the module loader registry at startup.
 
-After generated validation succeeds, a worker may run custom validation through its callback hook. `EnsureValid()` prevents `ExecuteAsync` from running when errors exist.
+### ModuleContext Envelope
 
-Execution returns an `IModuleExecutionResult` with a `ModuleExitStatus` (`Success`, `Failed`, `Skipped`, or `Canceled`) and an artifact scope. Worker result builders and `runtime.Exit(...)` finalize the result and publish configured artifacts.
+Every module invocation in JSON is represented as a `ModuleContext` — an envelope that separates the module definition from its execution context:
 
-## Runtime hierarchy and environments
+| Field | Purpose |
+|-------|---------|
+| `module` | The module to execute, identified by its versioned module ID |
+| `environment` | Scoping configuration for the execution environment (scope, name, transient flag, variable definitions) |
+| `configuration` | Optional configuration module that populates the environment before the main module runs |
+| `requires` | Optional pre-execution requirements that are asserted before the module executes |
 
-`RootModuleRuntime` owns the global environment and named-environment registry. Nested module execution creates scoped runtimes that carry an `IRuntimeEnvironment` while delegating root-level registration and lookup to the runtime hierarchy.
+When a `ModuleContext` is executed, the runtime first prepares the environment according to the declared scope, then runs the `configuration` module (if present) to populate variables, and finally executes the main `module` within that prepared environment.
 
-The effective module namespace is selected from `Name`, then `Group`, then `ModuleId`. It controls override lookup, self-references, artifact paths, and default artifact namespaces.
+### Module Composition via ModuleReference
 
-### Environment scopes
+The `ModuleReference` type enables modules to contain other modules as properties, creating arbitrarily nested execution trees. In JSON, a module reference is expressed as an object whose single property name is the module ID and whose value is the module's configuration. This structure eliminates the need for `$type` discriminators while enabling polymorphic, version-aware deserialization. Any module property typed as `ModuleReference` or `ModuleContext` can hold any module, enabling compositional patterns such as sequences of conditionals, loops over parameterized templates, or guards wrapping subprocess calls.
 
-| Scope | Behavior |
-|---|---|
-| `InheritParent` | New environment with fallback to the immediate parent |
-| `Isolated` | New environment without inheritance |
-| `Global` | Execute directly in the global environment |
-| `InheritGlobal` | New environment inheriting only from global |
-| `Parent` | Reuse the parent environment |
-| `Current` | Reuse the current environment |
-| `Reference` | Use a previously registered named environment |
+### Loading and Deserialization
 
-Named non-transient environments are registered at the root and can later be selected through `Reference` scope.
+Cyborg uses a dynamic, registry-based JSON deserialization model where the module ID serves as both a discriminator and a version identifier. This approach is fully AOT-compatible, avoiding reflection-based polymorphic deserialization.
 
-### Variable resolution and interpolation
+#### Registry-Based Deserialization
 
-Runtime environments support:
+When the JSON deserializer encounters a `ModuleReference`, the `ModuleReferenceJsonConverter` reads the property name as a module ID, looks up the corresponding `IModuleLoader` from the `IModuleLoaderRegistry`, and delegates deserialization to that loader. The registry is backed by a `FrozenDictionary` populated at startup from all registered `IModuleLoader` implementations. Each loader produces an `IModuleWorker` ready for execution. This registry-based dispatch enables version-aware loading and extensibility — new modules only need to register a loader at startup.
 
-- typed direct lookup;
-- parent fallback for inherited environments;
-- `${...}` indirection;
-- mixed literal/placeholder interpolation;
-- current-scope and entry-point self references;
-- decomposable-object member traversal;
-- cycle detection.
+Module IDs follow a versioned, dot-separated naming convention (e.g., `cyborg.modules.subprocess.v1`). All JSON property names use `snake_case` via `JsonKnownNamingPolicy.SnakeCaseLower`.
 
-Override resolution is a typed property-replacement mechanism. String interpolation is a later, separate phase. Keeping the two contracts separate allows a property to reject overrides while still being interpolated, or to preserve its raw string for worker-time interpolation.
+#### Dynamic Value System
 
-## Dynamic values and configuration
+Configuration modules populate the environment with typed values using the `IDynamicValueProvider` subsystem. Each entry in a configuration map is a key-value pair where the value type is identified by a property name in the JSON object. Providers are registered by type name (e.g., `"int"`, `"string"`, `"bool"`) in the `IDynamicValueProviderRegistry`. Domain-specific types register under versioned type names (e.g., `"cyborg.types.borg.remote.v1.4"`). Typed collections use `collection<T>` syntax to declare arrays of a specific value type.
 
-Configuration maps deserialize entries through registered `IDynamicValueProvider` implementations. Each dynamic entry requires a non-null key and value during parsing; malformed entries fail immediately with `JsonException`, even outside module-validation call sites. Empty or whitespace keys are subsequently rejected by `[Required]` when the model participates in generated validation.
+Custom types implement `IDynamicValueProvider` and register a versioned type name. When annotated with `[GeneratedDecomposition]`, they gain `IDecomposable` support for hierarchical property access via the variable resolution subsystem. Dynamic key-value entries must contain a non-null `key` and exactly one non-null typed value; malformed entries fail immediately with `JsonException`, including when they are parsed outside a module-validation context. See the [Dynamic Values Reference](dynamic-values-reference.md) for a complete listing of available value providers.
 
-Custom dynamic value types may use `[GeneratedDecomposition]` to expose typed properties through hierarchical environment paths.
+## Module Execution
 
-## Artifact publication
+This section describes how modules are executed at runtime: the validation pipeline that prepares module records before execution, the runtime hierarchy that manages nested module dispatch, and the environment binding model that determines each module's execution context.
 
-Module results can expose decomposable values as artifacts. Artifact configuration controls namespace, destination scope, and publication behavior. Published values are available to later modules through runtime environment lookup, subject to scope and namespace rules.
+### Execution Lifecycle
 
-Because child artifacts may not exist during pre-execution validation, values that intentionally reference them must opt out of generated interpolation and resolve after child execution.
+The `ModuleWorker<TModule>` base class orchestrates the complete lifecycle from raw configuration through validation to execution and artifact publishing. This lifecycle ensures that no worker ever operates on unvalidated configuration.
 
-## Supporting infrastructure
+#### Validation Pipeline
 
-### Parsing
+Before a worker's `ExecuteAsync` method is invoked, `ModuleWorker<TModule>` calls the source-generated `ValidateAsync` implementation on the module. The generated method orchestrates five ordered phases:
 
-The parser-combinator subsystem builds grammars from sequence, alternative, optional, and regex-backed terminal parsers. It produces typed syntax trees consumed through visitors. The same infrastructure supports subprocess-output parsing and `[MatchesGrammar]` validation.
+1. **Apply Defaults** — Fills null or type-default properties from `[DefaultValue<T>]`, `[DefaultInstance]`, `[DefaultInstanceFactory]`, and `[DefaultTimeSpan]`. Defaulting recurses into nested records marked with `[Validatable]` and supported collection elements.
 
-### Subprocess execution
+2. **Resolve Overrides** — Substitutes eligible module properties from runtime environment variables using the override subsystem described in [Module Property Overrides](#module-property-overrides). `[IgnoreOverride]` suppresses replacement of the annotated property; its optional `recurse` constructor argument also suppresses descendants when `true`.
 
-`IChildProcessDispatcher` executes `ProcessStartInfo` instances asynchronously and returns exit code, standard output, and standard error. Arguments are passed through `ProcessStartInfo.ArgumentList`, not shell-concatenated command strings.
+3. **Reapply Defaults** — Runs defaulting again so values introduced by overrides receive the same default semantics as values produced by deserialization.
 
-### Metrics
+4. **Interpolate Strings** — Recursively applies `runtime.Environment.Interpolate(...)` to eligible strings on the module, nested `[Validatable]` records, and supported collection elements. `[IgnoreInterpolation]` preserves strings that require later context-specific interpolation. `ModuleBase.Name` and `ModuleBase.Group` opt out because they establish structural identity before validation; `AssertModule.Message` is interpolated by its worker after the assertion child has executed so it can reference child artifacts.
 
-Modules register Prometheus-compatible counters, gauges, and untyped metrics through `IMetricsCollector`. The CLI writes collected samples in exposition format after execution.
+5. **Validate Constraints** — Checks constraints declared through `[Required]`, `[Range<T>]`, length, filesystem, path-shape, regex, grammar, enum, and related validation attributes. Produces a `ValidationResult<TModule>` containing either the transformed module or validation errors.
 
-## Security and AOT constraints
+Each transformation uses `with` expressions, so the original deserialized module is never mutated. The generator emits explicit `IModule<TModule>.ApplyDefaultsAsync` and `IModule<TModule>.ResolveOverridesAsync` implementations, a private static `__ApplyInterpolation` helper, and the public `ValidateAsync` orchestrator.
 
-Cyborg treats external configuration as executable orchestration input. Configured trust policies validate ownership and permissions before external files are deserialized. Enforcement can reject, log, or disable trust-policy failures according to deployment settings.
+Collection traversal is guarded according to the concrete collection shape. Null reference collections and absent nullable value-type collections are skipped. A default `ImmutableArray<T>` is not enumerated and remains distinct from an initialized empty array; property-level constraints such as `[Required]` still execute outside the enumeration guard, allowing invalid default arrays to produce validation errors instead of throwing while validating elements.
 
-Cross-cutting constraints include:
+After generated validation completes, workers may optionally adjust the result through `ModuleValidationCallbackAsync`. The pipeline then calls `EnsureValid()`, which throws a `ValidationException` if any errors remain. Only after successful validation does the worker's `ExecuteAsync` method execute.
 
-- source-generated JSON metadata instead of reflection-based serialization;
-- Jab compile-time dependency injection;
-- source-generated module loaders, validation, and decomposition;
-- array-based subprocess argument passing;
-- validation before execution;
-- trim-safe, AOT-compatible runtime contracts.
+#### Execution and Result
 
-These constraints are reinforced by project build settings and analyzer diagnostics.
+Every module execution returns an `IModuleExecutionResult` containing the executed module instance, a `ModuleExitStatus` (`Success`, `Failed`, `Skipped`, or `Canceled`), and an artifact scope holding the module's published outputs.
+
+Workers return results via builder methods on `ModuleWorker<TModule>`: `Success()`, `Failed()`, `Skipped()`, and `Canceled()`, each optionally accepting an `IDecomposable` result object for structured artifact publishing. The `runtime.Exit(result)` call finalizes the result and publishes artifacts to the configured target environment.
+
+### Runtime Hierarchy
+
+Module execution is orchestrated by `IModuleRuntime`, which manages the environment hierarchy and child module dispatch. The runtime forms a tree rooted at `RootModuleRuntime`:
+
+- **RootModuleRuntime** is the entry point. It holds the `GlobalRuntimeEnvironment`, the named environment registry, and the top-level execution surface.
+- **ScopedRuntime** is created for each nested execution. It carries its own `IRuntimeEnvironment` but delegates environment registration and lookup upward through the runtime tree.
+
+When a module calls `runtime.ExecuteAsync(...)`, the runtime prepares an `IRuntimeEnvironment` based on the requested scope, binds the module's namespace to the environment, creates a new `ScopedRuntime` wrapping that environment, and invokes the module worker's `ExecuteAsync` within the scoped runtime.
+
+### Environment Binding
+
+Each module executes within a bound environment — one whose `Namespace` property is set to the module's effective namespace. The effective namespace uses the most specific available identifier in this order: `Name`, `Group`, then `ModuleId`. This namespace determines how override resolution, artifact paths, self-references, and default artifact namespaces operate for that module.
+
+## Runtime Environment
+
+The runtime environment subsystem manages the hierarchical variable stores that modules use to communicate. It encompasses environment scoping, variable resolution with indirection and interpolation, a property override mechanism for late-binding module configuration, and structured artifact publishing for module outputs. Together, these components form the data flow backbone of the execution model.
+
+### Environment Scoping
+
+Environments form a hierarchical variable store. Each module executes in an environment determined by the `EnvironmentScope` declared in its `ModuleContext`.
+
+#### Scope Types
+
+| Scope | Behavior | Typical Use |
+|-------|----------|-------------|
+| `InheritParent` | New environment with fallback to the immediate parent | Default for most modules |
+| `Isolated` | New environment with no variable inheritance | Sandboxed execution |
+| `Global` | Execute directly in the global singleton environment | Cross-job shared state |
+| `InheritGlobal` | New environment inheriting only from global (skipping parent chain) | Read global config, ignore local overrides |
+| `Parent` | Bind directly to the parent's environment (shared, no copy) | In-place variable mutation, flatten execution layers |
+| `Current` | Use the current environment as-is | Equivalent to `Parent`, describes intent from the caller's perspective |
+| `Reference` | Reference a previously created named environment by name | Cross-step state sharing |
+
+#### Environment Types
+
+The environment hierarchy is implemented by three types:
+
+- **RuntimeEnvironment** — Base environment backed by a dictionary. Supports variable resolution, interpolation, override resolution, and artifact publishing.
+- **InheritedRuntimeEnvironment** — Extends `RuntimeEnvironment` with a parent link. Variable lookups first check the local dictionary, then fall through to the parent chain.
+- **GlobalRuntimeEnvironment** — A singleton root environment. The starting point for all global-scoped lookups.
+
+When a scope is `InheritParent`, the runtime creates an `InheritedRuntimeEnvironment` whose parent is the current module's environment. Variables set locally shadow the parent, but unresolved lookups propagate upward.
+
+#### Named Environments
+
+Environments declared with an explicit `name` (and not marked `transient`) are registered in the root runtime's environment registry. Any subsequent module can access them via `Reference` scope by name. This enables cross-step state sharing — for example, a guard module's `finally` block can reference the same named environment as the `body` block to read variables set during normal execution.
+
+Transient environments (those without an explicit name, or marked `transient: true`) receive a generated unique name and are not registered.
+
+### Variable Resolution
+
+Variables are the primary communication mechanism between modules. The resolution subsystem supports direct lookup, indirection, interpolation, type-safe access, and cycle detection.
+
+#### Resolution Semantics
+
+When `TryResolveVariable<T>(name)` is called, the runtime captures the environment where the lookup started as the **entry point**. Resolution proceeds as follows:
+
+1. **Current-scope self-reference** — The special name `@` resolves to the environment namespace in the environment tree where resolution is currently occurring.
+2. **Entry-point self-reference** — The special name `@@` resolves to the namespace of the environment that initiated the current resolution or interpolation chain, effectively resetting the resolution scope back to the entry point for any lookups within that chain. This allows for late-bound references to the entry-point scope even when resolution has propagated into parent environments.
+3. **Direct lookup** — The variable name is looked up in the local dictionary.
+4. **Indirection** — If the stored value is a string matching the pattern `${...}`, the referenced expression is resolved recursively. `${name}` resolves relative to the current resolution scope, `${@name}` resolves relative to the entry-point scope, `${@}` resolves the current scope namespace, and `${@@}` resolves the entry-point namespace.
+5. **Interpolation** — If the stored value is a string containing `${...}` placeholders mixed with literal text, all placeholders are replaced with their resolved values using the same scope rules. Unresolvable placeholders are left as-is.
+6. **Parent fallback** — In an `InheritedRuntimeEnvironment`, if the variable is not found locally, the lookup is delegated to the parent chain.
+7. **Type casting** — The resolved value is matched against the requested type `T`. A type mismatch is treated as a resolution failure.
+
+#### Cycle Detection
+
+The resolution subsystem tracks the chain of variable names during recursive resolution via a linked `ResolutionContext`. If a variable name appears twice in the resolution chain, an `InvalidOperationException` is thrown to prevent infinite loops.
+
+#### Variable Name Syntax
+
+Variable names follow the pattern `[A-Za-z_][A-Za-z_0-9\-\.]*`. Dots serve as hierarchical separators (e.g., `host.port`), enabling structured access into decomposed objects.
+
+Within `${...}` expressions, the following special forms are supported:
+
+- `${@}` — Current scope namespace.
+- `${@@}` — Entry-point scope namespace.
+- `${name}` — Normal lookup from the current resolution scope.
+- `${@name}` — Late-bound lookup from the entry-point scope.
+
+#### Decomposable Objects
+
+Types annotated with `[GeneratedDecomposition]` implement `IDecomposable`, which exposes their properties as `DynamicKeyValuePair` entries. When such an object is published to the environment, its properties become individually addressable variables. For example, publishing a remote host object makes `host.hostname`, `host.port`, and other properties available as individual variables.
+
+The `DecompositionStrategy` controls how deeply nested objects are flattened:
+
+| Strategy | Behavior |
+|----------|----------|
+| `LeavesOnly` | Only leaf (non-decomposable) values are published as variables |
+| `Shallow` | Top-level properties are published; nested decomposables become single entries |
+| `FullHierarchy` | The root and all nested decomposables are published at every level, allowing access to complex-typed intermediate nodes |
+
+### Module Property Overrides
+
+The override subsystem allows runtime environment variables to replace module properties after deserialization. This is the mechanism used by the source-generated `ResolveOverridesAsync()` pipeline.
+
+#### Override Resolution
+
+When a module property is resolved via `IRuntimeEnvironment.Resolve<TModule, T>()`:
+
+1. The property name is extracted from the call site using `CallerArgumentExpression` and converted to snake_case.
+2. Override keys are constructed using every identifier that can address the module instance: first `@{name}.{property_name}`, then `@{group}.{property_name}` when a group is set, then `@{module_id}.{property_name}`, and finally `@{tag}.{property_name}` for each override resolution tag attached to the environment.
+3. The environment is checked for each override key in that order. The first matching override wins, so more specific identifiers take priority (`name` > `group` > `module_id` > tags).
+4. Scalar values are resolved as the requested property type. Collections use `ResolveCollection` and are materialized back into the declared collection shape by generated code.
+5. `Resolve<TModule, T>()` retains its existing string-indirection behavior and interpolates string values encountered during resolution. The generated `__ApplyInterpolation` phase remains a separate recursive pass so strings are processed even when no override was applied, including strings inside nested records and collections.
+
+`[IgnoreOverride]` disables resolution of the annotated node without disabling the later interpolation phase. With the default `recurse: false`, eligible descendants may still resolve overrides; `recurse: true` suppresses the complete subtree. `[IgnoreInterpolation]` is a separate string-only control for values that must remain raw until worker execution.
+
+#### Override Use Case
+
+Overrides solve the problem of injecting non-string typed values into module properties when the source is a string variable. String interpolation (`${host.port}`) always produces a string, but a module property like `liveness_probe_port` may expect an `int`. By setting `@my_module.liveness_probe_port` to `"${host.port}"` in the environment, the override subsystem interpolates the string, then type-converts the result to the target type.
+
+The override subsystem supports any addressable property on the module, including `ModuleReference` properties, allowing modules to be treated as data and enabling dynamic module composition patterns. Overrides always operate in a deterministic copy-on-write manner — the original deserialized module instance is never mutated. Instead, a new instance is returned with freshly resolved properties for each execution, ensuring that module definitions remain immutable while always observing the latest environment state at execution time.
+
+Override resolution is applied recursively within module properties, so a complex-typed property instance may have overrides applied to its own properties as well.
+
+The generated pipeline applies defaults before override resolution and again afterward. Overrides must therefore produce values that satisfy the module's constraints, but they can also inject a type-default value to trigger the second defaulting pass. Eligible strings are then processed by the recursive interpolation phase before constraints are evaluated.
+
+#### Override Resolution Tags
+
+Override resolution tags are additional identifiers attached to an environment that extend the override lookup chain beyond the built-in `Name`, `Group`, `ModuleId` sequence. They are set when preparing an environment via `PrepareEnvironment()` and stored on the `IRuntimeEnvironment`.
+
+Tags are appended after `ModuleId` in the override resolution order, acting as a fallback. This mechanism enables parent modules to inject ambient overrides into child execution scopes without requiring knowledge of the child module's name or type. For example, a workflow orchestrator could tag an environment with `"production"`, causing any module executing in that environment to pick up overrides keyed under `@production.{property}`.
+
+### Artifact Publishing
+
+Artifacts are the structured output mechanism for modules. They allow a module's results to be exposed as environment variables accessible to parent or sibling modules, enabling dynamic, data-driven execution flows based on module outputs.
+
+While modules can set arbitrary variables in the environment during execution, the artifact subsystem provides a structured way to declare namespaced outputs that are automatically published upon module completion. This makes state management and data flow between modules explicit and easier to reason about. Decomposable artifacts are preferable to ad-hoc ambient state mutation for communicating results between modules.
+
+#### Artifact Lifecycle
+
+1. **Collection** — During execution, a worker collects artifacts via the `IModuleArtifactsBuilder` (accessed through the `Artifacts` property on the worker). Artifacts can be scalar values, decomposable objects, or arbitrary data.
+2. **Finalization** — When the worker returns via `runtime.Exit(result)`, the artifact builder is finalized. The module's exit status is added as a variable under the configured `ExitStatusName` (default: `$?`).
+3. **Publishing** — The finalized artifacts are published to a target environment. The target is determined by `module.Artifacts.Environment`, which defaults to `Parent` scope — meaning artifacts flow to the parent module's environment.
+
+#### Artifact Configuration
+
+Each module carries a `ModuleArtifacts` record (inherited from `ModuleBase`) that controls publishing behavior:
+
+| Field | Default | Purpose |
+|-------|---------|---------|
+| `Namespace` | Module's effective namespace | Variable path prefix for published artifacts |
+| `ExitStatusName` | `$?` | Name of the variable holding the module's exit status |
+| `Environment` | `Parent` scope | Target environment for artifact publication |
+| `DecompositionStrategy` | `LeavesOnly` | How deeply decomposable results are flattened |
+| `PublishNullValues` | `false` | Whether to publish null-valued properties |
+
+These artifact properties can be overridden from the environment at runtime using the override subsystem, allowing dynamic control over artifact publishing behavior. Structural `ModuleBase.Name` and `ModuleBase.Group` are explicit exceptions and ignore both overrides and generated interpolation.
+
+#### Artifact Exposure Patterns
+
+Workers expose artifacts in two ways:
+
+- **Scalar values** — `Artifacts.Expose("path", value)` sets a single variable at the given path within the artifact namespace.
+- **Decomposable results** — Returning `Success(result)` or `Failed(result)` with an `IDecomposable` result automatically decomposes the object and publishes its properties according to the configured `DecompositionStrategy`.
+
+After publishing, parent modules can read artifacts via standard variable resolution. For example, a subprocess module publishing a result with `ExitCode`, `Stdout`, and `Stderr` properties makes those values available as variables in the parent environment under the module's artifact namespace.
+
+## Supporting Infrastructure
+
+Beyond the module and environment systems, Cyborg provides several supporting subsystems that modules rely on for interacting with external processes, extracting structured data, and reporting operational metrics.
+
+### Parsing Infrastructure
+
+Cyborg includes a grammar-based parser combinator framework for extracting structured data from subprocess output. This subsystem is primarily used to parse borg command output into typed results for metrics extraction and programmatic consumption, but may also be used for validating unstructured input via the `[MatchesGrammar]` validation attribute.
+
+#### Parser Combinators
+
+The `Grammar` static factory provides a fluent builder API for composing parsers from smaller building blocks:
+
+| Combinator | Behavior |
+|------------|----------|
+| `Sequence` | All child parsers must match in order. Supports up to eight type parameters for zero-allocation singleton composition via CRTP, or a builder API for more flexible nesting. |
+| `Alternative` | Returns the result of the first child parser that matches. |
+| `Optional` | Always succeeds. If the inner parser matches, produces a node wrapping the result; otherwise produces an empty node. |
+
+Combinators can be nested arbitrarily to express complex grammars. The builder API supports naming sub-parsers for disambiguation when the same parser type appears in multiple positions within a grammar.
+
+#### Terminal Parsers
+
+Terminal parsers match text patterns via compiled regular expressions. The `RegexParserBase<TSelf>` abstract base class uses the curiously recurring template pattern to provide a static `Instance` singleton for each parser type. Each terminal parser implements the `IRegexOwner` static abstract interface, which exposes a `[GeneratedRegex]` property for AOT-safe, build-time compiled regular expressions.
+
+All regex patterns must be anchored at the current parse offset (using the `\G` anchor) to ensure deterministic, position-based matching. On a successful match, the terminal parser produces a typed `ISyntaxNode` containing the parsed value.
+
+#### Syntax Tree and Data Extraction
+
+Parsers produce an `ISyntaxNode` tree with parent-linked nodes. Each node carries a name and supports upward traversal via `HasParent(name)`, enabling contextual discrimination when the same parser type appears in different positions within a grammar.
+
+Data extraction from the syntax tree uses the visitor pattern. Consumers implement `INodeVisitor` with typed `Visit` methods for the syntax node types of interest. The `Accept` method on each node dispatches to the appropriate visitor method, allowing structured data to be collected in a single traversal.
+
+#### Integration Points
+
+The parsing infrastructure serves two roles:
+
+1. **Output parsing** — Grammars are applied to subprocess stdout or stderr to extract structured results (e.g., borg archive statistics, prune counts). The parsed data is published as module artifacts or metrics.
+2. **Input validation** — The `[MatchesGrammar]` validation attribute applies a grammar to a module property value at validation time, ensuring it conforms to an expected format (e.g., borg compression specifications).
+
+### Process Execution
+
+Subprocess execution is abstracted behind the `IChildProcessDispatcher` interface, which provides a single `ExecuteAsync` method accepting a `ProcessStartInfo` and returning a `ChildProcessResult` containing the exit code, captured standard output, and captured standard error.
+
+The default implementation handles stream redirection, asynchronous output capture, and process tree termination on cancellation. All subprocess arguments are passed via `ProcessStartInfo.ArgumentList` (array-based) rather than string concatenation, preventing shell injection vulnerabilities. See the [Security Design Principles](#security-design-principles) section for details.
+
+The `SubprocessModule` built-in module provides the JSON-configurable interface to this infrastructure, exposing options for impersonation, environment variable injection, exit code checking, and output capture configuration.
+
+### Metrics Collection
+
+Cyborg includes a Prometheus-compatible metrics collection subsystem. The `IMetricsCollector` interface supports creating labeled metrics in three standard types: counters, gauges, and untyped metrics. Each metric is registered with a name, description, and a builder callback that populates samples with label sets and values.
+
+Modules contribute metrics during execution. The CLI entry point writes collected metrics to a file in Prometheus exposition format after module execution completes. Metric names follow the `cyborg_` prefix convention. Label collections are reusable across multiple metric samples.
+
+## Cross-Cutting Concerns
+
+The following architectural constraints and design principles apply across all subsystems. They are not localized to any single component but instead shape the overall system design and inform implementation decisions throughout the codebase.
+
+### Security Design Principles
+
+Cyborg executes backup workflows defined in JSON configuration files that may reference external templates, module definitions, and dynamically discovered paths. Because these workflows can invoke subprocesses with elevated privileges, the security model must address both the integrity of configuration inputs and the safety of subprocess execution. The following principles govern how the system defends against injection, privilege escalation, and unauthorized configuration.
+
+#### Configuration File Trust
+
+Cyborg workflows are composable — a top-level job can reference external module files, load templates by path, pull in configuration fragments, or enumerate files via glob patterns. Any of these external files, if writable by an unprivileged user, could be used to inject arbitrary subprocess commands or alter backup behavior. To mitigate this, Cyborg enforces a configuration file trust model that audits every external configuration file before it is deserialized.
+
+Whenever the module configuration loader reads a file from disk — whether triggered by the CLI entry point, a template module, an external module, or an external configuration module — the trust subsystem evaluates the file against a set of configurable trust policies before deserialization proceeds. The evaluation produces a trust decision for the file, which aggregates individual policy decisions.
+
+Each trust policy inspects a property of the file and returns one of three outcomes: accept (the file satisfies the policy), reject (the file violates the policy), or abstain (the policy is not applicable in the current environment, for example a Unix permissions policy running on Windows). A file is considered trusted only if no policy rejects it. All policies are evaluated regardless of earlier rejections, so the trust decision captures the complete set of violations for diagnostic purposes.
+
+The built-in policies target Unix environments, where file ownership and permission bits are the primary access control mechanism:
+
+- **Owner policy** — Verifies that the file is owned by a user or group from an explicit allow list (e.g., only `root`). Abstains on non-Linux platforms.
+- **Permissions policy** — Verifies that specific permission bits are present (e.g., owner-readable) and that specific bits are absent (e.g., group-writable, other-writable, setuid, setgid). Abstains on Windows.
+
+The trust subsystem operates in one of three enforcement modes, configured globally:
+
+| Mode | Behavior |
+|------|----------|
+| `Enforce` | A rejected file causes a security exception, halting execution before the file is deserialized. |
+| `LogOnly` | Rejected files are logged but execution continues. Useful during initial deployment to audit existing file permissions without breaking workflows. |
+| `Disabled` | Trust evaluation is skipped entirely. |
+
+Trust policies are themselves configured through the dynamic value system, allowing deployments to define custom policy sets with environment-specific allowed owners and permission requirements.
+
+#### Subprocess Safety
+
+All subprocess invocations use array-based argument passing (`ProcessStartInfo.ArgumentList`), never string concatenation or shell interpretation. This prevents command injection via `$()`, backticks, or argument injection via `;`, `&&`, `||`, and similar shell metacharacters.
+
+#### Input Validation
+
+Each module validates inputs through the source-generated validation pipeline after deserialization and immediately before execution. Validation attributes enforce constraints on property values — string patterns via `[MatchesRegex]` and `[MatchesGrammar]`, file system existence via `[FileExists]` and `[DirectoryExists]`, numeric ranges via `[Range<T>]`, and required fields via `[Required]`. This ensures that invalid or potentially dangerous input is rejected before it reaches any execution logic.
+
+#### Privilege Boundaries
+
+Subprocess impersonation is controlled through explicit configuration on the `SubprocessModule`, with validation ensuring only permitted operations are expressed in the module configuration.
+
+### AOT Compilation
+
+Cyborg is designed for native AOT compilation, which imposes specific architectural constraints:
+
+- **No reflection-based dependency injection** — The Jab compile-time DI container generates service resolution code at build time, avoiding `System.Reflection.Emit`.
+- **No reflection-based JSON serialization** — All JSON deserialization uses source-generated `JsonSerializerContext` instances. Safe extension methods in the serialization infrastructure enforce this at the API level.
+- **No dynamic type instantiation** — Source generators create factory methods for module loaders, validation pipelines, and model decomposition, eliminating the need for `Activator.CreateInstance` or similar patterns.
+- **Trim-safe collections** — Module configuration properties use `ImmutableArray<T>` and `IReadOnlyCollection<T>` to avoid hidden allocations and ensure trim compatibility.
+
+These constraints are enforced by the project configuration (`PublishAot=true`, `IsAotCompatible=true`, `PublishTrimmed=true`, `JsonSerializerIsReflectionEnabledByDefault=false`) and validated at build time.

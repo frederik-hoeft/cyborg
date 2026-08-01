@@ -87,7 +87,7 @@ These attributes declare constraints that are checked during the `ValidateAsync`
 
 ### Required
 
-Validates that the property has a meaningful value. For strings, checks that the value is not null or whitespace. For other types, checks that the value is not equal to its type's default (e.g., `0` for integers, `null` for reference types).
+Validates that the property has a meaningful value. For strings, checks that the value is not null or whitespace. For other types, checks that the value is not equal to its type's default (e.g., `0` for integers, `null` for reference types, or a default `ImmutableArray<T>`). An initialized empty collection is distinct from a default immutable array and requires a length constraint when emptiness itself is invalid.
 
 ### Range
 
@@ -188,7 +188,7 @@ Validates that an enum property contains a defined value (i.e., not a raw intege
 
 ## Default Value Attributes
 
-These attributes declare default values applied during the `ApplyDefaultsAsync` stage. Defaults are applied when a property has a null value (for reference types) or a type-default value (for value types). Default application occurs recursively on nested `[Validatable]` records and collection elements.
+These attributes declare default values applied during the `ApplyDefaultsAsync` stage. Defaults are applied when a property has a null value (for reference types) or a type-default value (for value types). Default application occurs recursively on nested `[Validatable]` records and supported collection elements. Null collections, absent nullable value-type collections, and default immutable arrays are not enumerated; a default `ImmutableArray<T>` is preserved unless an explicit property default replaces it.
 
 ### DefaultValue
 
@@ -230,7 +230,7 @@ Prevents environment-driven override resolution for the annotated property.
 
 **Parameters:**
 
-- `Recurse` (optional, default `false`) — When `false`, only the annotated property itself ignores override resolution while eligible nested properties may still be processed. When `true`, the complete annotated subtree ignores overrides.
+- `recurse` (optional constructor argument, default `false`) — When `false`, only the annotated property itself ignores override resolution while eligible nested properties may still be processed. When `true`, the complete annotated subtree ignores overrides.
 
 `ModuleBase.Name` and `ModuleBase.Group` use this attribute because environment binding consumes their structural identity before validation begins.
 

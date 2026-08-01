@@ -1,8 +1,6 @@
-using Cyborg.Core.Aot.Modules.Validation;
-using Cyborg.Core.Aot.Modules.Validation.Attributes;
-using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Validation;
 using Cyborg.Core.TestAdapter;
+using Cyborg.TestModules.Validation;
 using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Immutable;
 
@@ -138,24 +136,3 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
         return TestModuleRuntimeScope.Create(services);
     }
 }
-
-[GeneratedModuleValidation]
-public sealed partial record ValidationPipelineTestModule
-(
-    [property: Required] ImmutableArray<ValidationPipelineTestItem> RequiredItems,
-    ImmutableArray<ValidationPipelineTestItem> OptionalItems,
-    ImmutableArray<ValidationPipelineTestItem>? NullableItems,
-    string InterpolatedValue,
-    [property: IgnoreInterpolation] string DeferredValue
-) : ModuleBase, IModule
-{
-    public static string ModuleId => "cyborg.modules.tests.validation-pipeline.v1";
-}
-
-[Validatable]
-public sealed record ValidationPipelineTestItem
-(
-    [property: Required]
-    [property: DefaultValue<string>("${fallback}")]
-    string Value
-);
