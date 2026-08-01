@@ -1,5 +1,6 @@
 ﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
+using Microsoft.CodeAnalysis;
 using System.Text;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
@@ -93,13 +94,13 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
         string collectionAccessExpression = propertyAccessExpression;
         string elementVariable = $"{safeIdentifier}Element";
         string elementCurrentVariable = $"{safeIdentifier}ElementCurrent";
-        bool collectionPropertyRequiresNullCheck = property.IsNullable || !property.Symbol.Type.IsValueType;
+        bool needsCollectionEnumerationGuard = CollectionHelpers.TryConstructEnumerationGuardExpression(property, propertyAccessExpression, out string? guardCondition, out string valueExpression);
         int elementPropertyIndentLevel = 1;
         if (collection.ElementRequiresNullCheck)
         {
             elementPropertyIndentLevel++;
         }
-        if (collectionPropertyRequiresNullCheck)
+        if (needsCollectionEnumerationGuard)
         {
             elementPropertyIndentLevel++;
         }
@@ -117,14 +118,14 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
             return;
         }
 
-        if (collectionPropertyRequiresNullCheck)
+        if (needsCollectionEnumerationGuard)
         {
             string collectionCurrentVariable = $"{safeIdentifier}CollectionCurrent";
             builder.AppendBlock(
                 $$"""
-                if ({{propertyAccessExpression}} is not null)
+                if ({{guardCondition}})
                 {
-                    {{property.NonNullableTypeName}} {{collectionCurrentVariable}} = {{propertyAccessExpression}};
+                    {{property.NonNullableTypeName}} {{collectionCurrentVariable}} = {{valueExpression}};
                 """);
             builder = builder.IncreaseIndent();
             collectionAccessExpression = collectionCurrentVariable;
@@ -135,12 +136,17 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
 
         if (collection.ElementRequiresNullCheck)
         {
+            (string collectionElementCheck, string collectionElementAccessExpression) = collection switch
+            {
+                { ElementType.IsValueType: true, IsElementNullable: true } => ($"{elementVariable}.HasValue", $"{elementVariable}.Value"),
+                _ => ($"{elementVariable} is not null", elementVariable),
+            };
             IndentedStringBuilder loopBuilder = builder.IncreaseIndent();
             loopBuilder.AppendBlock(
                 $$"""
-                if ({{elementVariable}} is not null)
+                if ({{collectionElementCheck}})
                 {
-                    {{collection.ElementNonNullableTypeName}} {{elementCurrentVariable}} = {{elementVariable}};
+                    {{collection.ElementNonNullableTypeName}} {{elementCurrentVariable}} = {{collectionElementAccessExpression}};
                 """);
             loopBuilder.Raw.Append(nestedBuilder.Raw.ToString());
             loopBuilder.AppendLine("}");
@@ -154,7 +160,7 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
 
         builder.AppendLine("}");
 
-        if (collectionPropertyRequiresNullCheck)
+        if (needsCollectionEnumerationGuard)
         {
             builder = builder.DecreaseIndent();
             builder.AppendLine("}");

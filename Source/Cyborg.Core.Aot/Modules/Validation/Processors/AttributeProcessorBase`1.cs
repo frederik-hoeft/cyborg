@@ -1,6 +1,4 @@
-﻿using Microsoft.CodeAnalysis;
-
-namespace Cyborg.Core.Aot.Modules.Validation.Processors;
+﻿namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
 internal abstract class AttributeProcessorBase<TAttribute> : AttributeProcessorBase where TAttribute : Attribute
 {

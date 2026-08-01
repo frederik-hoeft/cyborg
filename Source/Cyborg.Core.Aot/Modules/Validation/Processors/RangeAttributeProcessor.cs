@@ -11,7 +11,7 @@ internal sealed class RangeAttributeProcessor : AttributeProcessorBase
     public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {
         if (!ValidateTypeArguments(attribute, in context, context.Property.Type)
-            || !TryGetNamedArgumentExpressions(attribute, in context, out Dictionary<string, string?> namedArgumentExpressions) || namedArgumentExpressions.Count == 0)
+            || !TryGetNamedArgumentExpressions(attribute, in context, out Dictionary<string, string?> namedArgumentExpressions))
         {
             return false.WithDefaults(out aspect);
         }

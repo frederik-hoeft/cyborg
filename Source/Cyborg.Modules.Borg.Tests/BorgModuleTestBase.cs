@@ -1,5 +1,4 @@
-using Cyborg.Core.TestAdapter;
-using Cyborg.Modules.Borg;
+﻿using Cyborg.Core.TestAdapter;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Cyborg.Modules.Borg.Tests;
