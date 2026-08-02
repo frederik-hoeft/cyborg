@@ -36,6 +36,7 @@
         <EmbeddedResource Include="Modules\Validation\Attributes\IgnoreInterpolationAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\IgnoreOverrideAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\LengthAttribute.cs" />
+        <EmbeddedResource Include="Modules\Validation\Attributes\VariableIdentifierAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\MaxLengthAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\MinLengthAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\MatchesGrammarAttribute.cs" />

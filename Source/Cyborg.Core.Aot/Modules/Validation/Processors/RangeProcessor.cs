@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal sealed class RangeAttributeProcessor : AttributeProcessorBase
+internal sealed class RangeProcessor : AttributeProcessorBase
 {
     public override string AttributeMetadataName => typeof(RangeAttribute<>).FullName;
 

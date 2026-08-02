@@ -5,7 +5,7 @@ using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal sealed class DefaultInstanceAttributeProcessor : AttributeProcessorBase<DefaultInstanceAttribute>
+internal sealed class DefaultInstanceProcessor : AttributeProcessorBase<DefaultInstanceAttribute>
 {
     public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {

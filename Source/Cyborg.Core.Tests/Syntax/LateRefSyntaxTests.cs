@@ -7,7 +7,7 @@ namespace Cyborg.Core.Tests.Syntax;
 public sealed class LateRefSyntaxTests
 {
     [TestMethod]
-    public void LateRef_FromSelf_RendersExpectedReference()
+    public void Test_LateRef_FromSelf_RendersExpectedReference()
     {
         VariableSyntaxBuilder builder = CreateBuilder();
 
@@ -17,7 +17,7 @@ public sealed class LateRefSyntaxTests
     }
 
     [TestMethod]
-    public void LateRef_Member_AppendsOutsideInterpolationDelimiters()
+    public void Test_LateRef_Member_AppendsOutsideInterpolationDelimiters()
     {
         VariableSyntaxBuilder builder = CreateBuilder();
 
@@ -27,7 +27,7 @@ public sealed class LateRefSyntaxTests
     }
 
     [TestMethod]
-    public void LateRef_ChildPath_AppendsOutsideInterpolationDelimiters()
+    public void Test_LateRef_ChildPath_AppendsOutsideInterpolationDelimiters()
     {
         VariableSyntaxBuilder builder = CreateBuilder();
 

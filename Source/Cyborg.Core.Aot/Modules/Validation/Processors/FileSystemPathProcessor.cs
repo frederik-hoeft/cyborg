@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal abstract class FilesystemPathAttributeProcessor<TAttribute> : AttributeProcessorBase<TAttribute> where TAttribute : Attribute
+internal abstract class FileSystemPathProcessor<TAttribute> : AttributeProcessorBase<TAttribute> where TAttribute : Attribute
 {
     protected abstract string AttributeName { get; }
 

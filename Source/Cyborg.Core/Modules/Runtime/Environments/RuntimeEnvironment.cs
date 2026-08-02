@@ -113,11 +113,11 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(moduleId);
 
-        if (!string.IsNullOrEmpty(name))
+        if (SyntaxFactory.IsValidIdentifier(name))
         {
             yield return name;
         }
-        if (!string.IsNullOrEmpty(group))
+        if (SyntaxFactory.IsValidIdentifier(group))
         {
             yield return group;
         }

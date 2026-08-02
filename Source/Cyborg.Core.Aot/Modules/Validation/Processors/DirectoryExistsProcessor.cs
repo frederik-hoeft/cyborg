@@ -2,7 +2,7 @@
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal sealed class DirectoryExistsAttributeProcessor : FilesystemPathAttributeProcessor<DirectoryExistsAttribute>
+internal sealed class DirectoryExistsProcessor : FileSystemPathProcessor<DirectoryExistsAttribute>
 {
     protected override string AttributeName => nameof(DirectoryExistsAttribute);
 

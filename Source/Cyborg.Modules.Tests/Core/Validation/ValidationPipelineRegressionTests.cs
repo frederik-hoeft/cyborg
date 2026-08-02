@@ -1,4 +1,4 @@
-using Cyborg.Core.Modules.Validation;
+﻿using Cyborg.Core.Modules.Validation;
 using Cyborg.Core.TestAdapter;
 using Cyborg.TestModules.Validation;
 using Microsoft.Extensions.DependencyInjection;
@@ -98,7 +98,31 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
     }
 
     [TestMethod]
-    public async Task TestValidationAsync_StructuralAndDeferredStringsAreNotInterpolatedAsync()
+    public async Task TestValidationAsync_DeferredStringsAreNotInterpolatedAsync()
+    {
+        ValidationPipelineTestModule module = new(
+            RequiredItems: [],
+            OptionalItems: [],
+            NullableItems: null,
+            InterpolatedValue: "${resolved}",
+            DeferredValue: "${deferred}");
+
+        await using TestModuleRuntimeScope scope = CreateValidationScope();
+        scope.GlobalEnvironment.SetVariable("resolved", "resolved-value");
+        scope.GlobalEnvironment.SetVariable("deferred", "deferred-value");
+        ValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(
+            scope.Runtime,
+            scope.ServiceProvider,
+            TestContext.CancellationToken);
+
+        MSAssert.IsTrue(result.IsValid);
+        ValidationPipelineTestModule validatedModule = result.Module!;
+        MSAssert.AreEqual("resolved-value", validatedModule.InterpolatedValue);
+        MSAssert.AreEqual("${deferred}", validatedModule.DeferredValue);
+    }
+
+    [TestMethod]
+    public async Task TestValidationAsync_InterpolatedIdentifiersAreRejected()
     {
         ValidationPipelineTestModule module = new(
             RequiredItems: [],
@@ -121,12 +145,15 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
             scope.ServiceProvider,
             TestContext.CancellationToken);
 
-        MSAssert.IsTrue(result.IsValid);
-        ValidationPipelineTestModule validatedModule = result.Module!;
-        MSAssert.AreEqual("resolved-value", validatedModule.InterpolatedValue);
-        MSAssert.AreEqual("${deferred}", validatedModule.DeferredValue);
-        MSAssert.AreEqual("${name}", validatedModule.Name);
-        MSAssert.AreEqual("${group}", validatedModule.Group);
+        MSAssert.HasCount(2, result.Errors);
+        MSAssert.Contains(
+            error => error.Rule == "valid_identifier"
+                && error.PropertyName.EndsWith(nameof(ValidationPipelineTestModule.Name), StringComparison.Ordinal),
+            result.Errors);
+        MSAssert.Contains(
+            error => error.Rule == "valid_identifier"
+                && error.PropertyName.EndsWith(nameof(ValidationPipelineTestModule.Group), StringComparison.Ordinal),
+            result.Errors);
     }
 
     private TestModuleRuntimeScope CreateValidationScope()

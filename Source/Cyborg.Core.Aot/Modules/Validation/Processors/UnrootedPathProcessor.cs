@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal sealed class UnrootedPathAttributeProcessor : AttributeProcessorBase<UnrootedPathAttribute>
+internal sealed class UnrootedPathProcessor : AttributeProcessorBase<UnrootedPathAttribute>
 {
     public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {

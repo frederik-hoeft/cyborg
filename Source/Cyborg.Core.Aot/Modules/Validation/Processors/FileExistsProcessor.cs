@@ -2,7 +2,7 @@
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal sealed class FileExistsAttributeProcessor : FilesystemPathAttributeProcessor<FileExistsAttribute>
+internal sealed class FileExistsProcessor : FileSystemPathProcessor<FileExistsAttribute>
 {
     protected override string AttributeName => nameof(FileExistsAttribute);
 
