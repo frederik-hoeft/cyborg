@@ -1,0 +1,128 @@
+﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Attributes;
+using Microsoft.CodeAnalysis;
+
+namespace Cyborg.Core.Aot.Modules.Validation.Processors;
+
+internal abstract class PropertyValidationProcessorBase<TAttribute> : AttributeProcessorBase<TAttribute> where TAttribute : PropertyValidationAttribute
+{
+    public sealed override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
+    {
+        if (!TryGetAppliesToCollection(attribute, in context, out bool appliesToCollection))
+        {
+            return false.WithDefaults(out aspect);
+        }
+
+        PropertyValidationTarget target;
+        if (appliesToCollection)
+        {
+            if (!TryCreateCollectionElementTarget(attribute, in context, out target))
+            {
+                return false.WithDefaults(out aspect);
+            }
+        }
+        else
+        {
+            target = new PropertyValidationTarget(context.Property.Type, IsCollectionElement: false);
+        }
+        if (!TryProcessValidation(attribute, in context, in target, out PropertyValidationAspect? validationAspect))
+        {
+            return false.WithDefaults(out aspect);
+        }
+        if (validationAspect is null)
+        {
+            throw new InvalidOperationException($"Processor '{GetType().FullName}' returned success without a validation aspect.");
+        }
+
+        aspect = appliesToCollection
+            ? new CollectionElementValidationAspect(validationAspect)
+            : validationAspect;
+        return true;
+    }
+
+    protected abstract bool TryProcessValidation(
+        AttributeData attribute,
+        ref readonly PropertyProcessingContext context,
+        ref readonly PropertyValidationTarget target,
+        out PropertyValidationAspect? aspect);
+
+    protected bool ValidateTargetType(
+        AttributeData attribute,
+        ref readonly PropertyProcessingContext context,
+        ref readonly PropertyValidationTarget target,
+        SpecialType expectedType)
+    {
+        if (!target.IsCollectionElement)
+        {
+            return ValidatePropertyType(attribute, in context, expectedType);
+        }
+        if (expectedType is SpecialType.None)
+        {
+            throw new ArgumentOutOfRangeException(nameof(expectedType));
+        }
+        if (target.Type.SpecialType == expectedType)
+        {
+            return true;
+        }
+
+        context.Report(
+            ValidationGeneratorDiagnostics.CollectionElementTypeMismatch,
+            context.Property.Name,
+            context.ContainingType.Name,
+            GetAttributeFriendlyName(attribute),
+            target.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
+            context.Compilation.GetSpecialType(expectedType).ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat));
+        return false;
+    }
+
+    private bool TryCreateCollectionElementTarget(
+        AttributeData attribute,
+        ref readonly PropertyProcessingContext context,
+        out PropertyValidationTarget target)
+    {
+        _ = context.Property.Type.TryUnwrapNullableType(out ITypeSymbol nonNullableType);
+        if (nonNullableType.SpecialType is SpecialType.System_String
+            || !CollectionTypeInspector.TryDescribe(context.Compilation, nonNullableType, out CollectionTypeInspector.CollectionTypeDescriptor? descriptor)
+            || descriptor is null)
+        {
+            context.Report(
+                ValidationGeneratorDiagnostics.CollectionApplicationRequiresCollection,
+                context.Property.Name,
+                context.ContainingType.Name,
+                GetAttributeFriendlyName(attribute),
+                context.Property.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat));
+            target = default;
+            return false;
+        }
+
+        target = new PropertyValidationTarget(descriptor.ElementType, IsCollectionElement: true);
+        return true;
+    }
+
+    private bool TryGetAppliesToCollection(AttributeData attribute, ref readonly PropertyProcessingContext context, out bool appliesToCollection)
+    {
+        foreach (KeyValuePair<string, TypedConstant> namedArgument in attribute.NamedArguments)
+        {
+            if (namedArgument.Key != nameof(PropertyValidationAttribute.AppliesToCollection))
+            {
+                continue;
+            }
+            if (namedArgument.Value.Value is bool value)
+            {
+                appliesToCollection = value;
+                return true;
+            }
+
+            context.Report(
+                ValidationGeneratorDiagnostics.UnsupportedAttributeLiteral,
+                context.Property.Name,
+                context.ContainingType.Name,
+                GetAttributeFriendlyName(attribute));
+            appliesToCollection = false;
+            return false;
+        }
+
+        appliesToCollection = false;
+        return true;
+    }
+}
