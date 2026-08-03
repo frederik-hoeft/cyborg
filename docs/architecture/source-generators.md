@@ -107,6 +107,8 @@ Two processor interfaces exist:
 
 Each processor returns a `PropertyAspect` — an object that can contribute to one or more pipeline stages. An aspect exposes virtual methods for rewriting the default assignment expression, rewriting the override resolution expression, and emitting validation code. This design allows a single attribute to influence multiple stages of the pipeline. For example, a `[DefaultValue<T>]` attribute produces an aspect that contributes a default in the defaults stage but contributes nothing to validation.
 
+Validation attributes that support collection elements derive from `PropertyValidationAttribute` and are processed through `PropertyValidationProcessorBase<TAttribute>`. The base processor resolves the optional `TargetsElements` flag, verifies that the property is a supported collection when element targeting is requested, and evaluates attribute-specific type requirements against either the property type or the collection element type. Element-targeted constraints are wrapped in a `CollectionElementValidationAspect`, allowing the individual attribute processors to emit the same validation logic for either target without implementing collection traversal themselves. Because these attributes are repeatable, a property can contribute both an ordinary property aspect and one or more element-targeted aspects.
+
 The `ValidationProcessorRegistry` holds the complete set of processors as a static immutable array, with a frozen dictionary for attribute-based lookup by metadata name.
 
 ### Supported Attributes
@@ -118,6 +120,7 @@ The following attributes are recognized by the validation generator:
 | **Required values** | `[Required]` |
 | **Default values** | `[DefaultValue<T>]`, `[DefaultInstance]`, `[DefaultInstanceFactory]`, `[DefaultTimeSpan]` |
 | **Length constraints** | `[MinLength]`, `[MaxLength]`, `[ExactLength]`, `[Length]` |
+| **Variable syntax** | `[VariableIdentifier]` |
 | **Range constraints** | `[Range<T>]` |
 | **Pattern matching** | `[MatchesRegex]`, `[MatchesGrammar]` |
 | **File system and paths** | `[FileExists]`, `[DirectoryExists]`, `[FileName]`, `[RootedPath]`, `[UnrootedPath]`, `[NormalizedPath]` |
@@ -147,12 +150,13 @@ The generator supports recursive validation of nested record types and collectio
 
 - **Nested records** — Properties whose type is marked `[Validatable]` are processed recursively. The generator detects cycles in the type graph to prevent infinite recursion during generation.
 - **Collections** — Properties typed as supported enumerable shapes are rewritten and validated element-by-element when their element type requires work. `CollectionTypeInspector` selects a `CollectionMaterializationKind` for arrays, `List<T>`, `ImmutableArray<T>`, supported collection interfaces, and constructible concrete collections. Shared enumeration guards preserve collection absence semantics: null references are skipped, nullable value types are unwrapped only when present, and default `ImmutableArray<T>` values are never enumerated or silently converted to empty arrays.
+- **Element-targeted constraints** — Selected validation attributes can set `TargetsElements = true` to apply their constraint to each immediate collection element. The same guarded loop is shared with recursive validation of `[Validatable]` element records, while ordinary property constraints remain outside the guard. This allows repeated attributes to constrain the collection and its elements independently. Attribute-specific target checks use the element type, and element validation errors retain the parent property name while identifying the zero-based element index in the message.
 
 ## Module Loader Factory Generator
 
 ### Trigger and Target
 
-The generator is triggered by `[GeneratedModuleLoaderFactory]` on a class inheriting `ModuleLoader<TWorker, TModule>`. The target class must be `partial`. The worker type must have exactly one declared constructor.
+The generator is triggered by `[GeneratedModuleLoaderFactory]` on a class inheriting from `ModuleLoader<TWorker, TModule>`. The target class must be `partial`. The worker type must have exactly one declared constructor.
 
 ### Generated Output
 

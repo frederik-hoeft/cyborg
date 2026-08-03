@@ -229,6 +229,14 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
             error => error.Rule == "valid_identifier"
                 && error.PropertyName.EndsWith(nameof(ValidationPipelineTestModule.Tags), StringComparison.Ordinal),
             result.Errors);
+        MSAssert.Contains(
+            error => error.Rule == "required"
+                && error.Message.Equals("Collection element 0 of property 'Tags' is required.", StringComparison.Ordinal),
+            result.Errors);
+        MSAssert.Contains(
+            error => error.Rule == "valid_identifier"
+                && error.Message.Equals("Collection element 2 of property 'Tags' must be a valid variable identifier, but was 'invalid tag'.", StringComparison.Ordinal),
+            result.Errors);
     }
 
     [TestMethod]
