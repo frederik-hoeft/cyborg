@@ -4,17 +4,20 @@ using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal sealed class IgnoreInterpolationAttributeProcessor : AttributeProcessorBase<IgnoreInterpolationAttribute>
+internal sealed class IgnoreOverrideProcessor : AttributeProcessorBase<IgnoreOverrideAttribute>
 {
     public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {
-        if (!ValidatePropertyType(attribute, in context, SpecialType.System_String))
+        if (!TryGetConstructorArgumentValue(attribute, argumentIndex: 0, in context, out bool recurse))
         {
             return false.WithDefaults(out aspect);
         }
-        aspect = new IgnoreInterpolationAspect();
+        aspect = new IgnoreOverrideAspect(recurse);
         return true;
     }
 }
 
-internal sealed class IgnoreInterpolationAspect : PropertyAspect;
+internal sealed class IgnoreOverrideAspect(bool recurse) : PropertyAspect
+{
+    public bool Recurse => recurse;
+}

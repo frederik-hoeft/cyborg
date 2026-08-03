@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal sealed class MatchesGrammarAttributeProcessor : AttributeProcessorBase<MatchesGrammarAttribute>
+internal sealed class MatchesGrammarProcessor : AttributeProcessorBase<MatchesGrammarAttribute>
 {
     public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {

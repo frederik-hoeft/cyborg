@@ -178,11 +178,11 @@ Before a worker's `ExecuteAsync` method is invoked, `ModuleWorker<TModule>` call
 
 4. **Interpolate Strings** — Recursively applies `runtime.Environment.Interpolate(...)` to eligible strings on the module, nested `[Validatable]` records, and supported collection elements. `[IgnoreInterpolation]` preserves strings that require later context-specific interpolation. `ModuleBase.Name` and `ModuleBase.Group` opt out because they establish structural identity before validation; `AssertModule.Message` is interpolated by its worker after the assertion child has executed so it can reference child artifacts.
 
-5. **Validate Constraints** — Checks constraints declared through `[Required]`, `[Range<T>]`, length, filesystem, path-shape, regex, grammar, enum, and related validation attributes. Produces a `ValidationResult<TModule>` containing either the transformed module or validation errors.
+5. **Validate Constraints** — Checks constraints declared through `[Required]`, `[VariableIdentifier]`, `[Range<T>]`, length, filesystem, path-shape, regex, grammar, enum, and related validation attributes. Produces a `ValidationResult<TModule>` containing either the transformed module or validation errors.
 
 Each transformation uses `with` expressions, so the original deserialized module is never mutated. The generator emits explicit `IModule<TModule>.ApplyDefaultsAsync` and `IModule<TModule>.ResolveOverridesAsync` implementations, a private static `__ApplyInterpolation` helper, and the public `ValidateAsync` orchestrator.
 
-Collection traversal is guarded according to the concrete collection shape. Null reference collections and absent nullable value-type collections are skipped. A default `ImmutableArray<T>` is not enumerated and remains distinct from an initialized empty array; property-level constraints such as `[Required]` still execute outside the enumeration guard, allowing invalid default arrays to produce validation errors instead of throwing while validating elements.
+Collection traversal is guarded according to the concrete collection shape. Null reference collections and absent nullable value-type collections are skipped. A default `ImmutableArray<T>` is not enumerated and remains distinct from an initialized empty array; property-level constraints such as `[Required]` still execute outside the enumeration guard, allowing invalid default arrays to produce validation errors instead of throwing while validating elements. Selected validation attributes can set `TargetsElements = true` to validate each immediate collection element through the same guarded traversal. Element-targeted errors retain the parent property name and include the zero-based element index in their message.
 
 After generated validation completes, workers may optionally adjust the result through `ModuleValidationCallbackAsync`. The pipeline then calls `EnsureValid()`, which throws a `ValidationException` if any errors remain. Only after successful validation does the worker's `ExecuteAsync` method execute.
 
@@ -263,14 +263,92 @@ The resolution subsystem tracks the chain of variable names during recursive res
 
 #### Variable Name Syntax
 
-Variable names follow the pattern `[A-Za-z_][A-Za-z_0-9\-\.]*`. Dots serve as hierarchical separators (e.g., `host.port`), enabling structured access into decomposed objects.
+Cyborg distinguishes between identifiers, namespaces, variable expressions, interpolation, and indirection. Names and expressions are case-sensitive and use ASCII characters only.
 
-Within `${...}` expressions, the following special forms are supported:
+**Identifiers** are used for environment variable names and paths, module `name` and `group` values, template argument names, override-resolution tags, and the identifier portion of override keys.
 
-- `${@}` — Current scope namespace.
-- `${@@}` — Entry-point scope namespace.
-- `${name}` — Normal lookup from the current resolution scope.
-- `${@name}` — Late-bound lookup from the entry-point scope.
+An identifier consists of one or more dot-separated segments:
+
+- The first segment must begin with an ASCII letter, underscore, or hyphen.
+- The remaining characters of the first segment may be ASCII letters, decimal digits, underscores, or hyphens.
+- Every segment following a dot must contain at least one ASCII letter, decimal digit, underscore, or hyphen.
+
+Dots are the only hierarchical delimiters. They cannot appear at the beginning or end of an identifier, and two dots cannot occur consecutively.
+
+Hyphens and underscores are ordinary identifier characters. They may appear at the beginning or end of a segment and may occur consecutively. As a result, identifiers such as `-`, `--`, `_`, `-host_`, `_host-`, `host--name`, `host.-`, and `host.--` are valid.
+
+A decimal digit cannot begin the first segment, but it may begin a segment following a dot. For example, `host.0` is valid while `0host` is not.
+
+Other valid identifiers include `host`, `_internal`, `host.port`, `backup-job.result`, and `a-.b`.  
+Invalid identifiers include `.host`, `host.`, `host..port`, `host port`, and `${host}`.
+
+**Namespaces** currently use the same syntax as identifiers. They are maintained as a distinct grammar contract because namespace and general identifier syntax may diverge in the future.
+
+**Variable expressions** are enclosed in `${` and `}` and use one of the following forms:
+
+- `${name}` resolves an identifier from the current resolution scope.
+- `${@name}` resolves an identifier from the entry-point scope.
+- `${@}` resolves to the namespace of the current resolution scope.
+- `${@@}` resolves to the namespace of the entry-point scope.
+
+The `name` portion must be a valid identifier. Forms such as `${}`, `${1name}`, `${name.}`, `${@1name}`, and `${@@name}` are not valid variable expressions.
+
+**Interpolation** occurs when one or more valid variable expressions appear within a larger string. Each recognized expression is resolved independently while surrounding text remains unchanged. For example, `backup-${host.name}-${date}` contains two interpolation expressions.
+
+Malformed `${...}` text is not recognized as an interpolation expression and is ignored. There is currently no escape syntax for producing literal interpolation text; in particular, `${#name}` is not a valid expression, while `$${name}` still contains the valid expression `${name}`.
+
+**Indirection** is the special case where the complete string consists of exactly one variable expression, with no surrounding text. Indirection allows the referenced value to retain its original type rather than being converted into part of an interpolated string. So the following substitution chain is valid for `port` of type `int`:
+
+```text
+host_port = 8080
+@host.port = "${host_port}"
+```
+
+**Override keys** begin with an at-sign (`@`) followed by a valid identifier, for example `@backup.target`. The leading at-sign is override syntax and is not part of the identifier itself.
+
+Structured values published through [decomposition](#decomposable-objects) are addressed using the same identifier and dotted-path syntax. Override lookup uses these rules when constructing the candidates described in [Module Property Overrides](#module-property-overrides).
+
+**Full grammar** for identifiers, namespaces, variable expressions, and override keys is as follows (ANTLR4 syntax):
+
+```antlr
+grammar VariableGrammar;
+
+identifier
+    : IDENTIFIER EOF
+    ;
+
+namespaceName
+    : IDENTIFIER EOF
+    ;
+
+indirection
+    : interpolation EOF
+    ;
+
+interpolation
+    : '${' expression '}'
+    ;
+
+expression
+    : '@@'
+    | '@' IDENTIFIER?
+    | IDENTIFIER
+    ;
+
+IDENTIFIER
+    : IDENTIFIER_PREFIX
+      IDENTIFIER_CHAR*
+      ('.' IDENTIFIER_CHAR+)*
+    ;
+
+fragment IDENTIFIER_PREFIX
+    : [A-Za-z_-]
+    ;
+
+fragment IDENTIFIER_CHAR
+    : [A-Za-z_0-9-]
+    ;
+```
 
 #### Decomposable Objects
 
@@ -315,6 +393,8 @@ The generated pipeline applies defaults before override resolution and again aft
 Override resolution tags are additional identifiers attached to an environment that extend the override lookup chain beyond the built-in `Name`, `Group`, `ModuleId` sequence. They are set when preparing an environment via `PrepareEnvironment()` and stored on the `IRuntimeEnvironment`.
 
 Tags are appended after `ModuleId` in the override resolution order, acting as a fallback. This mechanism enables parent modules to inject ambient overrides into child execution scopes without requiring knowledge of the child module's name or type. For example, a workflow orchestrator could tag an environment with `"production"`, causing any module executing in that environment to pick up overrides keyed under `@production.{property}`.
+
+Because each tag becomes a variable-path identifier, it must satisfy the canonical variable-identifier grammar. `DynamicModule` interpolates and validates every configured tag before calling `PrepareEnvironment()`, so invalid user-provided tags fail module validation before child execution. `PrepareEnvironment()` retains the same identifier check as a runtime invariant for programmatic callers.
 
 ### Artifact Publishing
 

@@ -16,12 +16,14 @@ For how these attributes are processed by the source generators, see [Source Gen
   - [GeneratedModuleLoaderFactory](#generatedmoduleloaderfactory)
   - [GeneratedDecomposition](#generateddecomposition)
 - [Validation Attributes](#validation-attributes)
+  - [Collection Element Targeting](#collection-element-targeting)
   - [Required](#required)
   - [Range](#range)
   - [MinLength](#minlength)
   - [MaxLength](#maxlength)
   - [ExactLength](#exactlength)
   - [Length](#length)
+  - [VariableIdentifier](#variableidentifier)
   - [MatchesRegex](#matchesregex)
   - [MatchesGrammar](#matchesgrammar)
   - [FileExists](#fileexists)
@@ -83,7 +85,25 @@ Triggers the decomposition generator on a record or class. The generator emits a
 
 ## Validation Attributes
 
-These attributes declare constraints that are checked during the `ValidateAsync` stage of the generated pipeline. If a constraint is violated, a `ValidationError` is added to the result. All validation attributes target properties.
+These attributes declare constraints that are checked during the `ValidateAsync` stage of the generated pipeline. If a constraint is violated, a `ValidationError` is added to the result. All validation attributes are applied to properties; selected attributes can redirect their constraint to each immediate element of a collection property.
+
+### Collection Element Targeting
+
+`Required`, `MinLength`, `MaxLength`, `ExactLength`, `Length`, and `VariableIdentifier` derive from `PropertyValidationAttribute` and expose the following named property:
+
+- `TargetsElements` (optional, default `false`) — When `false`, validates the annotated property. When `true`, validates each immediate element of a supported collection property instead.
+
+Element-targeted validation runs after defaults, overrides, and interpolation, so constraints observe the same final values as ordinary property validation. The containing collection is not constrained by an element-targeted attribute. Null reference collections, absent nullable value-type collections, and default `ImmutableArray<T>` values are not enumerated.
+
+The supporting attributes allow multiple applications, so a collection and its elements can be constrained independently:
+
+```csharp
+[Required]
+[Required(TargetsElements = true)]
+IReadOnlyCollection<string?>? Values
+```
+
+In this example, the first attribute rejects a null collection while the second rejects null or whitespace elements. Attribute-specific type requirements are evaluated against the element type when `TargetsElements` is enabled; for example, `[VariableIdentifier(TargetsElements = true)]` requires a collection of strings. Applying `TargetsElements` to a non-collection property, or to an incompatible element type, produces a source-generator diagnostic. Targeting is limited to the immediate elements of the annotated collection; it does not recursively apply the same attribute to deeper collection layers.
 
 ### Required
 
@@ -132,6 +152,14 @@ Validates that a string or collection property length falls within a range. Comb
 
 - `Min` — Minimum length, inclusive.
 - `Max` — Maximum length, inclusive.
+
+### VariableIdentifier
+
+Validates that a string conforms to the canonical environment variable-identifier grammar used by `IRuntimeEnvironment.SyntaxFactory.IsValidIdentifier`. An identifier starts with an ASCII letter, underscore, or hyphen. Subsequent characters may be ASCII letters, digits, underscores, or hyphens; periods may separate non-empty suffixes. Empty segments, consecutive periods, and trailing periods are invalid. See [Architecture Overview -- Variable Name Syntax](architecture-overview.md#variable-name-syntax) for the complete variable and interpolation grammar.
+
+Null values are ignored by this constraint; combine it with `[Required]` when null must also be rejected. Because validation follows interpolation, the final interpolated value is checked rather than the original placeholder expression.
+
+**Applies to:** `string` properties, or immediate `string` collection elements when `TargetsElements = true`.
 
 ### MatchesRegex
 

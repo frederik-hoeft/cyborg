@@ -6,7 +6,7 @@ using System.Globalization;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal sealed class DefaultTimeSpanAttributeProcessor : AttributeProcessorBase<DefaultTimeSpanAttribute>
+internal sealed class DefaultTimeSpanProcessor : AttributeProcessorBase<DefaultTimeSpanAttribute>
 {
     public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {

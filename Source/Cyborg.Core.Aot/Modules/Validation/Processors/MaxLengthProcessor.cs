@@ -4,15 +4,15 @@ using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal sealed class MinLengthAttributeProcessor : LengthAttributeProcessorBase<MinLengthAttribute>
+internal sealed class MaxLengthProcessor : LengthAttributeProcessorBase<MaxLengthAttribute>
 {
     protected override bool TryGetBounds(AttributeData attribute, ref readonly PropertyProcessingContext context, out int? min, out int? max)
     {
-        if (!TryGetConstructorArgumentValue(attribute, argumentIndex: 0, in context, out int minValue))
+        if (!TryGetConstructorArgumentValue(attribute, argumentIndex: 0, in context, out int maxValue))
         {
             return false.WithDefaults(out min, out max);
         }
-        min = minValue;
-        return true.WithDefaults(out max);
+        max = maxValue;
+        return true.WithDefaults(out min);
     }
 }

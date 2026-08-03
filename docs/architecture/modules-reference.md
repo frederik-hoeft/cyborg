@@ -291,10 +291,11 @@ Executes a child module context, allowing the target to be replaced at runtime v
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
 | `target` | module context | Yes | -- | The module context to execute. Like all module properties, this can be overridden from the environment using the `@<name>.target` convention, which is what makes the module "dynamic" -- a parent module can inject a different module context at runtime. |
-| `tags` | array of strings | No | `null` | Override resolution tags applied to the child environment. Tags extend the override lookup chain beyond the standard `name` / `group` / `module_id` sequence, allowing ambient overrides keyed by tag to apply to any module executing in that environment. See [Runtime Infrastructure -- Override Resolution Tags](./architecture-overview.md#override-resolution-tags). |
+| `tags` | array of strings | No | `null` | Override resolution tags applied to the child environment. Each supplied tag is interpolated before validation and must be non-null, non-whitespace, and a valid variable identifier. Tags extend the override lookup chain beyond the standard `name` / `group` / `module_id` sequence, allowing ambient overrides keyed by tag to apply to any module executing in that environment. See [Runtime Infrastructure -- Override Resolution Tags](./architecture-overview.md#override-resolution-tags). |
 
 **Behavior:**
 
+- Validates the final interpolated tag values before preparing the child environment; invalid tags prevent the target module from executing.
 - Prepares a scoped environment for the `target` module context, applying any `tags` for override resolution.
 - Executes the resolved target module.
 - Returns the target module's status.

@@ -8,14 +8,20 @@ public sealed partial class VariableSyntaxBuilder(JsonNamingPolicy namingPolicy)
 {
     internal JsonNamingPolicy NamingPolicy { get; } = namingPolicy ?? throw new ArgumentNullException(nameof(namingPolicy));
 
-    [GeneratedRegex(@"^[A-Za-z_][A-Za-z_0-9\-\.]*$")]
+    [GeneratedRegex(VariableGrammar.IDENTIFIER_PATTERN)]
     internal partial Regex IdentifierRegex { get; }
 
-    [GeneratedRegex(@"^\$\{(?<expression>@@|@(?:[A-Za-z_][A-Za-z_0-9\-\.]*)?|[A-Za-z_][A-Za-z_0-9\-\.]*)\}$")]
-    internal partial Regex VariableRegex { get; }
+    [GeneratedRegex(VariableGrammar.INDIRECTION_PATTERN)]
+    internal partial Regex IndirectionRegex { get; }
 
-    [GeneratedRegex(@"\$\{(?<expression>@@|@(?:[A-Za-z_][A-Za-z_0-9\-\.]*)?|[A-Za-z_][A-Za-z_0-9\-\.]*)\}")]
+    [GeneratedRegex(VariableGrammar.INTERPOLATION_PATTERN)]
     internal partial Regex InterpolationRegex { get; }
+
+    [GeneratedRegex(VariableGrammar.NAMESPACE_PATTERN)]
+    internal partial Regex NamespaceRegex { get; }
+
+    public bool IsValidIdentifier([NotNullWhen(true)] string? identifier) =>
+        identifier is not null && IsValidIdentifier(identifier.AsSpan());
 
     public bool IsValidIdentifier(ReadOnlySpan<char> identifier)
     {
@@ -24,6 +30,18 @@ public sealed partial class VariableSyntaxBuilder(JsonNamingPolicy namingPolicy)
             return false;
         }
         return IdentifierRegex.IsMatch(identifier);
+    }
+
+    public bool IsValidNamespace([NotNullWhen(true)] string? ns) =>
+        ns is not null && IsValidNamespace(ns.AsSpan());
+
+    public bool IsValidNamespace(ReadOnlySpan<char> ns)
+    {
+        if (ns.IsWhiteSpace())
+        {
+            return false;
+        }
+        return NamespaceRegex.IsMatch(ns);
     }
 
     public PathSyntax Path(string? segment)

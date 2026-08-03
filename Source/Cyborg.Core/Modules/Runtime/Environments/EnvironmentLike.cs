@@ -44,11 +44,11 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         return sb.ToString();
     }
 
-    protected virtual bool TryResolveVariableCandidate<T>(ResolutionContext context, string name, [NotNullWhen(true)] out T? value)
+    protected virtual bool TryResolveIndirectionCandidate<T>(ResolutionContext context, string name, [NotNullWhen(true)] out T? value)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(name);
-        if (name.StartsWith('$') && SyntaxFactory.VariableRegex.Match(name) is { Success: true } match)
+        if (name.StartsWith('$') && SyntaxFactory.IndirectionRegex.Match(name) is { Success: true } match)
         {
             string expression = match.Groups["expression"].Value;
             if (TryParseVariableReference(expression, out VariableReference reference))
@@ -72,7 +72,7 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         if (Variables.TryGetValue(context.Name, out object? objValue))
         {
             // might need to resolve indirection via string variables, e.g. var1 = "${var2}", var2 = "actual_value"
-            if (objValue is string s && TryResolveVariableCandidate(context, s, out value))
+            if (objValue is string s && TryResolveIndirectionCandidate(context, s, out value))
             {
                 return true;
             }

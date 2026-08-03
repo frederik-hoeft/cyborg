@@ -7,10 +7,12 @@ public abstract record ModuleBase
 {
     [IgnoreOverride]
     [IgnoreInterpolation]
+    [VariableIdentifier]
     public virtual string? Name { get; init; }
 
     [IgnoreOverride]
     [IgnoreInterpolation]
+    [VariableIdentifier]
     public virtual string? Group { get; init; }
 
     [Required]

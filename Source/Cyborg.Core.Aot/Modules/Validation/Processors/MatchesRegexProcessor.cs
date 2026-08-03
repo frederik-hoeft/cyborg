@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal sealed class MatchesRegexAttributeProcessor : AttributeProcessorBase<MatchesRegexAttribute>
+internal sealed class MatchesRegexProcessor : AttributeProcessorBase<MatchesRegexAttribute>
 {
     public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {
