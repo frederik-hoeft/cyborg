@@ -116,8 +116,13 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
             collectionAccessExpression = collectionCurrentVariable;
         }
 
-        builder.AppendLine($"foreach ({collection.ElementNullableTypeName} {elementVariable} in {collectionAccessExpression})");
-        builder.AppendLine("{");
+        string indexVariable = $"{safeIdentifier}Index";
+        builder.AppendBlock(
+            $$"""
+            int {{indexVariable}} = 0;
+            foreach ({{collection.ElementNullableTypeName}} {{elementVariable}} in {{collectionAccessExpression}})
+            {
+            """);
         IndentedStringBuilder loopBuilder = builder.IncreaseIndent();
 
         if (property.TryGetAspects(out List<CollectionElementValidationAspect>? elementValidationAspects))
@@ -131,7 +136,8 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
                     property,
                     moduleVariableName,
                     propertyAccessExpression,
-                    elementVariable);
+                    elementVariable,
+                    indexVariable);
             }
         }
 
@@ -139,7 +145,7 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
         {
             AppendCollectionElementChildValidation(loopBuilder, property, moduleVariableName, elementVariable);
         }
-
+        loopBuilder.AppendLine($"++{indexVariable};");
         builder.AppendLine("}");
 
         if (needsCollectionEnumerationGuard)

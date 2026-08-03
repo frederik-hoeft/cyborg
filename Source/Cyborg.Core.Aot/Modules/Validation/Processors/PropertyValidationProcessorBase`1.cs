@@ -9,12 +9,11 @@ internal abstract class PropertyValidationProcessorBase<TAttribute> : AttributeP
     public sealed override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {
         bool targetsElements = false;
-        if (TryGetNamedArgument(attribute, nameof(PropertyValidationAttribute.TargetsElements), in context, out TypedConstant? targetsElementsArgument))
+        if (TryGetNamedArgument(attribute, nameof(PropertyValidationAttribute.TargetsElements), out TypedConstant? targetsElementsArgument))
         {
             if (targetsElementsArgument.Value.Value is not bool typedTargetsElements)
             {
-                context.Report(
-                    ValidationGeneratorDiagnostics.UnsupportedAttributeLiteral,
+                context.Report(ValidationGeneratorDiagnostics.UnsupportedAttributeLiteral,
                     context.Property.Name,
                     context.ContainingType.Name,
                     GetAttributeFriendlyName(attribute));
@@ -39,10 +38,7 @@ internal abstract class PropertyValidationProcessorBase<TAttribute> : AttributeP
         {
             return false.WithDefaults(out aspect);
         }
-        if (validationAspect is null)
-        {
-            throw new InvalidOperationException($"Processor '{GetType().FullName}' returned success without a validation aspect.");
-        }
+        _ = validationAspect ?? throw new InvalidOperationException($"Processor '{GetType().FullName}' returned success without a validation aspect.");
 
         aspect = targetsElements
             ? new CollectionElementValidationAspect(validationAspect)
@@ -50,17 +46,9 @@ internal abstract class PropertyValidationProcessorBase<TAttribute> : AttributeP
         return true;
     }
 
-    protected abstract bool TryProcessValidation(
-        AttributeData attribute,
-        ref readonly PropertyProcessingContext context,
-        ref readonly PropertyValidationTarget target,
-        out PropertyValidationAspect? aspect);
+    protected abstract bool TryProcessValidation(AttributeData attribute, ref readonly PropertyProcessingContext context, ref readonly PropertyValidationTarget target, out PropertyValidationAspect? aspect);
 
-    protected bool ValidateTargetType(
-        AttributeData attribute,
-        ref readonly PropertyProcessingContext context,
-        ref readonly PropertyValidationTarget target,
-        SpecialType expectedType)
+    protected bool ValidateTargetType(AttributeData attribute, ref readonly PropertyProcessingContext context, ref readonly PropertyValidationTarget target, SpecialType expectedType)
     {
         if (!target.IsCollectionElement)
         {
@@ -75,8 +63,7 @@ internal abstract class PropertyValidationProcessorBase<TAttribute> : AttributeP
             return true;
         }
 
-        context.Report(
-            ValidationGeneratorDiagnostics.CollectionElementTypeMismatch,
+        context.Report(ValidationGeneratorDiagnostics.CollectionElementTypeMismatch,
             context.Property.Name,
             context.ContainingType.Name,
             GetAttributeFriendlyName(attribute),
@@ -85,15 +72,11 @@ internal abstract class PropertyValidationProcessorBase<TAttribute> : AttributeP
         return false;
     }
 
-    private bool TryCreateCollectionElementTarget(
-        AttributeData attribute,
-        ref readonly PropertyProcessingContext context,
-        out PropertyValidationTarget target)
+    private bool TryCreateCollectionElementTarget(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyValidationTarget target)
     {
         _ = context.Property.Type.TryUnwrapNullableType(out ITypeSymbol nonNullableType);
         if (nonNullableType.SpecialType is SpecialType.System_String
-            || !CollectionTypeInspector.TryDescribe(context.Compilation, nonNullableType, out CollectionTypeInspector.CollectionTypeDescriptor? descriptor)
-            || descriptor is null)
+            || !CollectionTypeInspector.TryDescribe(context.Compilation, nonNullableType, out CollectionTypeInspector.CollectionTypeDescriptor? descriptor))
         {
             context.Report(
                 ValidationGeneratorDiagnostics.CollectionApplicationRequiresCollection,

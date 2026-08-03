@@ -110,7 +110,7 @@ internal abstract class AttributeProcessorBase : IPropertyAttributeProcessor
 
     protected bool TryGetNamedArgumentValue<T>(AttributeData attribute, string argumentName, ref readonly PropertyProcessingContext context, [NotNullWhen(true)] out T? value)
     {
-        if (TryGetNamedArgument(attribute, argumentName, in context, out TypedConstant? namedArgumentValue))
+        if (TryGetNamedArgument(attribute, argumentName, out TypedConstant? namedArgumentValue))
         {
             if (namedArgumentValue.Value.Value is T typedValue)
             {
@@ -125,7 +125,7 @@ internal abstract class AttributeProcessorBase : IPropertyAttributeProcessor
         return false.WithDefaults(out value);
     }
 
-    protected bool TryGetNamedArgument(AttributeData attribute, string argumentName, ref readonly PropertyProcessingContext context, [NotNullWhen(true)] out TypedConstant? value)
+    protected bool TryGetNamedArgument(AttributeData attribute, string argumentName, [NotNullWhen(true)] out TypedConstant? value)
     {
         foreach (KeyValuePair<string, TypedConstant> namedArgument in attribute.NamedArguments)
         {

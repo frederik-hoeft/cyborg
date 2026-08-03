@@ -6,11 +6,7 @@ namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
 internal sealed class VariableIdentifierProcessor : PropertyValidationProcessorBase<VariableIdentifierAttribute>
 {
-    protected override bool TryProcessValidation(
-        AttributeData attribute,
-        ref readonly PropertyProcessingContext context,
-        ref readonly PropertyValidationTarget target,
-        out PropertyValidationAspect? aspect)
+    protected override bool TryProcessValidation(AttributeData attribute, ref readonly PropertyProcessingContext context, ref readonly PropertyValidationTarget target, out PropertyValidationAspect? aspect)
     {
         if (!ValidateTargetType(attribute, in context, in target, SpecialType.System_String))
         {

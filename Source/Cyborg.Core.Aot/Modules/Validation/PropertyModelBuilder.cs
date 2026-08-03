@@ -70,7 +70,7 @@ internal sealed class PropertyModelBuilder(GenerationCandidateFactory factory, L
 
     private CollectionModel? TryCreateCollectionModel(INamedTypeSymbol containingType, IPropertySymbol property, ITypeSymbol nonNullableType, ImmutableHashSet<INamedTypeSymbol> traversalPath)
     {
-        if (!CollectionTypeInspector.TryDescribe(factory.Context.SemanticModel.Compilation, nonNullableType, out CollectionTypeInspector.CollectionTypeDescriptor? descriptor) || descriptor is null)
+        if (!CollectionTypeInspector.TryDescribe(factory.Context.SemanticModel.Compilation, nonNullableType, out CollectionTypeInspector.CollectionTypeDescriptor? descriptor))
         {
             return null;
         }

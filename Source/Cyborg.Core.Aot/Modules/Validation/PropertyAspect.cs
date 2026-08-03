@@ -46,7 +46,8 @@ internal abstract class PropertyAspect(bool ensuresDefault = false)
         PropertyModel property,
         string moduleVariableName,
         string propertyAccessExpression,
-        string elementAccessExpression)
+        string elementAccessExpression,
+        string indexVariable)
     {
         CollectionModel collection = property.Collection
             ?? throw new InvalidOperationException($"Property '{property.Name}' does not describe a collection.");
@@ -59,7 +60,8 @@ internal abstract class PropertyAspect(bool ensuresDefault = false)
             ErrorPropertyAccessExpression: propertyAccessExpression,
             TargetType: collection.ElementType,
             TargetNullableTypeName: collection.ElementNullableTypeName,
-            IsCollectionElement: true);
+            IsCollectionElement: true,
+            TargetDescription: $$"""Collection element {{{indexVariable}}} of property""");
         EmitValidation(builder, model);
     }
 
@@ -78,11 +80,10 @@ internal abstract class PropertyAspect(bool ensuresDefault = false)
         string ErrorPropertyAccessExpression,
         ITypeSymbol TargetType,
         string TargetNullableTypeName,
-        bool IsCollectionElement
+        bool IsCollectionElement,
+        string TargetDescription = "Property"
     )
     {
         public string PropertyNameExpression => $"nameof({ErrorPropertyAccessExpression})";
-
-        public string TargetDescription => IsCollectionElement ? "Collection element of property" : "Property";
     }
 }
