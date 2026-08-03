@@ -4,11 +4,11 @@ using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal sealed class VariableIdentifierProcessor : AttributeProcessorBase<VariableIdentifierAttribute>
+internal sealed class VariableIdentifierProcessor : PropertyValidationProcessorBase<VariableIdentifierAttribute>
 {
-    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
+    protected override bool TryProcessValidation(AttributeData attribute, ref readonly PropertyProcessingContext context, ref readonly PropertyValidationTarget target, out PropertyValidationAspect? aspect)
     {
-        if (!ValidatePropertyType(attribute, in context, SpecialType.System_String))
+        if (!ValidateTargetType(attribute, in context, in target, SpecialType.System_String))
         {
             return false.WithDefaults(out aspect);
         }
@@ -16,7 +16,7 @@ internal sealed class VariableIdentifierProcessor : AttributeProcessorBase<Varia
         return true;
     }
 
-    private sealed class VariableIdentifierAspect : PropertyAspect
+    private sealed class VariableIdentifierAspect : PropertyValidationAspect
     {
         protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
         {
@@ -24,7 +24,7 @@ internal sealed class VariableIdentifierProcessor : AttributeProcessorBase<Varia
             $$"""
             if ({{model.AccessExpression}} is not null && !runtime.Environment.SyntaxFactory.IsValidIdentifier({{model.AccessExpression}}))
             {
-                errors.Add({{CreateValidationError(model, rule: "valid_identifier", $"Property '{{nameof({model.AccessExpression})}}' must be a valid symbol name starting with a letter or underscore, followed by ., -, _, or alphanumeric characters.")}});
+                errors.Add({{CreateValidationError(model, rule: "valid_identifier", $"{model.TargetDescription} '{{{model.PropertyNameExpression}}}' must be a valid variable identifier, but was '{{{model.AccessExpression}}}'.")}});
             }
             """);
         }

@@ -181,4 +181,20 @@ internal static class ValidationGeneratorDiagnostics
         category: CATEGORY,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
+
+    public static DiagnosticDescriptor CollectionApplicationRequiresCollection { get; } = new(
+        id: "CYBORGVAL023",
+        title: "Collection validation requires a collection property",
+        messageFormat: "Property '{0}' on '{1}' uses '{2}' with TargetsElements enabled, but type '{3}' is not a supported collection",
+        category: CATEGORY,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    public static DiagnosticDescriptor CollectionElementTypeMismatch { get; } = new(
+        id: "CYBORGVAL024",
+        title: "Collection element type does not support validation attribute",
+        messageFormat: "Property '{0}' on '{1}' uses '{2}' with TargetsElements enabled, but collection element type '{3}' must be '{4}'",
+        category: CATEGORY,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
 }
