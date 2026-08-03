@@ -183,6 +183,26 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
     }
 
     [TestMethod]
+    public async Task TestValidationAsync_CollectionElementConstraintsAcceptParentViolationsAsync()
+    {
+        ValidationPipelineTestModule module = new(
+            RequiredItems: [],
+            OptionalItems: [],
+            NullableItems: null,
+            InterpolatedValue: "literal",
+            DeferredValue: "literal",
+            Tags: null);
+
+        await using TestModuleRuntimeScope scope = CreateValidationScope();
+        ValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(
+            scope.Runtime,
+            scope.ServiceProvider,
+            TestContext.CancellationToken);
+
+        MSAssert.IsTrue(result.IsValid);
+    }
+
+    [TestMethod]
     public async Task TestValidationAsync_CollectionElementConstraintsReportElementErrorsAsync()
     {
         ValidationPipelineTestModule module = new(
@@ -200,12 +220,9 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
             TestContext.CancellationToken);
 
         MSAssert.IsFalse(result.IsValid);
+        MSAssert.HasCount(4, result.Errors);
         MSAssert.Contains(
             error => error.Rule == "required"
-                && error.PropertyName.EndsWith(nameof(ValidationPipelineTestModule.Tags), StringComparison.Ordinal),
-            result.Errors);
-        MSAssert.Contains(
-            error => error.Rule == "length"
                 && error.PropertyName.EndsWith(nameof(ValidationPipelineTestModule.Tags), StringComparison.Ordinal),
             result.Errors);
         MSAssert.Contains(
