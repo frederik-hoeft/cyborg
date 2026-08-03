@@ -8,9 +8,19 @@ internal abstract class PropertyValidationProcessorBase<TAttribute> : AttributeP
 {
     public sealed override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {
-        if (!TryGetNamedArgumentValue(attribute, nameof(PropertyValidationAttribute.TargetsElements), in context, out bool targetsElements))
+        bool targetsElements = false;
+        if (TryGetNamedArgument(attribute, nameof(PropertyValidationAttribute.TargetsElements), in context, out TypedConstant? targetsElementsArgument))
         {
-            return false.WithDefaults(out aspect);
+            if (targetsElementsArgument.Value.Value is not bool typedTargetsElements)
+            {
+                context.Report(
+                    ValidationGeneratorDiagnostics.UnsupportedAttributeLiteral,
+                    context.Property.Name,
+                    context.ContainingType.Name,
+                    GetAttributeFriendlyName(attribute));
+                return false.WithDefaults(out aspect);
+            }
+            targetsElements = typedTargetsElements;
         }
 
         PropertyValidationTarget target;
