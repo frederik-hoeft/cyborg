@@ -3,7 +3,7 @@
 internal abstract class PropertyValidationAttribute : Attribute
 {
     /// <summary>
-    /// Gets or sets whether the validation constraint applies to each immediate collection element instead of the property itself.
+    /// Gets or sets whether the validation constraint applies to each immediate collection element instead of the collection property itself.
     /// </summary>
-    public bool AppliesToCollection { get; set; }
+    public bool TargetsElements { get; set; }
 }

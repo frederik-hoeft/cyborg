@@ -13,9 +13,7 @@ public sealed partial record ValidationPipelineTestModule
     ImmutableArray<ValidationPipelineTestItem>? NullableItems,
     string InterpolatedValue,
     [property: IgnoreInterpolation] string DeferredValue,
-    [property: Required(AppliesToCollection = true)]
-    [property: MinLength(1, AppliesToCollection = true)]
-    [property: VariableIdentifier(AppliesToCollection = true)]
+    [property: VariableIdentifier(TargetsElements = true)]
     IReadOnlyCollection<string?>? Tags
 ) : ModuleBase, IModule
 {

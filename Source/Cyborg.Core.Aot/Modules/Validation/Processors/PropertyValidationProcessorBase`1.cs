@@ -8,13 +8,13 @@ internal abstract class PropertyValidationProcessorBase<TAttribute> : AttributeP
 {
     public sealed override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {
-        if (!TryGetAppliesToCollection(attribute, in context, out bool appliesToCollection))
+        if (!TryGetCollectionModifier(attribute, in context, out bool targetsElements))
         {
             return false.WithDefaults(out aspect);
         }
 
         PropertyValidationTarget target;
-        if (appliesToCollection)
+        if (targetsElements)
         {
             if (!TryCreateCollectionElementTarget(attribute, in context, out target))
             {
@@ -34,7 +34,7 @@ internal abstract class PropertyValidationProcessorBase<TAttribute> : AttributeP
             throw new InvalidOperationException($"Processor '{GetType().FullName}' returned success without a validation aspect.");
         }
 
-        aspect = appliesToCollection
+        aspect = targetsElements
             ? new CollectionElementValidationAspect(validationAspect)
             : validationAspect;
         return true;
@@ -99,17 +99,17 @@ internal abstract class PropertyValidationProcessorBase<TAttribute> : AttributeP
         return true;
     }
 
-    private bool TryGetAppliesToCollection(AttributeData attribute, ref readonly PropertyProcessingContext context, out bool appliesToCollection)
+    private bool TryGetCollectionModifier(AttributeData attribute, ref readonly PropertyProcessingContext context, out bool targetsElements)
     {
         foreach (KeyValuePair<string, TypedConstant> namedArgument in attribute.NamedArguments)
         {
-            if (namedArgument.Key != nameof(PropertyValidationAttribute.AppliesToCollection))
+            if (namedArgument.Key != nameof(PropertyValidationAttribute.TargetsElements))
             {
                 continue;
             }
             if (namedArgument.Value.Value is bool value)
             {
-                appliesToCollection = value;
+                targetsElements = value;
                 return true;
             }
 
@@ -118,11 +118,11 @@ internal abstract class PropertyValidationProcessorBase<TAttribute> : AttributeP
                 context.Property.Name,
                 context.ContainingType.Name,
                 GetAttributeFriendlyName(attribute));
-            appliesToCollection = false;
+            targetsElements = false;
             return false;
         }
 
-        appliesToCollection = false;
+        targetsElements = false;
         return true;
     }
 }

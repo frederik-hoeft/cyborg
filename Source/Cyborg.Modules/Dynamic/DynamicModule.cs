@@ -9,10 +9,7 @@ namespace Cyborg.Modules.Dynamic;
 public sealed partial record DynamicModule
 (
     [property: Required] ModuleContext Target,
-    [property: Required(AppliesToCollection = true)]
-    [property: MinLength(1, AppliesToCollection = true)]
-    [property: VariableIdentifier(AppliesToCollection = true)]
-    IReadOnlyCollection<string>? Tags
+    [property: VariableIdentifier(TargetsElements = true)] IReadOnlyCollection<string>? Tags
 ) : ModuleBase, IModule
 {
     public static string ModuleId => "cyborg.modules.dynamic.v1";
