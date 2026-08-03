@@ -1,0 +1,61 @@
+name: Apply PR 59 documentation fixes
+
+on:
+  push:
+    branches:
+      - fix/59-document-collection-validation
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Update stale documentation sections
+        shell: python
+        run: |
+          from pathlib import Path
+
+          modules = Path("docs/architecture/modules-reference.md")
+          text = modules.read_text(encoding="utf-8-sig")
+          old = '| `tags` | array of strings | No | `null` | Override resolution tags applied to the child environment. Tags extend the override lookup chain beyond the standard `name` / `group` / `module_id` sequence, allowing ambient overrides keyed by tag to apply to any module executing in that environment. See [Runtime Infrastructure -- Override Resolution Tags](./architecture-overview.md#override-resolution-tags). |'
+          new = '| `tags` | array of strings | No | `null` | Override resolution tags applied to the child environment. Each supplied tag is interpolated before validation and must be non-null, non-whitespace, and a valid variable identifier. Tags extend the override lookup chain beyond the standard `name` / `group` / `module_id` sequence, allowing ambient overrides keyed by tag to apply to any module executing in that environment. See [Runtime Infrastructure -- Override Resolution Tags](./architecture-overview.md#override-resolution-tags). |'
+          if old not in text:
+              raise RuntimeError("Dynamic tags property documentation was not found")
+          text = text.replace(old, new, 1)
+          old = '**Behavior:**\n\n- Prepares a scoped environment for the `target` module context, applying any `tags` for override resolution.'
+          new = '**Behavior:**\n\n- Validates the final interpolated tag values before preparing the child environment; invalid tags prevent the target module from executing.\n- Prepares a scoped environment for the `target` module context, applying any `tags` for override resolution.'
+          if old not in text:
+              raise RuntimeError("Dynamic behavior documentation was not found")
+          modules.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          architecture = Path("docs/architecture/architecture-overview.md")
+          text = architecture.read_text(encoding="utf-8-sig")
+          old = '5. **Validate Constraints** — Checks constraints declared through `[Required]`, `[Range<T>]`, length, filesystem, path-shape, regex, grammar, enum, and related validation attributes. Produces a `ValidationResult<TModule>` containing either the transformed module or validation errors.'
+          new = '5. **Validate Constraints** — Checks constraints declared through `[Required]`, `[VariableIdentifier]`, `[Range<T>]`, length, filesystem, path-shape, regex, grammar, enum, and related validation attributes. Produces a `ValidationResult<TModule>` containing either the transformed module or validation errors.'
+          if old not in text:
+              raise RuntimeError("Validation constraint documentation was not found")
+          text = text.replace(old, new, 1)
+          old = 'Collection traversal is guarded according to the concrete collection shape. Null reference collections and absent nullable value-type collections are skipped. A default `ImmutableArray<T>` is not enumerated and remains distinct from an initialized empty array; property-level constraints such as `[Required]` still execute outside the enumeration guard, allowing invalid default arrays to produce validation errors instead of throwing while validating elements.'
+          new = old + ' Selected validation attributes can set `TargetsElements = true` to validate each immediate collection element through the same guarded traversal. Element-targeted errors retain the parent property name and include the zero-based element index in their message.'
+          if old not in text:
+              raise RuntimeError("Collection traversal documentation was not found")
+          text = text.replace(old, new, 1)
+          old = 'Tags are appended after `ModuleId` in the override resolution order, acting as a fallback. This mechanism enables parent modules to inject ambient overrides into child execution scopes without requiring knowledge of the child module\'s name or type. For example, a workflow orchestrator could tag an environment with `"production"`, causing any module executing in that environment to pick up overrides keyed under `@production.{property}`.'
+          new = old + '\n\nBecause each tag becomes a variable-path identifier, it must satisfy the canonical variable-identifier grammar. `DynamicModule` interpolates and validates every configured tag before calling `PrepareEnvironment()`, so invalid user-provided tags fail module validation before child execution. `PrepareEnvironment()` retains the same identifier check as a runtime invariant for programmatic callers.'
+          if old not in text:
+              raise RuntimeError("Override resolution tag documentation was not found")
+          architecture.write_text(text.replace(old, new, 1), encoding="utf-8")
+      - name: Remove temporary workflow and commit
+        run: |
+          git rm .github/workflows/apply-pr59-doc-fixes.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/architecture/modules-reference.md docs/architecture/architecture-overview.md
+          git commit -m "document collection element validation behavior"
+          git push
