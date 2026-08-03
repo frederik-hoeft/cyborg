@@ -202,6 +202,28 @@ public sealed class VariableSyntaxTests
     }
 
     [TestMethod]
+    [DataRow("${#HOME}", 1, "#|HOME")]
+    [DataRow("${##HOME}", 1, "##|HOME")]
+    [DataRow("${#}", 1, "#|")]
+    [DataRow("before ${#HOME} after ${##USER}", 2, "#|HOME;##|USER")]
+    [DataRow("${HOME}", 0, "")]
+    [DataRow("${#HOME", 0, "")]
+    public void Test_HashLiteralRegex_Input_ReturnsExpectedMatches(string value, int expectedCount, string expectedMatches)
+    {
+        VariableSyntaxBuilder builder = CreateBuilder();
+
+        System.Text.RegularExpressions.MatchCollection matches = builder.HashLiteralRegex.Matches(value);
+        List<string> actualMatches = [with(matches.Count)];
+        foreach (System.Text.RegularExpressions.Match match in matches)
+        {
+            actualMatches.Add($"{match.Groups["hashes"].Value}|{match.Groups["content"].Value}");
+        }
+
+        Assert.HasCount(expectedCount, matches);
+        Assert.AreEqual(expectedMatches, string.Join(";", actualMatches));
+    }
+
+    [TestMethod]
     [DataRow("root.-child", true)]
     [DataRow("root.child-", true)]
     [DataRow("root.--", true)]

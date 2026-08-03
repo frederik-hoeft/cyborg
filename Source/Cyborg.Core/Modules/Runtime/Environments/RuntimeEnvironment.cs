@@ -43,9 +43,41 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
     }
 
     [return: NotNullIfNotNull(nameof(value))]
+    public virtual string? SelectStringOverride<TModule>(TModule module, string? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
+        where TModule : ModuleBase, IModule
+        => TrySelectStringOverrideCore(this, module, moduleExpression, valueExpression, out string? selectedValue) ? selectedValue : value;
+
+    [return: NotNullIfNotNull(nameof(value))]
     public virtual T? Resolve<TModule, T>(TModule module, T? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
         where TModule : ModuleBase, IModule
-        => ResolveCore(this, module, value, moduleExpression, valueExpression);
+    {
+        T? resolvedValue = ResolveCore(this, module, value, moduleExpression, valueExpression);
+        if (resolvedValue is string stringValue)
+        {
+            return (T)(object)InterpolateFinal(stringValue, entryPoint: this);
+        }
+        return resolvedValue;
+    }
+
+    internal protected virtual bool TrySelectStringOverrideCore<TModule>(EnvironmentLike entryPoint, TModule module, string? moduleExpression, string? valueExpression, [NotNullWhen(true)] out string? value)
+        where TModule : ModuleBase, IModule
+    {
+        ArgumentNullException.ThrowIfNull(entryPoint);
+        ArgumentNullException.ThrowIfNull(module);
+        string valuePath = ConstructValueResolutionPath<string>(value: null, moduleExpression, valueExpression);
+
+        foreach (string identifier in EnumerateOverrideIdentifiers(module.Name, module.Group, TModule.ModuleId))
+        {
+            string overridePath = SyntaxFactory.Path(identifier, valuePath).Override();
+            if (TryGetStoredVariable(overridePath, out value))
+            {
+                return true;
+            }
+        }
+
+        value = default;
+        return false;
+    }
 
     [return: NotNullIfNotNull(nameof(value))]
     internal protected virtual T? ResolveCore<TModule, T>(EnvironmentLike entryPoint, TModule module, T? value, string? moduleExpression, string? valueExpression)

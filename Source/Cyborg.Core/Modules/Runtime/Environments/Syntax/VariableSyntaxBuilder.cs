@@ -17,6 +17,9 @@ public sealed partial class VariableSyntaxBuilder(JsonNamingPolicy namingPolicy)
     [GeneratedRegex(VariableGrammar.INTERPOLATION_PATTERN)]
     internal partial Regex InterpolationRegex { get; }
 
+    [GeneratedRegex(VariableGrammar.HASH_LITERAL_PATTERN)]
+    internal partial Regex HashLiteralRegex { get; }
+
     [GeneratedRegex(VariableGrammar.NAMESPACE_PATTERN)]
     internal partial Regex NamespaceRegex { get; }
 

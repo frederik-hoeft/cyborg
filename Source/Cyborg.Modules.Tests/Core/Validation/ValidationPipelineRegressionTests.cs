@@ -127,6 +127,80 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
     }
 
     [TestMethod]
+    public async Task TestValidationAsync_IgnoreInterpolationPreservesDefaultExpressionAsync()
+    {
+        ValidationPipelineTestModule module = new(
+            RequiredItems: [],
+            OptionalItems: [],
+            NullableItems: null,
+            InterpolatedValue: "literal",
+            DeferredValue: "literal",
+            Tags: null);
+
+        await using TestModuleRuntimeScope scope = CreateValidationScope();
+        scope.GlobalEnvironment.SetVariable("deferred_default", "resolved-value");
+        ValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(
+            scope.Runtime,
+            scope.ServiceProvider,
+            TestContext.CancellationToken);
+
+        MSAssert.IsTrue(result.IsValid);
+        MSAssert.AreEqual("${deferred_default}", result.Module!.DeferredDefault);
+    }
+
+    [TestMethod]
+    public async Task TestValidationAsync_NormalStringOverrideIsInterpolatedDuringFinalPhaseAsync()
+    {
+        ValidationPipelineTestModule module = new(
+            RequiredItems: [],
+            OptionalItems: [],
+            NullableItems: null,
+            InterpolatedValue: "fallback",
+            DeferredValue: "literal",
+            Tags: null)
+        {
+            Name = "validation",
+        };
+
+        await using TestModuleRuntimeScope scope = CreateValidationScope();
+        scope.GlobalEnvironment.SetVariable("@validation.interpolated_value", "${resolved}");
+        scope.GlobalEnvironment.SetVariable("resolved", "resolved-value");
+        ValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(
+            scope.Runtime,
+            scope.ServiceProvider,
+            TestContext.CancellationToken);
+
+        MSAssert.IsTrue(result.IsValid);
+        MSAssert.AreEqual("resolved-value", result.Module!.InterpolatedValue);
+    }
+
+    [TestMethod]
+    public async Task TestValidationAsync_IgnoreInterpolationPreservesOverrideExpressionAsync()
+    {
+        ValidationPipelineTestModule module = new(
+            RequiredItems: [],
+            OptionalItems: [],
+            NullableItems: null,
+            InterpolatedValue: "literal",
+            DeferredValue: "fallback",
+            Tags: null)
+        {
+            Name = "validation",
+        };
+
+        await using TestModuleRuntimeScope scope = CreateValidationScope();
+        scope.GlobalEnvironment.SetVariable("@validation.deferred_value", "${deferred}");
+        scope.GlobalEnvironment.SetVariable("deferred", "resolved-value");
+        ValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(
+            scope.Runtime,
+            scope.ServiceProvider,
+            TestContext.CancellationToken);
+
+        MSAssert.IsTrue(result.IsValid);
+        MSAssert.AreEqual("${deferred}", result.Module!.DeferredValue);
+    }
+
+    [TestMethod]
     public async Task TestValidationAsync_InterpolatedIdentifiersAreRejectedAsync()
     {
         ValidationPipelineTestModule module = new(
