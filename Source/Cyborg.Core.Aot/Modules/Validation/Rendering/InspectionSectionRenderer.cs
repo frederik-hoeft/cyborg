@@ -1,4 +1,4 @@
-using Cyborg.Core.Aot.Extensions;
+﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
@@ -6,7 +6,9 @@ namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
 /// <summary>
 /// Emits module identity plus a format-neutral recursive description.
 /// </summary>
-internal sealed class InspectionSectionRenderer(ValidationContractInfo contractInfo) : ISectionRenderer
+internal sealed class InspectionSectionRenderer(
+    ValidationContractInfo contractInfo,
+    DiagnosticsReporter diagnosticsReporter) : ISectionRenderer
 {
     private const string MODULE_IDENTITY_TYPE =
         "global::Cyborg.Core.Modules.Debugging.ModuleIdentity";
@@ -35,6 +37,7 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
                 builderVariableName: "builder",
                 nodeAccessExpression: property.Name,
                 displayName: property.Name,
+                symbolPath: property.Name,
                 isProperty: true);
         }
 
@@ -46,25 +49,50 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
             """);
     }
 
-    private static void AppendNode(
+    private void AppendNode(
         IndentedStringBuilder builder,
         PropertyModel property,
         string builderVariableName,
         string nodeAccessExpression,
         string displayName,
+        string symbolPath,
         bool isProperty)
     {
+        string hintsExpression = CreateHintsExpression(property);
+
         if (property.Collection is not null)
         {
-            AppendCollection(builder, property, builderVariableName, nodeAccessExpression, displayName, isProperty);
+            AppendCollection(
+                builder,
+                property,
+                builderVariableName,
+                nodeAccessExpression,
+                displayName,
+                symbolPath,
+                hintsExpression,
+                isProperty);
         }
         else if (property.HasValidatableChildren)
         {
-            AppendObject(builder, property, builderVariableName, nodeAccessExpression, displayName, isProperty);
+            AppendObject(
+                builder,
+                property,
+                builderVariableName,
+                nodeAccessExpression,
+                displayName,
+                symbolPath,
+                hintsExpression,
+                isProperty);
         }
         else
         {
-            AppendAtom(builder, builderVariableName, nodeAccessExpression, displayName, isProperty);
+            AppendAtom(
+                builder,
+                builderVariableName,
+                nodeAccessExpression,
+                displayName,
+                hintsExpression,
+                isProperty);
         }
     }
 
@@ -73,45 +101,48 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
         string builderVariableName,
         string nodeAccessExpression,
         string displayName,
+        string hintsExpression,
         bool isProperty)
     {
         builder.AppendLine(
             isProperty
-                ? $"{builderVariableName}.AddProperty(\"{displayName}\", [], {nodeAccessExpression});"
-                : $"{builderVariableName}.AddItem([], {nodeAccessExpression});");
+                ? $"{builderVariableName}.AddProperty(\"{displayName}\", {hintsExpression}, {nodeAccessExpression});"
+                : $"{builderVariableName}.AddItem({hintsExpression}, {nodeAccessExpression});");
     }
 
-    private static void AppendObject(
+    private void AppendObject(
         IndentedStringBuilder builder,
         PropertyModel property,
         string builderVariableName,
         string nodeAccessExpression,
         string displayName,
+        string symbolPath,
+        string hintsExpression,
         bool isProperty)
     {
-        string childBuilderName =
-            SymbolNameGenerator.MakeCamelCase($"{property.Name}DescriptionBuilder");
+        string childBuilderName = CreateSymbolName(
+            $"{symbolPath}_object_description_builder");
 
         builder.AppendBlock(
             isProperty
                 ? $$"""
                   if ({{nodeAccessExpression}} is null)
                   {
-                      {{builderVariableName}}.AddProperty("{{displayName}}", [], {{nodeAccessExpression}});
+                      {{builderVariableName}}.AddProperty("{{displayName}}", {{hintsExpression}}, {{nodeAccessExpression}});
                   }
                   else
                   {
-                      {{builderVariableName}}.AddObject("{{displayName}}", [], {{childBuilderName}} =>
+                      {{builderVariableName}}.AddObject("{{displayName}}", {{hintsExpression}}, {{childBuilderName}} =>
                       {
                   """
                 : $$"""
                   if ({{nodeAccessExpression}} is null)
                   {
-                      {{builderVariableName}}.AddItem([], {{nodeAccessExpression}});
+                      {{builderVariableName}}.AddItem({{hintsExpression}}, {{nodeAccessExpression}});
                   }
                   else
                   {
-                      {{builderVariableName}}.AddObjectItem([], {{childBuilderName}} =>
+                      {{builderVariableName}}.AddObjectItem({{hintsExpression}}, {{childBuilderName}} =>
                       {
                   """);
 
@@ -124,6 +155,7 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
                 childBuilderName,
                 $"{nodeAccessExpression}.{child.Name}",
                 child.Name,
+                $"{symbolPath}_{child.Name}",
                 isProperty: true);
         }
 
@@ -134,21 +166,25 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
             """);
     }
 
-    private static void AppendCollection(
+    private void AppendCollection(
         IndentedStringBuilder builder,
         PropertyModel property,
         string builderVariableName,
         string nodeAccessExpression,
         string displayName,
+        string symbolPath,
+        string hintsExpression,
         bool isProperty)
     {
         CollectionModel collection = property.Collection!;
-        string collectionBuilderName =
-            SymbolNameGenerator.MakeCamelCase($"{property.Name}CollectionDescriptionBuilder");
-        string elementName =
-            SymbolNameGenerator.MakeCamelCase($"{property.Name}DescriptionElement");
+        string collectionBuilderName = CreateSymbolName(
+            $"{symbolPath}_collection_description_builder");
+        string elementName = CreateSymbolName(
+            $"{symbolPath}_description_element");
 
-        bool requiresNullCheck = property.IsNullable || !property.Symbol.Type.IsValueType;
+        bool requiresNullCheck =
+            property.IsNullable || !property.Symbol.Type.IsValueType;
+
         if (requiresNullCheck)
         {
             builder.AppendBlock(
@@ -156,21 +192,21 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
                     ? $$"""
                       if ({{nodeAccessExpression}} is null)
                       {
-                          {{builderVariableName}}.AddProperty("{{displayName}}", [], {{nodeAccessExpression}});
+                          {{builderVariableName}}.AddProperty("{{displayName}}", {{hintsExpression}}, {{nodeAccessExpression}});
                       }
                       else
                       {
-                          {{builderVariableName}}.AddCollection("{{displayName}}", [], {{collectionBuilderName}} =>
+                          {{builderVariableName}}.AddCollection("{{displayName}}", {{hintsExpression}}, {{collectionBuilderName}} =>
                           {
                       """
                     : $$"""
                       if ({{nodeAccessExpression}} is null)
                       {
-                          {{builderVariableName}}.AddItem([], {{nodeAccessExpression}});
+                          {{builderVariableName}}.AddItem({{hintsExpression}}, {{nodeAccessExpression}});
                       }
                       else
                       {
-                          {{builderVariableName}}.AddCollectionItem([], {{collectionBuilderName}} =>
+                          {{builderVariableName}}.AddCollectionItem({{hintsExpression}}, {{collectionBuilderName}} =>
                           {
                       """);
         }
@@ -179,16 +215,18 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
             builder.AppendBlock(
                 isProperty
                     ? $$"""
-                      {{builderVariableName}}.AddCollection("{{displayName}}", [], {{collectionBuilderName}} =>
+                      {{builderVariableName}}.AddCollection("{{displayName}}", {{hintsExpression}}, {{collectionBuilderName}} =>
                       {
                       """
                     : $$"""
-                      {{builderVariableName}}.AddCollectionItem([], {{collectionBuilderName}} =>
+                      {{builderVariableName}}.AddCollectionItem({{hintsExpression}}, {{collectionBuilderName}} =>
                       {
                       """);
         }
 
-        IndentedStringBuilder loopBuilder = builder.IncreaseIndent(requiresNullCheck ? 2 : 1);
+        IndentedStringBuilder loopBuilder =
+            builder.IncreaseIndent(requiresNullCheck ? 2 : 1);
+
         loopBuilder.AppendBlock(
             $$"""
             foreach ({{collection.ElementNullableTypeName}} {{elementName}} in {{nodeAccessExpression}})
@@ -196,44 +234,21 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
             """);
 
         IndentedStringBuilder elementBody = loopBuilder.IncreaseIndent();
-        if (collection.IsElementValidatableType && !collection.ElementChildren.IsDefaultOrEmpty)
+
+        if (collection.IsElementValidatableType
+            && !collection.ElementChildren.IsDefaultOrEmpty)
         {
-            string elementBuilderName =
-                SymbolNameGenerator.MakeCamelCase($"{property.Name}ElementDescriptionBuilder");
-
-            elementBody.AppendBlock(
-                $$"""
-                if ({{elementName}} is null)
-                {
-                    {{collectionBuilderName}}.AddItem([], {{elementName}});
-                }
-                else
-                {
-                    {{collectionBuilderName}}.AddObjectItem([], {{elementBuilderName}} =>
-                    {
-                """);
-
-            IndentedStringBuilder objectBody = elementBody.IncreaseIndent(2);
-            foreach (PropertyModel child in collection.ElementChildren)
-            {
-                AppendNode(
-                    objectBody,
-                    child,
-                    elementBuilderName,
-                    $"{elementName}.{child.Name}",
-                    child.Name,
-                    isProperty: true);
-            }
-
-            elementBody.AppendBlock(
-                """
-                        });
-                    }
-                """);
+            AppendCollectionObjectElement(
+                elementBody,
+                collection,
+                collectionBuilderName,
+                elementName,
+                symbolPath);
         }
         else
         {
-            elementBody.AppendLine($"{collectionBuilderName}.AddItem([], {elementName});");
+            elementBody.AppendLine(
+                $"{collectionBuilderName}.AddItem([], {elementName});");
         }
 
         loopBuilder.AppendLine("}");
@@ -248,4 +263,105 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
                   });
                   """);
     }
+
+    private void AppendCollectionObjectElement(
+        IndentedStringBuilder builder,
+        CollectionModel collection,
+        string collectionBuilderName,
+        string elementName,
+        string symbolPath)
+    {
+        string elementBuilderName = CreateSymbolName(
+            $"{symbolPath}_element_description_builder");
+
+        if (collection.ElementRequiresNullCheck)
+        {
+            builder.AppendBlock(
+                $$"""
+                if ({{elementName}} is null)
+                {
+                    {{collectionBuilderName}}.AddItem([], {{elementName}});
+                }
+                else
+                {
+                    {{collectionBuilderName}}.AddObjectItem([], {{elementBuilderName}} =>
+                    {
+                """);
+
+            AppendCollectionElementProperties(
+                builder.IncreaseIndent(2),
+                collection,
+                elementBuilderName,
+                elementName,
+                symbolPath);
+
+            builder.AppendBlock(
+                """
+                        });
+                    }
+                """);
+        }
+        else
+        {
+            builder.AppendBlock(
+                $$"""
+                {{collectionBuilderName}}.AddObjectItem([], {{elementBuilderName}} =>
+                {
+                """);
+
+            AppendCollectionElementProperties(
+                builder.IncreaseIndent(),
+                collection,
+                elementBuilderName,
+                elementName,
+                symbolPath);
+
+            builder.AppendLine("});");
+        }
+    }
+
+    private void AppendCollectionElementProperties(
+        IndentedStringBuilder builder,
+        CollectionModel collection,
+        string elementBuilderName,
+        string elementName,
+        string symbolPath)
+    {
+        foreach (PropertyModel child in collection.ElementChildren)
+        {
+            AppendNode(
+                builder,
+                child,
+                elementBuilderName,
+                $"{elementName}.{child.Name}",
+                child.Name,
+                $"{symbolPath}_element_{child.Name}",
+                isProperty: true);
+        }
+    }
+
+    private string CreateHintsExpression(PropertyModel property)
+    {
+        List<string> hints = [];
+        foreach (PropertyValidationAspect aspect in property.Aspects)
+        {
+            aspect.RegisterDescriptorHints(
+                hints,
+                diagnosticsReporter,
+                property);
+        }
+
+        return hints.Count == 0
+            ? "[]"
+            : $"[{string.Join(", ", hints.Select(static hint => ToStringLiteral(hint)))}]";
+    }
+
+    private static string CreateSymbolName(string path)
+        => SymbolNameGenerator.MakeCamelCase(path);
+
+    private static string ToStringLiteral(string value)
+        => $"\"{value.Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("\"", "\\\"", StringComparison.Ordinal)
+            .Replace("\r", "\\r", StringComparison.Ordinal)
+            .Replace("\n", "\\n", StringComparison.Ordinal)}\"";
 }

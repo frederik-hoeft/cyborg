@@ -24,10 +24,20 @@ internal static class ModuleValidationRenderer
     {
         ReadOnlySpan<ISectionRenderer> renderPipeline =
         [
-            new DefaultsSectionRenderer(contractInfo, MODULE_VARIABLE, diagnosticsReporter),
-            new OverrideSectionRenderer(contractInfo, MODULE_VARIABLE, diagnosticsReporter),
-            new ValidationSectionRenderer(contractInfo, diagnosticsReporter),
-            new InspectionSectionRenderer(contractInfo),
+            new DefaultsSectionRenderer(
+                contractInfo,
+                MODULE_VARIABLE,
+                diagnosticsReporter),
+            new OverrideSectionRenderer(
+                contractInfo,
+                MODULE_VARIABLE,
+                diagnosticsReporter),
+            new ValidationSectionRenderer(
+                contractInfo,
+                diagnosticsReporter),
+            new InspectionSectionRenderer(
+                contractInfo,
+                diagnosticsReporter),
         ];
 
         StringBuilder builder = new();
@@ -36,7 +46,9 @@ internal static class ModuleValidationRenderer
 
         if (!string.IsNullOrWhiteSpace(model.Namespace))
         {
-            builder.Append("namespace ").Append(model.Namespace).AppendLine(";");
+            builder.Append("namespace ")
+                .Append(model.Namespace)
+                .AppendLine(";");
             builder.AppendLine();
         }
 
@@ -46,28 +58,37 @@ internal static class ModuleValidationRenderer
             builder.AppendLine("{");
         }
 
-        builder.Append("partial record ").Append(model.TypeName)
+        builder.Append("partial record ")
+            .Append(model.TypeName)
             .Append(" : ")
             .Append(contractInfo.IModuleT.RenderGlobalWithGenerics(model.TypeName))
             .Append(", ")
             .Append(contractInfo.IInspectable.RenderGlobal())
             .AppendLine();
         builder.AppendLine("{");
-        IndentedStringBuilder indentedBuilder = new(builder, indentLevel: 1);
-        for (int i = 0; i < renderPipeline.Length; ++i)
+
+        IndentedStringBuilder indentedBuilder =
+            new(builder, indentLevel: 1);
+
+        for (int index = 0; index < renderPipeline.Length; index++)
         {
-            if (i > 0)
+            if (index > 0)
             {
                 builder.AppendLine();
             }
-            renderPipeline[i].RenderSection(indentedBuilder, model);
+
+            renderPipeline[index].RenderSection(indentedBuilder, model);
         }
+
         builder.AppendLine("}");
 
-        for (int index = model.ContainingTypes.Length - 1; index >= 0; --index)
+        for (int index = model.ContainingTypes.Length - 1;
+            index >= 0;
+            index--)
         {
             builder.AppendLine("}");
         }
+
         builder.AppendLine();
         builder.AppendLine(
             $$"""

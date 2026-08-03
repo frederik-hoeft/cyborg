@@ -1,0 +1,23 @@
+using System.Collections.Immutable;
+
+namespace Cyborg.Core.Modules.Descriptors.Model;
+
+public interface IDescriptionComponentFactory
+{
+    IDescriptionPropertyComponent CreateProperty(
+        string name,
+        IDescriptionValueComponent value,
+        ImmutableArray<string> hints);
+
+    IDescriptionValueComponent CreateValue<T>(
+        T value,
+        ImmutableArray<string> hints);
+
+    IDescriptionObjectComponent CreateObject(
+        ImmutableArray<IDescriptionPropertyComponent> properties,
+        ImmutableArray<string> hints);
+
+    IDescriptionCollectionComponent CreateCollection(
+        ImmutableArray<IDescriptionValueComponent> items,
+        ImmutableArray<string> hints);
+}
