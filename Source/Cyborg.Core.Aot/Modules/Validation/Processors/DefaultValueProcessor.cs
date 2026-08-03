@@ -5,7 +5,7 @@ using System.Collections.Immutable;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal sealed class DefaultValueAttributeProcessor : AttributeProcessorBase
+internal sealed class DefaultValueProcessor : AttributeProcessorBase
 {
     public override string AttributeMetadataName => typeof(DefaultValueAttribute<>).FullName;
 

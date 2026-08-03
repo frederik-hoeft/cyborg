@@ -65,13 +65,6 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
             }
         }
 
-        if (value is string stringValue)
-        {
-            // Handle indirection via string variables
-            string resolvedString = Interpolate(stringValue, entryPoint);
-            value = Unsafe.As<string, T>(ref resolvedString);
-        }
-
         return value;
     }
 
@@ -120,11 +113,11 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(moduleId);
 
-        if (!string.IsNullOrEmpty(name))
+        if (SyntaxFactory.IsValidIdentifier(name))
         {
             yield return name;
         }
-        if (!string.IsNullOrEmpty(group))
+        if (SyntaxFactory.IsValidIdentifier(group))
         {
             yield return group;
         }

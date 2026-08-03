@@ -69,4 +69,9 @@ internal sealed record PropertyModel
     public bool HasCollectionElementChildren => Collection is not null
         && Collection.IsElementValidatableType
         && !Collection.ElementChildren.IsDefaultOrEmpty;
+
+    public bool HasCollectionElementValidationAspects => HasAspect<CollectionElementValidationAspect>();
+
+    public bool HasCollectionValidationWork => Collection is not null
+        && (HasCollectionElementChildren || HasCollectionElementValidationAspects);
 }

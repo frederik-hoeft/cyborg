@@ -1,23 +1,24 @@
 ﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Microsoft.CodeAnalysis;
 using System.Globalization;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal abstract class LengthAttributeProcessorBase<TAttribute> : AttributeProcessorBase<TAttribute> where TAttribute : Attribute
+internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValidationProcessorBase<TAttribute> where TAttribute : PropertyValidationAttribute
 {
-    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
+    protected override bool TryProcessValidation(AttributeData attribute, ref readonly PropertyProcessingContext context, ref readonly PropertyValidationTarget target, out PropertyValidationAspect? aspect)
     {
         aspect = null;
 
-        LengthTargetKind targetKind = GetTargetKind(context.Property.Type, out INamedTypeSymbol? collectionInterface);
+        LengthTargetKind targetKind = GetTargetKind(target.Type, out INamedTypeSymbol? collectionInterface);
         if (targetKind == LengthTargetKind.None)
         {
             context.Report(
                 ValidationGeneratorDiagnostics.UnsupportedLengthTargetType,
                 context.Property.Name,
                 context.ContainingType.Name,
-                context.Property.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat));
+                target.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat));
 
             return false;
         }
@@ -29,8 +30,7 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : AttributeProc
 
         if (min is < 0)
         {
-            context.Report(
-                ValidationGeneratorDiagnostics.LengthArgumentMustBeNonNegative,
+            context.Report(ValidationGeneratorDiagnostics.LengthArgumentMustBeNonNegative,
                 context.Property.Name,
                 context.ContainingType.Name,
                 "Min",
@@ -41,8 +41,7 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : AttributeProc
 
         if (max is < 0)
         {
-            context.Report(
-                ValidationGeneratorDiagnostics.LengthArgumentMustBeNonNegative,
+            context.Report(ValidationGeneratorDiagnostics.LengthArgumentMustBeNonNegative,
                 context.Property.Name,
                 context.ContainingType.Name,
                 "Max",
@@ -53,8 +52,7 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : AttributeProc
 
         if (min is not null && max is not null && min > max)
         {
-            context.Report(
-                ValidationGeneratorDiagnostics.InvalidRangeBounds,
+            context.Report(ValidationGeneratorDiagnostics.InvalidRangeBounds,
                 context.Property.Name,
                 context.ContainingType.Name,
                 min.Value.ToString(CultureInfo.InvariantCulture),
@@ -66,9 +64,9 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : AttributeProc
         aspect = new LengthValidationAspect(
             targetKind,
             collectionInterface,
-            min?.ToString(CultureInfo.InvariantCulture),
-            max?.ToString(CultureInfo.InvariantCulture),
-            requiresNullGuard: RequiresNullGuard(context.Property.Type));
+            minExpression: min?.ToString(CultureInfo.InvariantCulture),
+            maxExpression: max?.ToString(CultureInfo.InvariantCulture),
+            requiresNullGuard: RequiresNullGuard(target.Type));
 
         return true;
     }
@@ -136,9 +134,23 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : AttributeProc
         string? minExpression,
         string? maxExpression,
         bool requiresNullGuard
-    ) : PropertyAspect
+    ) : PropertyValidationAspect
     {
         protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
+        {
+            if (requiresNullGuard)
+            {
+                builder.AppendLine($"if ({model.AccessExpression} is not null)");
+                builder.AppendLine("{");
+                EmitLengthValidation(builder.IncreaseIndent(), model);
+                builder.AppendLine("}");
+                return;
+            }
+
+            EmitLengthValidation(builder, model);
+        }
+
+        private void EmitLengthValidation(IndentedStringBuilder builder, ModulePropertyModel model)
         {
             string accessExpression;
             if (collectionInterface is null)
@@ -157,20 +169,13 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : AttributeProc
                 _ => throw new InvalidOperationException("Unsupported length target kind.")
             };
 
-            if (requiresNullGuard)
-            {
-                builder.AppendLine($"if ({model.AccessExpression} is not null)");
-                builder.AppendLine("{");
-                builder = builder.IncreaseIndent();
-            }
-
             if (minExpression is not null)
             {
                 builder.AppendBlock(
                 $$"""
                 if ({{sizeExpression}} < {{minExpression}})
                 {
-                    errors.Add({{CreateValidationError(model, "length", $"Property '{{nameof({model.AccessExpression})}}' must have a length/count not smaller than configured minimum '{minExpression}', was '{{{sizeExpression}}}'.")}});
+                    errors.Add({{CreateValidationError(model, "length", $"{model.TargetDescription} '{{{model.PropertyNameExpression}}}' must have a length/count not smaller than configured minimum '{minExpression}', was '{{{sizeExpression}}}'.")}});
                 }
                 """);
             }
@@ -181,15 +186,9 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : AttributeProc
                 $$"""
                 if ({{sizeExpression}} > {{maxExpression}})
                 {
-                    errors.Add({{CreateValidationError(model, "length", $"Property '{{nameof({model.AccessExpression})}}' must have a length/count not greater than configured maximum '{maxExpression}', was '{{{sizeExpression}}}'.")}});
+                    errors.Add({{CreateValidationError(model, "length", $"{model.TargetDescription} '{{{model.PropertyNameExpression}}}' must have a length/count not greater than configured maximum '{maxExpression}', was '{{{sizeExpression}}}'.")}});
                 }
                 """);
-            }
-
-            if (requiresNullGuard)
-            {
-                builder = builder.DecreaseIndent();
-                builder.AppendLine("}");
             }
         }
     }

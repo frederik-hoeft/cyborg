@@ -5,7 +5,7 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal sealed class DefinedEnumValueAttributeProcessor : AttributeProcessorBase<DefinedEnumValueAttribute>
+internal sealed class DefinedEnumValueProcessor : AttributeProcessorBase<DefinedEnumValueAttribute>
 {
     public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {

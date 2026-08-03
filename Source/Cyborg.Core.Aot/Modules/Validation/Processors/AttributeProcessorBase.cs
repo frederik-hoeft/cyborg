@@ -108,6 +108,36 @@ internal abstract class AttributeProcessorBase : IPropertyAttributeProcessor
         return true;
     }
 
+    protected bool TryGetNamedArgumentValue<T>(AttributeData attribute, string argumentName, ref readonly PropertyProcessingContext context, [NotNullWhen(true)] out T? value)
+    {
+        if (TryGetNamedArgument(attribute, argumentName, out TypedConstant? namedArgumentValue))
+        {
+            if (namedArgumentValue.Value.Value is T typedValue)
+            {
+                value = typedValue;
+                return true;
+            }
+            context.Report(ValidationGeneratorDiagnostics.UnsupportedAttributeLiteral,
+                context.Property.Name,
+                context.ContainingType.Name,
+                GetAttributeFriendlyName(attribute));
+        }
+        return false.WithDefaults(out value);
+    }
+
+    protected bool TryGetNamedArgument(AttributeData attribute, string argumentName, [NotNullWhen(true)] out TypedConstant? value)
+    {
+        foreach (KeyValuePair<string, TypedConstant> namedArgument in attribute.NamedArguments)
+        {
+            if (namedArgument.Key.Equals(argumentName, StringComparison.InvariantCulture))
+            {
+                value = namedArgument.Value;
+                return true;
+            }
+        }
+        return false.WithDefaults(out value);
+    }
+
     protected bool ValidatePropertyType(AttributeData attribute, ref readonly PropertyProcessingContext context, SpecialType expectedType)
     {
         if (expectedType is SpecialType.None)
@@ -117,8 +147,7 @@ internal abstract class AttributeProcessorBase : IPropertyAttributeProcessor
 
         if (context.Property.Type.SpecialType != expectedType)
         {
-            context.Report(
-                ValidationGeneratorDiagnostics.TypeMismatch,
+            context.Report(ValidationGeneratorDiagnostics.TypeMismatch,
                 context.Property.Name,
                 context.ContainingType.Name,
                 GetAttributeFriendlyName(attribute),

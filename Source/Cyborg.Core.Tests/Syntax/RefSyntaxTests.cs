@@ -7,7 +7,7 @@ namespace Cyborg.Core.Tests.Syntax;
 public sealed class RefSyntaxTests
 {
     [TestMethod]
-    public void Ref_FromSelf_RendersExpectedReference()
+    public void Test_Ref_FromSelf_RendersExpectedReference()
     {
         VariableSyntaxBuilder builder = CreateBuilder();
 
@@ -17,7 +17,7 @@ public sealed class RefSyntaxTests
     }
 
     [TestMethod]
-    public void Ref_Member_AppendsOutsideInterpolationDelimiters()
+    public void Test_Ref_Member_AppendsOutsideInterpolationDelimiters()
     {
         VariableSyntaxBuilder builder = CreateBuilder();
 
@@ -27,7 +27,7 @@ public sealed class RefSyntaxTests
     }
 
     [TestMethod]
-    public void Ref_ChildPath_AppendsOutsideInterpolationDelimiters()
+    public void Test_Ref_ChildPath_AppendsOutsideInterpolationDelimiters()
     {
         VariableSyntaxBuilder builder = CreateBuilder();
 
@@ -37,7 +37,7 @@ public sealed class RefSyntaxTests
     }
 
     [TestMethod]
-    public void Ref_Property_UsesNamingPolicy()
+    public void Test_Ref_Property_UsesNamingPolicy()
     {
         VariableSyntaxBuilder builder = CreateBuilder();
         TestModel model = new(ResultValue: true);

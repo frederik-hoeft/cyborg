@@ -1,6 +1,6 @@
 # Validation Attributes Reference
 
-This document provides a complete reference for the validation, defaulting, and override control attributes used by the Cyborg source generators. These attributes are declared in `Cyborg.Core.Aot` and emitted into consuming compilations. They are applied to properties on module records (marked with `[GeneratedModuleValidation]`) and on nested records (marked with `[Validatable]`).
+This document provides a complete reference for the validation, defaulting, override-control, and interpolation-control attributes used by the Cyborg source generators. These attributes are declared in `Cyborg.Core.Aot` and emitted into consuming compilations. They are applied to properties on module records (marked with `[GeneratedModuleValidation]`) and on nested records (marked with `[Validatable]`).
 
 For how these attributes are processed by the source generators, see [Source Generators](source-generators.md). For the runtime systems that consume the generated validation pipeline, see [Architecture Overview](architecture-overview.md#validation-pipeline).
 
@@ -16,12 +16,14 @@ For how these attributes are processed by the source generators, see [Source Gen
   - [GeneratedModuleLoaderFactory](#generatedmoduleloaderfactory)
   - [GeneratedDecomposition](#generateddecomposition)
 - [Validation Attributes](#validation-attributes)
+  - [Collection Element Targeting](#collection-element-targeting)
   - [Required](#required)
   - [Range](#range)
   - [MinLength](#minlength)
   - [MaxLength](#maxlength)
   - [ExactLength](#exactlength)
   - [Length](#length)
+  - [VariableIdentifier](#variableidentifier)
   - [MatchesRegex](#matchesregex)
   - [MatchesGrammar](#matchesgrammar)
   - [FileExists](#fileexists)
@@ -36,8 +38,9 @@ For how these attributes are processed by the source generators, see [Source Gen
   - [DefaultInstance](#defaultinstance)
   - [DefaultInstanceFactory](#defaultinstancefactory)
   - [DefaultTimeSpan](#defaulttimespan)
-- [Override Control Attributes](#override-control-attributes)
-  - [IgnoreOverrides](#ignoreoverrides)
+- [Override and Interpolation Control Attributes](#override-and-interpolation-control-attributes)
+  - [IgnoreOverride](#ignoreoverride)
+  - [IgnoreInterpolation](#ignoreinterpolation)
 - [Decomposition Attributes](#decomposition-attributes)
   - [DecomposeIgnore](#decomposeignore)
 
@@ -50,13 +53,13 @@ These attributes trigger source generation on the annotated type. They are not a
 
 ### GeneratedModuleValidation
 
-Triggers the validation generator on a module record. The target must be a `partial record`. The generator emits implementations of `ApplyDefaultsAsync`, `ResolveOverridesAsync`, and `ValidateAsync` based on the attributes applied to the record's properties.
+Triggers the validation generator on a module record. The target must be a `partial record`. The generator emits `ApplyDefaultsAsync`, `ResolveOverridesAsync`, the private `__ApplyInterpolation` helper, and `ValidateAsync` based on the attributes applied to the record's properties.
 
 **Target:** `class` (record)
 
 ### Validatable
 
-Marks a nested record type for recursive validation. When a property on a `[GeneratedModuleValidation]` record has a type marked `[Validatable]`, the generated pipeline applies defaults, overrides, and validation recursively to that nested record's properties.
+Marks a nested record type for recursive validation. When a property on a `[GeneratedModuleValidation]` record has a type marked `[Validatable]`, the generated pipeline applies defaults, overrides, interpolation, and validation recursively to that nested record's properties.
 
 **Target:** `class` (record)
 
@@ -82,15 +85,33 @@ Triggers the decomposition generator on a record or class. The generator emits a
 
 ## Validation Attributes
 
-These attributes declare constraints that are checked during the `ValidateAsync` stage of the generated pipeline. If a constraint is violated, a `ValidationError` is added to the result. All validation attributes target properties.
+These attributes declare constraints that are checked during the `ValidateAsync` stage of the generated pipeline. If a constraint is violated, a `ValidationError` is added to the result. All validation attributes are applied to properties; selected attributes can redirect their constraint to each immediate element of a collection property.
+
+### Collection Element Targeting
+
+`Required`, `MinLength`, `MaxLength`, `ExactLength`, `Length`, and `VariableIdentifier` derive from `PropertyValidationAttribute` and expose the following named property:
+
+- `TargetsElements` (optional, default `false`) — When `false`, validates the annotated property. When `true`, validates each immediate element of a supported collection property instead.
+
+Element-targeted validation runs after defaults, overrides, and interpolation, so constraints observe the same final values as ordinary property validation. The containing collection is not constrained by an element-targeted attribute. Null reference collections, absent nullable value-type collections, and default `ImmutableArray<T>` values are not enumerated.
+
+The supporting attributes allow multiple applications, so a collection and its elements can be constrained independently:
+
+```csharp
+[Required]
+[Required(TargetsElements = true)]
+IReadOnlyCollection<string?>? Values
+```
+
+In this example, the first attribute rejects a null collection while the second rejects null or whitespace elements. Attribute-specific type requirements are evaluated against the element type when `TargetsElements` is enabled; for example, `[VariableIdentifier(TargetsElements = true)]` requires a collection of strings. Applying `TargetsElements` to a non-collection property, or to an incompatible element type, produces a source-generator diagnostic. Targeting is limited to the immediate elements of the annotated collection; it does not recursively apply the same attribute to deeper collection layers.
 
 ### Required
 
-Validates that the property has a meaningful value. For strings, checks that the value is not null or whitespace. For other types, checks that the value is not equal to its type's default (e.g., `0` for integers, `null` for reference types).
+Validates that the property has a meaningful value. For strings, checks that the value is not null or whitespace. For other types, checks that the value is not equal to its type's default (e.g., `0` for integers, `null` for reference types, or a default `ImmutableArray<T>`). An initialized empty collection is distinct from a default immutable array and requires a length constraint when emptiness itself is invalid.
 
 ### Range
 
-Validates that a comparable property value falls within specified bounds. Either or both bounds may be specified.
+Validates that a comparable property value falls within specified bounds. At least one bound must be specified; either bound may be omitted.
 
 **Parameters:**
 
@@ -132,6 +153,14 @@ Validates that a string or collection property length falls within a range. Comb
 - `Min` — Minimum length, inclusive.
 - `Max` — Maximum length, inclusive.
 
+### VariableIdentifier
+
+Validates that a string conforms to the canonical environment variable-identifier grammar used by `IRuntimeEnvironment.SyntaxFactory.IsValidIdentifier`. An identifier starts with an ASCII letter, underscore, or hyphen. Subsequent characters may be ASCII letters, digits, underscores, or hyphens; periods may separate non-empty suffixes. Empty segments, consecutive periods, and trailing periods are invalid. See [Architecture Overview -- Variable Name Syntax](architecture-overview.md#variable-name-syntax) for the complete variable and interpolation grammar.
+
+Null values are ignored by this constraint; combine it with `[Required]` when null must also be rejected. Because validation follows interpolation, the final interpolated value is checked rather than the original placeholder expression.
+
+**Applies to:** `string` properties, or immediate `string` collection elements when `TargetsElements = true`.
+
 ### MatchesRegex
 
 Validates that a string property matches a regular expression. The regex is referenced by member name — the attribute points to a static property or field on the containing type that provides the `Regex` instance.
@@ -158,25 +187,25 @@ Validates that the string property contains a path to an existing directory. Che
 
 ### FileName
 
-Validates that a string property contains a valid file name: non-empty, not `.` or `..`, and containing no characters in `Path.GetInvalidFileNameChars()`.
+Validates that a string contains a valid file name: it must be non-empty, must not be `.` or `..`, and must not contain characters returned by `Path.GetInvalidFileNameChars()`.
 
 **Applies to:** `string` properties only.
 
 ### RootedPath
 
-Validates that a string property contains a rooted (absolute) path. Uses `Path.IsPathRooted` semantics.
+Validates that a string contains a rooted (absolute) path according to `Path.IsPathRooted`.
 
 **Applies to:** `string` properties only.
 
 ### UnrootedPath
 
-Validates that a string property contains an unrooted (relative) path — i.e., that `Path.IsPathRooted` returns `false`.
+Validates that a string contains an unrooted (relative) path according to `Path.IsPathRooted`.
 
 **Applies to:** `string` properties only.
 
 ### NormalizedPath
 
-Validates that a string property contains a normalized path — one where no segment is `.` or `..` and there are no consecutive directory separators (empty segments). Works on both absolute and relative paths without resolving against the current working directory.
+Validates that a string contains a normalized path: no segment may be `.` or `..`, and consecutive directory separators may not create empty segments. The check does not resolve the path against the current working directory.
 
 **Applies to:** `string` properties only.
 
@@ -187,7 +216,7 @@ Validates that an enum property contains a defined value (i.e., not a raw intege
 
 ## Default Value Attributes
 
-These attributes declare default values applied during the `ApplyDefaultsAsync` stage. Defaults are applied when a property has a null value (for reference types) or a type-default value (for value types). Default application occurs recursively on nested `[Validatable]` records and collection elements.
+These attributes declare default values applied during the `ApplyDefaultsAsync` stage. Defaults are applied when a property has a null value (for reference types) or a type-default value (for value types). Default application occurs recursively on nested `[Validatable]` records and supported collection elements. Null collections, absent nullable value-type collections, and default immutable arrays are not enumerated; a default `ImmutableArray<T>` is preserved unless an explicit property default replaces it.
 
 ### DefaultValue
 
@@ -214,20 +243,32 @@ Provides a default by calling a named static factory method on the containing mo
 
 ### DefaultTimeSpan
 
-Provides a default `TimeSpan` value parsed from a string at compile time. The string must be in a format accepted by `TimeSpan.Parse` with invariant culture.
+Provides a default `TimeSpan` value parsed from a string at compile time. The string must use the invariant constant (`c`) format accepted by `TimeSpan.ParseExact`.
 
 **Parameters:**
 
 - `TimeSpan` — String representation of the default duration (e.g., `"00:30:00"` for 30 minutes).
 
 
-## Override Control Attributes
+## Override and Interpolation Control Attributes
 
-### IgnoreOverrides
+### IgnoreOverride
 
-Prevents the override resolution system from applying environment-driven overrides to the annotated property. The property retains its deserialized or defaulted value regardless of any matching override keys in the environment.
+Prevents environment-driven override resolution for the annotated property.
 
-This is typically applied to structural properties (such as `Name`, `Group`, or `Artifacts`) that should not be overridden at runtime, or to properties whose types are not compatible with the string-based override resolution mechanism.
+**Parameters:**
+
+- `recurse` (optional constructor argument, default `false`) — When `false`, only the annotated property itself ignores override resolution while eligible nested properties may still be processed. When `true`, the complete annotated subtree ignores overrides.
+
+`ModuleBase.Name` and `ModuleBase.Group` use this attribute because environment binding consumes their structural identity before validation begins.
+
+### IgnoreInterpolation
+
+Prevents the generated interpolation phase from calling `runtime.Environment.Interpolate(...)` for the annotated string property. The raw string is preserved so a worker can interpolate it later, after context-specific variables or child artifacts exist.
+
+**Applies to:** `string` properties only.
+
+This is used by `AssertModule.Message`, whose placeholders may refer to artifacts produced by the assertion module and therefore cannot be resolved during pre-execution validation. `ModuleBase.Name` and `ModuleBase.Group` also opt out because they define the environment namespace before interpolation runs.
 
 
 ## Decomposition Attributes

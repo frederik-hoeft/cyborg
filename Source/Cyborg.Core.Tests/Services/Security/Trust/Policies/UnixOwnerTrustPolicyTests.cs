@@ -1,6 +1,5 @@
 ﻿using Cyborg.Core.Services.Security.Trust;
 using Cyborg.Core.Services.Security.Trust.Policies;
-using System.Collections.Immutable;
 using System.Runtime.InteropServices;
 
 namespace Cyborg.Core.Tests.Services.Security.Trust.Policies;
@@ -8,6 +7,8 @@ namespace Cyborg.Core.Tests.Services.Security.Trust.Policies;
 [TestClass]
 public sealed class UnixOwnerTrustPolicyTests
 {
+    public TestContext TestContext { get; set; }
+
     [TestMethod]
     public async Task EvaluateAsync_AcceptsFileOwnedByAllowedUserOrGroup_OnLinuxAsync()
     {
@@ -27,9 +28,9 @@ public sealed class UnixOwnerTrustPolicyTests
             Assert.IsNotNull(userName);
             Assert.IsNotNull(groupName);
 
-            UnixOwnerTrustPolicy policy = new(ImmutableArray.Create(userName), ImmutableArray.Create(groupName));
+            UnixOwnerTrustPolicy policy = new(AllowedUsers: [userName], AllowedGroups: [groupName]);
 
-            ConfigurationTrustPolicyDecision decision = await policy.EvaluateAsync(new NullServiceProvider(), new ConfigurationTrustSubject(path));
+            ConfigurationTrustPolicyDecision decision = await policy.EvaluateAsync(new NullServiceProvider(), new ConfigurationTrustSubject(path), TestContext.CancellationToken);
 
             Assert.AreEqual(ConfigurationTrustDecisionKind.Accept, decision.Decision);
         }
@@ -48,9 +49,9 @@ public sealed class UnixOwnerTrustPolicyTests
         }
 
         string path = Path.Combine(Path.GetTempPath(), $"missing-{Guid.NewGuid():N}");
-        UnixOwnerTrustPolicy policy = new(ImmutableArray.Create("root"), ImmutableArray.Create("root"));
+        UnixOwnerTrustPolicy policy = new(["root"], ["root"]);
 
-        ConfigurationTrustPolicyDecision decision = await policy.EvaluateAsync(new NullServiceProvider(), new ConfigurationTrustSubject(path));
+        ConfigurationTrustPolicyDecision decision = await policy.EvaluateAsync(new NullServiceProvider(), new ConfigurationTrustSubject(path), TestContext.CancellationToken);
 
         Assert.AreEqual(ConfigurationTrustDecisionKind.Reject, decision.Decision);
         Assert.AreEqual("Unable to retrieve file owner information.", decision.Reason);
@@ -59,9 +60,9 @@ public sealed class UnixOwnerTrustPolicyTests
     [TestMethod]
     public async Task EvaluateAsync_AbstainsWhenAllowedListsAreEmptyAsync()
     {
-        UnixOwnerTrustPolicy policy = new(ImmutableArray<string>.Empty, ImmutableArray<string>.Empty);
+        UnixOwnerTrustPolicy policy = new(AllowedUsers: [], AllowedGroups: []);
 
-        ConfigurationTrustPolicyDecision decision = await policy.EvaluateAsync(new NullServiceProvider(), new ConfigurationTrustSubject("/tmp/unused"));
+        ConfigurationTrustPolicyDecision decision = await policy.EvaluateAsync(new NullServiceProvider(), new ConfigurationTrustSubject("/tmp/unused"), TestContext.CancellationToken);
 
         if (OperatingSystem.IsLinux() && RuntimeInformation.OSArchitecture == Architecture.X64)
         {

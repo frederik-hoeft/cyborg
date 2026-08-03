@@ -4,32 +4,31 @@ using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal sealed class RequiredAttributeProcessor : AttributeProcessorBase<RequiredAttribute>
+internal sealed class RequiredProcessor : PropertyValidationProcessorBase<RequiredAttribute>
 {
-    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
+    protected override bool TryProcessValidation(AttributeData attribute, ref readonly PropertyProcessingContext context, ref readonly PropertyValidationTarget target, out PropertyValidationAspect? aspect)
     {
         aspect = new RequiredValidationAspect();
         return true;
     }
 
-    private sealed class RequiredValidationAspect : PropertyAspect
+    private sealed class RequiredValidationAspect : PropertyValidationAspect
     {
         protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
         {
-            string comparer = KnownTypes.DefaultEqualityComparerOfT(model.Property.NullableTypeName);
-
-            if (model.Property.Symbol.Type.SpecialType is SpecialType.System_String)
+            if (model.TargetType.SpecialType is SpecialType.System_String)
             {
                 builder.AppendLine($"if (string.{nameof(string.IsNullOrWhiteSpace)}({model.AccessExpression}))");
             }
             else
             {
+                string comparer = KnownTypes.DefaultEqualityComparerOfT(model.TargetNullableTypeName);
                 builder.AppendLine($"if ({comparer}.Equals({model.AccessExpression}, default!))");
             }
             builder.AppendBlock(
             $$"""
             {
-                errors.Add({{CreateValidationError(model, "required", $"Property '{{nameof({model.AccessExpression})}}' is required.")}});
+                errors.Add({{CreateValidationError(model, "required", $"{model.TargetDescription} '{{{model.PropertyNameExpression}}}' is required.")}});
             }
             """);
         }
