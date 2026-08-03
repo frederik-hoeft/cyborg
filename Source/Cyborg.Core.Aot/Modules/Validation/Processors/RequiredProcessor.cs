@@ -6,11 +6,7 @@ namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
 internal sealed class RequiredProcessor : PropertyValidationProcessorBase<RequiredAttribute>
 {
-    protected override bool TryProcessValidation(
-        AttributeData attribute,
-        ref readonly PropertyProcessingContext context,
-        ref readonly PropertyValidationTarget target,
-        out PropertyValidationAspect? aspect)
+    protected override bool TryProcessValidation(AttributeData attribute, ref readonly PropertyProcessingContext context, ref readonly PropertyValidationTarget target, out PropertyValidationAspect? aspect)
     {
         aspect = new RequiredValidationAspect();
         return true;
@@ -20,14 +16,13 @@ internal sealed class RequiredProcessor : PropertyValidationProcessorBase<Requir
     {
         protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
         {
-            string comparer = KnownTypes.DefaultEqualityComparerOfT(model.TargetNullableTypeName);
-
             if (model.TargetType.SpecialType is SpecialType.System_String)
             {
                 builder.AppendLine($"if (string.{nameof(string.IsNullOrWhiteSpace)}({model.AccessExpression}))");
             }
             else
             {
+                string comparer = KnownTypes.DefaultEqualityComparerOfT(model.TargetNullableTypeName);
                 builder.AppendLine($"if ({comparer}.Equals({model.AccessExpression}, default!))");
             }
             builder.AppendBlock(

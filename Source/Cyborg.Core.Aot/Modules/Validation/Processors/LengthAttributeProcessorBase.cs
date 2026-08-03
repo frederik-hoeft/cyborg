@@ -7,11 +7,7 @@ namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
 internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValidationProcessorBase<TAttribute> where TAttribute : PropertyValidationAttribute
 {
-    protected override bool TryProcessValidation(
-        AttributeData attribute,
-        ref readonly PropertyProcessingContext context,
-        ref readonly PropertyValidationTarget target,
-        out PropertyValidationAspect? aspect)
+    protected override bool TryProcessValidation(AttributeData attribute, ref readonly PropertyProcessingContext context, ref readonly PropertyValidationTarget target, out PropertyValidationAspect? aspect)
     {
         aspect = null;
 
@@ -34,8 +30,7 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValid
 
         if (min is < 0)
         {
-            context.Report(
-                ValidationGeneratorDiagnostics.LengthArgumentMustBeNonNegative,
+            context.Report(ValidationGeneratorDiagnostics.LengthArgumentMustBeNonNegative,
                 context.Property.Name,
                 context.ContainingType.Name,
                 "Min",
@@ -46,8 +41,7 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValid
 
         if (max is < 0)
         {
-            context.Report(
-                ValidationGeneratorDiagnostics.LengthArgumentMustBeNonNegative,
+            context.Report(ValidationGeneratorDiagnostics.LengthArgumentMustBeNonNegative,
                 context.Property.Name,
                 context.ContainingType.Name,
                 "Max",
@@ -58,8 +52,7 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValid
 
         if (min is not null && max is not null && min > max)
         {
-            context.Report(
-                ValidationGeneratorDiagnostics.InvalidRangeBounds,
+            context.Report(ValidationGeneratorDiagnostics.InvalidRangeBounds,
                 context.Property.Name,
                 context.ContainingType.Name,
                 min.Value.ToString(CultureInfo.InvariantCulture),
@@ -71,8 +64,8 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValid
         aspect = new LengthValidationAspect(
             targetKind,
             collectionInterface,
-            min?.ToString(CultureInfo.InvariantCulture),
-            max?.ToString(CultureInfo.InvariantCulture),
+            minExpression: min?.ToString(CultureInfo.InvariantCulture),
+            maxExpression: max?.ToString(CultureInfo.InvariantCulture),
             requiresNullGuard: RequiresNullGuard(target.Type));
 
         return true;
