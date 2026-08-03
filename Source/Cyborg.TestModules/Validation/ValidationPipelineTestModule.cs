@@ -18,5 +18,9 @@ public sealed partial record ValidationPipelineTestModule
     IReadOnlyCollection<string?>? Tags
 ) : ModuleBase, IModule
 {
+    [Required]
+    [Required(TargetsElements = true)]
+    public IReadOnlyCollection<string?>? RequiredTags { get; init; } = [];
+
     public static string ModuleId => "cyborg.test-modules.validation-pipeline.v1";
 }
