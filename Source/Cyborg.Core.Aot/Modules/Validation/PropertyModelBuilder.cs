@@ -58,7 +58,7 @@ internal sealed class PropertyModelBuilder(GenerationCandidateFactory factory, L
             Symbol: property,
             Name: property.Name,
             NullableTypeName: property.Type.ToDisplayString(KnownSymbolFormats.Nullable),
-            NonNullableTypeName: nonNullableType.ToDisplayString(KnownSymbolFormats.NonNullable),
+            NonNullableTypeName: nonNullableType.ToDisplayString(KnownSymbolFormats.Nullable),
             IsNullable: isNullable,
             IsValidatableType: isValidatableType,
             Aspects: aspects,
@@ -94,7 +94,7 @@ internal sealed class PropertyModelBuilder(GenerationCandidateFactory factory, L
         return new CollectionModel(
             ElementType: descriptor.ElementType,
             ElementNullableTypeName: descriptor.ElementType.ToDisplayString(KnownSymbolFormats.Nullable),
-            ElementNonNullableTypeName: nonNullableElementType.ToDisplayString(KnownSymbolFormats.NonNullable),
+            ElementNonNullableTypeName: nonNullableElementType.ToDisplayString(KnownSymbolFormats.Nullable),
             IsElementNullable: isElementNullable,
             ElementRequiresNullCheck: descriptor.ElementType.IsReferenceType || isElementNullable,
             IsElementValidatableType: isElementValidatableType,
