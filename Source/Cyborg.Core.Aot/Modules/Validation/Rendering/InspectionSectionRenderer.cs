@@ -1,5 +1,6 @@
 ﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
+using Microsoft.CodeAnalysis.CSharp;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
 
@@ -353,15 +354,8 @@ internal sealed class InspectionSectionRenderer(
 
         return hints.Count == 0
             ? "[]"
-            : $"[{string.Join(", ", hints.Select(static hint => ToStringLiteral(hint)))}]";
+            : $"[{string.Join(", ", hints.Select(static hint => SymbolDisplay.FormatLiteral(hint, quote: false)))}]";
     }
 
-    private static string CreateSymbolName(string path)
-        => SymbolNameGenerator.MakeCamelCase(path);
-
-    private static string ToStringLiteral(string value)
-        => $"\"{value.Replace("\\", "\\\\", StringComparison.Ordinal)
-            .Replace("\"", "\\\"", StringComparison.Ordinal)
-            .Replace("\r", "\\r", StringComparison.Ordinal)
-            .Replace("\n", "\\n", StringComparison.Ordinal)}\"";
+    private static string CreateSymbolName(string path) => SymbolNameGenerator.MakeCamelCase(path);
 }

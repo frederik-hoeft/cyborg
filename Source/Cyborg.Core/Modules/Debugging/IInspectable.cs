@@ -1,4 +1,4 @@
-using Cyborg.Core.Aot.Contracts;
+﻿using Cyborg.Core.Aot.Contracts;
 using Cyborg.Core.Modules.Descriptors;
 
 namespace Cyborg.Core.Modules.Debugging;
@@ -8,8 +8,7 @@ namespace Cyborg.Core.Modules.Debugging;
 /// Implementations are source-generated for types annotated with
 /// <c>[GeneratedModuleValidation]</c>.
 /// </summary>
-[GeneratorContractRegistration<ModuleValidationGeneratorContract>(
-    ModuleValidationGeneratorContract.IInspectable)]
+[GeneratorContractRegistration<ModuleValidationGeneratorContract>(ModuleValidationGeneratorContract.IInspectable)]
 public interface IInspectable : IModuleDescriptor
 {
     /// <summary>

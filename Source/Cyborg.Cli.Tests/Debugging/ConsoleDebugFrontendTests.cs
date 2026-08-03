@@ -7,6 +7,7 @@ using Cyborg.Core.Modules.Runtime.Environments;
 using Microsoft.Extensions.Logging;
 using System.Text;
 using System.Text.Json;
+using Cyborg.Core.Aot.Modules.Validation;
 
 namespace Cyborg.Cli.Tests.Debugging;
 
@@ -121,19 +122,10 @@ public sealed class ConsoleDebugFrontendTests
             runtime,
             registry,
             requestStep: () => registry.Add(".*", isOneShot: true),
-            detach: () => registry.Clear());
+            detach: registry.Clear);
 
         DebugResumeAction action = await frontend.PauseAsync(context, TestContext.CancellationToken);
         return (action, outputBuilder.ToString(), registry);
-    }
-
-    private sealed record ProbeModule : ModuleBase, IModule, IInspectable
-    {
-        public static string ModuleId => "cyborg.tests.probe.v1";
-
-        public override string ToString() => ModuleIdentity.Format(ModuleId, Name, Group);
-
-        public string Inspect() => ToString() + Environment.NewLine + "  Payload: \"test\"";
     }
 
     private sealed class DebugPauseContextStub(IModule module, string moduleId, IModuleRuntime runtime, IBreakpointRegistry breakpoints, Action requestStep, Action detach) : IDebugPauseContext
@@ -154,4 +146,10 @@ public sealed class ConsoleDebugFrontendTests
 
         public void Detach() => detach();
     }
+}
+
+[GeneratedModuleValidation]
+internal sealed partial record ProbeModule : ModuleBase, IModule
+{
+    public static string ModuleId => "cyborg.tests.probe.v1";
 }

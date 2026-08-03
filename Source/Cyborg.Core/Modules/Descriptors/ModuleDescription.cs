@@ -1,3 +1,4 @@
+﻿using Cyborg.Core.Common.Text;
 using Cyborg.Core.Modules.Descriptors.Builders;
 using Cyborg.Core.Modules.Descriptors.Model;
 using Cyborg.Core.Modules.Descriptors.Writers;
@@ -22,7 +23,7 @@ public static class ModuleDescription
         IDescriptionObjectComponent description = Build(descriptor);
         StringBuilder builder = new();
         TextModuleDescriptionComponentWriter writer =
-            new(new Common.Text.IndentedStringBuilder(builder));
+            new(new IndentedStringBuilder(builder));
 
         description.AcceptAsync(writer, CancellationToken.None)
             .GetAwaiter()

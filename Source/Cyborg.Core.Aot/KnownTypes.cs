@@ -35,6 +35,8 @@ internal static class KnownTypes
 
     public static string File => $"global::System.IO.File";
 
+    public static string ArgumentNullException => field ??= $"global::{typeof(ArgumentNullException).FullName}";
+
     public static string Path => field ??= $"global::{typeof(Path).FullName}";
 
     public static string InvariantCulture => field ??= $"global::{typeof(CultureInfo).FullName}.{nameof(CultureInfo.InvariantCulture)}";
