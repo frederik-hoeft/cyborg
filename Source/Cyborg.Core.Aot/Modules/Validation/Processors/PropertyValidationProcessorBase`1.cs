@@ -8,7 +8,7 @@ internal abstract class PropertyValidationProcessorBase<TAttribute> : AttributeP
 {
     public sealed override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {
-        if (!TryGetCollectionModifier(attribute, in context, out bool targetsElements))
+        if (!TryGetNamedArgumentValue(attribute, nameof(PropertyValidationAttribute.TargetsElements), in context, out bool targetsElements))
         {
             return false.WithDefaults(out aspect);
         }
@@ -96,33 +96,6 @@ internal abstract class PropertyValidationProcessorBase<TAttribute> : AttributeP
         }
 
         target = new PropertyValidationTarget(descriptor.ElementType, IsCollectionElement: true);
-        return true;
-    }
-
-    private bool TryGetCollectionModifier(AttributeData attribute, ref readonly PropertyProcessingContext context, out bool targetsElements)
-    {
-        foreach (KeyValuePair<string, TypedConstant> namedArgument in attribute.NamedArguments)
-        {
-            if (namedArgument.Key != nameof(PropertyValidationAttribute.TargetsElements))
-            {
-                continue;
-            }
-            if (namedArgument.Value.Value is bool value)
-            {
-                targetsElements = value;
-                return true;
-            }
-
-            context.Report(
-                ValidationGeneratorDiagnostics.UnsupportedAttributeLiteral,
-                context.Property.Name,
-                context.ContainingType.Name,
-                GetAttributeFriendlyName(attribute));
-            targetsElements = false;
-            return false;
-        }
-
-        targetsElements = false;
         return true;
     }
 }
