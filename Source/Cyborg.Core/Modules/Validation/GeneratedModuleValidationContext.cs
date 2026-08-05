@@ -10,11 +10,14 @@ public sealed class GeneratedModuleValidationContext
 {
     private readonly IRuntimeEnvironment _environment;
 
-    internal GeneratedModuleValidationContext(IRuntimeEnvironment environment)
+    private GeneratedModuleValidationContext(IRuntimeEnvironment environment)
     {
         ArgumentNullException.ThrowIfNull(environment);
         _environment = environment;
     }
+
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public static GeneratedModuleValidationContext Create(IRuntimeEnvironment environment) => new(environment);
 
     public string Interpolate(string value)
     {
