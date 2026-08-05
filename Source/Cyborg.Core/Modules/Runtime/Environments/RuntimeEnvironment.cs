@@ -11,8 +11,7 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
     public IReadOnlyCollection<string> OverrideResolutionTags { get; init; } = [];
 
     [return: NotNullIfNotNull(nameof(value))]
-    internal IReadOnlyCollection<T>? ResolveCollection<TModule, T>(TModule module, IReadOnlyCollection<T>? value, string moduleExpression, string valueExpression)
-        where TModule : ModuleBase, IModule =>
+    IReadOnlyCollection<T>? IRuntimeEnvironment.ResolveCollection<TModule, T>(TModule module, IReadOnlyCollection<T>? value, string moduleExpression, string valueExpression) =>
         ResolveCollectionCore(this, module, value, moduleExpression, valueExpression);
 
     [return: NotNullIfNotNull(nameof(value))]
@@ -43,12 +42,11 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
     }
 
     [return: NotNullIfNotNull(nameof(value))]
-    internal string? SelectRawStringOverride<TModule>(TModule module, string? value, string moduleExpression, string valueExpression)
-        where TModule : ModuleBase, IModule =>
-        TrySelectRawStringOverrideCore(this, module, moduleExpression, valueExpression, out string? selectedValue) ? selectedValue : value;
+    T? IRuntimeEnvironment.Resolve<TModule, T>(TModule module, T? value, string? moduleExpression, string? valueExpression) where T : default =>
+        Resolve(module, value, moduleExpression, valueExpression);
 
     [return: NotNullIfNotNull(nameof(value))]
-    public virtual T? Resolve<TModule, T>(TModule module, T? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
+    internal protected virtual T? Resolve<TModule, T>(TModule module, T? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
         where TModule : ModuleBase, IModule
     {
         T? resolvedValue = ResolveCore(this, module, value, moduleExpression, valueExpression);
@@ -59,29 +57,8 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         return resolvedValue;
     }
 
-    internal protected virtual bool TrySelectRawStringOverrideCore<TModule>(EnvironmentLike entryPoint, TModule module, string? moduleExpression, string? valueExpression, [NotNullWhen(true)] out string? value)
-        where TModule : ModuleBase, IModule
-    {
-        ArgumentNullException.ThrowIfNull(entryPoint);
-        ArgumentNullException.ThrowIfNull(module);
-        string valuePath = ConstructValueResolutionPath<string>(value: null, moduleExpression, valueExpression);
-
-        foreach (string identifier in EnumerateOverrideIdentifiers(module.Name, module.Group, TModule.ModuleId))
-        {
-            string overridePath = SyntaxFactory.Path(identifier, valuePath).Override();
-            if (TryGetStoredVariable(overridePath, out value))
-            {
-                return true;
-            }
-        }
-
-        value = default;
-        return false;
-    }
-
     [return: NotNullIfNotNull(nameof(value))]
-    internal protected virtual T? ResolveCore<TModule, T>(EnvironmentLike entryPoint, TModule module, T? value, string? moduleExpression, string? valueExpression)
-        where TModule : ModuleBase, IModule
+    internal protected virtual T? ResolveCore<TModule, T>(EnvironmentLike entryPoint, TModule module, T? value, string? moduleExpression, string? valueExpression) where TModule : ModuleBase, IModule
     {
         ArgumentNullException.ThrowIfNull(entryPoint);
         ArgumentNullException.ThrowIfNull(module);
@@ -98,6 +75,29 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         }
 
         return value;
+    }
+
+    [return: NotNullIfNotNull(nameof(value))]
+    string? IRuntimeEnvironment.SelectRawStringOverride<TModule>(TModule module, string? value, string moduleExpression, string valueExpression) =>
+        TrySelectRawStringOverrideCore(this, module, moduleExpression, valueExpression, out string? selectedValue) ? selectedValue : value;
+
+    internal protected virtual bool TrySelectRawStringOverrideCore<TModule>(EnvironmentLike entryPoint, TModule module, string? moduleExpression, string? valueExpression, [NotNullWhen(true)] out string? value) where TModule : ModuleBase, IModule
+    {
+        ArgumentNullException.ThrowIfNull(entryPoint);
+        ArgumentNullException.ThrowIfNull(module);
+        string valuePath = ConstructValueResolutionPath<string>(value: null, moduleExpression, valueExpression);
+
+        foreach (string identifier in EnumerateOverrideIdentifiers(module.Name, module.Group, TModule.ModuleId))
+        {
+            string overridePath = SyntaxFactory.Path(identifier, valuePath).Override();
+            if (TryGetStoredVariable(overridePath, out value))
+            {
+                return true;
+            }
+        }
+
+        value = default;
+        return false;
     }
 
     private string ConstructValueResolutionPath<T>(T? value, string? moduleExpression, string? valueExpression)

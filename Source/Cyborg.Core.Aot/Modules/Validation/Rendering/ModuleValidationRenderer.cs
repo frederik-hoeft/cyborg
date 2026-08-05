@@ -17,7 +17,13 @@ internal static class ModuleValidationRenderer
         public static string NullableRelax => "__NullableRelax";
     }
 
-    public static string ApplyInterpolation => "__ApplyInterpolation";
+    public static string ApplyDefaultsAsync => "ApplyDefaultsAsync";
+
+    public static string ApplyInterpolationAsync => "ApplyInterpolationAsync";
+
+    public static string ResolveOverridesAsync => "ResolveOverridesAsync";
+
+    public static string ValidateAsync => "ValidateAsync";
 
     public static string Render(ModuleModel model, ValidationContractInfo contractInfo, DiagnosticsReporter diagnosticsReporter)
     {
@@ -25,7 +31,7 @@ internal static class ModuleValidationRenderer
         [
             new DefaultsSectionRenderer(contractInfo, MODULE_VARIABLE, diagnosticsReporter),
             new OverrideSectionRenderer(contractInfo, MODULE_VARIABLE, diagnosticsReporter),
-            new InterpolationSectionRenderer(contractInfo),
+            new InterpolationSectionRenderer(contractInfo, MODULE_VARIABLE),
             new ValidationSectionRenderer(contractInfo, diagnosticsReporter),
         ];
 

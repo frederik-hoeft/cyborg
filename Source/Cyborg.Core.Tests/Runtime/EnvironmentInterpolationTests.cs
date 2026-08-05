@@ -186,12 +186,12 @@ public sealed class EnvironmentInterpolationTests
     [TestMethod]
     public void Test_PublicEnvironmentSurface_DoesNotExposeGeneratedPreparationOperations()
     {
-        string[] methodNames = typeof(IRuntimeEnvironment).GetMethods().Select(static method => method.Name).ToArray();
+        string[] methodNames = [.. typeof(IRuntimeEnvironment).GetMethods().Select(static method => method.Name)];
 
-        CollectionAssert.DoesNotContain(methodNames, "InterpolateFinal");
-        CollectionAssert.DoesNotContain(methodNames, "SelectStringOverride");
-        CollectionAssert.DoesNotContain(methodNames, "SelectRawStringOverride");
-        CollectionAssert.DoesNotContain(methodNames, "ResolveCollection");
+        Assert.DoesNotContain("InterpolateFinal", methodNames);
+        Assert.DoesNotContain("SelectStringOverride", methodNames);
+        Assert.DoesNotContain("SelectRawStringOverride", methodNames);
+        Assert.DoesNotContain("ResolveCollection", methodNames);
     }
 
     private static GlobalRuntimeEnvironment CreateEnvironment() => new(JsonNamingPolicy.SnakeCaseLower);

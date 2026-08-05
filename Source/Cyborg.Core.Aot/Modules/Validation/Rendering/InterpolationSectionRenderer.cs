@@ -6,23 +6,30 @@ using System.Collections.Immutable;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
 
-internal sealed class InterpolationSectionRenderer(ValidationContractInfo contractInfo) : ISectionRenderer
+internal sealed class InterpolationSectionRenderer(ValidationContractInfo contractInfo, string rootModuleVariable) : ISectionRenderer
 {
+    private const string CONTEXT_VARIABLE = "context";
+
     public void RenderSection(IndentedStringBuilder builder, ModuleModel model)
     {
         string qualifiedType = model.FullyQualifiedTypeName;
         builder.AppendBlock(
             $$"""
-            private static {{qualifiedType}} {{ModuleValidationRenderer.ApplyInterpolation}}({{qualifiedType}} module, {{contractInfo.GeneratedModuleValidationContext.RenderGlobal()}} validationContext)
+            private async {{KnownTypes.ValueTaskOfT(qualifiedType)}} {{ModuleValidationRenderer.ApplyInterpolationAsync}}(
+                {{contractInfo.ModuleValidationContext.RenderGlobal()}} {{CONTEXT_VARIABLE}},
+                {{KnownTypes.CancellationToken}} cancellationToken)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+                {{qualifiedType}} {{rootModuleVariable}} = this;
             """);
 
         builder = builder.IncreaseIndent();
-        AppendInterpolationForObject(builder, model.Properties, "module");
+        AppendInterpolationForObject(builder, model.Properties, rootModuleVariable);
         builder = builder.DecreaseIndent();
         builder.AppendBlock(
             $$"""
-                return module;
+                await {{KnownTypes.Task}}.CompletedTask;
+                return {{rootModuleVariable}};
             }
             """);
     }
@@ -89,13 +96,13 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
     {
         if (property.IsNullable)
         {
-            builder.AppendLine($"{property.NullableTypeName} {localName} = {propertyAccess} is not null ? validationContext.Interpolate({propertyAccess}) : null;");
+            builder.AppendLine($"{property.NullableTypeName} {localName} = {propertyAccess} is not null ? {CONTEXT_VARIABLE}.Interpolate({propertyAccess}) : null;");
         }
         else
         {
             // Non-nullable: guard against null defensively (validation will catch it if it is null).
             // Use ! on the fallback so the ternary stays typed as non-nullable and avoids CS8600/CS8601.
-            builder.AppendLine($"{property.NullableTypeName} {localName} = {propertyAccess} is not null ? validationContext.Interpolate({propertyAccess}) : {propertyAccess}!;");
+            builder.AppendLine($"{property.NullableTypeName} {localName} = {propertyAccess} is not null ? {CONTEXT_VARIABLE}.Interpolate({propertyAccess}) : {propertyAccess}!;");
         }
     }
 
@@ -182,7 +189,7 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
             IndentedStringBuilder ifBuilder = loopBuilder.IncreaseIndent();
             if (isStringElem)
             {
-                ifBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elemValueVar} = validationContext.Interpolate({elemCurrentVar}!);");
+                ifBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elemValueVar} = {CONTEXT_VARIABLE}.Interpolate({elemCurrentVar}!);");
                 ifBuilder.AppendLine($"{elemCurrentVar} = {elemValueVar};");
             }
             else
@@ -191,15 +198,18 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
                 AppendInterpolationForObject(ifBuilder, collection.ElementChildren, elemValueVar);
                 ifBuilder.AppendLine($"{elemCurrentVar} = {elemValueVar};");
             }
-            loopBuilder.AppendLine("}");
-            loopBuilder.AppendLine($"{ModuleValidationRenderer.Helpers}.{ModuleValidationRenderer.HelperMembers.NullableRelax}({elemCurrentVar});");
-            loopBuilder.AppendLine($"{rewrittenItemsVar}.Add({elemCurrentVar});");
+            loopBuilder.AppendBlock(
+                $$"""
+                }
+                {{ModuleValidationRenderer.Helpers}}.{{ModuleValidationRenderer.HelperMembers.NullableRelax}}({{elemCurrentVar}});
+                {{rewrittenItemsVar}}.Add({{elemCurrentVar}});
+                """);
         }
         else
         {
             if (isStringElem)
             {
-                loopBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elemCurrentVar} = validationContext.Interpolate({elemVar});");
+                loopBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elemCurrentVar} = {CONTEXT_VARIABLE}.Interpolate({elemVar});");
             }
             else
             {
@@ -234,13 +244,16 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
                 string rewrittenCollectionVar = $"{safeId}Collection";
                 string rewrittenCollectionItemsVar = $"{safeId}CollectionItems";
                 string rewrittenItemVar = $"{safeId}Item";
-                builder.AppendLine($"{collection.MaterializationTypeName} {rewrittenCollectionVar} = new();");
-                builder.AppendLine($"{KnownTypes.ICollectionOfT(collection.ElementNullableTypeName)} {rewrittenCollectionItemsVar} = {rewrittenCollectionVar};");
-                builder.AppendLine($"foreach ({collection.ElementNullableTypeName} {rewrittenItemVar} in {rewrittenItemsVariable})");
-                builder.AppendLine("{");
-                builder.IncreaseIndent().AppendLine($"{rewrittenCollectionItemsVar}.Add({rewrittenItemVar});");
-                builder.AppendLine("}");
-                builder.AppendLine($"{targetVariable} = {rewrittenCollectionVar};");
+                builder.AppendBlock(
+                    $$"""
+                    {{collection.MaterializationTypeName}} {{rewrittenCollectionVar}} = new();
+                    {{KnownTypes.ICollectionOfT(collection.ElementNullableTypeName)}} {{rewrittenCollectionItemsVar}} = {{rewrittenCollectionVar}};
+                    foreach ({{collection.ElementNullableTypeName}} {{rewrittenItemVar}} in {{rewrittenItemsVariable}})
+                    {
+                        {{rewrittenCollectionItemsVar}}.Add({{rewrittenItemVar}});
+                    }
+                    {{targetVariable}} = {{rewrittenCollectionVar}};
+                    """);
                 break;
         }
     }

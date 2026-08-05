@@ -10,6 +10,8 @@ internal record PropertyRewriteContext
 
     public string ModuleVariable { get; init; }
 
+    public string ContextVariable { get; init; }
+
     public string PropertyAccessExpression { get; init; }
 
     public DiagnosticsReporter DiagnosticsReporter { get; init; }
@@ -18,10 +20,12 @@ internal record PropertyRewriteContext
         ValidationContractInfo contractInfo,
         DiagnosticsReporter diagnosticsReporter,
         string moduleVariable,
+        string contextVariable,
         string propertyAccessExpression)
     {
         ContractInfo = contractInfo;
         ModuleVariable = moduleVariable;
+        ContextVariable = contextVariable;
         DiagnosticsReporter = diagnosticsReporter;
         PropertyAccessExpression = propertyAccessExpression;
         Property = property;
