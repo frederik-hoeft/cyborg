@@ -5,7 +5,7 @@ using System.Collections.Immutable;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
 
-internal sealed class DefaultApplicationRenderer(ValidationContractInfo contractInfo, string rootModuleVariable, DiagnosticsReporter diagnosticsReporter)
+internal sealed class DefaultApplicationRenderer(ValidationContractInfo contractInfo, DiagnosticsReporter diagnosticsReporter, string rootModuleVariable, string contextVariable)
 {
     public bool AppendDefaultApplicationForObject(IndentedStringBuilder builder, ImmutableArray<PropertyModel> properties, string targetVariable, string diagnosticsPhase)
     {
@@ -13,7 +13,7 @@ internal sealed class DefaultApplicationRenderer(ValidationContractInfo contract
         foreach (PropertyModel property in properties)
         {
             string propertyAccessExpression = $"{targetVariable}.{property.Name}";
-            PropertyRewriteContext rewriteContext = new(property, contractInfo, diagnosticsReporter, rootModuleVariable, propertyAccessExpression);
+            PropertyRewriteContext rewriteContext = new(property, contractInfo, diagnosticsReporter, rootModuleVariable, contextVariable, propertyAccessExpression);
             string? directExpression = CreateDefaultAssignmentExpression(rewriteContext);
             bool hasDirectAssignment = !string.IsNullOrEmpty(directExpression);
             bool hasNestedValidatableAssignments = property.HasValidatableChildren && property.Children.Any(child => HasDefaultWork(child, rewriteContext));
@@ -61,16 +61,15 @@ internal sealed class DefaultApplicationRenderer(ValidationContractInfo contract
         return true;
     }
 
-    public void AppendDirectDefaultApplicationForProperty(IndentedStringBuilder builder, PropertyModel property, string propertyAccessExpression)
+    public void AppendDirectDefaultApplicationForProperty(IndentedStringBuilder builder, PropertyRewriteContext rewriteContext)
     {
-        PropertyRewriteContext rewriteContext = new(property, contractInfo, diagnosticsReporter, rootModuleVariable, propertyAccessExpression);
         string? defaultExpression = CreateDefaultAssignmentExpression(rewriteContext);
         if (string.IsNullOrEmpty(defaultExpression))
         {
             return;
         }
 
-        builder.AppendLine($"{propertyAccessExpression} = {defaultExpression};");
+        builder.AppendLine($"{rewriteContext.PropertyAccessExpression} = {defaultExpression};");
     }
 
     public void AppendCollectionDefaultApplicationForProperty(IndentedStringBuilder builder, PropertyModel property, string localName, string diagnosticsPhase)
@@ -103,7 +102,7 @@ internal sealed class DefaultApplicationRenderer(ValidationContractInfo contract
 
     public bool HasDefaultWork(PropertyModel property, PropertyRewriteContext rewriteContext)
     {
-        MutablePropertyRewriteContext mutableContext = new(property, rewriteContext.ContractInfo, rewriteContext.DiagnosticsReporter, rewriteContext.ModuleVariable, rewriteContext.PropertyAccessExpression);
+        MutablePropertyRewriteContext mutableContext = new(property, rewriteContext.ContractInfo, rewriteContext.DiagnosticsReporter, rewriteContext.ModuleVariable, rewriteContext.ContextVariable, rewriteContext.PropertyAccessExpression);
         return HasDefaultWork(mutableContext);
     }
 
@@ -111,7 +110,7 @@ internal sealed class DefaultApplicationRenderer(ValidationContractInfo contract
     {
         foreach (PropertyModel child in collection.ElementChildren)
         {
-            MutablePropertyRewriteContext mutableContext = new(child, rewriteContext.ContractInfo, rewriteContext.DiagnosticsReporter, rewriteContext.ModuleVariable, rewriteContext.PropertyAccessExpression);
+            MutablePropertyRewriteContext mutableContext = new(child, rewriteContext.ContractInfo, rewriteContext.DiagnosticsReporter, rewriteContext.ModuleVariable, rewriteContext.ContextVariable, rewriteContext.PropertyAccessExpression);
             if (HasDefaultWork(mutableContext))
             {
                 return true;

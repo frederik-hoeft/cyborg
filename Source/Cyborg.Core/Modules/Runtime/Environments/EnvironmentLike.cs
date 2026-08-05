@@ -44,6 +44,29 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         return sb.ToString();
     }
 
+    protected virtual string FinalizeInterpolationLiterals(string value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        if (!SyntaxFactory.HashLiteralRegex.IsMatch(value))
+        {
+            return value;
+        }
+
+        StringBuilder builder = new();
+        int currentIndex = 0;
+        ReadOnlySpan<char> valueSpan = value.AsSpan();
+        foreach (ValueMatch match in SyntaxFactory.HashLiteralRegex.EnumerateMatches(value))
+        {
+            builder.Append(valueSpan[currentIndex..match.Index]);
+            ReadOnlySpan<char> literalSlice = valueSpan.Slice(match.Index, match.Length);
+            builder.Append(literalSlice[..2]);
+            builder.Append(literalSlice[3..]);
+            currentIndex = match.Index + match.Length;
+        }
+        builder.Append(valueSpan[currentIndex..]);
+        return builder.ToString();
+    }
+
     protected virtual bool TryResolveIndirectionCandidate<T>(ResolutionContext context, string name, [NotNullWhen(true)] out T? value)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -89,6 +112,20 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         return false;
     }
 
+    protected virtual bool TryGetStoredVariableInCurrentScopeCore(string name, [NotNullWhen(true)] out object? value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (Variables.TryGetValue(name, out value) && value is not null)
+        {
+            return true;
+        }
+        value = default;
+        return false;
+    }
+
+    internal protected virtual bool TryGetStoredVariableRecursiveCore(string name, [NotNullWhen(true)] out object? value) =>
+        TryGetStoredVariableInCurrentScopeCore(name, out value);
+
     internal protected virtual bool TryResolveVariableRecursiveCore(ResolutionContext context, [NotNullWhen(true)] out object? value) =>
         TryResolveVariableInCurrentScopeCore(context, out value);
 
@@ -123,7 +160,15 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
     public virtual bool TryResolveVariable<T>(string name, [NotNullWhen(true)] out T? value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        return TryResolveVariable(name, entryPoint: this, out value);
+        if (!TryResolveVariable(name, entryPoint: this, out value))
+        {
+            return false;
+        }
+        if (value is string stringValue)
+        {
+            value = (T)(object)FinalizeInterpolationLiterals(stringValue);
+        }
+        return true;
     }
 
     public virtual void SetVariable<T>(string name, T value) => Variables[name] = value;
@@ -133,7 +178,7 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
     public virtual string Interpolate(string template)
     {
         ArgumentNullException.ThrowIfNull(template);
-        return Interpolate(template, entryPoint: this);
+        return InterpolateCore(template, entryPoint: this);
     }
 
     public virtual void Publish(string root, IDecomposable decomposable, DecompositionStrategy strategy, bool publishNullValues)
@@ -171,6 +216,22 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
+    private protected bool TryGetStoredVariable<T>(string name, [NotNullWhen(true)] out T? value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (TryGetStoredVariableRecursiveCore(name, out object? objectValue))
+        {
+            if (objectValue is T typedValue)
+            {
+                value = typedValue;
+                return true;
+            }
+            throw new InvalidCastException($"Attempted to select stored variable '{name}' as type {typeof(T).FullName}, but it is of type {objectValue.GetType().FullName}.");
+        }
+        value = default;
+        return false;
+    }
+
     private protected bool TryResolveVariable<T>(string name, EnvironmentLike entryPoint, [NotNullWhen(true)] out T? value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -178,11 +239,12 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         return TryResolveVariableRecursiveCore(ResolutionContext.Create(entryPoint, name), out value);
     }
 
-    private protected string Interpolate(string template, EnvironmentLike entryPoint)
+    private protected string InterpolateCore(string template, EnvironmentLike entryPoint)
     {
         ArgumentNullException.ThrowIfNull(template);
         ArgumentNullException.ThrowIfNull(entryPoint);
-        return InterpolateString(ResolutionContext.CreateRoot(entryPoint), template);
+        string interpolated = InterpolateString(ResolutionContext.CreateRoot(entryPoint), template);
+        return FinalizeInterpolationLiterals(interpolated);
     }
 
     private bool TryParseVariableReference(string expression, out VariableReference reference)

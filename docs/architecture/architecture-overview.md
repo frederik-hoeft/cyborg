@@ -180,7 +180,7 @@ Before a worker's `ExecuteAsync` method is invoked, `ModuleWorker<TModule>` call
 
 5. **Validate Constraints** — Checks constraints declared through `[Required]`, `[VariableIdentifier]`, `[Range<T>]`, length, filesystem, path-shape, regex, grammar, enum, and related validation attributes. Produces a `ValidationResult<TModule>` containing either the transformed module or validation errors.
 
-Each transformation uses `with` expressions, so the original deserialized module is never mutated. The generator emits explicit `IModule<TModule>.ApplyDefaultsAsync` and `IModule<TModule>.ResolveOverridesAsync` implementations, a private static `__ApplyInterpolation` helper, and the public `ValidateAsync` orchestrator.
+Each transformation uses `with` expressions, so the original deserialized module is never mutated. The generator emits private async `ApplyDefaultsAsync`, `ResolveOverridesAsync`, and `ApplyInterpolationAsync` instance helpers plus the public `ValidateAsync` orchestrator required by `IModule<TModule>`. `ValidateAsync` creates one editor-hidden `ModuleValidationContext` containing the runtime and service provider and passes it through all generated preparation phases.
 
 Collection traversal is guarded according to the concrete collection shape. Null reference collections and absent nullable value-type collections are skipped. A default `ImmutableArray<T>` is not enumerated and remains distinct from an initialized empty array; property-level constraints such as `[Required]` still execute outside the enumeration guard, allowing invalid default arrays to produce validation errors instead of throwing while validating elements. Selected validation attributes can set `TargetsElements = true` to validate each immediate collection element through the same guarded traversal. Element-targeted errors retain the parent property name and include the zero-based element index in their message.
 
@@ -295,7 +295,7 @@ The `name` portion must be a valid identifier. Forms such as `${}`, `${1name}`, 
 
 **Interpolation** occurs when one or more valid variable expressions appear within a larger string. Each recognized expression is resolved independently while surrounding text remains unchanged. For example, `backup-${host.name}-${date}` contains two interpolation expressions.
 
-Malformed `${...}` text is not recognized as an interpolation expression and is ignored. There is currently no escape syntax for producing literal interpolation text; in particular, `${#name}` is not a valid expression, while `$${name}` still contains the valid expression `${name}`.
+Malformed `${...}` text is not recognized as an interpolation expression and is ignored. A hash immediately after `${` escapes one interpolation pass: `${#name}` becomes the literal `${name}`, `${##name}` becomes `${#name}`, and the expression revealed by removing the hash is not rescanned during the same pass. `$${name}` is not an escape because it still contains the valid expression `${name}`.
 
 **Indirection** is the special case where the complete string consists of exactly one variable expression, with no surrounding text. Indirection allows the referenced value to retain its original type rather than being converted into part of an interpolated string. So the following substitution chain is valid for `port` of type `int`:
 
@@ -368,19 +368,19 @@ The override subsystem allows runtime environment variables to replace module pr
 
 #### Override Resolution
 
-When a module property is resolved via `IRuntimeEnvironment.Resolve<TModule, T>()`:
+Generated override preparation resolves module properties through `ModuleValidationContext`, which mediates internal operations on `IRuntimeEnvironment`:
 
-1. The property name is extracted from the call site using `CallerArgumentExpression` and converted to snake_case.
+1. The generator supplies the module and property expressions used to derive the snake_case property path.
 2. Override keys are constructed using every identifier that can address the module instance: first `@{name}.{property_name}`, then `@{group}.{property_name}` when a group is set, then `@{module_id}.{property_name}`, and finally `@{tag}.{property_name}` for each override resolution tag attached to the environment.
 3. The environment is checked for each override key in that order. The first matching override wins, so more specific identifiers take priority (`name` > `group` > `module_id` > tags).
-4. Scalar values are resolved as the requested property type. Collections use `ResolveCollection` and are materialized back into the declared collection shape by generated code.
-5. `Resolve<TModule, T>()` retains its existing string-indirection behavior and interpolates string values encountered during resolution. The generated `__ApplyInterpolation` phase remains a separate recursive pass so strings are processed even when no override was applied, including strings inside nested records and collections.
+4. String properties select the raw stored override without interpolation. Non-string properties use typed resolution, including exact-reference indirection, and collections use a collection-specific resolver before generated code materializes the declared collection shape.
+5. The later generated `ApplyInterpolationAsync` phase recursively interpolates every eligible string, including strings for which no override was applied and strings inside nested records and collections. `[IgnoreInterpolation]` skips this phase, so a raw string selected from an override remains available for worker-controlled interpolation.
 
 `[IgnoreOverride]` disables resolution of the annotated node without disabling the later interpolation phase. With the default `recurse: false`, eligible descendants may still resolve overrides; `recurse: true` suppresses the complete subtree. `[IgnoreInterpolation]` is a separate string-only control for values that must remain raw until worker execution.
 
 #### Override Use Case
 
-Overrides solve the problem of injecting non-string typed values into module properties when the source is a string variable. String interpolation (`${host.port}`) always produces a string, but a module property like `liveness_probe_port` may expect an `int`. By setting `@my_module.liveness_probe_port` to `"${host.port}"` in the environment, the override subsystem interpolates the string, then type-converts the result to the target type.
+Overrides solve the problem of injecting non-string typed values into module properties through exact-reference indirection. A composite interpolation result is a string, but an exact expression such as `${host.port}` can resolve directly to the stored `int`. By setting `@my_module.liveness_probe_port` to `"${host.port}"`, generated typed override resolution retrieves the referenced value as the property type rather than converting an interpolated string afterward.
 
 The override subsystem supports any addressable property on the module, including `ModuleReference` properties, allowing modules to be treated as data and enabling dynamic module composition patterns. Overrides always operate in a deterministic copy-on-write manner — the original deserialized module instance is never mutated. Instead, a new instance is returned with freshly resolved properties for each execution, ensuring that module definitions remain immutable while always observing the latest environment state at execution time.
 

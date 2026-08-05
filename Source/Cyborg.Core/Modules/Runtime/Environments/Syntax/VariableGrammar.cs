@@ -29,5 +29,8 @@ internal static class VariableGrammar
     public const string INTERPOLATION_PATTERN = $@"\$\{{(?<expression>@@|@(?:{IDENTIFIER})?|{IDENTIFIER})\}}";
 
     [StringSyntax(StringSyntaxAttribute.Regex)]
+    public const string HASH_LITERAL_PATTERN = @"\$\{(?<hashes>#+)(?<content>[^}]*)\}";
+
+    [StringSyntax(StringSyntaxAttribute.Regex)]
     public const string INDIRECTION_PATTERN = $@"\A{INTERPOLATION_PATTERN}\z";
 }

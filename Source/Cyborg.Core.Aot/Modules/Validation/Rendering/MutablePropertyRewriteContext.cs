@@ -8,8 +8,9 @@ internal sealed record MutablePropertyRewriteContext
     ValidationContractInfo ContractInfo,
     DiagnosticsReporter DiagnosticsReporter,
     string ModuleVariable,
+    string ContextVariable,
     string PropertyAccessExpression
-) : PropertyRewriteContext(Property, ContractInfo, DiagnosticsReporter, ModuleVariable, PropertyAccessExpression)
+) : PropertyRewriteContext(Property, ContractInfo, DiagnosticsReporter, ModuleVariable, ContextVariable, PropertyAccessExpression)
 {
     public void SetProperty(PropertyModel newProperty) => Property = newProperty;
 }

@@ -18,6 +18,10 @@ public sealed partial record ValidationPipelineTestModule
     IReadOnlyCollection<string?>? Tags
 ) : ModuleBase, IModule
 {
+    [DefaultValue<string>("${deferred_default}")]
+    [IgnoreInterpolation]
+    public string? DeferredDefault { get; init; }
+
     [Required]
     [Required(TargetsElements = true)]
     public IReadOnlyCollection<string?>? RequiredTags { get; init; } = [];

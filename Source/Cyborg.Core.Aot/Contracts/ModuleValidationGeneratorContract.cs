@@ -4,6 +4,7 @@ internal enum ModuleValidationGeneratorContract
 {
     IModuleRuntime,
     IModuleT,
+    ModuleValidationContext,
     ValidationResultT,
     ValidationError,
     IDefaultValueT,

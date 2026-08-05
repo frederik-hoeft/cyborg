@@ -7,40 +7,47 @@ namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
 
 internal sealed class ValidationSectionRenderer(ValidationContractInfo contractInfo, DiagnosticsReporter diagnosticsReporter) : ISectionRenderer
 {
+    private const string CONTEXT_VARIABLE = "context";
+    private const string MODULE_VARIABLE = "module";
+    private const string ERRORS_VARIABLE = "errors";
+
     public void RenderSection(IndentedStringBuilder builder, ModuleModel model)
     {
         string qualifiedType = model.FullyQualifiedTypeName;
+        string validationContextType = contractInfo.ModuleValidationContext.RenderGlobal();
 
         builder.AppendBlock(
             $$"""
-            public async {{KnownTypes.ValueTaskOfT(contractInfo.ValidationResultT.RenderGlobalWithGenerics(qualifiedType))}} ValidateAsync(
+            public async {{KnownTypes.ValueTaskOfT(contractInfo.ValidationResultT.RenderGlobalWithGenerics(qualifiedType))}} {{ModuleValidationRenderer.ValidateAsync}}(
                 {{contractInfo.IModuleRuntime.RenderGlobal()}} runtime,
                 {{KnownTypes.IServiceProvider}} serviceProvider,
                 {{KnownTypes.CancellationToken}} cancellationToken)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                {{contractInfo.IModuleT.RenderGlobalWithGenerics(qualifiedType)}} self = this;
-                {{contractInfo.IModuleT.RenderGlobalWithGenerics(qualifiedType)}} withDefaults = await self.ApplyDefaultsAsync(runtime, serviceProvider, cancellationToken);
-                {{contractInfo.IModuleT.RenderGlobalWithGenerics(qualifiedType)}} withOverrides = await withDefaults.ResolveOverridesAsync(runtime, serviceProvider, cancellationToken);
+                {{validationContextType}} {{CONTEXT_VARIABLE}} = {{validationContextType}}.Create(runtime, serviceProvider);
+                // apply defaults first to avoid overriding properties of null objects
+                {{qualifiedType}} {{MODULE_VARIABLE}} = await this.{{ModuleValidationRenderer.ApplyDefaultsAsync}}({{CONTEXT_VARIABLE}}, cancellationToken);
+                // resolve any overrides that may have been applied to the module
+                {{MODULE_VARIABLE}} = await {{MODULE_VARIABLE}}.{{ModuleValidationRenderer.ResolveOverridesAsync}}({{CONTEXT_VARIABLE}}, cancellationToken);
                 // ensure that defaults are also applied to values injected via overrides
-                {{qualifiedType}} module = await withOverrides.ApplyDefaultsAsync(runtime, serviceProvider, cancellationToken);
+                {{MODULE_VARIABLE}} = await {{MODULE_VARIABLE}}.{{ModuleValidationRenderer.ApplyDefaultsAsync}}({{CONTEXT_VARIABLE}}, cancellationToken);
                 // interpolate all string members against the runtime environment
-                module = {{ModuleValidationRenderer.ApplyInterpolation}}(module, runtime);
-                {{KnownTypes.ListOfT(contractInfo.ValidationError.RenderGlobal())}} errors = [];
+                {{MODULE_VARIABLE}} = await {{MODULE_VARIABLE}}.{{ModuleValidationRenderer.ApplyInterpolationAsync}}({{CONTEXT_VARIABLE}}, cancellationToken);
+                {{KnownTypes.ListOfT(contractInfo.ValidationError.RenderGlobal())}} {{ERRORS_VARIABLE}} = [];
 
             """);
 
         builder = builder.IncreaseIndent();
         foreach (PropertyModel property in model.Properties)
         {
-            AppendValidationForProperty(builder, property, "module", $"module.{property.Name}");
+            AppendValidationForProperty(builder, property, MODULE_VARIABLE, $"{MODULE_VARIABLE}.{property.Name}");
         }
         builder = builder.DecreaseIndent();
         builder.AppendBlock(
             $$"""
-                return errors.Count == 0
-                    ? {{contractInfo.ValidationResultT.RenderGlobalWithGenerics(qualifiedType)}}.Valid(module)
-                    : {{contractInfo.ValidationResultT.RenderGlobalWithGenerics(qualifiedType)}}.Invalid(errors);
+                return {{ERRORS_VARIABLE}}.Count == 0
+                    ? {{contractInfo.ValidationResultT.RenderGlobalWithGenerics(qualifiedType)}}.Valid({{MODULE_VARIABLE}})
+                    : {{contractInfo.ValidationResultT.RenderGlobalWithGenerics(qualifiedType)}}.Invalid({{ERRORS_VARIABLE}});
             }
             """);
     }

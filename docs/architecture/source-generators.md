@@ -44,7 +44,7 @@ For the runtime architecture these generators integrate with, see [Architecture 
 
 The generator layer covers three concerns:
 
-- **Module validation** — Generating the four-renderer validation pipeline (`ApplyDefaultsAsync`, `ResolveOverridesAsync`, `__ApplyInterpolation`, `ValidateAsync`) from annotated module records, transforming declarative attributes into executable validation, defaulting, override resolution, interpolation, and validation logic.
+- **Module validation** — Generating the four-renderer validation pipeline (`ApplyDefaultsAsync`, `ResolveOverridesAsync`, `ApplyInterpolationAsync`, `ValidateAsync`) from annotated module records, transforming declarative attributes into executable validation, defaulting, override resolution, interpolation, and validation logic.
 - **Module loader factories** — Generating worker construction methods that resolve constructor dependencies from the DI container, eliminating boilerplate in module loaders.
 - **Model decomposition** — Generating `IDecomposable` implementations that project record properties into `DynamicKeyValuePair` collections for environment publishing and artifact flattening.
 
@@ -60,7 +60,7 @@ Each generator declares a contract enum whose members correspond to the runtime 
 
 | Contract | Members | Used By |
 |----------|---------|---------|
-| `ModuleValidationGeneratorContract` | `IModuleRuntime`, `IModuleT`, `ValidationResultT`, `ValidationError`, `IDefaultValueT`, `IParser` | Validation generator |
+| `ModuleValidationGeneratorContract` | `IModuleRuntime`, `IModuleT`, `ModuleValidationContext`, `ValidationResultT`, `ValidationError`, `IDefaultValueT`, `IParser` | Validation generator |
 | `ModuleLoaderFactoryGeneratorContract` | `IModuleWorker`, `ModuleLoaderT`, `IModuleWorkerContextT`, `ModuleWorkerContextImplementationT` | Loader factory generator |
 | `ModelDecompositionGeneratorContract` | `IDecomposable`, `DynamicKeyValuePair` | Decomposition generator |
 
@@ -84,17 +84,19 @@ The generator is triggered by the `[GeneratedModuleValidation]` attribute on a `
 
 ### Generated Pipeline
 
-For each annotated record, the generator emits a partial record implementing `IModule<TModule>` with two explicit async interface methods, one public async validation method, and one private static interpolation helper:
+For each annotated record, the generator emits a partial record implementing `IModule<TModule>` with one public async validation method and three private async instance helpers:
 
 1. **`ApplyDefaultsAsync`** — For each property carrying a default attribute (`[DefaultValue<T>]`, `[DefaultInstance]`, `[DefaultInstanceFactory]`, `[DefaultTimeSpan]`), emits a `with`-expression that replaces null or zero-valued properties with their declared defaults. Recursively applies defaults to nested records marked `[Validatable]` and to elements within collections.
 
-2. **`ResolveOverridesAsync`** — For each property not suppressed by `[IgnoreOverride]`, emits a call to `runtime.Environment.Resolve<TModule, T>()` or a collection-specific resolution expression. `[IgnoreOverride]` suppresses the annotated node; `Recurse = true` also suppresses descendants. Defaults are applied again after this phase so injected type-default values receive their declared defaults.
+2. **`ResolveOverridesAsync`** — For each property not suppressed by `[IgnoreOverride]`, emits an operation through `ModuleValidationContext`. String properties use raw override selection so `[IgnoreInterpolation]` can preserve the effective expression, while non-string properties and collections use typed resolution. `[IgnoreOverride]` suppresses the annotated node; `Recurse = true` also suppresses descendants. Defaults are applied again after this phase so injected type-default values receive their declared defaults.
 
-3. **`__ApplyInterpolation`** — Private static helper that recursively rewrites eligible string properties through `runtime.Environment.Interpolate(...)`, including strings in nested `[Validatable]` records and supported collections. `[IgnoreInterpolation]` leaves a string untouched for later context-specific interpolation.
+3. **`ApplyInterpolationAsync`** — Private instance helper that recursively rewrites eligible string properties through `ModuleValidationContext.Interpolate(...)`, including strings in nested `[Validatable]` records and supported collections. `[IgnoreInterpolation]` leaves a string untouched for later context-specific interpolation.
 
-4. **`ValidateAsync`** — Orchestrates defaults → overrides → defaults → interpolation → constraints, collects `ValidationError` instances, and returns `ValidationResult<TModule>.Valid(module)` or `ValidationResult<TModule>.Invalid(errors)`. Validation recurses into nested validatable records and supported collection elements.
+4. **`ValidateAsync`** — Creates one `ModuleValidationContext` from the runtime and service provider, orchestrates defaults → overrides → defaults → interpolation → constraints, collects `ValidationError` instances, and returns `ValidationResult<TModule>.Valid(module)` or `ValidationResult<TModule>.Invalid(errors)`. Validation recurses into nested validatable records and supported collection elements.
 
 The generated code uses `with`-expressions throughout, ensuring that each stage produces a new record instance and that the original deserialized module is never mutated.
+
+`ModuleValidationContext` is registered as a generator contract because the generated helpers are compiled into the consuming module assembly. The type is public at the CLR level for that cross-assembly call path, but it lives in an `Internal` namespace, is hidden from IntelliSense, and exposes the internal override primitives only to generated preparation code. `IModule<TModule>` itself requires only `ValidateAsync(...)`; the three preparation helpers remain private implementation details of the generated partial record.
 
 ### Processor Architecture
 
@@ -139,7 +141,7 @@ The generator assembles its output through four section renderers, each implemen
 |----------|-----------------|----------------|
 | `DefaultsSectionRenderer` | `ApplyDefaultsAsync` | Emits default value assignments from aspect rewrite expressions |
 | `OverrideSectionRenderer` | `ResolveOverridesAsync` | Emits override resolution calls with aspect rewrite expressions |
-| `InterpolationSectionRenderer` | `__ApplyInterpolation` | Recursively rewrites eligible strings after defaults and overrides |
+| `InterpolationSectionRenderer` | `ApplyInterpolationAsync` | Recursively rewrites eligible strings after defaults and overrides |
 | `ValidationSectionRenderer` | `ValidateAsync` | Orchestrates the full pipeline and emits constraint checks from aspect validation logic |
 
 The `ModuleValidationRenderer` orchestrates these renderers sequentially into a single partial record declaration. It also emits file-scoped helper methods for default instance resolution and nullable relaxation.
