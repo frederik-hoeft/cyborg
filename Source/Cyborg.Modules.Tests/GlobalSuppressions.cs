@@ -11,3 +11,9 @@ using System.Diagnostics.CodeAnalysis;
     Justification = "Must be public for test discovery.",
     Scope = "namespaceanddescendants",
     Target = "~N:Cyborg.Modules.Tests")]
+
+[assembly: SuppressMessage("Style",
+    "IDE1006:Naming Styles",
+    Justification = "Disabled for tests, methods are never called manually.",
+    Scope = "namespaceanddescendants",
+    Target = "~N:Cyborg.Modules.Tests")]

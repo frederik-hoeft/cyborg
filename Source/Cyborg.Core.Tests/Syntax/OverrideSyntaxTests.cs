@@ -7,7 +7,7 @@ namespace Cyborg.Core.Tests.Syntax;
 public sealed class OverrideSyntaxTests
 {
     [TestMethod]
-    public void Override_Member_AppendsSegment()
+    public void Test_Override_Member_AppendsSegment()
     {
         VariableSyntaxBuilder builder = CreateBuilder();
 
@@ -17,7 +17,7 @@ public sealed class OverrideSyntaxTests
     }
 
     [TestMethod]
-    public void Override_ChildPath_AppendsSegment()
+    public void Test_Override_ChildPath_AppendsSegment()
     {
         VariableSyntaxBuilder builder = CreateBuilder();
 

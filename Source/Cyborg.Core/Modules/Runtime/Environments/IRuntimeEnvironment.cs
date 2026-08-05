@@ -24,13 +24,16 @@ public interface IRuntimeEnvironment : IEnvironmentLike
     /// <param name="moduleExpression">The expression representing the module for which the variable is being resolved. Used to construct the environment variable name for override resolution based on the module context.</param>
     /// <param name="valueExpression">The value expression representing the variable being resolved. Used to construct the environment variable name for override resolution based on the variable context.</param>
     /// <returns>The resolved value of the variable, or null if the variable could not be resolved. The return value is determined based on the module and value expressions, allowing for overrides based on the context of the module and variable being accessed.</returns>
+    /// <remarks>String results are fully interpolated and finalize one layer of escaped interpolation literals.</remarks>
     [return: NotNullIfNotNull(nameof(value))]
-    T? Resolve<TModule, T>(TModule module, T? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
+    internal T? Resolve<TModule, T>(TModule module, T? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
         where TModule : ModuleBase, IModule;
 
     [return: NotNullIfNotNull(nameof(value))]
-    IReadOnlyCollection<T>? ResolveCollection<TModule, T>(TModule module, IReadOnlyCollection<T>? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
-        where TModule : ModuleBase, IModule;
+    internal string? SelectRawStringOverride<TModule>(TModule module, string? value, string moduleExpression, string valueExpression) where TModule : ModuleBase, IModule;
+
+    [return: NotNullIfNotNull(nameof(value))]
+    internal IReadOnlyCollection<T>? ResolveCollection<TModule, T>(TModule module, IReadOnlyCollection<T>? value, string moduleExpression, string valueExpression) where TModule : ModuleBase, IModule;
 
     void Publish<TModule, T>(TModule module, string root, T decomposable)
         where TModule : ModuleBase, IModule
@@ -48,7 +51,7 @@ public interface IRuntimeEnvironment : IEnvironmentLike
 
     internal IRuntimeEnvironment WithOverrideResolutionTags(IReadOnlyCollection<string> tags);
 
-    IEnvironmentLike CreateArtifactCollection(ModuleArtifacts artifacts);
+    internal IEnvironmentLike CreateArtifactCollection(ModuleArtifacts artifacts);
 
-    IEnvironmentLike CreateArtifactCollection();
+    internal IEnvironmentLike CreateArtifactCollection();
 }

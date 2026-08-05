@@ -7,7 +7,7 @@ namespace Cyborg.Core.Tests.Syntax;
 public sealed class VariableSyntaxBuilderTests
 {
     [TestMethod]
-    public void Path_Root_ReturnsEmptyPath()
+    public void Test_Path_Root_ReturnsEmptyPath()
     {
         VariableSyntaxBuilder builder = CreateBuilder();
 
@@ -18,7 +18,7 @@ public sealed class VariableSyntaxBuilderTests
     }
 
     [TestMethod]
-    public void Path_SingleSegment_ReturnsSegment()
+    public void Test_Path_SingleSegment_ReturnsSegment()
     {
         VariableSyntaxBuilder builder = CreateBuilder();
 
@@ -28,7 +28,7 @@ public sealed class VariableSyntaxBuilderTests
     }
 
     [TestMethod]
-    public void Path_Member_UsesNamingPolicy()
+    public void Test_Path_Member_UsesNamingPolicy()
     {
         VariableSyntaxBuilder builder = CreateBuilder();
 
@@ -38,7 +38,7 @@ public sealed class VariableSyntaxBuilderTests
     }
 
     [TestMethod]
-    public void Self_RendersExpectedSymbol()
+    public void Test_Self_RendersExpectedSymbol()
     {
         VariableSyntaxBuilder builder = CreateBuilder();
 

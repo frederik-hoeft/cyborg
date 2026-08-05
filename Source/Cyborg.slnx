@@ -14,5 +14,6 @@
   <Project Path="Cyborg.Modules.Borg/Cyborg.Modules.Borg.csproj" Id="52006f4b-ff36-4a6e-adb5-f9b136c3f23b" />
   <Project Path="Cyborg.Modules.Borg.Tests/Cyborg.Modules.Borg.Tests.csproj" />
   <Project Path="Cyborg.Modules.Tests/Cyborg.Modules.Tests.csproj" Id="04f2108d-fc2c-4113-a9e3-4583e547cc80" />
+  <Project Path="Cyborg.TestModules/Cyborg.TestModules.csproj" />
   <Project Path="Cyborg.Modules/Cyborg.Modules.csproj" Id="abcd666f-abb6-46d2-90b5-e9f011fd9e6d" />
 </Solution>

@@ -160,7 +160,7 @@ public abstract class CyborgTestBase
     #region HOF: Validation Testing
 
     /// <summary>
-    /// Deserializes the module JSON, runs the full validation pipeline (defaults, overrides, constraints),
+    /// Deserializes the module JSON, runs the full generated pipeline (defaults, overrides, defaults, interpolation, constraints),
     /// and invokes the test body with the validation result. Use this to verify that validation attributes
     /// are enforced correctly and that default values are applied as expected.
     /// </summary>

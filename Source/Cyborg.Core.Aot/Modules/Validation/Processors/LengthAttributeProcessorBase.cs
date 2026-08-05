@@ -1,38 +1,36 @@
 ﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Microsoft.CodeAnalysis;
 using System.Globalization;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
-internal abstract class LengthAttributeProcessorBase : IPropertyAttributeProcessor
+internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValidationProcessorBase<TAttribute> where TAttribute : PropertyValidationAttribute
 {
-    public abstract string AttributeMetadataName { get; }
-
-    public bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect)
+    protected override bool TryProcessValidation(AttributeData attribute, ref readonly PropertyProcessingContext context, ref readonly PropertyValidationTarget target, out PropertyValidationAspect? aspect)
     {
         aspect = null;
 
-        LengthTargetKind targetKind = GetTargetKind(context.Property.Type, out INamedTypeSymbol? collectionInterface);
+        LengthTargetKind targetKind = GetTargetKind(target.Type, out INamedTypeSymbol? collectionInterface);
         if (targetKind == LengthTargetKind.None)
         {
             context.Report(
                 ValidationGeneratorDiagnostics.UnsupportedLengthTargetType,
                 context.Property.Name,
                 context.ContainingType.Name,
-                context.Property.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat));
+                target.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat));
 
             return false;
         }
 
-        if (!TryGetBounds(context, attribute, out int? min, out int? max))
+        if (!TryGetBounds(attribute, in context, out int? min, out int? max))
         {
             return false;
         }
 
         if (min is < 0)
         {
-            context.Report(
-                ValidationGeneratorDiagnostics.LengthArgumentMustBeNonNegative,
+            context.Report(ValidationGeneratorDiagnostics.LengthArgumentMustBeNonNegative,
                 context.Property.Name,
                 context.ContainingType.Name,
                 "Min",
@@ -43,8 +41,7 @@ internal abstract class LengthAttributeProcessorBase : IPropertyAttributeProcess
 
         if (max is < 0)
         {
-            context.Report(
-                ValidationGeneratorDiagnostics.LengthArgumentMustBeNonNegative,
+            context.Report(ValidationGeneratorDiagnostics.LengthArgumentMustBeNonNegative,
                 context.Property.Name,
                 context.ContainingType.Name,
                 "Max",
@@ -55,8 +52,7 @@ internal abstract class LengthAttributeProcessorBase : IPropertyAttributeProcess
 
         if (min is not null && max is not null && min > max)
         {
-            context.Report(
-                ValidationGeneratorDiagnostics.InvalidRangeBounds,
+            context.Report(ValidationGeneratorDiagnostics.InvalidRangeBounds,
                 context.Property.Name,
                 context.ContainingType.Name,
                 min.Value.ToString(CultureInfo.InvariantCulture),
@@ -68,92 +64,14 @@ internal abstract class LengthAttributeProcessorBase : IPropertyAttributeProcess
         aspect = new LengthValidationAspect(
             targetKind,
             collectionInterface,
-            min?.ToString(CultureInfo.InvariantCulture),
-            max?.ToString(CultureInfo.InvariantCulture),
-            requiresNullGuard: RequiresNullGuard(context.Property.Type));
+            minExpression: min?.ToString(CultureInfo.InvariantCulture),
+            maxExpression: max?.ToString(CultureInfo.InvariantCulture),
+            requiresNullGuard: RequiresNullGuard(target.Type));
 
         return true;
     }
 
-    protected abstract bool TryGetBounds(
-        PropertyProcessingContext context,
-        AttributeData attribute,
-        out int? min,
-        out int? max);
-
-    protected static bool TryGetSingleIntConstructorArgument(
-        PropertyProcessingContext context,
-        AttributeData attribute,
-        string attributeDisplayName,
-        out int value)
-    {
-        value = default;
-
-        if (attribute.ConstructorArguments.Length != 1)
-        {
-            context.Report(
-                ValidationGeneratorDiagnostics.MissingArgument,
-                context.Property.Name,
-                context.ContainingType.Name,
-                attributeDisplayName);
-
-            return false;
-        }
-
-        TypedConstant constant = attribute.ConstructorArguments[0];
-        if (constant.IsNull || constant.Value is not int intValue)
-        {
-            context.Report(
-                ValidationGeneratorDiagnostics.UnsupportedAttributeLiteral,
-                context.Property.Name,
-                context.ContainingType.Name);
-
-            return false;
-        }
-
-        value = intValue;
-        return true;
-    }
-
-    protected static bool TryGetTwoIntConstructorArguments(
-        PropertyProcessingContext context,
-        AttributeData attribute,
-        string attributeDisplayName,
-        out int min,
-        out int max)
-    {
-        min = default;
-        max = default;
-
-        if (attribute.ConstructorArguments.Length != 2)
-        {
-            context.Report(
-                ValidationGeneratorDiagnostics.MissingArgument,
-                context.Property.Name,
-                context.ContainingType.Name,
-                attributeDisplayName);
-
-            return false;
-        }
-
-        TypedConstant minConstant = attribute.ConstructorArguments[0];
-        TypedConstant maxConstant = attribute.ConstructorArguments[1];
-
-        if (minConstant.IsNull || minConstant.Value is not int minValue
-            || maxConstant.IsNull || maxConstant.Value is not int maxValue)
-        {
-            context.Report(
-                ValidationGeneratorDiagnostics.UnsupportedAttributeLiteral,
-                context.Property.Name,
-                context.ContainingType.Name);
-
-            return false;
-        }
-
-        min = minValue;
-        max = maxValue;
-        return true;
-    }
+    protected abstract bool TryGetBounds(AttributeData attribute, ref readonly PropertyProcessingContext context, out int? min, out int? max);
 
     private static bool RequiresNullGuard(ITypeSymbol propertyType) =>
         propertyType.IsReferenceType || propertyType.NullableAnnotation == NullableAnnotation.Annotated;
@@ -209,16 +127,30 @@ internal abstract class LengthAttributeProcessorBase : IPropertyAttributeProcess
         Collection
     }
 
-    private sealed class LengthValidationAspect(
+    private sealed class LengthValidationAspect
+    (
         LengthTargetKind targetKind,
         INamedTypeSymbol? collectionInterface,
         string? minExpression,
         string? maxExpression,
-        bool requiresNullGuard) : PropertyValidationAspect
+        bool requiresNullGuard
+    ) : PropertyValidationAspect
     {
-        public override bool EnsuresDefault => false;
-
         protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
+        {
+            if (requiresNullGuard)
+            {
+                builder.AppendLine($"if ({model.AccessExpression} is not null)");
+                builder.AppendLine("{");
+                EmitLengthValidation(builder.IncreaseIndent(), model);
+                builder.AppendLine("}");
+                return;
+            }
+
+            EmitLengthValidation(builder, model);
+        }
+
+        private void EmitLengthValidation(IndentedStringBuilder builder, ModulePropertyModel model)
         {
             string accessExpression;
             if (collectionInterface is null)
@@ -237,20 +169,13 @@ internal abstract class LengthAttributeProcessorBase : IPropertyAttributeProcess
                 _ => throw new InvalidOperationException("Unsupported length target kind.")
             };
 
-            if (requiresNullGuard)
-            {
-                builder.AppendLine($"if ({model.AccessExpression} is not null)");
-                builder.AppendLine("{");
-                builder = builder.IncreaseIndent();
-            }
-
             if (minExpression is not null)
             {
                 builder.AppendBlock(
                 $$"""
                 if ({{sizeExpression}} < {{minExpression}})
                 {
-                    errors.Add({{CreateValidationError(model, "length", $"Property '{{nameof({model.AccessExpression})}}' must have a length/count not smaller than configured minimum '{minExpression}', was '{{{sizeExpression}}}'.")}});
+                    errors.Add({{CreateValidationError(model, "length", $"{model.TargetDescription} '{{{model.PropertyNameExpression}}}' must have a length/count not smaller than configured minimum '{minExpression}', was '{{{sizeExpression}}}'.")}});
                 }
                 """);
             }
@@ -261,15 +186,9 @@ internal abstract class LengthAttributeProcessorBase : IPropertyAttributeProcess
                 $$"""
                 if ({{sizeExpression}} > {{maxExpression}})
                 {
-                    errors.Add({{CreateValidationError(model, "length", $"Property '{{nameof({model.AccessExpression})}}' must have a length/count not greater than configured maximum '{maxExpression}', was '{{{sizeExpression}}}'.")}});
+                    errors.Add({{CreateValidationError(model, "length", $"{model.TargetDescription} '{{{model.PropertyNameExpression}}}' must have a length/count not greater than configured maximum '{maxExpression}', was '{{{sizeExpression}}}'.")}});
                 }
                 """);
-            }
-
-            if (requiresNullGuard)
-            {
-                builder = builder.DecreaseIndent();
-                builder.AppendLine("}");
             }
         }
     }

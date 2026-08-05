@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <TargetFramework>netstandard2.0</TargetFramework>
         <LangVersion>14</LangVersion>
@@ -16,7 +16,7 @@
         <DevelopmentDependency>true</DevelopmentDependency>
         <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     </PropertyGroup>
-    
+        
     <ItemGroup>
         <EmbeddedResource Include="Contracts\ModuleLoaderFactoryGeneratorContract.cs" />
         <EmbeddedResource Include="Contracts\ModuleValidationGeneratorContract.cs" />
@@ -24,6 +24,7 @@
         <EmbeddedResource Include="Modules\Composition\DecomposeIgnoreAttribute.cs" />
         <EmbeddedResource Include="Modules\Composition\GeneratedDecompositionAttribute.cs" />
         <EmbeddedResource Include="Modules\Loaders\Configuration\GeneratedModuleLoaderFactoryAttribute.cs" />
+        <EmbeddedResource Include="Modules\Validation\Attributes\PropertyValidationAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\DefaultInstanceAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\DefaultInstanceFactoryAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\DefaultTimeSpanAttribute.cs" />
@@ -33,8 +34,10 @@
         <EmbeddedResource Include="Modules\Validation\Attributes\ExactLengthAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\FileExistsAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\FileNameAttribute.cs" />
-        <EmbeddedResource Include="Modules\Validation\Attributes\IgnoreOverridesAttribute.cs" />
+        <EmbeddedResource Include="Modules\Validation\Attributes\IgnoreInterpolationAttribute.cs" />
+        <EmbeddedResource Include="Modules\Validation\Attributes\IgnoreOverrideAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\LengthAttribute.cs" />
+        <EmbeddedResource Include="Modules\Validation\Attributes\VariableIdentifierAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\MaxLengthAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\MinLengthAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\MatchesGrammarAttribute.cs" />
