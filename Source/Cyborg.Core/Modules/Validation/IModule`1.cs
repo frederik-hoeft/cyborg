@@ -14,7 +14,7 @@ public interface IModule<TSelf> : IModule where TSelf : class, IModule<TSelf>
     /// is used to obtain any necessary services for resolving overrides, such as configuration providers or logging services.
     /// The method returns a new instance of the module with all applicable overrides applied, allowing for dynamic configuration based on the runtime context.</remarks>
     /// <param name="runtime">The runtime environment in which the module operates. Used to determine and apply relevant overrides.</param>
-    /// <param name="serviceProvider">The service provider that supplies required services for resolving overrides.</param>
+    /// <param name="serviceProvider">The service provider that supplies required services for resolving module overrides.</param>
     /// <param name="cancellationToken">A cancellation token that can be used to cancel the asynchronous operation.</param>
     /// <returns>A value task that represents the asynchronous operation. The result contains the current module instance with
     /// any overrides applied.</returns>
