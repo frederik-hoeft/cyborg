@@ -12,11 +12,11 @@ public sealed class EnvironmentInterpolationTests
     [DataRow("${##HOME}", "${#HOME}")]
     [DataRow("before ${#HOME} after", "before ${HOME} after")]
     [DataRow("${#}", "${}")]
-    public void Test_InterpolateFinal_HashLiteral_StripsExactlyOneHash(string value, string expected)
+    public void Test_Interpolate_HashLiteral_StripsExactlyOneHash(string value, string expected)
     {
         GlobalRuntimeEnvironment environment = CreateEnvironment();
 
-        string actual = environment.InterpolateFinal(value);
+        string actual = environment.Interpolate(value);
 
         Assert.AreEqual(expected, actual);
     }
@@ -33,12 +33,12 @@ public sealed class EnvironmentInterpolationTests
     }
 
     [TestMethod]
-    public void Test_InterpolateFinal_RevealedExpression_IsNotRescanned()
+    public void Test_Interpolate_RevealedExpression_IsNotRescanned()
     {
         GlobalRuntimeEnvironment environment = CreateEnvironment();
         environment.SetVariable("HOME", "resolved-home");
 
-        string actual = environment.InterpolateFinal("${#HOME}");
+        string actual = environment.Interpolate("${#HOME}");
 
         Assert.AreEqual("${HOME}", actual);
     }
@@ -147,18 +147,6 @@ public sealed class EnvironmentInterpolationTests
     }
 
     [TestMethod]
-    public void Test_SelectStringOverride_ReturnsStoredExpressionWithoutEvaluation()
-    {
-        GlobalRuntimeEnvironment environment = CreateEnvironment();
-        ProbeModule module = new(Value: "fallback", Port: 0) { Name = "probe" };
-        environment.SetVariable("@probe.value", "${#HOME}");
-
-        string? actual = environment.SelectStringOverride(module, module.Value);
-
-        Assert.AreEqual("${#HOME}", actual);
-    }
-
-    [TestMethod]
     public void Test_Resolve_StringFallback_PerformsCompleteEvaluation()
     {
         GlobalRuntimeEnvironment environment = CreateEnvironment();
@@ -193,6 +181,17 @@ public sealed class EnvironmentInterpolationTests
         int actual = environment.Resolve(module, module.Port);
 
         Assert.AreEqual(22, actual);
+    }
+
+    [TestMethod]
+    public void Test_PublicEnvironmentSurface_DoesNotExposeGeneratedPreparationOperations()
+    {
+        string[] methodNames = typeof(IRuntimeEnvironment).GetMethods().Select(static method => method.Name).ToArray();
+
+        CollectionAssert.DoesNotContain(methodNames, "InterpolateFinal");
+        CollectionAssert.DoesNotContain(methodNames, "SelectStringOverride");
+        CollectionAssert.DoesNotContain(methodNames, "SelectRawStringOverride");
+        CollectionAssert.DoesNotContain(methodNames, "ResolveCollection");
     }
 
     private static GlobalRuntimeEnvironment CreateEnvironment() => new(JsonNamingPolicy.SnakeCaseLower);
