@@ -56,8 +56,7 @@ public abstract class ModuleWorker<TModule>(IWorkerContext<TModule> context) : I
     {
         ArgumentNullException.ThrowIfNull(runtime);
         Logger.LogModuleValidationStarted(ModuleId);
-        GeneratedModuleValidationContext validationContext = new(runtime.Environment);
-        ValidationResult<TModule> result = await context.Module.ValidateAsync(runtime, validationContext, ServiceProvider, cancellationToken);
+        ValidationResult<TModule> result = await context.Module.ValidateAsync(runtime, ServiceProvider, cancellationToken);
         ValidationResult<TModule> overriddenResult = await ModuleValidationCallbackAsync(result, context.Module, cancellationToken);
         IModuleArtifactsFactory artifactsFactory = ServiceProvider.GetRequiredService<IModuleArtifactsFactory>();
         if (!overriddenResult.IsValid)
