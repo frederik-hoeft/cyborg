@@ -17,6 +17,7 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
             $$"""
             async {{KnownTypes.ValueTaskOfT(qualifiedType)}} {{contractInfo.IModuleT.RenderGlobalWithGenerics(qualifiedType)}}.ResolveOverridesAsync(
                 {{contractInfo.IModuleRuntime.RenderGlobal()}} runtime,
+                {{contractInfo.GeneratedModuleValidationContext.RenderGlobal()}} validationContext,
                 {{KnownTypes.IServiceProvider}} serviceProvider,
                 {{KnownTypes.CancellationToken}} cancellationToken)
             {
@@ -160,8 +161,8 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
     private static string CreateOverrideResolutionExpression(PropertyRewriteContext context, string rootPathExpression)
     {
         string expression = context.Property.Symbol.Type.SpecialType is SpecialType.System_String
-            ? $"runtime.Environment.SelectStringOverride({context.ModuleVariable}, {context.PropertyAccessExpression}, valueExpression: \"{rootPathExpression}\")"
-            : $"runtime.Environment.Resolve({context.ModuleVariable}, {context.PropertyAccessExpression}, valueExpression: \"{rootPathExpression}\")";
+            ? $"validationContext.SelectRawStringOverride({context.ModuleVariable}, {context.PropertyAccessExpression}, moduleExpression: \"{context.ModuleVariable}\", valueExpression: \"{rootPathExpression}\")"
+            : $"validationContext.ResolveOverride({context.ModuleVariable}, {context.PropertyAccessExpression}, moduleExpression: \"{context.ModuleVariable}\", valueExpression: \"{rootPathExpression}\")";
         foreach (PropertyAspect aspect in context.Property.Aspects)
         {
             expression = aspect.RewriteOverrideResolutionExpression(context, expression, rootPathExpression);
