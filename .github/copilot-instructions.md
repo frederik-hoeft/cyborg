@@ -1,65 +1,198 @@
-# Cyborg
+# Cyborg Repository Instructions
 
-Cyborg is a .NET 10 domain-agnostic workflow orchestration framework with native AOT compilation. It uses a modular, JSON-configured architecture where workflows are composed from reusable module trees.
+Cyborg is a .NET 10 application for modular, JSON-configured backup orchestration with native AOT compilation support. Workflows are immutable module trees that are loaded through source-generated JSON metadata, prepared through generated validation code, and executed inside hierarchical runtime environments.
 
-> **For architecture and design, refer to [/docs/architecture.md](/docs/architecture.md)** — the central hub linking to all detailed documentation.
+## Start Here
 
-## Project Structure
+Before changing implementation code:
 
-```
-Source/
-├── Cyborg.Cli/          # ConsoleAppFramework CLI entry point
-├── Cyborg.Core/         # Core abstractions: modules, configuration, runtime, parsing
-├── Cyborg.Core.Aot/     # Roslyn source generators (validation, loader factory, decomposition)
-├── Cyborg.Core.Tests/   # Unit tests
-├── Cyborg.Modules/      # Built-in modules (Sequence, Subprocess, Template, If, Foreach, etc.)
-└── Cyborg.Modules.Borg/ # BorgBackup-specific modules
-```
+1. Read [`/code-style.md`](/code-style.md).
+2. Read the architecture hub at [`/docs/architecture.md`](/docs/architecture.md).
+3. Read the subsystem document relevant to the change and inspect nearby production code and tests.
+4. Treat the current architecture documentation and implementation as the source of truth. Update the documentation when a change alters a documented contract.
+
+Important architecture references:
+
+| Topic | Document |
+|-------|----------|
+| System structure and runtime interactions | [`/docs/architecture/architecture-overview.md`](/docs/architecture/architecture-overview.md) |
+| Interpolation and override-resolution contract | [`/docs/architecture/interpolation.md`](/docs/architecture/interpolation.md) |
+| Source generators | [`/docs/architecture/source-generators.md`](/docs/architecture/source-generators.md) |
+| Validation/default/override attributes | [`/docs/architecture/validation-attributes-reference.md`](/docs/architecture/validation-attributes-reference.md) |
+| Built-in modules | [`/docs/architecture/modules-reference.md`](/docs/architecture/modules-reference.md) |
+| Dynamic values | [`/docs/architecture/dynamic-values-reference.md`](/docs/architecture/dynamic-values-reference.md) |
+| Templates | [`/docs/architecture/templates-reference.md`](/docs/architecture/templates-reference.md) |
+| Module test infrastructure | [`/docs/architecture/module-testing.md`](/docs/architecture/module-testing.md) |
+
+## Solution Structure
+
+The solution is under `Source/Cyborg.slnx`.
+
+| Project | Responsibility |
+|---------|----------------|
+| `Cyborg.Core` | Runtime abstractions, module execution, environment scoping, configuration, parsing, process execution, metrics, security, and shared services. It must not contain module-specific behavior. |
+| `Cyborg.Core.Aot` | Roslyn incremental generators for module validation, loader factories, decomposition, and generator-contract bootstrapping. Targets `netstandard2.0` for analyzer hosting. |
+| `Cyborg.Core.TestAdapter` | Reusable production-backed module test runtime and higher-order test APIs. |
+| `Cyborg.TestModules` | Minimal analyzer-consuming assembly for source-generator fixture models. |
+| `Cyborg.Core.Tests` | Core runtime and infrastructure tests. |
+| `Cyborg.Modules` | Built-in domain-agnostic modules and their generated code. |
+| `Cyborg.Modules.Tests` | Tests for built-in modules and generated validation behavior. |
+| `Cyborg.Modules.Borg` | Borg-specific modules, configuration types, parsers, and metrics. |
+| `Cyborg.Modules.Borg.Tests` | Borg-specific tests. |
+| `Cyborg.Cli` | ConsoleAppFramework entry point and Jab composition root. |
+
+## Architectural Invariants
+
+### Module model
+
+A normal executable module has three production types:
+
+1. A sealed partial configuration record marked `[GeneratedModuleValidation]`, inheriting from `ModuleBase`, implementing `IModule`, and exposing a versioned static `ModuleId`.
+2. A sealed worker inheriting from `ModuleWorker<TModule>`, receiving an `IWorkerContext<TModule>`, and implementing `ExecuteAsync`.
+3. A sealed partial loader marked `[GeneratedModuleLoaderFactory]` and inheriting from `ModuleLoader<TWorker, TModule>`.
+
+`ModuleContext` is the execution envelope. It combines the module with environment selection, an optional configuration module, and optional requirements. `ModuleReference` is the polymorphic composition mechanism used for nested module trees.
+
+Module IDs are versioned, dot-separated identifiers such as `cyborg.modules.subprocess.v1`. JSON property names use snake case. Polymorphic loading is registry-based and must remain native-AOT-compatible.
+
+### Generated preparation and validation
+
+The generated module pipeline has a fixed order:
+
+1. Apply defaults.
+2. Resolve or select overrides.
+3. Reapply defaults.
+4. Interpolate eligible strings.
+5. Validate constraints.
+
+Each phase returns transformed records through `with` expressions. Do not mutate the deserialized module instance.
+
+String overrides are selected as stored values without evaluating their contents. Non-string overrides use full typed resolution. This distinction is required so `[IgnoreInterpolation]` applies equally to JSON values, defaults, and overrides, and so generated preparation does not accidentally perform an extra interpolation pass.
+
+The worker receives the validated module. Do not repeat generated interpolation in worker code. Manually call `runtime.Environment.Interpolate(...)` only for values whose evaluation was intentionally deferred, normally through `[IgnoreInterpolation]`.
+
+### Runtime environments, resolution, and interpolation
+
+Environment values are late-bound:
+
+- `SetVariable(...)` stores values unchanged.
+- `TryResolveVariable(...)` and `Interpolate(...)` are complete evaluation boundaries.
+- Unresolved ordinary expressions remain unchanged.
+- Cyclic resolution throws `InvalidOperationException`.
+
+Supported ordinary expressions are:
+
+| Syntax | Meaning |
+|--------|---------|
+| `${identifier}` | Resolve relative to the scope where the expression is encountered. |
+| `${@identifier}` | Resolve relative to the original resolution entry point. |
+| `${@}` | Resolve the current scope namespace. |
+| `${@@}` | Resolve the original entry-point namespace. |
+
+`${#...}` escapes one interpolation pass. Each pass removes exactly one leading `#` and does not rescan the newly exposed expression during that pass.
+
+The effective module namespace uses `Name`, then `Group`, then `ModuleId`. Override lookup uses this precedence:
+
+1. Module `Name`.
+2. Module `Group`.
+3. Module ID.
+4. Override-resolution tags in their declared order.
+
+`ModuleBase.Name` and `ModuleBase.Group` define structural identity before validation and therefore opt out of normal override and interpolation processing.
+
+### Source generators and native AOT
+
+Production paths must remain trim-safe and native-AOT-compatible. Prefer source generation, explicit registration, and compile-time metadata over reflection or runtime type discovery.
+
+Do not edit generated output. Change the source generator, processor/aspect, contract registration, annotated model, or source-generation metadata that owns the behavior.
+
+Generator targets have structural requirements:
+
+- `[GeneratedModuleValidation]`: partial record.
+- `[GeneratedModuleLoaderFactory]`: partial loader with the expected `ModuleLoader<TWorker, TModule>` base.
+- `[GeneratedDecomposition]`: partial record or class.
+- `[Validatable]`: nested record participating recursively in defaults, overrides, interpolation, and constraints.
+
+Generator-emitted references should use fully qualified global type names. Preserve incremental-generator value semantics and avoid carrying mutable or identity-based state through incremental pipelines.
+
+When changing generator behavior, add or update diagnostics and regression coverage for the generated shape, nullability, collection materialization, recursion, and invalid attribute usage as applicable.
+
+### Dynamic values and decomposition
+
+A dynamic value entry contains a non-null `key` and exactly one non-null typed-value property. Structural errors belong in the converter because dynamic values are also used outside module-validation paths. Semantic constraints belong in generated validation where applicable.
+
+New dynamic types require an `IDynamicValueProvider`, explicit service registration, and the appropriate source-generated JSON metadata. Use `[GeneratedDecomposition]` when a typed model must expose hierarchical environment paths through `IDecomposable`.
+
+### Dependency injection and serialization
+
+Jab service-provider modules are the compile-time DI registration surface. Module loaders are registered as `IModuleLoader` implementations in the appropriate service module, such as `ICyborgModuleServices` or `ICyborgBorgServices`.
+
+Every serializable module/configuration type required at runtime must be enrolled in the appropriate `JsonSerializerContext`. Do not introduce reflection-based serialization as a shortcut.
+
+## Adding or Changing a Module
+
+For a new module or a new version of an existing module:
+
+1. Add the module record, worker, and generated loader in the appropriate project and namespace.
+2. Apply validation, defaulting, override, and interpolation-control attributes to the configuration model instead of duplicating preparation logic in the worker.
+3. Register the loader in the appropriate Jab service module.
+4. Add the module/configuration type to the appropriate source-generated JSON serializer context.
+5. Add focused tests through the production-backed module test adapter.
+6. Update the module reference and any affected architecture documentation.
+
+Do not silently change the JSON contract or behavior of an existing versioned module ID. Add a new version or document and justify compatibility when the external contract changes.
+
+## Testing
+
+Prefer the higher-order APIs exposed by `CyborgTestBase` and the domain test bases for module tests. They exercise production deserialization, generated preparation, validation, runtime execution, and artifact publication with less duplicated setup.
+
+Use `Cyborg.TestModules` for fixture records that must directly consume `Cyborg.Core.Aot`. Do not enroll `Cyborg.Modules.Tests` itself in the validation analyzer: it is an `InternalsVisibleTo` target of `Cyborg.Core`, and emitting another copy of the internal generator framework types there creates conflicting definitions.
+
+Keep tests in the matching layer:
+
+- core behavior in `Cyborg.Core.Tests`;
+- domain-agnostic modules in `Cyborg.Modules.Tests`;
+- Borg-specific behavior in `Cyborg.Modules.Borg.Tests`;
+- generator-only model shapes in `Cyborg.TestModules`, asserted from the relevant test project.
 
 ## Code Style
 
-Full guide: [/code-style.md](/code-style.md)
+Follow `/code-style.md` and `.editorconfig`. In particular:
 
-- **No `var`** — always explicit types: `FileStream stream = new(...);`
-- **Naming** — `_camelCase` private fields, `s_camelCase` statics, `SCREAMING_CASE` constants
-- **Async** — suffix with `Async`, always await Tasks
-- **Visibility** — always explicit; seal/static all internal types
-- **Collections** — `ImmutableArray<T>` for module configuration properties
+- Use explicit types instead of `var`, except for truly anonymous types.
+- Use Allman braces and four-space indentation.
+- Keep `using` directives outside file-scoped namespaces and sort them alphabetically.
+- Always specify visibility.
+- Use `_camelCase` for non-public instance fields, `s_camelCase` for static fields, and `SCREAMING_SNAKE_CASE` for compile-time constants.
+- Suffix task-returning methods with `Async`.
+- Use language keywords such as `int` and `string` instead of BCL aliases.
+- Seal or make static internal/private types unless derivation is required.
+- Use nullable annotations and the appropriate nullability attributes for `Try...` APIs.
+- Prefer `nameof(...)`, `string.Empty`, target-typed `new()` with an explicit left-hand type, and named arguments for unclear constants.
+- Use Unicode escape sequences rather than literal non-ASCII source characters.
+- Keep one top-level type per file unless tightly coupled types clearly benefit from co-location.
 
-## Key Patterns
+Match the established style in adjacent code. Avoid unrelated cleanup in focused changes.
 
-- **Three-part module pattern** — Module record (`IModule`) + Worker (`ModuleWorker<T>`) + Loader (`[GeneratedModuleLoaderFactory]`)
-- **Jab DI** — compile-time DI via `[ServiceProviderModule]` / `[Import<T>]`
-- **Environment scoping** — hierarchical variable scopes (`Isolated`, `InheritParent`, `Global`, etc.)
-- **Source generators** — validation, loader factory, decomposition, contract bootstrap (see [/docs/architecture/source-generators.md](/docs/architecture/source-generators.md))
+## Build and Validation
 
-## Creating a New Module
-
-1. Define module record in `Cyborg.Modules/{Name}/` implementing `IModule`
-2. Create worker inheriting `ModuleWorker<TModule>`
-3. Create loader with `[GeneratedModuleLoaderFactory]` attribute
-4. Register in `ICyborgModuleServices.cs`
-5. Add to `ModuleJsonSerializerContext.cs`
-
-Details: [/docs/architecture/architecture-overview.md § Module System](/docs/architecture/architecture-overview.md)
-
-## Build
+Run commands from the repository root:
 
 ```bash
-cd Source
-dotnet build Cyborg.slnx                     # Build all
-dotnet test                                   # Run tests
-./docker-build.sh -o /path/to/output          # AOT publish via Docker
+dotnet restore Source/Cyborg.slnx
+dotnet build Source/Cyborg.slnx --no-restore --configuration Release
+dotnet test Source/Cyborg.slnx --no-build --configuration Release
 ```
 
-## Key Documentation
+For focused iteration, run the affected test project directly, then run the full solution tests before completing a substantive implementation change.
 
-| Topic | Path |
-|-------|------|
-| Architecture hub | [/docs/architecture.md](/docs/architecture.md) |
-| Full architecture | [/docs/architecture/architecture-overview.md](/docs/architecture/architecture-overview.md) |
-| Source generators | [/docs/architecture/source-generators.md](/docs/architecture/source-generators.md) |
-| Module reference | [/docs/architecture/modules-reference.md](/docs/architecture/modules-reference.md) |
-| Validation attributes | [/docs/architecture/validation-attributes-reference.md](/docs/architecture/validation-attributes-reference.md) |
-| Dynamic values | [/docs/architecture/dynamic-values-reference.md](/docs/architecture/dynamic-values-reference.md) |
-| Templates | [/docs/architecture/templates-reference.md](/docs/architecture/templates-reference.md) |
+For documentation-only changes, inspect the rendered Markdown, verify links and paths, and report that no build was required rather than claiming unrun validation.
+
+## Change Discipline
+
+- Keep changes scoped to the requested behavior.
+- Preserve layer boundaries and native-AOT constraints.
+- Preserve the generated validation phase order and the separation between override selection and expression evaluation.
+- Add regression tests for behavioral fixes.
+- Update architecture documentation when contracts, phases, registration requirements, or cross-subsystem interactions change.
+- Do not guess at undocumented behavior when the implementation or tests can establish the contract.
