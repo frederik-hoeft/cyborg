@@ -2,15 +2,14 @@
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation;
 
 internal static class CollectionTypeInspector
 {
-    private const string IMMUTABLE_ARRAY_METADATA_NAME = "System.Collections.Immutable.ImmutableArray`1";
-
-    public static bool TryDescribe(Compilation compilation, ITypeSymbol type, out CollectionTypeDescriptor? descriptor)
+    public static bool TryDescribe(Compilation compilation, ITypeSymbol type, [NotNullWhen(true)] out CollectionTypeDescriptor? descriptor)
     {
         descriptor = null;
 
@@ -37,10 +36,7 @@ internal static class CollectionTypeInspector
         ITypeSymbol elementType = enumerableInterface.TypeArguments[0];
         CollectionMaterializationKind materializationKind = DetermineMaterializationKind(compilation, namedType, elementType, out string? materializationTypeName);
 
-        descriptor = new CollectionTypeDescriptor(
-            ElementType: elementType,
-            MaterializationKind: materializationKind,
-            MaterializationTypeName: materializationTypeName);
+        descriptor = new CollectionTypeDescriptor(elementType, materializationKind, materializationTypeName);
 
         return true;
     }
@@ -76,7 +72,7 @@ internal static class CollectionTypeInspector
             return CollectionMaterializationKind.UseList;
         }
 
-        if (type.IsGenericType && type.OriginalDefinition.GetFullMetadataName() == IMMUTABLE_ARRAY_METADATA_NAME)
+        if (type.IsGenericType && type.OriginalDefinition.GetFullMetadataName().Equals(typeof(ImmutableArray<>).FullName, StringComparison.Ordinal))
         {
             return CollectionMaterializationKind.UseImmutableArray;
         }
@@ -118,7 +114,7 @@ internal static class CollectionTypeInspector
             return false;
         }
 
-        INamedTypeSymbol? listDefinition = compilation.GetTypeByMetadataName(typeof(List<>).FullName!);
+        INamedTypeSymbol? listDefinition = compilation.GetTypeByMetadataName(typeof(List<>).FullName);
         if (listDefinition is null)
         {
             return false;
@@ -183,8 +179,5 @@ internal static class CollectionTypeInspector
     private static bool IsCollection(INamedTypeSymbol type) =>
         type.OriginalDefinition.SpecialType == SpecialType.System_Collections_Generic_ICollection_T;
 
-    internal sealed record CollectionTypeDescriptor(
-        ITypeSymbol ElementType,
-        CollectionMaterializationKind MaterializationKind,
-        string? MaterializationTypeName);
+    internal sealed record CollectionTypeDescriptor(ITypeSymbol ElementType, CollectionMaterializationKind MaterializationKind, string? MaterializationTypeName);
 }

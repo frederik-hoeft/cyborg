@@ -16,6 +16,7 @@ This document describes the design and architecture of the reusable unit testing
   - [TestModuleRuntimeScope](#testmoduleruntimescope)
   - [CyborgTestBase](#cyborgtestbase)
   - [Per-Domain Test Base Classes](#per-domain-test-base-classes)
+  - [Generator-Enrolled Test Models](#generator-enrolled-test-models)
 - [Higher-Order Function API](#higher-order-function-api)
   - [Deserialization Testing](#deserialization-testing)
   - [Validation Testing](#validation-testing)
@@ -31,6 +32,7 @@ This document describes the design and architecture of the reusable unit testing
 - [Design Decisions](#design-decisions)
   - [Reflection-Based Jab Discovery](#reflection-based-jab-discovery)
   - [Facade Pattern Over Monolith](#facade-pattern-over-monolith)
+  - [Dedicated Generator Fixture Assembly](#dedicated-generator-fixture-assembly)
   - [InternalsVisibleTo](#internalsvisibleto)
 
 <!-- /code_chunk_output -->
@@ -40,7 +42,7 @@ This document describes the design and architecture of the reusable unit testing
 The testing adapter enables writing per-module unit tests that cover the following common scenarios:
 
 1. **Polymorphic deserialization** — Verifying that module JSON is correctly deserialized into the expected module record type via the registry-based deserialization pipeline.
-2. **Validation attribute enforcement** — Checking that required fields, regex patterns, range constraints, and other validation attributes produce expected validation results.
+2. **Generated preparation and validation** — Checking defaults, override resolution, recursive interpolation, collection materialization and guards, and validation attributes through generated `IModule<T>` implementations.
 3. **Runtime override resolution** — Confirming that environment variable injection, property overrides, and default value application produce correctly transformed module records.
 4. **Worker execution and artifact publishing** — Asserting actual vs. expected module results, exit statuses, artifact paths, and published environment variables after execution.
 5. **Exception handling and error reporting** — Testing that execution produces expected exceptions or error states (validation failures, skipped/failed statuses).
@@ -165,6 +167,21 @@ Each test project provides a thin subclass of `CyborgTestBase` that registers th
 | `ModuleTestBase` | `Cyborg.Modules.Tests` | `ICyborgModuleServices` |
 | `BorgModuleTestBase` | `Cyborg.Modules.Borg.Tests` | `ICyborgModuleServices` + `ICyborgBorgServices` |
 
+### Generator-Enrolled Test Models
+
+`Cyborg.TestModules` is a minimal class library for test-only records that must consume `Cyborg.Core.Aot`. It references `Cyborg.Core` and the analyzer, but it does not reference MSTest, the test adapter, or production module libraries. `Cyborg.Modules.Tests` references the compiled fixture assembly and invokes the generated `IModule<T>` members directly through a production-backed `TestModuleRuntimeScope`.
+
+```text
+Cyborg.Core.Aot --analyzer--> Cyborg.TestModules --project reference--> Cyborg.Modules.Tests
+       |                              |                                  |
+       |                              +--> Cyborg.Core (public API)       +--> Cyborg.Core (friend access)
+       +---------------------------------------------------------------> production module projects
+```
+
+This separation is intentional. `Cyborg.Modules.Tests` is a friend assembly of `Cyborg.Core`, so it can see the internal framework attributes and contract types emitted into `Cyborg.Core`. Running the same bootstrap generator in that friend compilation would emit another set of identically named internal framework types, producing ambiguous or conflicting source-generated members. `Cyborg.TestModules` is not an `InternalsVisibleTo` target, so only its own generated framework types participate in its compilation.
+
+The fixture assembly is used for generator-specific shapes that are difficult to express through production modules, such as a default `ImmutableArray<T>`, a nullable immutable array whose underlying value is default, nested validatable collection elements, and explicit interpolation opt-outs. Runtime/deserialization regressions that already have a production module shape remain in the normal module test project.
+
 ## Higher-Order Function API
 
 All HOF methods follow a consistent pattern: they accept an optional `moduleJson` string, a required assertion callback (lambda), and optional configuration overrides. The assertion lambda receives only the data relevant to the specific test scenario, keeping test code focused and free of boilerplate.
@@ -217,7 +234,7 @@ protected Task TestValidationAsync<TModule>(
     Action<IServiceCollection>? configureServices = null)
 ```
 
-Runs the full three-stage validation pipeline (defaults → overrides → constraints) and passes the `ValidationResult<TModule>` to the assertion. Use this to verify that validation attributes reject invalid inputs and that defaults are applied correctly.
+Runs the complete generated pipeline (defaults → overrides → defaults → interpolation → constraints) and passes the `ValidationResult<TModule>` to the assertion. Use this to verify transformed values, recursive collection behavior, interpolation ordering, and validation errors.
 
 ```csharp
 protected Task TestValidatedModuleAsync<TModule>(
@@ -244,7 +261,7 @@ protected Task TestOverridesAsync<TModule>(
     Action<IServiceCollection>? configureServices = null)
 ```
 
-Configures environment variables via the `environmentSetup` callback, then runs validation (which includes override resolution) and passes the resolved module to the assertion. Use this to verify that `@module.property` overrides, variable interpolation, and default substitution work correctly.
+Configures environment variables via the `environmentSetup` callback, then runs validation and passes the transformed module to the assertion. Use this to verify typed `@module.property` overrides, the second defaulting pass, and the separate recursive interpolation phase.
 
 ### Module Execution Testing
 
@@ -410,7 +427,7 @@ This approach was chosen over the alternative of manually duplicating registrati
 
 ### Facade Pattern Over Monolith
 
-`ModuleTestBase` is intentionally a thin façade that delegates to `TestServiceConfiguration`, `JabRegistrationDiscovery`, and `TestModuleRuntimeScope`. Each component has a single responsibility:
+`ModuleTestBase` is intentionally a thin façade that delegates to `TestServiceConfiguration`, `JabServiceDiscovery`, and `TestModuleRuntimeScope`. Each component has a single responsibility:
 
 | Component | Responsibility |
 |-----------|----------------|
@@ -422,6 +439,18 @@ This approach was chosen over the alternative of manually duplicating registrati
 
 This separation ensures maintainability: changes to the DI translation logic do not affect the test API surface, and new HOF methods can be added to `ModuleTestBase` without touching the infrastructure components.
 
+### Dedicated Generator Fixture Assembly
+
+Generator-enrolled fixtures live in `Cyborg.TestModules` rather than directly in `Cyborg.Modules.Tests`. The fixture project has the smallest dependency surface required by the generator and is included in `Cyborg.slnx`, while the consuming test project references its public fixture records.
+
+This boundary provides three benefits:
+
+1. Analyzer-generated members are compiled once in a normal non-friend assembly.
+2. The MSTest project remains focused on test execution and does not acquire an analyzer-only build contract.
+3. Generator regression fixtures can evolve independently from production module registration and JSON loader infrastructure.
+
+The fixture records are instantiated directly in validation tests because they are not production modules and deliberately have no loader or DI registration. Tests create a normal `TestModuleRuntimeScope`, configure environment values, and call the generated `ValidateAsync` implementation.
+
 ### InternalsVisibleTo
 
-`[assembly: InternalsVisibleTo("...")]` entries are declared in `Cyborg.Core/_friends.cs` for each test project (`Cyborg.Core.Tests`, `Cyborg.Modules.Tests`, `Cyborg.Modules.Borg.Tests`) to grant access to `internal` runtime APIs (e.g., `IModuleWorker.ExecuteAsync`, `ScopedRuntime`, `ModuleExecutionResult`). This follows the existing pattern already used for `Cyborg.Core.Tests`.
+`[assembly: InternalsVisibleTo("...")]` entries are declared in `Cyborg.Core/_friends.cs` for each executable test project (`Cyborg.Core.Tests`, `Cyborg.Modules.Tests`, `Cyborg.Modules.Borg.Tests`) to grant access to internal runtime APIs such as `IModuleWorker.ExecuteAsync`, `ScopedRuntime`, and `ModuleExecutionResult`. `Cyborg.TestModules` is intentionally not included: it consumes only public runtime contracts, which prevents internal generated framework types from `Cyborg.Core` from colliding with the copies emitted into the fixture compilation.

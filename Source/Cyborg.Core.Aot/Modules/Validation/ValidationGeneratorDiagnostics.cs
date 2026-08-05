@@ -30,10 +30,10 @@ internal static class ValidationGeneratorDiagnostics
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
 
-    public static DiagnosticDescriptor GenericTypeMismatch { get; } = new(
+    public static DiagnosticDescriptor GenericTypesMismatch { get; } = new(
         id: "CYBORGVAL004",
         title: "Generic attribute type mismatch",
-        messageFormat: "Property '{0}' on '{1}' has a '{2}' whose generic type does not match the property type",
+        messageFormat: "Property '{0}' on '{1}' has a '{2}' whose generic type argument at position {3} does not match the expected types: '{4}'",
         category: CATEGORY,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
@@ -49,7 +49,7 @@ internal static class ValidationGeneratorDiagnostics
     public static DiagnosticDescriptor UnsupportedAttributeLiteral { get; } = new(
         id: "CYBORGVAL006",
         title: "Unsupported attribute literal",
-        messageFormat: "Property '{0}' on '{1}' uses an attribute value that the generator cannot re-emit as source",
+        messageFormat: "Property '{0}' on '{1}' passes a value to '{2}' that the generator cannot re-emit as source",
         category: CATEGORY,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
@@ -178,6 +178,22 @@ internal static class ValidationGeneratorDiagnostics
         id: "CYBORGVAL022",
         title: "Attribute member inaccessible",
         messageFormat: "Property '{0}' on '{1}' has a '{2}' referencing member '{3}' which is not accessible from the generated code",
+        category: CATEGORY,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    public static DiagnosticDescriptor CollectionApplicationRequiresCollection { get; } = new(
+        id: "CYBORGVAL023",
+        title: "Collection validation requires a collection property",
+        messageFormat: "Property '{0}' on '{1}' uses '{2}' with TargetsElements enabled, but type '{3}' is not a supported collection",
+        category: CATEGORY,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    public static DiagnosticDescriptor CollectionElementTypeMismatch { get; } = new(
+        id: "CYBORGVAL024",
+        title: "Collection element type does not support validation attribute",
+        messageFormat: "Property '{0}' on '{1}' uses '{2}' with TargetsElements enabled, but collection element type '{3}' must be '{4}'",
         category: CATEGORY,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);

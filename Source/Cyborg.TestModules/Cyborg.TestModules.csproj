@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Cyborg.Core\Cyborg.Core.csproj" />
+        <ProjectReference Include="..\Cyborg.Core.Aot\Cyborg.Core.Aot.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </ProjectReference>
+    </ItemGroup>
+</Project>

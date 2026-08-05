@@ -4,5 +4,6 @@
 internal sealed class RangeAttribute<T> : Attribute
 {
     public T? Min { get; set; }
+
     public T? Max { get; set; }
 }

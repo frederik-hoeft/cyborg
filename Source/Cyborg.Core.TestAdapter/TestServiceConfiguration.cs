@@ -2,7 +2,7 @@
 
 namespace Cyborg.Core.TestAdapter;
 
-internal static class TestServiceConfiguration
+public static class TestServiceConfiguration
 {
     public static IServiceCollection CreateDefaultServices() => new ServiceCollection();
 }

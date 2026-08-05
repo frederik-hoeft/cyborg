@@ -1,29 +1,30 @@
-﻿using Cyborg.Core.Aot.Modules.Validation.Attributes;
+﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using System.Globalization;
 
 namespace Cyborg.Core.Aot;
 
 internal static class KnownTypes
 {
-    public static string IServiceProvider => field ??= $"global::{typeof(IServiceProvider).FullName}";
+    public static string IServiceProvider => field ??= typeof(IServiceProvider).RenderGlobal();
 
-    public static string CancellationToken => field ??= $"global::{typeof(CancellationToken).FullName}";
+    public static string CancellationToken => field ??= typeof(CancellationToken).RenderGlobal();
 
-    public static string ValueTaskOfT(string typeArgument) => $"global::{typeof(ValueTask<>).Namespace}.{nameof(ValueTask<>)}<{typeArgument}>";
+    public static string ValueTaskOfT(string typeArgument) => typeof(ValueTask<>).RenderGlobalWithGenerics(typeArgument);
 
-    public static string IEnumerableOfT(string typeArgument) => $"global::{typeof(IEnumerable<>).Namespace}.{nameof(IEnumerable<>)}<{typeArgument}>";
+    public static string IEnumerableOfT(string typeArgument) => typeof(IEnumerable<>).RenderGlobalWithGenerics(typeArgument);
 
-    public static string ICollectionOfT(string typeArgument) => $"global::{typeof(ICollection<>).Namespace}.{nameof(ICollection<>)}<{typeArgument}>";
+    public static string ICollectionOfT(string typeArgument) => typeof(ICollection<>).RenderGlobalWithGenerics(typeArgument);
 
-    public static string ListOfT(string typeArgument) => $"global::{typeof(List<>).Namespace}.{nameof(List<>)}<{typeArgument}>";
+    public static string ListOfT(string typeArgument) => typeof(List<>).RenderGlobalWithGenerics(typeArgument);
 
     public static string Enumerable => "global::System.Linq.Enumerable";
 
     public static string ImmutableArray => "global::System.Collections.Immutable.ImmutableArray";
 
-    public static string TimeSpan => field ??= $"global::{typeof(TimeSpan).FullName}";
+    public static string TimeSpan => field ??= typeof(TimeSpan).RenderGlobal();
 
-    public static string Enum => field ??= $"global::{typeof(Enum).FullName}";
+    public static string Enum => field ??= typeof(Enum).RenderGlobal();
 
     public static string JsonNamingPolicy => "global::System.Text.Json.JsonNamingPolicy";
 
@@ -35,11 +36,13 @@ internal static class KnownTypes
 
     public static string File => $"global::System.IO.File";
 
-    public static string Path => field ??= $"global::{typeof(Path).FullName}";
+    public static string Path => field ??= typeof(Path).RenderGlobal();
 
-    public static string InvariantCulture => field ??= $"global::{typeof(CultureInfo).FullName}.{nameof(CultureInfo.InvariantCulture)}";
+    public static string Task => field ??= typeof(Task).RenderGlobal();
 
-    public static string ValidationRuntimeHelpers => field ??= $"global::{typeof(ValidationRuntimeHelpers).FullName}";
+    public static string InvariantCulture => field ??= $"{typeof(CultureInfo).RenderGlobal()}.{nameof(CultureInfo.InvariantCulture)}";
 
-    public static string DefaultEqualityComparerOfT(string typeArgument) => $"global::{typeof(EqualityComparer<>).Namespace}.{nameof(EqualityComparer<>)}<{typeArgument}>.{nameof(EqualityComparer<>.Default)}";
+    public static string ValidationRuntimeHelpers => field ??= typeof(ValidationRuntimeHelpers).RenderGlobal();
+
+    public static string DefaultEqualityComparerOfT(string typeArgument) => $"{typeof(EqualityComparer<>).RenderGlobalWithGenerics(typeArgument)}.{nameof(EqualityComparer<>.Default)}";
 }

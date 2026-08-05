@@ -6,5 +6,5 @@ internal interface IPropertyAttributeProcessor : IPropertyProcessor
 {
     string AttributeMetadataName { get; }
 
-    bool TryProcess(PropertyProcessingContext context, AttributeData attribute, out PropertyValidationAspect? aspect);
+    bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect);
 }
