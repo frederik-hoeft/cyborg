@@ -175,12 +175,10 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
 
     public virtual bool TryRemoveVariable(string name) => Variables.Remove(name);
 
-    public virtual string Interpolate(string template) => InterpolateFinal(template);
-
-    public virtual string InterpolateFinal(string template)
+    public virtual string Interpolate(string template)
     {
         ArgumentNullException.ThrowIfNull(template);
-        return InterpolateFinal(template, entryPoint: this);
+        return InterpolateCore(template, entryPoint: this);
     }
 
     public virtual void Publish(string root, IDecomposable decomposable, DecompositionStrategy strategy, bool publishNullValues)
@@ -241,7 +239,7 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         return TryResolveVariableRecursiveCore(ResolutionContext.Create(entryPoint, name), out value);
     }
 
-    private protected string InterpolateFinal(string template, EnvironmentLike entryPoint)
+    private protected string InterpolateCore(string template, EnvironmentLike entryPoint)
     {
         ArgumentNullException.ThrowIfNull(template);
         ArgumentNullException.ThrowIfNull(entryPoint);
