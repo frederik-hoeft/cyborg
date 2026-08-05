@@ -1,4 +1,4 @@
-using Cyborg.Core.Aot.Extensions;
+﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using System.Text;
 
@@ -17,24 +17,23 @@ internal static class ModuleValidationRenderer
         public static string NullableRelax => "__NullableRelax";
     }
 
-    public static string Render(
-        ModuleModel model,
-        ValidationContractInfo contractInfo,
-        DiagnosticsReporter diagnosticsReporter)
+    public static string ApplyDefaultsAsync => "ApplyDefaultsAsync";
+
+    public static string ApplyInterpolationAsync => "ApplyInterpolationAsync";
+
+    public static string ResolveOverridesAsync => "ResolveOverridesAsync";
+
+    public static string ValidateAsync => "ValidateAsync";
+
+    public static string Render(ModuleModel model, ValidationContractInfo contractInfo, DiagnosticsReporter diagnosticsReporter)
     {
         ReadOnlySpan<ISectionRenderer> renderPipeline =
         [
-            new DefaultsSectionRenderer(
-                contractInfo,
-                MODULE_VARIABLE,
-                diagnosticsReporter),
-            new OverrideSectionRenderer(
-                contractInfo,
-                MODULE_VARIABLE,
-                diagnosticsReporter),
-            new ValidationSectionRenderer(
-                contractInfo,
-                diagnosticsReporter),
+            new DefaultsSectionRenderer(contractInfo, MODULE_VARIABLE, diagnosticsReporter),
+            new OverrideSectionRenderer(contractInfo, MODULE_VARIABLE, diagnosticsReporter),
+            new InterpolationSectionRenderer(contractInfo, MODULE_VARIABLE),
+            new ValidationSectionRenderer(contractInfo, diagnosticsReporter),
+            new InspectionSectionRenderer(contractInfo, diagnosticsReporter),
             new InspectionSectionRenderer(
                 contractInfo,
                 diagnosticsReporter),

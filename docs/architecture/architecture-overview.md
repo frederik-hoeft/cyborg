@@ -1,4 +1,4 @@
-# Cyborg System Architecture
+﻿# Cyborg System Architecture
 
 This document provides a comprehensive overview of the Cyborg system architecture. It covers the module system, JSON deserialization, execution model, environment scoping, variable resolution, property overrides, artifact publishing, parsing infrastructure, process execution, metrics, and security. After reading this document, you should have a clear understanding of how the system is structured, how modules are loaded and executed, and how the major subsystems interact.
 
@@ -8,7 +8,8 @@ For detailed reference material, see:
 - [Dynamic Values Reference](dynamic-values-reference.md) — Dynamic value providers and typed configuration
 - [Templates Reference](templates-reference.md) — Template module usage and patterns
 - [Source Generators](source-generators.md) — Roslyn source generators for AOT-compatible code generation
-- [Validation Attributes Reference](validation-attributes-reference.md) — Validation, defaulting, and override control attributes
+- [Validation Attributes Reference](validation-attributes-reference.md) — Validation, defaulting, override, and interpolation control attributes
+- [Module Testing](module-testing.md) — Production-backed test infrastructure and generator regression fixtures
 - [Workflow Debugging](debugging.md) — Breakpoints, interactive REPL, module inspection, and debug adapters
 
 **Table of Contents**
@@ -19,6 +20,7 @@ For detailed reference material, see:
 
 - [Overview](#overview)
 - [Project Structure](#project-structure)
+  - [Test Support Projects](#test-support-projects)
 - [Module System](#module-system)
   - [Three-Part Module Pattern](#three-part-module-pattern)
   - [ModuleContext Envelope](#modulecontext-envelope)
@@ -80,7 +82,7 @@ Cyborg is a .NET 10 application providing modular, JSON-configured backup orches
 
 ## Project Structure
 
-The solution is organized into four primary layers, each with a specific role in the dependency hierarchy:
+The production solution is organized into five primary projects, each with a specific role in the dependency hierarchy:
 
 | Layer | Target | Purpose |
 |-------|--------|---------|
@@ -91,6 +93,20 @@ The solution is organized into four primary layers, each with a specific role in
 | `Cyborg.Cli` | net10.0 | Application entry point using ConsoleAppFramework for CLI routing, with Jab for compile-time dependency injection composition. |
 
 `Cyborg.Core` defines the runtime interfaces and abstractions. `Cyborg.Core.Aot` generates code that implements those interfaces for specific module types. `Cyborg.Modules` and `Cyborg.Modules.Borg` provide the built-in module library. `Cyborg.Cli` composes everything into the final executable. Each module library exposes a Jab `[ServiceProviderModule]` interface (e.g., `ICyborgModuleServices`, `ICyborgBorgServices`) that the CLI project imports into its composition root.
+
+### Test Support Projects
+
+The reusable test infrastructure is split by responsibility:
+
+| Project | Purpose |
+|---------|---------|
+| `Cyborg.Core.TestAdapter` | Builds production-equivalent runtime scopes for tests and exposes the higher-order test API. |
+| `Cyborg.TestModules` | Minimal non-test assembly containing source-generator-enrolled fixture models. It references `Cyborg.Core` and consumes `Cyborg.Core.Aot` as an analyzer. |
+| `Cyborg.Core.Tests` | Unit tests for core runtime and infrastructure behavior. |
+| `Cyborg.Modules.Tests` | Tests for domain-agnostic modules and generated validation behavior. References `Cyborg.TestModules` but does not itself consume the validation analyzer. |
+| `Cyborg.Modules.Borg.Tests` | Tests for Borg-specific modules, parsers, and metrics behavior. |
+
+Keeping generated fixture models in `Cyborg.TestModules` avoids exposing the analyzer-generated framework types directly inside friend test assemblies. `Cyborg.Modules.Tests` is an `InternalsVisibleTo` target of `Cyborg.Core`; enrolling that same compilation for source generation would make both the internal framework types from `Cyborg.Core` and newly emitted copies visible, creating conflicting type definitions.
 
 ## Module System
 
@@ -106,7 +122,7 @@ Each module consists of three types serving distinct responsibilities:
 | Worker | Execution logic. Inherits from `ModuleWorker<TModule>`, receives injected services, and implements module behavior through the abstract `ExecuteAsync` method. | Per-configuration, stateless |
 | Loader | JSON deserialization. Inherits from `ModuleLoader<TWorker, TModule>` with a source-generated factory method that constructs the worker from the deserialized module record and dependency-injected services. | Singleton |
 
-Before execution, the immutable module record is copied and transformed through the validation pipeline, applying defaults, and per-execution overrides. The worker operates on the fully validated module instance, ensuring that execution logic never encounters invalid configuration and that deserialized module definitions remain immutable and free of execution-time side effects.
+Before execution, the immutable module record is copied and transformed through the generated preparation and validation pipeline, applying defaults, per-execution overrides, string interpolation, and constraints. The worker operates on the fully validated module instance, ensuring that execution logic never encounters invalid configuration and that deserialized module definitions remain immutable and free of execution-time side effects.
 
 The separation of module from worker ensures that configuration data remains immutable and free of side effects. Workers are instantiated per configuration, receive the validated module record, and have access to dependency-injected services. Loaders are singletons registered in the module loader registry at startup.
 
@@ -141,7 +157,7 @@ Module IDs follow a versioned, dot-separated naming convention (e.g., `cyborg.mo
 
 Configuration modules populate the environment with typed values using the `IDynamicValueProvider` subsystem. Each entry in a configuration map is a key-value pair where the value type is identified by a property name in the JSON object. Providers are registered by type name (e.g., `"int"`, `"string"`, `"bool"`) in the `IDynamicValueProviderRegistry`. Domain-specific types register under versioned type names (e.g., `"cyborg.types.borg.remote.v1.4"`). Typed collections use `collection<T>` syntax to declare arrays of a specific value type.
 
-Custom types implement `IDynamicValueProvider` and register a versioned type name. When annotated with `[GeneratedDecomposition]`, they gain `IDecomposable` support for hierarchical property access via the variable resolution subsystem. See the [Dynamic Values Reference](dynamic-values-reference.md) for a complete listing of available value providers.
+Custom types implement `IDynamicValueProvider` and register a versioned type name. When annotated with `[GeneratedDecomposition]`, they gain `IDecomposable` support for hierarchical property access via the variable resolution subsystem. Dynamic key-value entries must contain a non-null `key` and exactly one non-null typed value; malformed entries fail immediately with `JsonException`, including when they are parsed outside a module-validation context. See the [Dynamic Values Reference](dynamic-values-reference.md) for a complete listing of available value providers.
 
 ## Module Execution
 
@@ -153,15 +169,23 @@ The `ModuleWorker<TModule>` base class orchestrates the complete lifecycle from 
 
 #### Validation Pipeline
 
-Before a worker's `ExecuteAsync` method is invoked, the base class runs the module through a source-generated three-stage validation pipeline implemented by `IModule<TModule>`:
+Before a worker's `ExecuteAsync` method is invoked, `ModuleWorker<TModule>` calls the source-generated `ValidateAsync` implementation on the module. The generated method orchestrates five ordered phases:
 
-1. **Apply Defaults** — Fills null or zero-valued properties from `[DefaultValue<T>]`, `[DefaultInstance]`, `[DefaultInstanceFactory]`, and `[DefaultTimeSpan]` annotations. Operates recursively on nested records marked with `[Validatable]`.
+1. **Apply Defaults** — Fills null or type-default properties from `[DefaultValue<T>]`, `[DefaultInstance]`, `[DefaultInstanceFactory]`, and `[DefaultTimeSpan]`. Defaulting recurses into nested records marked with `[Validatable]` and supported collection elements.
 
-2. **Resolve Overrides** — Substitutes module properties from runtime environment variables using the override resolution subsystem (described in [Module Property Overrides](#module-property-overrides)). String-typed property values containing `${...}` expressions are interpolated against the current environment.
+2. **Resolve Overrides** — Substitutes eligible module properties from runtime environment variables using the override subsystem described in [Module Property Overrides](#module-property-overrides). `[IgnoreOverride]` suppresses replacement of the annotated property; its optional `recurse` constructor argument also suppresses descendants when `true`.
 
-3. **Validate** — Checks constraints declared via validation attributes such as `[Required]`, `[Range<T>]`, `[MinLength]`, `[MaxLength]`, `[ExactLength]`, `[FileExists]`, `[DirectoryExists]`, `[MatchesRegex]`, `[MatchesGrammar]`, and `[DefinedEnumValue]`. Produces a `ValidationResult<TModule>` containing any errors.
+3. **Reapply Defaults** — Runs defaulting again so values introduced by overrides receive the same default semantics as values produced by deserialization.
 
-Each stage returns a new record instance via `with` expressions — the original deserialized module is never mutated. After the generated pipeline completes, workers may optionally implement `ModuleValidationCallbackAsync` for custom validation logic. The pipeline then calls `EnsureValid()`, which throws a `ValidationException` if any errors were recorded. Only after successful validation does the worker's `ExecuteAsync` method execute.
+4. **Interpolate Strings** — Recursively applies `runtime.Environment.Interpolate(...)` to eligible strings on the module, nested `[Validatable]` records, and supported collection elements. `[IgnoreInterpolation]` preserves strings that require later context-specific interpolation. `ModuleBase.Name` and `ModuleBase.Group` opt out because they establish structural identity before validation; `AssertModule.Message` is interpolated by its worker after the assertion child has executed so it can reference child artifacts.
+
+5. **Validate Constraints** — Checks constraints declared through `[Required]`, `[VariableIdentifier]`, `[Range<T>]`, length, filesystem, path-shape, regex, grammar, enum, and related validation attributes. Produces a `ValidationResult<TModule>` containing either the transformed module or validation errors.
+
+Each transformation uses `with` expressions, so the original deserialized module is never mutated. The generator emits private async `ApplyDefaultsAsync`, `ResolveOverridesAsync`, and `ApplyInterpolationAsync` instance helpers plus the public `ValidateAsync` orchestrator required by `IModule<TModule>`. `ValidateAsync` creates one editor-hidden `ModuleValidationContext` containing the runtime and service provider and passes it through all generated preparation phases.
+
+Collection traversal is guarded according to the concrete collection shape. Null reference collections and absent nullable value-type collections are skipped. A default `ImmutableArray<T>` is not enumerated and remains distinct from an initialized empty array; property-level constraints such as `[Required]` still execute outside the enumeration guard, allowing invalid default arrays to produce validation errors instead of throwing while validating elements. Selected validation attributes can set `TargetsElements = true` to validate each immediate collection element through the same guarded traversal. Element-targeted errors retain the parent property name and include the zero-based element index in their message.
+
+After generated validation completes, workers may optionally adjust the result through `ModuleValidationCallbackAsync`. The pipeline then calls `EnsureValid()`, which throws a `ValidationException` if any errors remain. Only after successful validation does the worker's `ExecuteAsync` method execute.
 
 #### Execution and Result
 
@@ -240,14 +264,92 @@ The resolution subsystem tracks the chain of variable names during recursive res
 
 #### Variable Name Syntax
 
-Variable names follow the pattern `[A-Za-z_][A-Za-z_0-9\-\.]*`. Dots serve as hierarchical separators (e.g., `host.port`), enabling structured access into decomposed objects.
+Cyborg distinguishes between identifiers, namespaces, variable expressions, interpolation, and indirection. Names and expressions are case-sensitive and use ASCII characters only.
 
-Within `${...}` expressions, the following special forms are supported:
+**Identifiers** are used for environment variable names and paths, module `name` and `group` values, template argument names, override-resolution tags, and the identifier portion of override keys.
 
-- `${@}` — Current scope namespace.
-- `${@@}` — Entry-point scope namespace.
-- `${name}` — Normal lookup from the current resolution scope.
-- `${@name}` — Late-bound lookup from the entry-point scope.
+An identifier consists of one or more dot-separated segments:
+
+- The first segment must begin with an ASCII letter, underscore, or hyphen.
+- The remaining characters of the first segment may be ASCII letters, decimal digits, underscores, or hyphens.
+- Every segment following a dot must contain at least one ASCII letter, decimal digit, underscore, or hyphen.
+
+Dots are the only hierarchical delimiters. They cannot appear at the beginning or end of an identifier, and two dots cannot occur consecutively.
+
+Hyphens and underscores are ordinary identifier characters. They may appear at the beginning or end of a segment and may occur consecutively. As a result, identifiers such as `-`, `--`, `_`, `-host_`, `_host-`, `host--name`, `host.-`, and `host.--` are valid.
+
+A decimal digit cannot begin the first segment, but it may begin a segment following a dot. For example, `host.0` is valid while `0host` is not.
+
+Other valid identifiers include `host`, `_internal`, `host.port`, `backup-job.result`, and `a-.b`.  
+Invalid identifiers include `.host`, `host.`, `host..port`, `host port`, and `${host}`.
+
+**Namespaces** currently use the same syntax as identifiers. They are maintained as a distinct grammar contract because namespace and general identifier syntax may diverge in the future.
+
+**Variable expressions** are enclosed in `${` and `}` and use one of the following forms:
+
+- `${name}` resolves an identifier from the current resolution scope.
+- `${@name}` resolves an identifier from the entry-point scope.
+- `${@}` resolves to the namespace of the current resolution scope.
+- `${@@}` resolves to the namespace of the entry-point scope.
+
+The `name` portion must be a valid identifier. Forms such as `${}`, `${1name}`, `${name.}`, `${@1name}`, and `${@@name}` are not valid variable expressions.
+
+**Interpolation** occurs when one or more valid variable expressions appear within a larger string. Each recognized expression is resolved independently while surrounding text remains unchanged. For example, `backup-${host.name}-${date}` contains two interpolation expressions.
+
+Malformed `${...}` text is not recognized as an interpolation expression and is ignored. A hash immediately after `${` escapes one interpolation pass: `${#name}` becomes the literal `${name}`, `${##name}` becomes `${#name}`, and the expression revealed by removing the hash is not rescanned during the same pass. `$${name}` is not an escape because it still contains the valid expression `${name}`.
+
+**Indirection** is the special case where the complete string consists of exactly one variable expression, with no surrounding text. Indirection allows the referenced value to retain its original type rather than being converted into part of an interpolated string. So the following substitution chain is valid for `port` of type `int`:
+
+```text
+host_port = 8080
+@host.port = "${host_port}"
+```
+
+**Override keys** begin with an at-sign (`@`) followed by a valid identifier, for example `@backup.target`. The leading at-sign is override syntax and is not part of the identifier itself.
+
+Structured values published through [decomposition](#decomposable-objects) are addressed using the same identifier and dotted-path syntax. Override lookup uses these rules when constructing the candidates described in [Module Property Overrides](#module-property-overrides).
+
+**Full grammar** for identifiers, namespaces, variable expressions, and override keys is as follows (ANTLR4 syntax):
+
+```antlr
+grammar VariableGrammar;
+
+identifier
+    : IDENTIFIER EOF
+    ;
+
+namespaceName
+    : IDENTIFIER EOF
+    ;
+
+indirection
+    : interpolation EOF
+    ;
+
+interpolation
+    : '${' expression '}'
+    ;
+
+expression
+    : '@@'
+    | '@' IDENTIFIER?
+    | IDENTIFIER
+    ;
+
+IDENTIFIER
+    : IDENTIFIER_PREFIX
+      IDENTIFIER_CHAR*
+      ('.' IDENTIFIER_CHAR+)*
+    ;
+
+fragment IDENTIFIER_PREFIX
+    : [A-Za-z_-]
+    ;
+
+fragment IDENTIFIER_CHAR
+    : [A-Za-z_0-9-]
+    ;
+```
 
 #### Decomposable Objects
 
@@ -267,28 +369,33 @@ The override subsystem allows runtime environment variables to replace module pr
 
 #### Override Resolution
 
-When a module property is resolved via `IRuntimeEnvironment.Resolve<TModule, T>()`:
+Generated override preparation resolves module properties through `ModuleValidationContext`, which mediates internal operations on `IRuntimeEnvironment`:
 
-1. The property name is extracted from the call site using `CallerArgumentExpression` and converted to snake_case.
+1. The generator supplies the module and property expressions used to derive the snake_case property path.
 2. Override keys are constructed using every identifier that can address the module instance: first `@{name}.{property_name}`, then `@{group}.{property_name}` when a group is set, then `@{module_id}.{property_name}`, and finally `@{tag}.{property_name}` for each override resolution tag attached to the environment.
 3. The environment is checked for each override key in that order. The first matching override wins, so more specific identifiers take priority (`name` > `group` > `module_id` > tags).
-4. After override resolution, if the resulting property value is a string, it is interpolated (replacing `${...}` placeholders).
+4. String properties select the raw stored override without interpolation. Non-string properties use typed resolution, including exact-reference indirection, and collections use a collection-specific resolver before generated code materializes the declared collection shape.
+5. The later generated `ApplyInterpolationAsync` phase recursively interpolates every eligible string, including strings for which no override was applied and strings inside nested records and collections. `[IgnoreInterpolation]` skips this phase, so a raw string selected from an override remains available for worker-controlled interpolation.
+
+`[IgnoreOverride]` disables resolution of the annotated node without disabling the later interpolation phase. With the default `recurse: false`, eligible descendants may still resolve overrides; `recurse: true` suppresses the complete subtree. `[IgnoreInterpolation]` is a separate string-only control for values that must remain raw until worker execution.
 
 #### Override Use Case
 
-Overrides solve the problem of injecting non-string typed values into module properties when the source is a string variable. String interpolation (`${host.port}`) always produces a string, but a module property like `liveness_probe_port` may expect an `int`. By setting `@my_module.liveness_probe_port` to `"${host.port}"` in the environment, the override subsystem interpolates the string, then type-converts the result to the target type.
+Overrides solve the problem of injecting non-string typed values into module properties through exact-reference indirection. A composite interpolation result is a string, but an exact expression such as `${host.port}` can resolve directly to the stored `int`. By setting `@my_module.liveness_probe_port` to `"${host.port}"`, generated typed override resolution retrieves the referenced value as the property type rather than converting an interpolated string afterward.
 
 The override subsystem supports any addressable property on the module, including `ModuleReference` properties, allowing modules to be treated as data and enabling dynamic module composition patterns. Overrides always operate in a deterministic copy-on-write manner — the original deserialized module instance is never mutated. Instead, a new instance is returned with freshly resolved properties for each execution, ensuring that module definitions remain immutable while always observing the latest environment state at execution time.
 
 Override resolution is applied recursively within module properties, so a complex-typed property instance may have overrides applied to its own properties as well.
 
-Overrides are resolved before default values are applied and before constraints are validated in the source-generated validation pipeline. This means overrides must produce valid values that satisfy the module's constraints, and they can also be used to erase values to trigger default value substitution.
+The generated pipeline applies defaults before override resolution and again afterward. Overrides must therefore produce values that satisfy the module's constraints, but they can also inject a type-default value to trigger the second defaulting pass. Eligible strings are then processed by the recursive interpolation phase before constraints are evaluated.
 
 #### Override Resolution Tags
 
 Override resolution tags are additional identifiers attached to an environment that extend the override lookup chain beyond the built-in `Name`, `Group`, `ModuleId` sequence. They are set when preparing an environment via `PrepareEnvironment()` and stored on the `IRuntimeEnvironment`.
 
 Tags are appended after `ModuleId` in the override resolution order, acting as a fallback. This mechanism enables parent modules to inject ambient overrides into child execution scopes without requiring knowledge of the child module's name or type. For example, a workflow orchestrator could tag an environment with `"production"`, causing any module executing in that environment to pick up overrides keyed under `@production.{property}`.
+
+Because each tag becomes a variable-path identifier, it must satisfy the canonical variable-identifier grammar. `DynamicModule` interpolates and validates every configured tag before calling `PrepareEnvironment()`, so invalid user-provided tags fail module validation before child execution. `PrepareEnvironment()` retains the same identifier check as a runtime invariant for programmatic callers.
 
 ### Artifact Publishing
 
@@ -314,7 +421,7 @@ Each module carries a `ModuleArtifacts` record (inherited from `ModuleBase`) tha
 | `DecompositionStrategy` | `LeavesOnly` | How deeply decomposable results are flattened |
 | `PublishNullValues` | `false` | Whether to publish null-valued properties |
 
-Like all module properties, these can be overridden from the environment at runtime using the override subsystem, allowing dynamic control over artifact publishing behavior.
+These artifact properties can be overridden from the environment at runtime using the override subsystem, allowing dynamic control over artifact publishing behavior. Structural `ModuleBase.Name` and `ModuleBase.Group` are explicit exceptions and ignore both overrides and generated interpolation.
 
 #### Artifact Exposure Patterns
 
@@ -415,7 +522,7 @@ All subprocess invocations use array-based argument passing (`ProcessStartInfo.A
 
 #### Input Validation
 
-Each module validates inputs through the source-generated validation pipeline at deserialization time, before any execution occurs. Validation attributes enforce constraints on property values — string patterns via `[MatchesRegex]` and `[MatchesGrammar]`, file system existence via `[FileExists]` and `[DirectoryExists]`, numeric ranges via `[Range<T>]`, and required fields via `[Required]`. This ensures that invalid or potentially dangerous input is rejected before it reaches any execution logic.
+Each module validates inputs through the source-generated validation pipeline after deserialization and immediately before execution. Validation attributes enforce constraints on property values — string patterns via `[MatchesRegex]` and `[MatchesGrammar]`, file system existence via `[FileExists]` and `[DirectoryExists]`, numeric ranges via `[Range<T>]`, and required fields via `[Required]`. This ensures that invalid or potentially dangerous input is rejected before it reaches any execution logic.
 
 #### Privilege Boundaries
 

@@ -40,8 +40,10 @@ public sealed class DynamicKeyValuePairJsonConverter(IDynamicValueProviderRegist
             value = dynamicValue.Value;
         }
 
-        _ = key ?? throw new JsonException("Missing required property 'Key' in dynamic key-value pair.");
+        // non-emptiness and whitespace checks via [Required] attribute in pre-execution validation
+        // explicit null checks here, since dynamic KVP is also used for config parsing
+        _ = key ?? throw new JsonException("Missing dynamic key in dynamic key-value pair.");
         _ = value ?? throw new JsonException("Missing dynamic value in dynamic key-value pair.");
-        return new DynamicKeyValuePair(key, value);
+        return new DynamicKeyValuePair(key!, value);
     }
 }

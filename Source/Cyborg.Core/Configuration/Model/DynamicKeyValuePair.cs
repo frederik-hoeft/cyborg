@@ -1,7 +1,9 @@
 ﻿using Cyborg.Core.Aot.Contracts;
+using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using System.Text.Json.Serialization;
 
 namespace Cyborg.Core.Configuration.Model;
 
+[Validatable]
 [GeneratorContractRegistration<ModelDecompositionGeneratorContract>(ModelDecompositionGeneratorContract.DynamicKeyValuePair)]
-public sealed record DynamicKeyValuePair(string Key, [property: JsonIgnore] object? Value);
+public sealed record DynamicKeyValuePair([property: Required] string Key, [property: Required][property: JsonIgnore] object? Value);

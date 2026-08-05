@@ -11,9 +11,8 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
     public IReadOnlyCollection<string> OverrideResolutionTags { get; init; } = [];
 
     [return: NotNullIfNotNull(nameof(value))]
-    public virtual IReadOnlyCollection<T>? ResolveCollection<TModule, T>(TModule module, IReadOnlyCollection<T>? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
-        where TModule : ModuleBase, IModule
-        => ResolveCollectionCore(this, module, value, moduleExpression, valueExpression);
+    IReadOnlyCollection<T>? IRuntimeEnvironment.ResolveCollection<TModule, T>(TModule module, IReadOnlyCollection<T>? value, string moduleExpression, string valueExpression) =>
+        ResolveCollectionCore(this, module, value, moduleExpression, valueExpression);
 
     [return: NotNullIfNotNull(nameof(value))]
     internal protected virtual IReadOnlyCollection<T>? ResolveCollectionCore<TModule, T>(EnvironmentLike entryPoint, TModule module, IReadOnlyCollection<T>? value, string? moduleExpression, string? valueExpression)
@@ -43,13 +42,23 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
     }
 
     [return: NotNullIfNotNull(nameof(value))]
-    public virtual T? Resolve<TModule, T>(TModule module, T? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
-        where TModule : ModuleBase, IModule
-        => ResolveCore(this, module, value, moduleExpression, valueExpression);
+    T? IRuntimeEnvironment.Resolve<TModule, T>(TModule module, T? value, string? moduleExpression, string? valueExpression) where T : default =>
+        Resolve(module, value, moduleExpression, valueExpression);
 
     [return: NotNullIfNotNull(nameof(value))]
-    internal protected virtual T? ResolveCore<TModule, T>(EnvironmentLike entryPoint, TModule module, T? value, string? moduleExpression, string? valueExpression)
+    internal protected virtual T? Resolve<TModule, T>(TModule module, T? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
         where TModule : ModuleBase, IModule
+    {
+        T? resolvedValue = ResolveCore(this, module, value, moduleExpression, valueExpression);
+        if (resolvedValue is string stringValue)
+        {
+            return (T)(object)InterpolateCore(stringValue, entryPoint: this);
+        }
+        return resolvedValue;
+    }
+
+    [return: NotNullIfNotNull(nameof(value))]
+    internal protected virtual T? ResolveCore<TModule, T>(EnvironmentLike entryPoint, TModule module, T? value, string? moduleExpression, string? valueExpression) where TModule : ModuleBase, IModule
     {
         ArgumentNullException.ThrowIfNull(entryPoint);
         ArgumentNullException.ThrowIfNull(module);
@@ -65,14 +74,30 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
             }
         }
 
-        if (value is string stringValue)
+        return value;
+    }
+
+    [return: NotNullIfNotNull(nameof(value))]
+    string? IRuntimeEnvironment.SelectRawStringOverride<TModule>(TModule module, string? value, string moduleExpression, string valueExpression) =>
+        TrySelectRawStringOverrideCore(this, module, moduleExpression, valueExpression, out string? selectedValue) ? selectedValue : value;
+
+    internal protected virtual bool TrySelectRawStringOverrideCore<TModule>(EnvironmentLike entryPoint, TModule module, string? moduleExpression, string? valueExpression, [NotNullWhen(true)] out string? value) where TModule : ModuleBase, IModule
+    {
+        ArgumentNullException.ThrowIfNull(entryPoint);
+        ArgumentNullException.ThrowIfNull(module);
+        string valuePath = ConstructValueResolutionPath<string>(value: null, moduleExpression, valueExpression);
+
+        foreach (string identifier in EnumerateOverrideIdentifiers(module.Name, module.Group, TModule.ModuleId))
         {
-            // Handle indirection via string variables
-            string resolvedString = Interpolate(stringValue, entryPoint);
-            value = Unsafe.As<string, T>(ref resolvedString);
+            string overridePath = SyntaxFactory.Path(identifier, valuePath).Override();
+            if (TryGetStoredVariable(overridePath, out value))
+            {
+                return true;
+            }
         }
 
-        return value;
+        value = default;
+        return false;
     }
 
     private string ConstructValueResolutionPath<T>(T? value, string? moduleExpression, string? valueExpression)
@@ -120,11 +145,11 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(moduleId);
 
-        if (!string.IsNullOrEmpty(name))
+        if (SyntaxFactory.IsValidIdentifier(name))
         {
             yield return name;
         }
-        if (!string.IsNullOrEmpty(group))
+        if (SyntaxFactory.IsValidIdentifier(group))
         {
             yield return group;
         }

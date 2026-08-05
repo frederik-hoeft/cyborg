@@ -15,7 +15,7 @@ public sealed partial record BorgPruneModule
 {
     public static string ModuleId => "cyborg.modules.borg.prune.v1.4";
 
-    [IgnoreOverrides]
+    [IgnoreOverride]
     [Range<int>(Min = 1, Max = int.MaxValue)]
     public int CheckpointIntervalSeconds => (int)CheckpointInterval.TotalSeconds;
 }

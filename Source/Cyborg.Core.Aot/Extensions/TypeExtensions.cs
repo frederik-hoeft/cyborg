@@ -8,37 +8,34 @@ internal static class TypeExtensions
 
     extension(Type self)
     {
-        public string ConstructFullyQualifiedGenericName(params ReadOnlySpan<Type> genericArguments)
+        public string RenderGlobalWithGenerics(params IReadOnlyList<string> genericArguments)
         {
             if (!self.IsGenericTypeDefinition)
             {
-                return $"{GLOBAL}{self.Namespace}.{self.Name}";
+                throw new InvalidOperationException($"Type '{self.FullName}' is not a generic type definition.");
             }
             StringBuilder builder = new();
-            builder.Append(GLOBAL).Append(self.Namespace).Append('.').Append(self.Name);
-            if (genericArguments.Length > 0)
+            // strip any generic arity suffix from the type name (e.g., `List`1` becomes `List`)
+            builder.Append(GLOBAL).Append(self.Namespace).Append('.').Append(self.Name.Split('`')[0]);
+            if (genericArguments.Count > 0)
             {
                 builder.Append('<');
-                for (int i = 0; i < genericArguments.Length; i++)
+                for (int i = 0; i < genericArguments.Count; i++)
                 {
                     if (i > 0)
                     {
                         builder.Append(", ");
                     }
-                    builder.Append(genericArguments[i].ConstructFullyQualifiedGenericName());
+                    builder.Append(genericArguments[i]);
                 }
                 builder.Append('>');
             }
             return builder.ToString();
         }
 
-        public string GetFullyQualifiedBaseTypeName()
-        {
-            if (self.IsGenericType)
-            {
-                return $"{GLOBAL}{self.Namespace}.{self.Name[..self.Name.IndexOf('`')]}";
-            }
-            return $"{GLOBAL}{self.Namespace}.{self.Name}";
-        }
+        public string RenderGlobalWithGenerics(params IReadOnlyList<Type> genericArguments) =>
+            self.RenderGlobalWithGenerics(genericArguments.Select(t => t.RenderGlobal()).ToList());
+
+        public string RenderGlobal() => $"{GLOBAL}{self.FullName}";
     }
 }

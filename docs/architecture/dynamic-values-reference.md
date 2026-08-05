@@ -61,6 +61,8 @@ Example:
 }
 ```
 
+The converter accepts the key and typed-value properties in either order, but both must be present and non-null. A missing key, missing value, second typed-value property, or malformed typed value causes deserialization to fail with `JsonException`. These structural checks occur in the converter because dynamic key-value pairs are also used by configuration parsing paths that do not run module validation. Semantic checks such as an empty or whitespace key are handled later by `[Required]` when the containing model participates in generated validation.
+
 ### Type Name Syntax
 
 Type names are either:
