@@ -10,19 +10,20 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
     public void RenderSection(IndentedStringBuilder builder, ModuleModel model)
     {
         string qualifiedType = model.FullyQualifiedTypeName;
+        string validationContextType = contractInfo.GeneratedModuleValidationContext.RenderGlobal();
 
         builder.AppendBlock(
             $$"""
             public async {{KnownTypes.ValueTaskOfT(contractInfo.ValidationResultT.RenderGlobalWithGenerics(qualifiedType))}} ValidateAsync(
                 {{contractInfo.IModuleRuntime.RenderGlobal()}} runtime,
-                {{contractInfo.GeneratedModuleValidationContext.RenderGlobal()}} validationContext,
                 {{KnownTypes.IServiceProvider}} serviceProvider,
                 {{KnownTypes.CancellationToken}} cancellationToken)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                {{validationContextType}} validationContext = {{validationContextType}}.Create(runtime.Environment);
                 {{contractInfo.IModuleT.RenderGlobalWithGenerics(qualifiedType)}} self = this;
                 {{contractInfo.IModuleT.RenderGlobalWithGenerics(qualifiedType)}} withDefaults = await self.ApplyDefaultsAsync(runtime, serviceProvider, cancellationToken);
-                {{contractInfo.IModuleT.RenderGlobalWithGenerics(qualifiedType)}} withOverrides = await withDefaults.ResolveOverridesAsync(runtime, validationContext, serviceProvider, cancellationToken);
+                {{contractInfo.IModuleT.RenderGlobalWithGenerics(qualifiedType)}} withOverrides = await withDefaults.ResolveOverridesAsync(runtime, serviceProvider, cancellationToken);
                 // ensure that defaults are also applied to values injected via overrides
                 {{qualifiedType}} module = await withOverrides.ApplyDefaultsAsync(runtime, serviceProvider, cancellationToken);
                 // interpolate all string members against the runtime environment
