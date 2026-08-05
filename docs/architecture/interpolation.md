@@ -63,9 +63,9 @@ Generated preparation treats string and non-string properties differently:
 
 Raw string selection is required so `[IgnoreInterpolation]` applies to the effective value regardless of whether it came from JSON, a default, or an override. It also prevents override lookup from performing an accidental interpolation pass before generated interpolation.
 
-These operations are not part of the normal worker-facing environment API. Source-generated preparation code accesses them through `GeneratedModuleValidationContext`, an IntelliSense-hidden CLR bridge whose construction and implementation details are controlled by `Cyborg.Core`. The corresponding raw environment operations remain internal.
+These operations are not part of the normal worker-facing environment API. Source-generated preparation code accesses them through `ModuleValidationContext` in the `Cyborg.Core.Modules.Validation.Internal` namespace. This IntelliSense-hidden CLR bridge carries the runtime and service provider required by the generated phases, while the corresponding environment operations remain internal interface members.
 
-The existing public `Resolve(...)` API retains its complete materialization semantics for compatibility and for explicit advanced callers. It is not the raw-selection primitive used by generated string-property preparation.
+Typed override resolution is therefore a generated-pipeline concern rather than a client-code API. Module workers use the ordinary environment operations described under [API Boundaries](#api-boundaries).
 
 ### 4. Generated interpolation
 
@@ -89,7 +89,7 @@ Module workers and other handwritten consumers use one interpolation API:
 string result = runtime.Environment.Interpolate(value);
 ```
 
-`Interpolate(...)`, `TryResolveVariable(...)`, and `Resolve(...)` are complete evaluation boundaries. They resolve ordinary expressions recursively and remove one escape layer in string results.
+`Interpolate(...)` and `TryResolveVariable(...)` are complete evaluation boundaries. They resolve ordinary expressions recursively and remove one escape layer in string results.
 
 A worker should manually interpolate only when evaluation was intentionally deferred until worker execution, normally through `[IgnoreInterpolation]`. Eligible properties processed by the generated pipeline are already interpolated before the worker receives the validated module and should not be interpolated again.
 
@@ -107,10 +107,11 @@ The environment API exposed to module authors includes operations that are meani
 
 - `Interpolate(...)` for intentionally deferred string evaluation;
 - `TryResolveVariable(...)` for typed variable reads;
-- `SetVariable(...)` and `TryRemoveVariable(...)` for environment state;
-- `Resolve(...)` for compatibility and explicit property-override materialization.
+- `SetVariable(...)` and `TryRemoveVariable(...)` for environment state.
 
-Generated preparation additionally requires raw string override selection, typed collection override materialization, and recursive generated interpolation. These operations are grouped on `GeneratedModuleValidationContext` rather than exposed on `IRuntimeEnvironment`. Although the context must be public so generated code in consuming assemblies can call it, it is marked as editor-hidden and is not intended as a client-code contract.
+Generated preparation additionally requires raw string override selection, typed scalar and collection override materialization, and access to the runtime and service provider shared by every preparation phase. These operations are grouped on `ModuleValidationContext` rather than exposed as public members of `IRuntimeEnvironment`. The context must be public because generated code is compiled into consuming assemblies, but it has a private constructor, lives in an `Internal` namespace, and is marked as editor-hidden; it is not a client-code contract.
+
+`IModule<TModule>` exposes only `ValidateAsync(...)`. The generated defaulting, override-resolution, and interpolation phases are private async instance helpers invoked by that public orchestrator.
 
 ## Override Precedence
 
