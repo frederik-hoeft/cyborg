@@ -15,17 +15,18 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
             $$"""
             public async {{KnownTypes.ValueTaskOfT(contractInfo.ValidationResultT.RenderGlobalWithGenerics(qualifiedType))}} ValidateAsync(
                 {{contractInfo.IModuleRuntime.RenderGlobal()}} runtime,
+                {{contractInfo.GeneratedModuleValidationContext.RenderGlobal()}} validationContext,
                 {{KnownTypes.IServiceProvider}} serviceProvider,
                 {{KnownTypes.CancellationToken}} cancellationToken)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 {{contractInfo.IModuleT.RenderGlobalWithGenerics(qualifiedType)}} self = this;
                 {{contractInfo.IModuleT.RenderGlobalWithGenerics(qualifiedType)}} withDefaults = await self.ApplyDefaultsAsync(runtime, serviceProvider, cancellationToken);
-                {{contractInfo.IModuleT.RenderGlobalWithGenerics(qualifiedType)}} withOverrides = await withDefaults.ResolveOverridesAsync(runtime, serviceProvider, cancellationToken);
+                {{contractInfo.IModuleT.RenderGlobalWithGenerics(qualifiedType)}} withOverrides = await withDefaults.ResolveOverridesAsync(runtime, validationContext, serviceProvider, cancellationToken);
                 // ensure that defaults are also applied to values injected via overrides
                 {{qualifiedType}} module = await withOverrides.ApplyDefaultsAsync(runtime, serviceProvider, cancellationToken);
                 // interpolate all string members against the runtime environment
-                module = {{ModuleValidationRenderer.ApplyInterpolation}}(module, runtime);
+                module = {{ModuleValidationRenderer.ApplyInterpolation}}(module, validationContext);
                 {{KnownTypes.ListOfT(contractInfo.ValidationError.RenderGlobal())}} errors = [];
 
             """);
