@@ -18,6 +18,6 @@ internal sealed class ReadOnlyCollectionOverrideProcessor : IDynamicPropertyProc
     private sealed class ReadOnlyCollectionOverridesAspect : PropertyAspect
     {
         public override string RewriteOverrideResolutionExpression(PropertyRewriteContext context, string currentExpression, string rootPathExpression) =>
-            $"runtime.Environment.ResolveCollection({context.ModuleVariable}, {context.PropertyAccessExpression}, valueExpression: \"{rootPathExpression}\")";
+            $"validationContext.ResolveCollectionOverride({context.ModuleVariable}, {context.PropertyAccessExpression}, moduleExpression: \"{context.ModuleVariable}\", valueExpression: \"{rootPathExpression}\")";
     }
 }
