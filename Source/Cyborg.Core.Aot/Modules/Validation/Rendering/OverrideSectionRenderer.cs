@@ -13,15 +13,16 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
     public void RenderSection(IndentedStringBuilder builder, ModuleModel model)
     {
         string qualifiedType = model.FullyQualifiedTypeName;
+        string validationContextType = contractInfo.GeneratedModuleValidationContext.RenderGlobal();
         builder.AppendBlock(
             $$"""
             async {{KnownTypes.ValueTaskOfT(qualifiedType)}} {{contractInfo.IModuleT.RenderGlobalWithGenerics(qualifiedType)}}.ResolveOverridesAsync(
                 {{contractInfo.IModuleRuntime.RenderGlobal()}} runtime,
-                {{contractInfo.GeneratedModuleValidationContext.RenderGlobal()}} validationContext,
                 {{KnownTypes.IServiceProvider}} serviceProvider,
                 {{KnownTypes.CancellationToken}} cancellationToken)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                {{validationContextType}} validationContext = {{validationContextType}}.Create(runtime.Environment);
                 {{qualifiedType}} {{rootModuleVariable}} = this;
 
             """);
