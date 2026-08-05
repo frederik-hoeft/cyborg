@@ -13,16 +13,6 @@ public interface IRuntimeEnvironment : IEnvironmentLike
     IReadOnlyCollection<string> OverrideResolutionTags { get; }
 
     /// <summary>
-    /// Selects the first matching string override without resolving interpolation or indirection in the stored string.
-    /// </summary>
-    /// <remarks>
-    /// This is the raw selection primitive used by the generated preparation pipeline. Explicit consumers should normally use <see cref="Resolve{TModule, T}"/>, which fully materializes string results.
-    /// </remarks>
-    [return: NotNullIfNotNull(nameof(value))]
-    string? SelectStringOverride<TModule>(TModule module, string? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
-        where TModule : ModuleBase, IModule;
-
-    /// <summary>
     /// Resolves the specified value for the given module. The module and value expressions are used for override resolution based on corresponding environment variables.
     /// The module expression is used to determine the module for which the variable is being resolved, while the value expression is used to determine the specific variable being resolved.
     /// This allows for more granular control over variable resolution based on the context of the module and the variable being accessed.
@@ -37,10 +27,6 @@ public interface IRuntimeEnvironment : IEnvironmentLike
     /// <remarks>String results are fully interpolated and finalize one layer of escaped interpolation literals.</remarks>
     [return: NotNullIfNotNull(nameof(value))]
     T? Resolve<TModule, T>(TModule module, T? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
-        where TModule : ModuleBase, IModule;
-
-    [return: NotNullIfNotNull(nameof(value))]
-    IReadOnlyCollection<T>? ResolveCollection<TModule, T>(TModule module, IReadOnlyCollection<T>? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
         where TModule : ModuleBase, IModule;
 
     void Publish<TModule, T>(TModule module, string root, T decomposable)
