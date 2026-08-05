@@ -53,7 +53,7 @@ These attributes trigger source generation on the annotated type. They are not a
 
 ### GeneratedModuleValidation
 
-Triggers the validation generator on a module record. The target must be a `partial record`. The generator emits `ApplyDefaultsAsync`, `ResolveOverridesAsync`, the private `__ApplyInterpolation` helper, and `ValidateAsync` based on the attributes applied to the record's properties.
+Triggers the validation generator on a module record. The target must be a `partial record`. The generator emits private `ApplyDefaultsAsync`, `ResolveOverridesAsync`, and `ApplyInterpolationAsync` preparation helpers together with the public `ValidateAsync` orchestrator, based on the attributes applied to the record's properties.
 
 **Target:** `class` (record)
 
