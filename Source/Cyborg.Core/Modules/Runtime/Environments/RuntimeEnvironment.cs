@@ -11,9 +11,9 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
     public IReadOnlyCollection<string> OverrideResolutionTags { get; init; } = [];
 
     [return: NotNullIfNotNull(nameof(value))]
-    public virtual IReadOnlyCollection<T>? ResolveCollection<TModule, T>(TModule module, IReadOnlyCollection<T>? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
-        where TModule : ModuleBase, IModule
-        => ResolveCollectionCore(this, module, value, moduleExpression, valueExpression);
+    internal IReadOnlyCollection<T>? ResolveCollection<TModule, T>(TModule module, IReadOnlyCollection<T>? value, string moduleExpression, string valueExpression)
+        where TModule : ModuleBase, IModule =>
+        ResolveCollectionCore(this, module, value, moduleExpression, valueExpression);
 
     [return: NotNullIfNotNull(nameof(value))]
     internal protected virtual IReadOnlyCollection<T>? ResolveCollectionCore<TModule, T>(EnvironmentLike entryPoint, TModule module, IReadOnlyCollection<T>? value, string? moduleExpression, string? valueExpression)
@@ -43,9 +43,9 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
     }
 
     [return: NotNullIfNotNull(nameof(value))]
-    public virtual string? SelectStringOverride<TModule>(TModule module, string? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
-        where TModule : ModuleBase, IModule
-        => TrySelectStringOverrideCore(this, module, moduleExpression, valueExpression, out string? selectedValue) ? selectedValue : value;
+    internal string? SelectRawStringOverride<TModule>(TModule module, string? value, string moduleExpression, string valueExpression)
+        where TModule : ModuleBase, IModule =>
+        TrySelectRawStringOverrideCore(this, module, moduleExpression, valueExpression, out string? selectedValue) ? selectedValue : value;
 
     [return: NotNullIfNotNull(nameof(value))]
     public virtual T? Resolve<TModule, T>(TModule module, T? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
@@ -54,12 +54,12 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         T? resolvedValue = ResolveCore(this, module, value, moduleExpression, valueExpression);
         if (resolvedValue is string stringValue)
         {
-            return (T)(object)InterpolateFinal(stringValue, entryPoint: this);
+            return (T)(object)InterpolateCore(stringValue, entryPoint: this);
         }
         return resolvedValue;
     }
 
-    internal protected virtual bool TrySelectStringOverrideCore<TModule>(EnvironmentLike entryPoint, TModule module, string? moduleExpression, string? valueExpression, [NotNullWhen(true)] out string? value)
+    internal protected virtual bool TrySelectRawStringOverrideCore<TModule>(EnvironmentLike entryPoint, TModule module, string? moduleExpression, string? valueExpression, [NotNullWhen(true)] out string? value)
         where TModule : ModuleBase, IModule
     {
         ArgumentNullException.ThrowIfNull(entryPoint);
