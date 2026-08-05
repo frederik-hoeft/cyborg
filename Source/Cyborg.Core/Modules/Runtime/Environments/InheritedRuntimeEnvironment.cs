@@ -32,22 +32,18 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
         return Parent.TryResolveVariable(context.Name, out value);
     }
 
-    internal protected override bool TrySelectStringOverrideCore<TModule>(EnvironmentLike entryPoint, TModule module, string? moduleExpression, string? valueExpression, [NotNullWhen(true)] out string? value)
+    internal protected override bool TrySelectRawStringOverrideCore<TModule>(EnvironmentLike entryPoint, TModule module, string? moduleExpression, string? valueExpression, [NotNullWhen(true)] out string? value)
     {
-        if (base.TrySelectStringOverrideCore(entryPoint, module, moduleExpression, valueExpression, out value))
+        if (base.TrySelectRawStringOverrideCore(entryPoint, module, moduleExpression, valueExpression, out value))
         {
             return true;
         }
         if (Parent is RuntimeEnvironment runtimeParent)
         {
-            return runtimeParent.TrySelectStringOverrideCore(entryPoint, module, moduleExpression, valueExpression, out value);
+            return runtimeParent.TrySelectRawStringOverrideCore(entryPoint, module, moduleExpression, valueExpression, out value);
         }
-        value = Parent.SelectStringOverride(
-            module,
-            value: null,
-            moduleExpression: moduleExpression,
-            valueExpression: valueExpression);
-        return value is not null;
+        value = default;
+        return false;
     }
 
     [return: NotNullIfNotNull(nameof(value))]
@@ -62,7 +58,7 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
         {
             return runtimeParent.ResolveCollectionCore(entryPoint, module, value, moduleExpression, valueExpression);
         }
-        return Parent.ResolveCollection(module, value, moduleExpression, valueExpression);
+        return Parent.Resolve(module, value, moduleExpression, valueExpression);
     }
 
     [return: NotNullIfNotNull(nameof(value))]
