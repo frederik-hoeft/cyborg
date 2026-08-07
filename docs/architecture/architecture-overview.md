@@ -82,7 +82,7 @@ Cyborg is a .NET 10 application providing modular, JSON-configured backup orches
 
 ## Project Structure
 
-The production solution is organized into five primary projects, each with a specific role in the dependency hierarchy:
+The production solution is organized into six primary projects, each with a specific role in the dependency hierarchy:
 
 | Layer | Target | Purpose |
 |-------|--------|---------|
@@ -90,9 +90,10 @@ The production solution is organized into five primary projects, each with a spe
 | `Cyborg.Core.Aot` | netstandard2.0 | Roslyn incremental source generators distributed as analyzers. Targets netstandard2.0 as required by the Roslyn analyzer hosting model. |
 | `Cyborg.Modules` | net10.0 | Built-in, domain-agnostic module implementations supplemented by generated code from `Cyborg.Core.Aot`, e.g., for model validation and instance activation. |
 | `Cyborg.Modules.Borg` | net10.0 | Borg-specific modules (create, prune, compact) with JSON output parsing and borg-specific configuration types. |
-| `Cyborg.Cli` | net10.0 | Application entry point using ConsoleAppFramework for CLI routing, with Jab for compile-time dependency injection composition. |
+| `Cyborg.Cli.Debugging` | net10.0 | Console debugger frontend and its isolated ConsoleAppFramework-generated REPL command surface. |
+| `Cyborg.Cli` | net10.0 | Application entry point using its own ConsoleAppFramework command surface, with Jab for compile-time dependency injection composition. |
 
-`Cyborg.Core` defines the runtime interfaces and abstractions. `Cyborg.Core.Aot` generates code that implements those interfaces for specific module types. `Cyborg.Modules` and `Cyborg.Modules.Borg` provide the built-in module library. `Cyborg.Cli` composes everything into the final executable. Each module library exposes a Jab `[ServiceProviderModule]` interface (e.g., `ICyborgModuleServices`, `ICyborgBorgServices`) that the CLI project imports into its composition root.
+`Cyborg.Core` defines the runtime interfaces and abstractions. `Cyborg.Core.Aot` generates code that implements those interfaces for specific module types. `Cyborg.Modules` and `Cyborg.Modules.Borg` provide the built-in module library. `Cyborg.Cli.Debugging` provides the console debugger adapter in a separate CAF compilation, and `Cyborg.Cli` composes everything into the final executable. Each module library exposes a Jab `[ServiceProviderModule]` interface (e.g., `ICyborgModuleServices`, `ICyborgBorgServices`) that the CLI project imports into its composition root.
 
 ### Test Support Projects
 

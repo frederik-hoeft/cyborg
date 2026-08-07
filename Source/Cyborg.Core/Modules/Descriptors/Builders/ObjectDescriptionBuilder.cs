@@ -4,17 +4,15 @@ using System.Collections.Immutable;
 
 namespace Cyborg.Core.Modules.Descriptors.Builders;
 
-public sealed class ObjectDescriptionBuilder(IDescriptionComponentFactory factory) : IObjectDescriptionBuilder
+internal sealed class ObjectDescriptionBuilder(IDescriptionComponentFactory factory) : IObjectDescriptionBuilder
 {
     private readonly ImmutableArray<IDescriptionPropertyComponent>.Builder _properties = ImmutableArray.CreateBuilder<IDescriptionPropertyComponent>();
-
     private IDescriptionObjectComponent? _builtComponent;
 
     public void AddProperty<T>(string name, ImmutableArray<string> hints, T value)
     {
         EnsureMutable();
         ValidateName(name);
-
         IDescriptionValueComponent valueComponent = factory.CreateValue(value, hints: []);
         AddPropertyComponent(name, hints.OrEmpty(), valueComponent);
     }
@@ -27,10 +25,10 @@ public sealed class ObjectDescriptionBuilder(IDescriptionComponentFactory factor
 
         ObjectDescriptionBuilder objectBuilder = new(factory);
         describe(objectBuilder);
-        AddPropertyComponent(name, hints.OrEmpty(), objectBuilder.Build());
+        AddPropertyComponent(name, hints.OrEmpty(), objectBuilder.BuildComponent());
     }
 
-    public void AddCollection(string name,ImmutableArray<string> hints, Action<ICollectionDescriptionBuilder> describe)
+    public void AddCollection(string name, ImmutableArray<string> hints, Action<ICollectionDescriptionBuilder> describe)
     {
         EnsureMutable();
         ValidateName(name);
@@ -41,12 +39,12 @@ public sealed class ObjectDescriptionBuilder(IDescriptionComponentFactory factor
         AddPropertyComponent(name, hints.OrEmpty(), collectionBuilder.BuildComponent());
     }
 
+    internal IDescriptionObjectComponent BuildComponent(ImmutableArray<string> hints = default) => _builtComponent ??= factory.CreateObject(_properties.ToImmutable(), hints.OrEmpty());
+
     private void AddPropertyComponent(string name, ImmutableArray<string> hints, IDescriptionValueComponent value)
     {
         ArgumentNullException.ThrowIfNull(value);
-
-        IDescriptionPropertyComponent property = factory.CreateProperty(name, value, hints);
-        _properties.Add(property);
+        _properties.Add(factory.CreateProperty(name, value, hints));
     }
 
     private void EnsureMutable()
@@ -56,9 +54,6 @@ public sealed class ObjectDescriptionBuilder(IDescriptionComponentFactory factor
             throw new InvalidOperationException("The module description has already been built and can no longer be modified.");
         }
     }
-
-    public IDescriptionObjectComponent Build(ImmutableArray<string> hints = default) =>
-        _builtComponent ??= factory.CreateObject(_properties.ToImmutable(), hints.OrEmpty());
 
     private static void ValidateName(string name) => ArgumentException.ThrowIfNullOrWhiteSpace(name);
 }

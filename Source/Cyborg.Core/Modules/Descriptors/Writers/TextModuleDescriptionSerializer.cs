@@ -4,9 +4,9 @@ using System.Text;
 
 namespace Cyborg.Core.Modules.Descriptors.Writers;
 
-public sealed class TextModuleDescriptionSerializer : IModuleDescriptionSerializer
+internal sealed class TextModuleDescriptionSerializer : IModuleDescriptionSerializer
 {
-    public static TextModuleDescriptionSerializer Instance { get; } = new();
+    internal static TextModuleDescriptionSerializer Instance { get; } = new();
 
     public string Format => ModuleDescriptionFormats.Text;
 

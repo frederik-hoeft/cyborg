@@ -2,16 +2,15 @@
 
 namespace Cyborg.Core.Modules.Descriptors;
 
-public sealed class DefaultModuleDescriptionSerializerRegistry : IModuleDescriptionSerializerRegistry
+internal sealed class DefaultModuleDescriptionSerializerRegistry : IModuleDescriptionSerializerRegistry
 {
     private readonly FrozenDictionary<string, IModuleDescriptionSerializer> _serializers;
 
-    public DefaultModuleDescriptionSerializerRegistry(IEnumerable<IModuleDescriptionSerializer> serializers)
+    internal DefaultModuleDescriptionSerializerRegistry(IEnumerable<IModuleDescriptionSerializer> serializers)
     {
         ArgumentNullException.ThrowIfNull(serializers);
 
-        Dictionary<string, IModuleDescriptionSerializer> serializersByFormat =
-            new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, IModuleDescriptionSerializer> serializersByFormat = new(StringComparer.OrdinalIgnoreCase);
         foreach (IModuleDescriptionSerializer serializer in serializers)
         {
             ArgumentNullException.ThrowIfNull(serializer);
@@ -20,8 +19,7 @@ public sealed class DefaultModuleDescriptionSerializerRegistry : IModuleDescript
 
             if (!serializersByFormat.TryAdd(format, serializer))
             {
-                throw new InvalidOperationException(
-                    $"More than one module description serializer is registered for format '{format}'.");
+                throw new InvalidOperationException($"More than one module description serializer is registered for format '{format}'.");
             }
         }
 
@@ -34,13 +32,10 @@ public sealed class DefaultModuleDescriptionSerializerRegistry : IModuleDescript
 
         return TryGetSerializer(format, out IModuleDescriptionSerializer? serializer)
             ? serializer
-            : throw new KeyNotFoundException(
-                $"No module description serializer is registered for format '{format}'.");
+            : throw new KeyNotFoundException($"No module description serializer is registered for format '{format}'.");
     }
 
-    public bool TryGetSerializer(
-        string format,
-        [NotNullWhen(true)] out IModuleDescriptionSerializer? serializer)
+    public bool TryGetSerializer(string format, [NotNullWhen(true)] out IModuleDescriptionSerializer? serializer)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(format);
         return _serializers.TryGetValue(format, out serializer);

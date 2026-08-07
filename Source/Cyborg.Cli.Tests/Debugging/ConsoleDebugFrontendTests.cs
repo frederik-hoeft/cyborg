@@ -1,12 +1,14 @@
-﻿using Cyborg.Cli.Debugging;
-using Cyborg.Core.Aot.Modules.Validation;
+﻿using Cyborg.Cli;
+using Cyborg.Cli.Debugging;
 using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Debugging;
 using Cyborg.Core.Modules.Debugging.Breakpoints;
 using Cyborg.Core.Modules.Descriptors;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
+using Cyborg.Core.Services.Default;
 using Cyborg.TestModules.Cli;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Text;
 using System.Text.Json;
@@ -17,6 +19,15 @@ namespace Cyborg.Cli.Tests.Debugging;
 public sealed class ConsoleDebugFrontendTests
 {
     public TestContext TestContext { get; set; }
+
+    [TestMethod]
+    public void DefaultFrontend_ResolvesConsoleFrontend()
+    {
+        using DefaultServiceProvider services = new();
+        IDefault<IDebugFrontend> defaultFrontend = services.GetRequiredService<IDefault<IDebugFrontend>>();
+
+        Assert.AreEqual("console", defaultFrontend.GetRequiredDefault().Key);
+    }
 
     [TestMethod]
     public async Task PauseAsync_Continue_ResumesExecutionAsync()
@@ -41,6 +52,7 @@ public sealed class ConsoleDebugFrontendTests
         Assert.AreEqual(DebugResumeAction.Continue, action);
         Assert.Contains("Commands:", output);
         Assert.Contains("break", output);
+        Assert.DoesNotContain("run", output);
     }
 
     [TestMethod]
@@ -184,9 +196,7 @@ public sealed class ConsoleDebugFrontendTests
         Assert.AreEqual(0, breakpoints.Count);
     }
 
-    private async Task<(DebugResumeAction Action, string Output)> RunReplAsync(
-        string script,
-        string[]? seedBreakpoints = null)
+    private async Task<(DebugResumeAction Action, string Output)> RunReplAsync(string script, string[]? seedBreakpoints = null)
     {
         BreakpointRegistry registry = new();
         if (seedBreakpoints is not null)
@@ -197,24 +207,19 @@ public sealed class ConsoleDebugFrontendTests
             }
         }
 
-        (DebugResumeAction action, string output, _) =
-            await RunReplWithRegistryAsync(script, registry);
+        (DebugResumeAction action, string output, _) = await RunReplWithRegistryAsync(script, registry);
         return (action, output);
     }
 
-    private async Task<(
-        DebugResumeAction Action,
-        string Output,
-        IBreakpointRegistry Breakpoints)> RunReplWithRegistryAsync(
-            string script,
-            BreakpointRegistry registry,
-            int pauseCount = 1)
+    private async Task<(DebugResumeAction Action, string Output, IBreakpointRegistry Breakpoints)> RunReplWithRegistryAsync(string script, BreakpointRegistry registry, int pauseCount = 1)
     {
         using StringReader input = new(script);
         StringBuilder outputBuilder = new();
         using StringWriter output = new(outputBuilder);
         TextDebugReplIo io = new(input, output);
-        DebugCommandDispatcher dispatcher = new(io);
+        using DefaultServiceProvider services = new();
+        IModuleSerializationService serializationService = services.GetRequiredService<IModuleSerializationService>();
+        DebugCommandDispatcher dispatcher = new(io, serializationService);
         ConsoleDebugFrontend frontend = new(io, dispatcher);
 
         using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
@@ -222,39 +227,25 @@ public sealed class ConsoleDebugFrontendTests
         RootModuleRuntime runtime = new(environment, loggerFactory);
         ProbeModule module = new() { Name = "probe" };
 
-        DebugPauseContextStub context = new(
-            module,
-            ProbeModule.ModuleId,
-            runtime,
-            registry,
-            requestStep: () => registry.Add(".*", isOneShot: true),
-            detach: registry.Clear);
+        DebugPauseContextStub context = new(module, ProbeModule.ModuleId, runtime, registry, requestStep: () => registry.Add(".*", isOneShot: true), detach: registry.Clear);
 
         DebugResumeAction action = default;
         for (int index = 0; index < pauseCount; index++)
         {
-            action = await frontend.PauseAsync(
-                context,
-                TestContext.CancellationToken);
+            action = await frontend.PauseAsync(context, TestContext.CancellationToken);
         }
 
         return (action, outputBuilder.ToString(), registry);
     }
 
-    private sealed class DebugPauseContextStub(
-        IModule module,
-        string moduleId,
-        IModuleRuntime runtime,
-        IBreakpointRegistry breakpoints,
-        Action requestStep,
-        Action detach) : IDebugPauseContext
+    private sealed class DebugPauseContextStub(IModule module, string moduleId, IModuleRuntime runtime, IBreakpointRegistry breakpoints, Action requestStep, Action detach)
+        : IDebugPauseContext
     {
         public IModule Module { get; } = module;
 
         public string ModuleId { get; } = moduleId;
 
-        public string ModuleIdentity { get; } =
-            global::Cyborg.Core.Modules.Debugging.ModuleIdentity.Format(module, moduleId);
+        public string ModuleIdentity { get; } = global::Cyborg.Core.Modules.Debugging.ModuleIdentity.Format(module, moduleId);
 
         public IModuleRuntime Runtime { get; } = runtime;
 

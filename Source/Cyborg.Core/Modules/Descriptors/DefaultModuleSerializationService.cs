@@ -3,25 +3,25 @@ using Cyborg.Core.Modules.Descriptors.Model;
 
 namespace Cyborg.Core.Modules.Descriptors;
 
-public sealed class DefaultModuleSerializationService(IObjectDescriptionBuilderFactory builderFactory, IModuleDescriptionSerializerRegistry serializerRegistry) : IModuleSerializationService
+internal sealed class DefaultModuleSerializationService(IModuleDescriptionSerializerRegistry serializerRegistry) : IModuleSerializationService
 {
     public async ValueTask<IDescriptionObjectComponent> BuildAsync(IModuleDescriptor descriptor, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
         cancellationToken.ThrowIfCancellationRequested();
-        IObjectDescriptionBuilder builder = builderFactory.CreateBuilder();
 
-        await descriptor.DescribeAsync(builder, cancellationToken);
+        ObjectDescriptionBuilder builder = new(DefaultDescriptionComponentFactory.Instance);
+        await descriptor.DescribeAsync(builder, cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
-        return builder.Build();
+        return builder.BuildComponent();
     }
 
     public async ValueTask<string> SerializeAsync(IModuleDescriptor descriptor, IModuleDescriptionSerializer serializer, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(serializer);
 
-        IDescriptionObjectComponent description = await BuildAsync(descriptor, cancellationToken);
-        return await serializer.SerializeAsync(description, cancellationToken);
+        IDescriptionObjectComponent description = await BuildAsync(descriptor, cancellationToken).ConfigureAwait(false);
+        return await serializer.SerializeAsync(description, cancellationToken).ConfigureAwait(false);
     }
 
     public ValueTask<string> SerializeAsync(IModuleDescriptor descriptor, string format, CancellationToken cancellationToken = default)

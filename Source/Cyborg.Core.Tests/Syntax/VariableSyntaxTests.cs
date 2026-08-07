@@ -125,7 +125,7 @@ public sealed class VariableSyntaxTests
         }
 
         Assert.AreEqual(0, match.Index);
-        Assert.AreEqual(value?.Length, match.Length);
+        Assert.AreEqual(value.Length, match.Length);
         Assert.AreEqual(expectedExpression, match.Groups["expression"].Value);
     }
 
@@ -306,9 +306,7 @@ public sealed class VariableSyntaxTests
     [DataRow("identifier value", false)]
     [DataRow("\u00E4", false)]
     [DataRow("identifier\n", false)]
-    public void Test_IsValidIdentifier_ReturnsExpectedResult(
-        string value,
-        bool expected)
+    public void Test_IsValidIdentifier_ReturnsExpectedResult(string value, bool expected)
     {
         VariableSyntaxBuilder builder = CreateBuilder();
 
@@ -358,9 +356,7 @@ public sealed class VariableSyntaxTests
     [DataRow("\u00E4", false)]
     [DataRow("namespace.\u00E4", false)]
     [DataRow("namespace\n", false)]
-    public void Test_IsValidNamespace_ReturnsExpectedResult(
-        string value,
-        bool expected)
+    public void Test_IsValidNamespace_ReturnsExpectedResult(string value, bool expected)
     {
         VariableSyntaxBuilder builder = CreateBuilder();
 

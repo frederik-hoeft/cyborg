@@ -17,12 +17,8 @@ internal record PropertyRewriteContext
 
     public DiagnosticsReporter DiagnosticsReporter { get; init; }
 
-    public PropertyRewriteContext(PropertyModel property,
-        ValidationContractInfo contractInfo,
-        DiagnosticsReporter diagnosticsReporter,
-        string moduleVariable,
-        string contextVariable,
-        string propertyAccessExpression)
+    public PropertyRewriteContext(PropertyModel property, ValidationContractInfo contractInfo, DiagnosticsReporter diagnosticsReporter, string moduleVariable,
+        string contextVariable, string propertyAccessExpression)
     {
         ContractInfo = contractInfo;
         ModuleVariable = moduleVariable;

@@ -1,22 +1,13 @@
-﻿using Cyborg.Core.Configuration;
-using Cyborg.Core.Modules.Debugging.Breakpoints;
+﻿using Cyborg.Core.Modules.Debugging.Breakpoints;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Services.Default;
 using Microsoft.Extensions.Logging;
 
 namespace Cyborg.Core.Modules.Debugging;
 
-public sealed class WorkflowDebugger
-(
-    IServiceProvider serviceProvider,
-    IBreakpointRegistry breakpoints,
-    ILoggerFactory loggerFactory,
-    IDefault<IDebugFrontend> defaultFrontend
-) : IWorkflowDebugger
+internal sealed class WorkflowDebugger(IBreakpointRegistry breakpoints, ILoggerFactory loggerFactory, IDefault<IDebugFrontend> defaultFrontend) : IWorkflowDebugger
 {
-    /// <summary>
-    /// Expression used to implement <c>step</c> via the shared breakpoint matcher.
-    /// </summary>
+    /// <summary>Expression used to implement <c>step</c> via the shared breakpoint matcher.</summary>
     public const string STEP_EXPRESSION = ".*";
 
     private readonly ILogger _logger = loggerFactory.CreateLogger("cyborg.core.debugging");
@@ -41,30 +32,11 @@ public sealed class WorkflowDebugger
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+        DebugPauseContext pauseContext = new(module, moduleId, runtime, breakpoints, RequestStepAction: () => breakpoints.Add(STEP_EXPRESSION, isOneShot: true), DetachAction: breakpoints.Clear);
 
-        DebugPauseContext pauseContext = new
-        (
-            serviceProvider,
-            module,
-            moduleId,
-            runtime,
-            breakpoints,
-            RequestStepAction: () => breakpoints.Add(STEP_EXPRESSION, isOneShot: true),
-            DetachAction: breakpoints.Clear
-        );
+        _logger.LogBreakpointHit(pauseContext.ModuleIdentity, matched!.Expression);
 
-        // FIXME: use ZLogger (everywhere in the debugger) for structured logging and performance.
-        _logger.LogDebug(
-            "Breakpoint hit for module '{ModuleIdentity}' (expression {Expression})",
-            pauseContext.ModuleIdentity,
-            matched!.Expression);
-
-        if (defaultFrontend.GetDefault() is not { } frontend)
-        {
-            // No interactive adapter: treat as a soft break and continue.
-            return DebugResumeAction.Continue;
-        }
-
+        IDebugFrontend frontend = defaultFrontend.GetRequiredDefault();
         return await frontend.PauseAsync(pauseContext, cancellationToken).ConfigureAwait(false);
     }
 }

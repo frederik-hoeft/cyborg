@@ -24,8 +24,8 @@ internal static class DecompositionGenerationCandidateFactory
         }
 
         string namingPolicyPropertyName = GetNamedArgument(target.GeneratorAttribute, nameof(GeneratedDecompositionAttribute.NamingPolicy)) ?? "SnakeCaseLower";
-        string namingPolicyProviderTypeName = (target.GeneratorAttribute.NamedArguments.FirstOrDefault(kv => kv.Key == nameof(GeneratedDecompositionAttribute.NamingPolicyProvider)).Value.Value as Type)
-            ?.RenderGlobal()
+        string namingPolicyProviderTypeName = (target.GeneratorAttribute.NamedArguments
+            .FirstOrDefault(kv => kv.Key == nameof(GeneratedDecompositionAttribute.NamingPolicyProvider)).Value.Value as Type)?.RenderGlobal()
             ?? KnownTypes.JsonNamingPolicy;
 
         ImmutableArray<IPropertySymbol> decomposableProperties =

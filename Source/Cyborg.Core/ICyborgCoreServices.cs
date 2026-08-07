@@ -5,6 +5,7 @@ using Cyborg.Core.Configuration.Serialization.Dynamics;
 using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Debugging;
+using Cyborg.Core.Modules.Descriptors;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Runtime.Environments.Artifacts;
@@ -22,6 +23,7 @@ namespace Cyborg.Core;
 [ServiceProviderModule]
 [Import<IDynamicValueProviderServices>]
 [Import<IConfigurationTrustServices>]
+[Import<IModuleDescriptionServices>]
 [Import<IDebugServices>]
 [Singleton<IConfiguration, DefaultConfiguration>]
 [Singleton<IConfigurationLoader, DefaultConfigurationLoader>]

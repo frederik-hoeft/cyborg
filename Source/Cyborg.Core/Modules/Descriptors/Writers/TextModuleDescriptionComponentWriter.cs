@@ -1,4 +1,4 @@
-using Cyborg.Core.Common.Text;
+﻿using Cyborg.Core.Common.Text;
 using Cyborg.Core.Modules.Descriptors.Model;
 using System.Collections.Immutable;
 using System.Globalization;
@@ -6,13 +6,9 @@ using System.Text;
 
 namespace Cyborg.Core.Modules.Descriptors.Writers;
 
-internal sealed class TextModuleDescriptionComponentWriter(
-    IndentedStringBuilder builder) : IDescriptionComponentWriter
+internal sealed class TextModuleDescriptionComponentWriter(IndentedStringBuilder builder) : IDescriptionComponentWriter
 {
-    public ValueTask WriteAtomAsync<T>(
-        T value,
-        ImmutableArray<string> hints,
-        CancellationToken cancellationToken)
+    public ValueTask WriteAtomAsync<T>(T value, ImmutableArray<string> hints, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         WriteAtom(builder.GetInnerBuilder(), value);
@@ -20,9 +16,7 @@ internal sealed class TextModuleDescriptionComponentWriter(
         return ValueTask.CompletedTask;
     }
 
-    public async ValueTask WriteAsync(
-        IDescriptionObjectComponent objectComponent,
-        CancellationToken cancellationToken)
+    public async ValueTask WriteAsync(IDescriptionObjectComponent objectComponent, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(objectComponent);
         cancellationToken.ThrowIfCancellationRequested();
@@ -39,9 +33,7 @@ internal sealed class TextModuleDescriptionComponentWriter(
         }
     }
 
-    public async ValueTask WriteAsync(
-        IDescriptionCollectionComponent collectionComponent,
-        CancellationToken cancellationToken)
+    public async ValueTask WriteAsync(IDescriptionCollectionComponent collectionComponent, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(collectionComponent);
         cancellationToken.ThrowIfCancellationRequested();
@@ -60,10 +52,8 @@ internal sealed class TextModuleDescriptionComponentWriter(
             if (item is IDescriptionObjectComponent or IDescriptionCollectionComponent)
             {
                 builder.GetInnerBuilder().AppendLine();
-                TextModuleDescriptionComponentWriter nestedWriter =
-                    new(builder.IncreaseIndent());
-                await item.AcceptAsync(nestedWriter, cancellationToken)
-                    .ConfigureAwait(false);
+                TextModuleDescriptionComponentWriter nestedWriter = new(builder.IncreaseIndent());
+                await item.AcceptAsync(nestedWriter, cancellationToken).ConfigureAwait(false);
             }
             else
             {
@@ -73,30 +63,23 @@ internal sealed class TextModuleDescriptionComponentWriter(
         }
     }
 
-    public async ValueTask WriteAsync(
-        IDescriptionPropertyComponent propertyComponent,
-        CancellationToken cancellationToken)
+    public async ValueTask WriteAsync(IDescriptionPropertyComponent propertyComponent, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(propertyComponent);
         cancellationToken.ThrowIfCancellationRequested();
 
         builder.Append($"{propertyComponent.Name}:");
 
-        if (propertyComponent.Value is
-            IDescriptionObjectComponent or IDescriptionCollectionComponent)
+        if (propertyComponent.Value is IDescriptionObjectComponent or IDescriptionCollectionComponent)
         {
             builder.GetInnerBuilder().AppendLine();
-            TextModuleDescriptionComponentWriter nestedWriter =
-                new(builder.IncreaseIndent());
-            await propertyComponent.Value.AcceptAsync(
-                nestedWriter,
-                cancellationToken).ConfigureAwait(false);
+            TextModuleDescriptionComponentWriter nestedWriter = new(builder.IncreaseIndent());
+            await propertyComponent.Value.AcceptAsync(nestedWriter, cancellationToken).ConfigureAwait(false);
         }
         else
         {
             builder.GetInnerBuilder().Append(' ');
-            await propertyComponent.Value.AcceptAsync(this, cancellationToken)
-                .ConfigureAwait(false);
+            await propertyComponent.Value.AcceptAsync(this, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -129,22 +112,15 @@ internal sealed class TextModuleDescriptionComponentWriter(
                 builder.Append(guid.ToString("D"));
                 break;
             case Enum:
-                builder.Append(value.GetType().Name)
-                    .Append('.')
-                    .Append(value);
+                builder.Append(value.GetType().Name).Append('.').Append(value);
                 break;
             default:
-                builder.Append(
-                    Convert.ToString(value, CultureInfo.InvariantCulture)
-                    ?? value.GetType().Name);
+                builder.Append(Convert.ToString(value, CultureInfo.InvariantCulture) ?? value.GetType().Name);
                 break;
         }
     }
 
-    private static void AppendQuotedString(
-        StringBuilder builder,
-        string value,
-        char quote)
+    private static void AppendQuotedString(StringBuilder builder, string value, char quote)
     {
         builder.Append(quote);
         foreach (char character in value)
@@ -187,8 +163,7 @@ internal sealed class TextModuleDescriptionComponentWriter(
                 default:
                     if (char.IsControl(character))
                     {
-                        builder.Append("\\u")
-                            .Append(((int)character).ToString("X4", CultureInfo.InvariantCulture));
+                        builder.Append("\\u").Append(((int)character).ToString("X4", CultureInfo.InvariantCulture));
                     }
                     else
                     {

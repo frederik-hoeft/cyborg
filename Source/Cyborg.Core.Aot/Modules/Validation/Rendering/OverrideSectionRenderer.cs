@@ -128,7 +128,8 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
 
     private static bool HasOverrideWork(PropertyModel property, PropertyRewriteContext rewriteContext)
     {
-        MutablePropertyRewriteContext mutableContext = new(property, rewriteContext.ContractInfo, rewriteContext.DiagnosticsReporter, rewriteContext.ModuleVariable, rewriteContext.ContextVariable, rewriteContext.PropertyAccessExpression);
+        MutablePropertyRewriteContext mutableContext = new(property, rewriteContext.ContractInfo, rewriteContext.DiagnosticsReporter, rewriteContext.ModuleVariable,
+            rewriteContext.ContextVariable, rewriteContext.PropertyAccessExpression);
         return HasOverrideWork(mutableContext);
     }
 
@@ -161,9 +162,10 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
 
     private string CreateOverrideResolutionExpression(PropertyRewriteContext context, string rootPathExpression)
     {
+        string arguments = $"{context.ModuleVariable}, {context.PropertyAccessExpression}, moduleExpression: \"{context.ModuleVariable}\", valueExpression: \"{rootPathExpression}\"";
         string expression = context.Property.Symbol.Type.SpecialType is SpecialType.System_String
-            ? $"{ContextVariable}.SelectRawStringOverride({context.ModuleVariable}, {context.PropertyAccessExpression}, moduleExpression: \"{context.ModuleVariable}\", valueExpression: \"{rootPathExpression}\")"
-            : $"{ContextVariable}.ResolveOverride({context.ModuleVariable}, {context.PropertyAccessExpression}, moduleExpression: \"{context.ModuleVariable}\", valueExpression: \"{rootPathExpression}\")";
+            ? $"{ContextVariable}.SelectRawStringOverride({arguments})"
+            : $"{ContextVariable}.ResolveOverride({arguments})";
         foreach (PropertyAspect aspect in context.Property.Aspects)
         {
             expression = aspect.RewriteOverrideResolutionExpression(context, expression, rootPathExpression);

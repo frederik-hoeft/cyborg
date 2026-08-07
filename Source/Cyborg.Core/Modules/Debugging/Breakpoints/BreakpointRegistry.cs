@@ -43,11 +43,12 @@ public sealed class BreakpointRegistry : IBreakpointRegistry
                 continue;
             }
 
-            matched = candidate;
-            if (candidate.IsOneShot)
+            if (candidate.IsOneShot && !_breakpoints.TryRemove(id, out _))
             {
-                _breakpoints.TryRemove(id, out _);
+                continue;
             }
+
+            matched = candidate;
             return true;
         }
         matched = null;

@@ -102,7 +102,8 @@ internal sealed class DefaultApplicationRenderer(SectionRenderer parent)
 
     public bool HasDefaultWork(PropertyModel property, PropertyRewriteContext rewriteContext)
     {
-        MutablePropertyRewriteContext mutableContext = new(property, rewriteContext.ContractInfo, rewriteContext.DiagnosticsReporter, rewriteContext.ModuleVariable, rewriteContext.ContextVariable, rewriteContext.PropertyAccessExpression);
+        MutablePropertyRewriteContext mutableContext = new(property, rewriteContext.ContractInfo, rewriteContext.DiagnosticsReporter, rewriteContext.ModuleVariable,
+            rewriteContext.ContextVariable, rewriteContext.PropertyAccessExpression);
         return HasDefaultWork(mutableContext);
     }
 
@@ -110,7 +111,8 @@ internal sealed class DefaultApplicationRenderer(SectionRenderer parent)
     {
         foreach (PropertyModel child in collection.ElementChildren)
         {
-            MutablePropertyRewriteContext mutableContext = new(child, rewriteContext.ContractInfo, rewriteContext.DiagnosticsReporter, rewriteContext.ModuleVariable, rewriteContext.ContextVariable, rewriteContext.PropertyAccessExpression);
+            MutablePropertyRewriteContext mutableContext = new(child, rewriteContext.ContractInfo, rewriteContext.DiagnosticsReporter, rewriteContext.ModuleVariable,
+                rewriteContext.ContextVariable, rewriteContext.PropertyAccessExpression);
             if (HasDefaultWork(mutableContext))
             {
                 return true;
@@ -159,9 +161,12 @@ internal sealed class DefaultApplicationRenderer(SectionRenderer parent)
         string elementCurrentVariable = $"{safeIdentifier}ElementCurrent";
         string elementValueVariable = $"{safeIdentifier}ElementValue";
 
-        builder.AppendLine($"{KnownTypes.ListOfT(collection.ElementNullableTypeName)} {rewrittenItemsVariable} = [];");
-        builder.AppendLine($"foreach ({collection.ElementNullableTypeName} {elementVariable} in {collectionVariable})");
-        builder.AppendLine("{");
+        builder.AppendBlock(
+            $$"""
+            {{KnownTypes.ListOfT(collection.ElementNullableTypeName)}} {{rewrittenItemsVariable}} = [];
+            foreach ({{collection.ElementNullableTypeName}} {{elementVariable}} in {{collectionVariable}})
+            {
+            """);
 
         IndentedStringBuilder loopBuilder = builder.IncreaseIndent();
         if (collection.ElementRequiresNullCheck)
@@ -250,13 +255,16 @@ internal sealed class DefaultApplicationRenderer(SectionRenderer parent)
                 string rewrittenCollectionVariable = $"{safeIdentifier}Collection";
                 string rewrittenCollectionItemsVariable = $"{safeIdentifier}CollectionItems";
                 string rewrittenItemVariable = $"{safeIdentifier}Item";
-                builder.AppendLine($"{collection.MaterializationTypeName} {rewrittenCollectionVariable} = new();");
-                builder.AppendLine($"{KnownTypes.ICollectionOfT(collection.ElementNullableTypeName)} {rewrittenCollectionItemsVariable} = {rewrittenCollectionVariable};");
-                builder.AppendLine($"foreach ({collection.ElementNullableTypeName} {rewrittenItemVariable} in {rewrittenItemsVariable})");
-                builder.AppendLine("{");
-                builder.IncreaseIndent().AppendLine($"{rewrittenCollectionItemsVariable}.Add({rewrittenItemVariable});");
-                builder.AppendLine("}");
-                builder.AppendLine($"{targetVariable} = {rewrittenCollectionVariable};");
+                builder.AppendBlock(
+                    $$"""
+                    {{collection.MaterializationTypeName}} {{rewrittenCollectionVariable}} = new();
+                    {{KnownTypes.ICollectionOfT(collection.ElementNullableTypeName)}} {{rewrittenCollectionItemsVariable}} = {{rewrittenCollectionVariable}};
+                    foreach ({{collection.ElementNullableTypeName}} {{rewrittenItemVariable}} in {{rewrittenItemsVariable}})
+                    {
+                        {{rewrittenCollectionItemsVariable}}.Add({{rewrittenItemVariable}});
+                    }
+                    {{targetVariable}} = {{rewrittenCollectionVariable}};
+                    """);
                 break;
             default:
                 throw new InvalidOperationException("Unsupported collection materialization kind.");

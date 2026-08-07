@@ -69,7 +69,7 @@ internal sealed class DebugCommandDispatcher
 
         try
         {
-            await _app.RunAsync(arguments, disposeServiceProvider: false, cancellationToken);
+            await _app.RunAsync(arguments, disposeServiceProvider: false, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             return _resumeAction;
         }
@@ -112,7 +112,13 @@ internal sealed class DebugCommandDispatcher
     /// <summary>Print the full validated state of the current module.</summary>
     private async Task InspectAsync()
     {
-        string inspection = await _moduleSerializationService.SerializeAsync(Context.Module.GetDescriptor(), ModuleDescriptionFormats.Text, _cancellationToken);
+        if (Context.Module is not IModuleDescriptor descriptor)
+        {
+            _io.WriteLine("The current module does not expose a description.");
+            return;
+        }
+
+        string inspection = await _moduleSerializationService.ToTextAsync(descriptor, _cancellationToken).ConfigureAwait(false);
         _io.WriteLine(inspection);
     }
 

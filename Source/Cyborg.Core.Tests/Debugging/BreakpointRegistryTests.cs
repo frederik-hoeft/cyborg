@@ -25,7 +25,8 @@ public sealed class BreakpointRegistryTests
         BreakpointRegistry registry = new();
         registry.Add("cyborg\\.modules\\.empty\\.v1");
 
-        bool matched = registry.TryMatchAndConsume("cyborg.modules.empty.v1", name: null, group: null, out BreakpointExpression? bp);
+        BreakpointContext context = new("cyborg.modules.empty.v1", Name: null, Group: null);
+        bool matched = registry.TryMatchAndConsume(in context, out BreakpointExpression? bp);
         Assert.IsTrue(matched);
         Assert.IsNotNull(bp);
         Assert.AreEqual(1, registry.Count); // persistent breakpoint remains
@@ -37,9 +38,12 @@ public sealed class BreakpointRegistryTests
         BreakpointRegistry registry = new();
         registry.Add("^my-step$");
 
-        Assert.IsTrue(registry.TryMatchAndConsume("cyborg.modules.empty.v1", name: "my-step", group: null, out _));
-        Assert.IsTrue(registry.TryMatchAndConsume("cyborg.modules.empty.v1", name: null, group: "my-step", out _));
-        Assert.IsFalse(registry.TryMatchAndConsume("cyborg.modules.empty.v1", name: "other", group: "other", out _));
+        BreakpointContext nameContext = new("cyborg.modules.empty.v1", Name: "my-step", Group: null);
+        BreakpointContext groupContext = new("cyborg.modules.empty.v1", Name: null, Group: "my-step");
+        BreakpointContext otherContext = new("cyborg.modules.empty.v1", Name: "other", Group: "other");
+        Assert.IsTrue(registry.TryMatchAndConsume(in nameContext, out _));
+        Assert.IsTrue(registry.TryMatchAndConsume(in groupContext, out _));
+        Assert.IsFalse(registry.TryMatchAndConsume(in otherContext, out _));
     }
 
     [TestMethod]
@@ -48,10 +52,11 @@ public sealed class BreakpointRegistryTests
         BreakpointRegistry registry = new();
         registry.Add(".*", isOneShot: true);
 
-        Assert.IsTrue(registry.TryMatchAndConsume("anything", null, null, out BreakpointExpression? bp));
+        BreakpointContext context = new("anything", Name: null, Group: null);
+        Assert.IsTrue(registry.TryMatchAndConsume(in context, out BreakpointExpression? bp));
         Assert.IsTrue(bp!.IsOneShot);
         Assert.AreEqual(0, registry.Count);
-        Assert.IsFalse(registry.TryMatchAndConsume("anything", null, null, out _));
+        Assert.IsFalse(registry.TryMatchAndConsume(in context, out _));
     }
 
     [TestMethod]

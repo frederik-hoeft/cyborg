@@ -2,7 +2,7 @@
 
 namespace Cyborg.Core.Modules.Descriptors.Model;
 
-public interface IDescriptionComponentFactory
+internal interface IDescriptionComponentFactory
 {
     IDescriptionPropertyComponent CreateProperty(string name, IDescriptionValueComponent value, ImmutableArray<string> hints);
 

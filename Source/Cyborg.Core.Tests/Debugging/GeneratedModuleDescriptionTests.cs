@@ -1,8 +1,8 @@
-﻿using Cyborg.Core.Aot.Modules.Validation;
-using Cyborg.Core.Aot.Modules.Validation.Attributes;
+﻿using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Descriptors;
 using Cyborg.TestModules.Description;
+using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Immutable;
 using System.Text.Json;
 
@@ -11,7 +11,17 @@ namespace Cyborg.Core.Tests.Debugging;
 [TestClass]
 public sealed class GeneratedModuleDescriptionTests
 {
+    private DescriptionTestServiceProvider _services = null!;
+    private IModuleSerializationService _serializationService = null!;
+
     public TestContext TestContext { get; set; }
+
+    [TestInitialize]
+    public void Initialize()
+    {
+        _services = new DescriptionTestServiceProvider();
+        _serializationService = _services.GetRequiredService<IModuleSerializationService>();
+    }
 
     [TestMethod]
     public async Task ToJsonAsync_StringProperty_IsScalarAsync()
@@ -24,9 +34,7 @@ public sealed class GeneratedModuleDescriptionTests
             Values = ["first", "second"],
         };
 
-        string json = await ModuleDescription.ToJsonAsync(
-            module,
-            cancellationToken: TestContext.CancellationToken);
+        string json = await _serializationService.ToJsonAsync(module, TestContext.CancellationToken);
         using JsonDocument document = JsonDocument.Parse(json);
 
         JsonElement root = document.RootElement;
@@ -58,9 +66,7 @@ public sealed class GeneratedModuleDescriptionTests
             Values = ["value"],
         };
 
-        string json = await ModuleDescription.ToJsonAsync(
-            module,
-            cancellationToken: TestContext.CancellationToken);
+        string json = await _serializationService.ToJsonAsync(module, TestContext.CancellationToken);
         using JsonDocument document = JsonDocument.Parse(json);
 
         JsonElement root = document.RootElement;
@@ -89,9 +95,7 @@ public sealed class GeneratedModuleDescriptionTests
             Values = ["value"],
         };
 
-        string json = await ModuleDescription.ToJsonAsync(
-            module,
-            cancellationToken: TestContext.CancellationToken);
+        string json = await _serializationService.ToJsonAsync(module, TestContext.CancellationToken);
         using JsonDocument document = JsonDocument.Parse(json);
 
         JsonElement root = document.RootElement;
@@ -124,9 +128,7 @@ public sealed class GeneratedModuleDescriptionTests
             Values = [],
         };
 
-        string text = await ModuleDescription.ToTextAsync(
-            module,
-            TestContext.CancellationToken);
+        string text = await _serializationService.ToTextAsync(module, TestContext.CancellationToken);
 
         Assert.Contains($"{nameof(module.Values)}:{Environment.NewLine}  (empty)", text);
     }
@@ -140,9 +142,7 @@ public sealed class GeneratedModuleDescriptionTests
             Values = default,
         };
 
-        string text = await ModuleDescription.ToTextAsync(
-            module,
-            TestContext.CancellationToken);
+        string text = await _serializationService.ToTextAsync(module, TestContext.CancellationToken);
 
         Assert.Contains($"{nameof(module.Values)}:", text);
         Assert.DoesNotContain($"{nameof(module.Values)}: (empty)", text);

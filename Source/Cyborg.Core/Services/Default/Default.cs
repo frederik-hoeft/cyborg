@@ -2,7 +2,8 @@
 
 namespace Cyborg.Core.Services.Default;
 
-public sealed class Default<TService>(IServiceSelectionKey<TService> serviceKey, IEnumerable<TService> services, IConfiguration configuration) : IDefault<TService> where TService : class, IKeyedService
+public sealed class Default<TService>(IServiceSelectionKey<TService> serviceKey, IEnumerable<TService> services, IConfiguration configuration)
+    : IDefault<TService> where TService : class, IKeyedService
 {
     public TService? GetDefault()
     {
@@ -17,5 +18,6 @@ public sealed class Default<TService>(IServiceSelectionKey<TService> serviceKey,
         return services.FirstOrDefault(s => s.Key.Equals(selectedService, StringComparison.OrdinalIgnoreCase));
     }
 
-    public TService GetRequiredDefault() => GetDefault() ?? throw new InvalidOperationException($"No default service found for key '{serviceKey.Key}' and no default service specified or available.");
+    public TService GetRequiredDefault() =>
+        GetDefault() ?? throw new InvalidOperationException($"No registered service matches the configured or default selection for key '{serviceKey.Key}'.");
 }

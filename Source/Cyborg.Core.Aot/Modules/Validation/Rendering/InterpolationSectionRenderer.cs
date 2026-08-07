@@ -170,9 +170,12 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
         string elemCurrentVar = $"{safeId}ElementCurrent";
         string elemValueVar = $"{safeId}ElementValue";
 
-        builder.AppendLine($"{KnownTypes.ListOfT(collection.ElementNullableTypeName)} {rewrittenItemsVar} = [];");
-        builder.AppendLine($"foreach ({collection.ElementNullableTypeName} {elemVar} in {collectionVar})");
-        builder.AppendLine("{");
+        builder.AppendBlock(
+            $$"""
+            {{KnownTypes.ListOfT(collection.ElementNullableTypeName)}} {{rewrittenItemsVar}} = [];
+            foreach ({{collection.ElementNullableTypeName}} {{elemVar}} in {{collectionVar}})
+            {
+            """);
         IndentedStringBuilder loopBuilder = builder.IncreaseIndent();
 
         bool isStringElem = IsStringType(collection.ElementType);

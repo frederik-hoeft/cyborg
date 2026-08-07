@@ -1,15 +1,16 @@
-﻿using Cyborg.Core.Modules.Descriptors.Writers;
-
-namespace Cyborg.Core.Modules.Descriptors;
+﻿namespace Cyborg.Core.Modules.Descriptors;
 
 public static class ModuleSerializationServiceExtensions
 {
-    extension (IModuleSerializationService self)
+    public static ValueTask<string> ToTextAsync(this IModuleSerializationService serializationService, IModuleDescriptor descriptor, CancellationToken cancellationToken = default)
     {
-        public ValueTask<string> ToTextAsync(IModuleDescriptor descriptor, CancellationToken cancellationToken = default) =>
-            self.SerializeAsync(descriptor, TextModuleDescriptionSerializer.Instance, cancellationToken);
+        ArgumentNullException.ThrowIfNull(serializationService);
+        return serializationService.SerializeAsync(descriptor, ModuleDescriptionFormats.Text, cancellationToken);
+    }
 
-        public ValueTask<string> ToJsonAsync(IModuleDescriptor descriptor, bool indented = true, CancellationToken cancellationToken = default) =>
-            self.SerializeAsync(descriptor, new JsonModuleDescriptionSerializer(indented), cancellationToken);
+    public static ValueTask<string> ToJsonAsync(this IModuleSerializationService serializationService, IModuleDescriptor descriptor, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(serializationService);
+        return serializationService.SerializeAsync(descriptor, ModuleDescriptionFormats.Json, cancellationToken);
     }
 }

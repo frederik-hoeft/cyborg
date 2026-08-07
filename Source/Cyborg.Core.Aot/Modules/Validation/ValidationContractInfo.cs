@@ -10,7 +10,6 @@ internal sealed class ValidationContractInfo(Dictionary<ModuleValidationGenerato
     private static readonly ImmutableArray<ModuleValidationGeneratorContract> s_allContracts =
     [
         ModuleValidationGeneratorContract.IModuleRuntime,
-        ModuleValidationGeneratorContract.IModule,
         ModuleValidationGeneratorContract.IModuleT,
         ModuleValidationGeneratorContract.ModuleValidationContext,
         ModuleValidationGeneratorContract.ValidationResultT,
@@ -23,8 +22,6 @@ internal sealed class ValidationContractInfo(Dictionary<ModuleValidationGenerato
     ];
 
     public INamedTypeSymbol IModuleRuntime => ContractTypes[ModuleValidationGeneratorContract.IModuleRuntime];
-
-    public INamedTypeSymbol IModule => ContractTypes[ModuleValidationGeneratorContract.IModule];
 
     public INamedTypeSymbol IModuleT => ContractTypes[ModuleValidationGeneratorContract.IModuleT];
 

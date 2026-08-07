@@ -3,7 +3,6 @@
 internal enum ModuleValidationGeneratorContract
 {
     IModuleRuntime,
-    IModule,
     IModuleT,
     ModuleValidationContext,
     ValidationResultT,

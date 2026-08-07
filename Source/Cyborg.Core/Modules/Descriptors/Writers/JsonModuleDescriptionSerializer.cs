@@ -4,12 +4,8 @@ using System.Text.Json;
 
 namespace Cyborg.Core.Modules.Descriptors.Writers;
 
-public sealed class JsonModuleDescriptionSerializer(bool indented) : IModuleDescriptionSerializer
+internal sealed class JsonModuleDescriptionSerializer(bool indented) : IModuleDescriptionSerializer
 {
-    public JsonModuleDescriptionSerializer() : this(indented: true)
-    {
-    }
-
     public string Format => ModuleDescriptionFormats.Json;
 
     public async ValueTask<string> SerializeAsync(IDescriptionObjectComponent description, CancellationToken cancellationToken)

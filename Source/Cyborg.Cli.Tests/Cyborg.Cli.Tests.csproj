@@ -14,6 +14,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Cyborg.Cli\Cyborg.Cli.csproj" />
+        <ProjectReference Include="..\Cyborg.Cli.Debugging\Cyborg.Cli.Debugging.csproj" />
         <ProjectReference Include="..\Cyborg.Core\Cyborg.Core.csproj" />
         <ProjectReference Include="..\Cyborg.TestModules\Cyborg.TestModules.csproj" />
     </ItemGroup>

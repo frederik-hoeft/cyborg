@@ -2,6 +2,7 @@
 using Cyborg.Core.Modules.Descriptors.Builders;
 using Cyborg.Core.Modules.Descriptors.Model;
 using Cyborg.Core.Modules.Descriptors.Writers;
+using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
@@ -11,16 +12,23 @@ namespace Cyborg.Core.Tests.Debugging;
 [TestClass]
 public sealed class ModuleDescriptionTests
 {
+    private DescriptionTestServiceProvider _services = null!;
+    private IModuleSerializationService _serializationService = null!;
     public TestContext TestContext { get; set; }
+
+    [TestInitialize]
+    public void Initialize()
+    {
+        _services = new DescriptionTestServiceProvider();
+        _serializationService = _services.GetRequiredService<IModuleSerializationService>();
+    }
 
     [TestMethod]
     public async Task ToTextAsync_RendersNestedObjectsAndCollectionsAsync()
     {
         TestDescriptor descriptor = new();
 
-        string result = await ModuleDescription.ToTextAsync(
-            descriptor,
-            TestContext.CancellationToken);
+        string result = await _serializationService.ToTextAsync(descriptor, TestContext.CancellationToken);
 
         Assert.Contains("ModuleId: \"cyborg.tests.description.v1\"", result);
         Assert.Contains("Options:", result);
@@ -36,9 +44,7 @@ public sealed class ModuleDescriptionTests
     {
         TestDescriptor descriptor = new();
 
-        string result = await ModuleDescription.ToJsonAsync(
-            descriptor,
-            cancellationToken: TestContext.CancellationToken);
+        string result = await _serializationService.ToJsonAsync(descriptor, TestContext.CancellationToken);
         using JsonDocument document = JsonDocument.Parse(result);
 
         JsonElement root = document.RootElement;
@@ -55,7 +61,7 @@ public sealed class ModuleDescriptionTests
     {
         HintDescriptor descriptor = new();
 
-        IDescriptionObjectComponent result = await ModuleDescription.BuildAsync(descriptor, TestContext.CancellationToken);
+        IDescriptionObjectComponent result = await _serializationService.BuildAsync(descriptor, TestContext.CancellationToken);
 
         Assert.HasCount(1, result.Properties);
         IDescriptionPropertyComponent property = result.Properties[0];
@@ -69,10 +75,7 @@ public sealed class ModuleDescriptionTests
         HintDescriptor descriptor = new();
         RedactingDescriptionSerializer serializer = new();
 
-        string result = await ModuleDescription.SerializeAsync(
-            descriptor,
-            serializer,
-            TestContext.CancellationToken);
+        string result = await _serializationService.SerializeAsync(descriptor, serializer, TestContext.CancellationToken);
 
         Assert.AreEqual("Password=<redacted>", result);
     }
@@ -82,9 +85,7 @@ public sealed class ModuleDescriptionTests
     {
         EscapingDescriptor descriptor = new();
 
-        string result = await ModuleDescription.ToTextAsync(
-            descriptor,
-            TestContext.CancellationToken);
+        string result = await _serializationService.ToTextAsync(descriptor, TestContext.CancellationToken);
 
         Assert.Contains("Text: \"line\\n\\t\\\\\\\"\\0\"", result);
         Assert.Contains("Quote: '\\''", result);
@@ -95,9 +96,7 @@ public sealed class ModuleDescriptionTests
     {
         ScalarDescriptor descriptor = new();
 
-        string result = await ModuleDescription.ToTextAsync(
-            descriptor,
-            TestContext.CancellationToken);
+        string result = await _serializationService.ToTextAsync(descriptor, TestContext.CancellationToken);
 
         Assert.Contains("Null: null", result);
         Assert.Contains("Decimal: 12.5", result);
@@ -115,13 +114,21 @@ public sealed class ModuleDescriptionTests
         CancellationTrackingSerializer serializer = new();
         using CancellationTokenSource cancellationSource = new();
 
-        await ModuleDescription.SerializeAsync(
-            descriptor,
-            serializer,
-            cancellationSource.Token);
+        await _serializationService.SerializeAsync(descriptor, serializer, cancellationSource.Token);
 
         Assert.AreEqual(cancellationSource.Token, descriptor.CancellationToken);
         Assert.AreEqual(cancellationSource.Token, serializer.CancellationToken);
+    }
+
+    [TestMethod]
+    public async Task SerializeAsync_CustomSerializerRegisteredThroughDi_IsResolvedByFormatAsync()
+    {
+        CustomDescriptionTestServiceProvider services = new();
+        IModuleSerializationService serializationService = services.GetRequiredService<IModuleSerializationService>();
+
+        string result = await serializationService.SerializeAsync(new TestDescriptor(), "application/x-cyborg-test", TestContext.CancellationToken);
+
+        Assert.AreEqual("custom-from-di", result);
     }
 
     [TestMethod]
@@ -149,9 +156,7 @@ public sealed class ModuleDescriptionTests
 
     private sealed class TestDescriptor : IModuleDescriptor
     {
-        public ValueTask DescribeAsync(
-            IObjectDescriptionBuilder builder,
-            CancellationToken cancellationToken)
+        public ValueTask DescribeAsync(IObjectDescriptionBuilder builder, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             builder.AddProperty("ModuleId", [], "cyborg.tests.description.v1");
@@ -173,24 +178,17 @@ public sealed class ModuleDescriptionTests
 
     private sealed class HintDescriptor : IModuleDescriptor
     {
-        public ValueTask DescribeAsync(
-            IObjectDescriptionBuilder builder,
-            CancellationToken cancellationToken)
+        public ValueTask DescribeAsync(IObjectDescriptionBuilder builder, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            builder.AddProperty(
-                "Password",
-                ["secret", "application-specific"],
-                "sensitive");
+            builder.AddProperty("Password", ["secret", "application-specific"], "sensitive");
             return ValueTask.CompletedTask;
         }
     }
 
     private sealed class EscapingDescriptor : IModuleDescriptor
     {
-        public ValueTask DescribeAsync(
-            IObjectDescriptionBuilder builder,
-            CancellationToken cancellationToken)
+        public ValueTask DescribeAsync(IObjectDescriptionBuilder builder, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             builder.AddProperty("Text", [], "line\n\t\\\"\0");
@@ -201,41 +199,21 @@ public sealed class ModuleDescriptionTests
 
     private sealed class ScalarDescriptor : IModuleDescriptor
     {
-        public ValueTask DescribeAsync(
-            IObjectDescriptionBuilder builder,
-            CancellationToken cancellationToken)
+        public ValueTask DescribeAsync(IObjectDescriptionBuilder builder, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             builder.AddProperty("Null", [], (string?)null);
             builder.AddProperty("Decimal", [], 12.5m);
-            builder.AddProperty(
-                "DateTime",
-                [],
-                new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc));
-            builder.AddProperty(
-                "DateTimeOffset",
-                [],
-                new DateTimeOffset(
-                    2026,
-                    1,
-                    2,
-                    3,
-                    4,
-                    5,
-                    TimeSpan.FromHours(2)));
+            builder.AddProperty("DateTime", [], new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc));
+            builder.AddProperty("DateTimeOffset", [], new DateTimeOffset(2026, 1, 2, 3, 4, 5, TimeSpan.FromHours(2)));
             builder.AddProperty("Duration", [], new TimeSpan(1, 2, 3));
-            builder.AddProperty(
-                "Guid",
-                [],
-                Guid.Parse("01234567-89ab-cdef-0123-456789abcdef"));
+            builder.AddProperty("Guid", [], Guid.Parse("01234567-89ab-cdef-0123-456789abcdef"));
             builder.AddProperty("Enum", [], DayOfWeek.Monday);
             return ValueTask.CompletedTask;
         }
     }
 
-    private sealed class RedactingDescriptionSerializer :
-        IModuleDescriptionSerializer,
-        IDescriptionComponentWriter
+    private sealed class RedactingDescriptionSerializer : IModuleDescriptionSerializer, IDescriptionComponentWriter
     {
         private const string SECRET_HINT = "secret";
 
@@ -243,9 +221,7 @@ public sealed class ModuleDescriptionTests
 
         public string Format => "redacted";
 
-        public async ValueTask<string> SerializeAsync(
-            IDescriptionObjectComponent description,
-            CancellationToken cancellationToken)
+        public async ValueTask<string> SerializeAsync(IDescriptionObjectComponent description, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(description);
             _builder.Clear();
@@ -253,19 +229,14 @@ public sealed class ModuleDescriptionTests
             return _builder.ToString();
         }
 
-        public ValueTask WriteAtomAsync<T>(
-            T value,
-            ImmutableArray<string> hints,
-            CancellationToken cancellationToken)
+        public ValueTask WriteAtomAsync<T>(T value, ImmutableArray<string> hints, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             _builder.Append(value);
             return ValueTask.CompletedTask;
         }
 
-        public async ValueTask WriteAsync(
-            IDescriptionObjectComponent objectComponent,
-            CancellationToken cancellationToken)
+        public async ValueTask WriteAsync(IDescriptionObjectComponent objectComponent, CancellationToken cancellationToken)
         {
             foreach (IDescriptionPropertyComponent property in objectComponent.Properties)
             {
@@ -273,9 +244,7 @@ public sealed class ModuleDescriptionTests
             }
         }
 
-        public async ValueTask WriteAsync(
-            IDescriptionCollectionComponent collectionComponent,
-            CancellationToken cancellationToken)
+        public async ValueTask WriteAsync(IDescriptionCollectionComponent collectionComponent, CancellationToken cancellationToken)
         {
             foreach (IDescriptionValueComponent item in collectionComponent.Items)
             {
@@ -283,9 +252,7 @@ public sealed class ModuleDescriptionTests
             }
         }
 
-        public async ValueTask WriteAsync(
-            IDescriptionPropertyComponent propertyComponent,
-            CancellationToken cancellationToken)
+        public async ValueTask WriteAsync(IDescriptionPropertyComponent propertyComponent, CancellationToken cancellationToken)
         {
             _builder.Append(propertyComponent.Name).Append('=');
             foreach (string hint in propertyComponent.Hints)
@@ -297,8 +264,7 @@ public sealed class ModuleDescriptionTests
                 }
             }
 
-            await propertyComponent.Value.AcceptAsync(this, cancellationToken)
-                .ConfigureAwait(false);
+            await propertyComponent.Value.AcceptAsync(this, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -306,9 +272,7 @@ public sealed class ModuleDescriptionTests
     {
         public CancellationToken CancellationToken { get; private set; }
 
-        public ValueTask DescribeAsync(
-            IObjectDescriptionBuilder builder,
-            CancellationToken cancellationToken)
+        public ValueTask DescribeAsync(IObjectDescriptionBuilder builder, CancellationToken cancellationToken)
         {
             CancellationToken = cancellationToken;
             builder.AddProperty("Value", [], 1);
@@ -322,9 +286,7 @@ public sealed class ModuleDescriptionTests
 
         public CancellationToken CancellationToken { get; private set; }
 
-        public ValueTask<string> SerializeAsync(
-            IDescriptionObjectComponent description,
-            CancellationToken cancellationToken)
+        public ValueTask<string> SerializeAsync(IDescriptionObjectComponent description, CancellationToken cancellationToken)
         {
             CancellationToken = cancellationToken;
             return ValueTask.FromResult("tracked");
@@ -335,9 +297,7 @@ public sealed class ModuleDescriptionTests
     {
         public string Format => "custom";
 
-        public ValueTask<string> SerializeAsync(
-            IDescriptionObjectComponent description,
-            CancellationToken cancellationToken)
+        public ValueTask<string> SerializeAsync(IDescriptionObjectComponent description, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(description);
             cancellationToken.ThrowIfCancellationRequested();

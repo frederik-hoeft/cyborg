@@ -2,10 +2,9 @@
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Debugging;
 using Cyborg.Core.Modules.Debugging.Breakpoints;
-using Cyborg.Core.Modules.Descriptors;
-using Cyborg.Core.Modules.Descriptors.Writers;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
+using Cyborg.Core.Services.Default;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
@@ -21,12 +20,11 @@ public sealed class WorkflowDebuggerTests
     {
         BreakpointRegistry registry = new();
         using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
-        WorkflowDebugger debugger = CreateDebugger(registry, loggerFactory);
-        GlobalRuntimeEnvironment env = new(JsonNamingPolicy.SnakeCaseLower);
-        RootModuleRuntime runtime = new(env, loggerFactory);
-        ProbeModule module = new();
+        WorkflowDebugger debugger = CreateDebugger(registry, loggerFactory, frontend: null);
+        RootModuleRuntime runtime = new(new GlobalRuntimeEnvironment(JsonNamingPolicy.SnakeCaseLower), loggerFactory);
 
-        DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(module, ProbeModule.ModuleId, runtime, TestContext.CancellationToken);
+        DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(new ProbeModule(), ProbeModule.ModuleId, runtime, TestContext.CancellationToken);
+
         Assert.AreEqual(DebugResumeAction.Continue, action);
         Assert.IsFalse(debugger.IsEnabled);
     }
@@ -37,15 +35,13 @@ public sealed class WorkflowDebuggerTests
         BreakpointRegistry registry = new();
         registry.Add("probe");
         using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
-        WorkflowDebugger debugger = CreateDebugger(registry, loggerFactory);
         ScriptedFrontend frontend = new(DebugResumeAction.Continue);
-        debugger.Frontend = frontend;
-
-        GlobalRuntimeEnvironment env = new(JsonNamingPolicy.SnakeCaseLower);
-        RootModuleRuntime runtime = new(env, loggerFactory);
+        WorkflowDebugger debugger = CreateDebugger(registry, loggerFactory, frontend);
+        RootModuleRuntime runtime = new(new GlobalRuntimeEnvironment(JsonNamingPolicy.SnakeCaseLower), loggerFactory);
         ProbeModule module = new() { Name = "probe-step" };
 
         DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(module, ProbeModule.ModuleId, runtime, TestContext.CancellationToken);
+
         Assert.AreEqual(DebugResumeAction.Continue, action);
         Assert.AreEqual(1, frontend.PauseCount);
         Assert.AreEqual("cyborg.tests.probe.v1 name=probe-step", frontend.LastIdentity);
@@ -57,13 +53,11 @@ public sealed class WorkflowDebuggerTests
         BreakpointRegistry registry = new();
         registry.Add(".*");
         using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
-        WorkflowDebugger debugger = CreateDebugger(registry, loggerFactory);
-        debugger.Frontend = new ScriptedFrontend(DebugResumeAction.Cancel);
-
-        GlobalRuntimeEnvironment env = new(JsonNamingPolicy.SnakeCaseLower);
-        RootModuleRuntime runtime = new(env, loggerFactory);
+        WorkflowDebugger debugger = CreateDebugger(registry, loggerFactory, new ScriptedFrontend(DebugResumeAction.Cancel));
+        RootModuleRuntime runtime = new(new GlobalRuntimeEnvironment(JsonNamingPolicy.SnakeCaseLower), loggerFactory);
 
         DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(new ProbeModule(), ProbeModule.ModuleId, runtime, TestContext.CancellationToken);
+
         Assert.AreEqual(DebugResumeAction.Cancel, action);
     }
 
@@ -73,39 +67,57 @@ public sealed class WorkflowDebuggerTests
         BreakpointRegistry registry = new();
         registry.Add("first");
         using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
-        WorkflowDebugger debugger = CreateDebugger(registry, loggerFactory);
-        StepThenContinueFrontend frontend = new();
-        debugger.Frontend = frontend;
-
-        GlobalRuntimeEnvironment env = new(JsonNamingPolicy.SnakeCaseLower);
-        RootModuleRuntime runtime = new(env, loggerFactory);
+        WorkflowDebugger debugger = CreateDebugger(registry, loggerFactory, new StepThenContinueFrontend());
+        RootModuleRuntime runtime = new(new GlobalRuntimeEnvironment(JsonNamingPolicy.SnakeCaseLower), loggerFactory);
         ProbeModule module = new() { Name = "first" };
 
         await debugger.EvaluatePreExecutionAsync(module, ProbeModule.ModuleId, runtime, TestContext.CancellationToken);
 
-        IReadOnlyList<BreakpointExpression> list = registry.List();
-        Assert.Contains(static b => b.Expression == WorkflowDebugger.STEP_EXPRESSION && b.IsOneShot, list);
+        IReadOnlyList<BreakpointExpression> breakpoints = registry.List();
+        Assert.Contains(static breakpoint => breakpoint.Expression == WorkflowDebugger.STEP_EXPRESSION && breakpoint.IsOneShot, breakpoints);
     }
 
-    private static WorkflowDebugger CreateDebugger(BreakpointRegistry registry, ILoggerFactory loggerFactory)
+    [TestMethod]
+    public async Task EvaluatePreExecutionAsync_WhenFrontendConfigurationIsInvalid_ThrowsAsync()
     {
-        DefaultModuleDescriptionSerializerRegistry serializers = new([TextModuleDescriptionSerializer.Instance]);
-        return new WorkflowDebugger(registry, serializers, loggerFactory);
+        BreakpointRegistry registry = new();
+        registry.Add("probe");
+        using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
+        WorkflowDebugger debugger = CreateDebugger(registry, loggerFactory, frontend: null);
+        RootModuleRuntime runtime = new(new GlobalRuntimeEnvironment(JsonNamingPolicy.SnakeCaseLower), loggerFactory);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        {
+            await debugger.EvaluatePreExecutionAsync(new ProbeModule(), ProbeModule.ModuleId, runtime, TestContext.CancellationToken);
+        });
     }
+
+    private static WorkflowDebugger CreateDebugger(BreakpointRegistry registry, ILoggerFactory loggerFactory, IDebugFrontend? frontend) =>
+        new(registry, loggerFactory, new TestDefaultFrontend(frontend));
 
     private sealed record ProbeModule : ModuleBase, IModule
     {
         public static string ModuleId => "cyborg.tests.probe.v1";
     }
 
+    private sealed class TestDefaultFrontend(IDebugFrontend? frontend) : IDefault<IDebugFrontend>
+    {
+        public IDebugFrontend? GetDefault() => frontend;
+
+        public IDebugFrontend GetRequiredDefault() => frontend ?? throw new InvalidOperationException("No frontend configured.");
+    }
+
     private sealed class ScriptedFrontend(DebugResumeAction action) : IDebugFrontend
     {
+        public string Key => "test";
+
         public int PauseCount { get; private set; }
 
         public string? LastIdentity { get; private set; }
 
         public ValueTask<DebugResumeAction> PauseAsync(IDebugPauseContext context, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             PauseCount++;
             LastIdentity = context.ModuleIdentity;
             return ValueTask.FromResult(action);
@@ -114,8 +126,11 @@ public sealed class WorkflowDebuggerTests
 
     private sealed class StepThenContinueFrontend : IDebugFrontend
     {
+        public string Key => "test-step";
+
         public ValueTask<DebugResumeAction> PauseAsync(IDebugPauseContext context, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             context.RequestStep();
             return ValueTask.FromResult(DebugResumeAction.Continue);
         }
