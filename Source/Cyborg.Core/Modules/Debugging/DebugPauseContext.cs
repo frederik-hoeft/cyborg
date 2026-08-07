@@ -1,38 +1,57 @@
-﻿using Cyborg.Core.Modules.Runtime;
+using Cyborg.Core.Modules.Descriptors;
+using Cyborg.Core.Modules.Runtime;
 
 namespace Cyborg.Core.Modules.Debugging;
 
-// TODO: can probably be a record
 internal sealed class DebugPauseContext(
     IModule module,
     string moduleId,
     IModuleRuntime runtime,
     IBreakpointRegistry breakpoints,
+    IModuleDescriptionSerializer textSerializer,
     Action requestStep,
     Action detach) : IDebugPauseContext
 {
-    public IModule Module { get; } = module;
+    private readonly IModuleDescriptionSerializer _textSerializer =
+        textSerializer ?? throw new ArgumentNullException(nameof(textSerializer));
+    private readonly Action _requestStep =
+        requestStep ?? throw new ArgumentNullException(nameof(requestStep));
+    private readonly Action _detach =
+        detach ?? throw new ArgumentNullException(nameof(detach));
 
-    public string ModuleId { get; } = moduleId;
+    public IModule Module { get; } =
+        module ?? throw new ArgumentNullException(nameof(module));
 
-    public string ModuleIdentity { get; } = Debugging.ModuleIdentity.Format(module, moduleId);
+    public string ModuleId { get; } =
+        !string.IsNullOrWhiteSpace(moduleId)
+            ? moduleId
+            : throw new ArgumentException("Module id must not be null or whitespace.", nameof(moduleId));
 
-    public IModuleRuntime Runtime { get; } = runtime;
+    public string ModuleIdentity { get; } =
+        global::Cyborg.Core.Modules.Debugging.ModuleIdentity.Format(module, moduleId);
 
-    public IBreakpointRegistry Breakpoints { get; } = breakpoints;
+    public IModuleRuntime Runtime { get; } =
+        runtime ?? throw new ArgumentNullException(nameof(runtime));
 
-    public string Inspect()
+    public IBreakpointRegistry Breakpoints { get; } =
+        breakpoints ?? throw new ArgumentNullException(nameof(breakpoints));
+
+    public ValueTask<string> InspectAsync(CancellationToken cancellationToken)
     {
-        if (Module is IInspectable inspectable)
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (Module is IModuleDescriptor descriptor)
         {
-            return inspectable.Inspect();
+            return ModuleDescription.SerializeAsync(
+                descriptor,
+                _textSerializer,
+                cancellationToken);
         }
 
-        // Fallback for modules without generated inspection support.
-        return ModuleIdentity;
+        return ValueTask.FromResult(ModuleIdentity);
     }
 
-    public void RequestStep() => requestStep();
+    public void RequestStep() => _requestStep();
 
-    public void Detach() => detach();
+    public void Detach() => _detach();
 }

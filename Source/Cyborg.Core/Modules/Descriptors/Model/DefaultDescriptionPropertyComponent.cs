@@ -3,7 +3,7 @@ using System.Collections.Immutable;
 
 namespace Cyborg.Core.Modules.Descriptors.Model;
 
-public sealed record DefaultDescriptionPropertyComponent(
+internal sealed record DefaultDescriptionPropertyComponent(
     string Name,
     IDescriptionValueComponent Value,
     ImmutableArray<string> Hints) : IDescriptionPropertyComponent

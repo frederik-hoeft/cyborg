@@ -5,7 +5,7 @@ using System.Text.Json;
 
 namespace Cyborg.Core.Modules.Descriptors.Writers;
 
-public sealed class JsonModuleDescriptionComponentWriter(
+internal sealed class JsonModuleDescriptionComponentWriter(
     Utf8JsonWriter jsonWriter) : IDescriptionComponentWriter
 {
     public ValueTask WriteAtomAsync<T>(
@@ -99,7 +99,7 @@ public sealed class JsonModuleDescriptionComponentWriter(
         jsonWriter.WriteStartObject();
         foreach (IDescriptionPropertyComponent property in objectComponent.Properties)
         {
-            await property.AcceptAsync(this, cancellationToken);
+            await property.AcceptAsync(this, cancellationToken).ConfigureAwait(false);
         }
         jsonWriter.WriteEndObject();
     }
@@ -114,18 +114,9 @@ public sealed class JsonModuleDescriptionComponentWriter(
         jsonWriter.WriteStartArray();
         foreach (IDescriptionValueComponent item in collectionComponent.Items)
         {
-            await item.AcceptAsync(this, cancellationToken);
+            await item.AcceptAsync(this, cancellationToken).ConfigureAwait(false);
         }
         jsonWriter.WriteEndArray();
-    }
-
-    public ValueTask WriteAsync(
-        IDescriptionValueComponent valueComponent,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(valueComponent);
-        cancellationToken.ThrowIfCancellationRequested();
-        return valueComponent.AcceptAsync(this, cancellationToken);
     }
 
     public async ValueTask WriteAsync(
@@ -136,6 +127,7 @@ public sealed class JsonModuleDescriptionComponentWriter(
         cancellationToken.ThrowIfCancellationRequested();
 
         jsonWriter.WritePropertyName(propertyComponent.Name);
-        await propertyComponent.Value.AcceptAsync(this, cancellationToken);
+        await propertyComponent.Value.AcceptAsync(this, cancellationToken)
+            .ConfigureAwait(false);
     }
 }

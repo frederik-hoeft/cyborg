@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using System.Text;
 
@@ -34,9 +34,6 @@ internal static class ModuleValidationRenderer
             new InterpolationSectionRenderer(contractInfo, MODULE_VARIABLE),
             new ValidationSectionRenderer(contractInfo, diagnosticsReporter),
             new InspectionSectionRenderer(contractInfo, diagnosticsReporter),
-            new InspectionSectionRenderer(
-                contractInfo,
-                diagnosticsReporter),
         ];
 
         StringBuilder builder = new();
@@ -62,7 +59,7 @@ internal static class ModuleValidationRenderer
             .Append(" : ")
             .Append(contractInfo.IModuleT.RenderGlobalWithGenerics(model.TypeName))
             .Append(", ")
-            .Append(contractInfo.IInspectable.RenderGlobal())
+            .Append(contractInfo.IModuleDescriptor.RenderGlobal())
             .AppendLine();
         builder.AppendLine("{");
 

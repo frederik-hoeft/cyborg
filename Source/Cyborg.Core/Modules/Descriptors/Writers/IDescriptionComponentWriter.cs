@@ -3,6 +3,9 @@ using System.Collections.Immutable;
 
 namespace Cyborg.Core.Modules.Descriptors.Writers;
 
+/// <summary>
+/// Visitor used by custom module-description serializers to consume the immutable description tree.
+/// </summary>
 public interface IDescriptionComponentWriter
 {
     ValueTask WriteAtomAsync<T>(
@@ -16,10 +19,6 @@ public interface IDescriptionComponentWriter
 
     ValueTask WriteAsync(
         IDescriptionCollectionComponent collectionComponent,
-        CancellationToken cancellationToken);
-
-    ValueTask WriteAsync(
-        IDescriptionValueComponent valueComponent,
         CancellationToken cancellationToken);
 
     ValueTask WriteAsync(

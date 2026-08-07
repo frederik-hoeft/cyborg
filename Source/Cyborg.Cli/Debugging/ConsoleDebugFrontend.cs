@@ -1,33 +1,35 @@
-﻿using Cyborg.Core.Modules.Debugging;
+using Cyborg.Core.Modules.Debugging;
 
 namespace Cyborg.Cli.Debugging;
 
 /// <summary>
-/// Console-based debug frontend that runs a minimal extensible REPL at each breakpoint.
-/// Command handlers are resolved via DI so additional commands can be registered without
-/// modifying this type.
+/// Console-based debug frontend. The frontend owns REPL lifecycle and I/O while
+/// ConsoleAppFramework owns command grammar, aliases, validation, and help generation.
 /// </summary>
-internal sealed class ConsoleDebugFrontend(IDebugReplIo io, IEnumerable<IDebugReplCommand> commands) : IDebugFrontend
+internal sealed class ConsoleDebugFrontend(
+    IDebugReplIo io,
+    DebugCommandDispatcher commandDispatcher) : IDebugFrontend
 {
-    private readonly Dictionary<string, IDebugReplCommand> _commandsByName = BuildCommandMap(commands);
-    private readonly IReadOnlyList<IDebugReplCommand> _uniqueCommands = commands
-        .GroupBy(static c => c.Name, StringComparer.OrdinalIgnoreCase)
-        .Select(static g => g.First())
-        .OrderBy(static c => c.Name, StringComparer.OrdinalIgnoreCase)
-        .ToArray();
+    private readonly IDebugReplIo _io =
+        io ?? throw new ArgumentNullException(nameof(io));
+    private readonly DebugCommandDispatcher _commandDispatcher =
+        commandDispatcher ?? throw new ArgumentNullException(nameof(commandDispatcher));
 
-    public async ValueTask<DebugResumeAction> PauseAsync(IDebugPauseContext context, CancellationToken cancellationToken)
+    public async ValueTask<DebugResumeAction> PauseAsync(
+        IDebugPauseContext context,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        io.WriteLine(string.Empty);
-        io.WriteLine($"Breakpoint hit: {context.ModuleIdentity}");
-        io.WriteLine("Type 'help' for available commands.");
+        _io.WriteLine(string.Empty);
+        _io.WriteLine($"Breakpoint hit: {context.ModuleIdentity}");
+        _io.WriteLine("Type 'help' for available commands.");
 
-        while (!cancellationToken.IsCancellationRequested)
+        while (true)
         {
-            io.Write("(cyborg-dbg) ");
-            string? line = io.ReadLine();
+            cancellationToken.ThrowIfCancellationRequested();
+            _io.Write("(cyborg-dbg) ");
+            string? line = await _io.ReadLineAsync(cancellationToken).ConfigureAwait(false);
             if (line is null)
             {
                 // EOF: detach and continue so unattended pipes do not hang forever.
@@ -41,85 +43,14 @@ internal sealed class ConsoleDebugFrontend(IDebugReplIo io, IEnumerable<IDebugRe
                 continue;
             }
 
-            if (!TryParse(line, out string commandName, out string arguments))
+            DebugResumeAction? action = await _commandDispatcher.DispatchAsync(
+                line,
+                context,
+                cancellationToken).ConfigureAwait(false);
+            if (action is not null)
             {
-                io.WriteLine("Unrecognized input. Type 'help' for available commands.");
-                continue;
-            }
-
-            if (commandName.Equals("help", StringComparison.OrdinalIgnoreCase)
-                || commandName.Equals("?", StringComparison.OrdinalIgnoreCase)
-                || commandName.Equals("h", StringComparison.OrdinalIgnoreCase))
-            {
-                WriteHelp();
-                continue;
-            }
-
-            if (!_commandsByName.TryGetValue(commandName, out IDebugReplCommand? command))
-            {
-                io.WriteLine($"Unknown command '{commandName}'. Type 'help' for available commands.");
-                continue;
-            }
-
-            DebugReplCommandInput input = new(line, commandName, arguments);
-            DebugReplCommandResult result = await command.ExecuteAsync(input, context, cancellationToken).ConfigureAwait(false);
-            if (result.ErrorMessage is not null)
-            {
-                io.WriteLine(result.ErrorMessage);
-            }
-
-            if (!result.StayInRepl && result.ResumeAction is { } action)
-            {
-                return action;
+                return action.Value;
             }
         }
-
-        cancellationToken.ThrowIfCancellationRequested();
-        return DebugResumeAction.Cancel;
-    }
-
-    private void WriteHelp()
-    {
-        io.WriteLine("Debugger commands:");
-        foreach (IDebugReplCommand command in _uniqueCommands)
-        {
-            string aliases = command.Aliases.Count > 0
-                ? $" (aliases: {string.Join(", ", command.Aliases)})"
-                : string.Empty;
-            io.WriteLine($"  {command.Name,-12}{aliases}");
-            io.WriteLine($"               {command.Description}");
-        }
-        io.WriteLine("  help        (aliases: h, ?)");
-        io.WriteLine("               List available debugger commands.");
-    }
-
-    private static Dictionary<string, IDebugReplCommand> BuildCommandMap(IEnumerable<IDebugReplCommand> commands)
-    {
-        Dictionary<string, IDebugReplCommand> map = new(StringComparer.OrdinalIgnoreCase);
-        foreach (IDebugReplCommand command in commands)
-        {
-            map[command.Name] = command;
-            foreach (string alias in command.Aliases)
-            {
-                map[alias] = command;
-            }
-        }
-        return map;
-    }
-
-    private static bool TryParse(string line, out string commandName, out string arguments)
-    {
-        // TODO: doesn't handle quoted arguments with spaces or tabs
-        int space = line.IndexOf(' ');
-        if (space < 0)
-        {
-            commandName = line;
-            arguments = string.Empty;
-            return commandName.Length > 0;
-        }
-
-        commandName = line[..space];
-        arguments = line[(space + 1)..].Trim();
-        return commandName.Length > 0;
     }
 }

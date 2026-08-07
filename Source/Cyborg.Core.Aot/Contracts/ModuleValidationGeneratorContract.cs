@@ -9,6 +9,7 @@ internal enum ModuleValidationGeneratorContract
     ValidationError,
     IDefaultValueT,
     IParser,
-    IInspectable,
+    IModuleDescriptor,
     IObjectDescriptionBuilder,
+    ModuleIdentity,
 }

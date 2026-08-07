@@ -1,5 +1,4 @@
-﻿using Cyborg.Cli.Debugging;
-using Cyborg.Cli.Debugging.Commands;
+using Cyborg.Cli.Debugging;
 using Cyborg.Cli.Logging;
 using Cyborg.Cli.Logging.Options;
 using Cyborg.Cli.Metrics;
@@ -30,16 +29,11 @@ namespace Cyborg.Cli;
 [Singleton<JsonConverter>(Factory = nameof(CreateLogFormatConverter))]
 [Singleton<JsonConverter>(Factory = nameof(CreateLogLevelConverter))]
 [Singleton<IDebugReplIo, ConsoleDebugReplIo>]
-[Singleton<IDebugReplCommand, ContinueCommand>]
-[Singleton<IDebugReplCommand, DetachCommand>]
-[Singleton<IDebugReplCommand, StepCommand>]
-[Singleton<IDebugReplCommand, InspectCommand>]
-[Singleton<IDebugReplCommand, CancelCommand>]
-[Singleton<IDebugReplCommand, BreakCommand>]
+[Singleton<DebugCommandDispatcher>]
 [Singleton<IDebugFrontend, ConsoleDebugFrontend>]
 internal interface ICyborgCliServiceOptions
 {
-    static ILoggerFactory CreateLoggerFactory(IConfiguration configuration, IEnumerable<ILoggingConfigurator> configurators) =>
+    public static ILoggerFactory CreateLoggerFactory(IConfiguration configuration, IEnumerable<ILoggingConfigurator> configurators) =>
         LoggerFactory.Create(builder =>
         {
             GlobalLoggingOptions globalOptions = configuration.Get("cyborg.services.logging", () => new GlobalLoggingOptions(LogLevel.Trace));
@@ -50,9 +44,9 @@ internal interface ICyborgCliServiceOptions
             }
         });
 
-    static JsonConverter CreateRollingIntervalConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<RollingInterval>(namingPolicy);
+    public static JsonConverter CreateRollingIntervalConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<RollingInterval>(namingPolicy);
 
-    static JsonConverter CreateLogFormatConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<LogFormat>(namingPolicy);
+    public static JsonConverter CreateLogFormatConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<LogFormat>(namingPolicy);
 
-    static JsonConverter CreateLogLevelConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<LogLevel>(namingPolicy);
+    public static JsonConverter CreateLogLevelConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<LogLevel>(namingPolicy);
 }

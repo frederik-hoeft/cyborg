@@ -1,4 +1,4 @@
-﻿# Source Generators
+# Source Generators
 
 This document describes the Roslyn source generators in `Cyborg.Core.Aot`. The generator layer produces the compile-time code that makes the module system, validation pipeline, and decomposition model work without runtime reflection, enabling native AOT compilation and trim safety.
 
@@ -37,7 +37,6 @@ For the runtime architecture these generators integrate with, see [Architecture 
 
 <!-- /code_chunk_output -->
 
-
 ## Design Role
 
 `Cyborg.Core.Aot` is a Roslyn incremental generator assembly consumed by the module projects as an analyzer reference. It targets netstandard2.0 as required by the Roslyn analyzer hosting model. The generators produce the repetitive, reflection-equivalent code that would otherwise need to be written by hand for every module type.
@@ -45,7 +44,7 @@ For the runtime architecture these generators integrate with, see [Architecture 
 The generator layer covers four concerns:
 
 - **Module validation** — Generating the four-renderer validation pipeline (`ApplyDefaultsAsync`, `ResolveOverridesAsync`, `ApplyInterpolationAsync`, `ValidateAsync`) from annotated module records, transforming declarative attributes into executable validation, defaulting, override resolution, interpolation, and validation logic.
-- **Module inspection** — Generating `ToString` (short identity) and `IInspectable.Inspect` (full recursive state dump) on the same `[GeneratedModuleValidation]` partial records used for validation, so debugging works without per-module source changes. See [Workflow Debugging](debugging.md).
+- **Module descriptions** — Generating `ToString` (short identity) and asynchronous `IModuleDescriptor.DescribeAsync` traversal on the same `[GeneratedModuleValidation]` partial records used for validation. The format-neutral description tree is then serialized by the debugger or other clients without per-module source changes. See [Workflow Debugging](debugging.md).
 - **Module loader factories** — Generating worker construction methods that resolve constructor dependencies from the DI container, eliminating boilerplate in module loaders.
 - **Model decomposition** — Generating `IDecomposable` implementations that project record properties into `DynamicKeyValuePair` collections for environment publishing and artifact flattening.
 
@@ -85,7 +84,7 @@ The generator is triggered by the `[GeneratedModuleValidation]` attribute on a `
 
 ### Generated Pipeline
 
-For each annotated record, the generator emits a partial record implementing `IModule<TModule>` with one public async validation method and three private async instance helpers:
+For each annotated record, the generator emits a partial record implementing `IModule<TModule>` and `IModuleDescriptor`. The validation pipeline consists of one public async validation method and three private async instance helpers:
 
 1. **`ApplyDefaultsAsync`** — For each property carrying a default attribute (`[DefaultValue<T>]`, `[DefaultInstance]`, `[DefaultInstanceFactory]`, `[DefaultTimeSpan]`), emits a `with`-expression that replaces null or zero-valued properties with their declared defaults. Recursively applies defaults to nested records marked `[Validatable]` and to elements within collections.
 
@@ -145,14 +144,14 @@ The generator assembles its output through four section renderers, each implemen
 | `InterpolationSectionRenderer` | `ApplyInterpolationAsync` | Recursively rewrites eligible strings after defaults and overrides |
 | `ValidationSectionRenderer` | `ValidateAsync` | Orchestrates the full pipeline and emits constraint checks from aspect validation logic |
 
-The `ModuleValidationRenderer` orchestrates these renderers sequentially into a single partial record declaration, and additionally runs `InspectionSectionRenderer` to emit `ToString` and `Inspect` while implementing `IInspectable`. It also emits file-scoped helper methods for default instance resolution and nullable relaxation.
+The `ModuleValidationRenderer` orchestrates these renderers sequentially into a single partial record declaration, and additionally runs `InspectionSectionRenderer` once to emit `ToString` and `DescribeAsync` while implementing `IModuleDescriptor`. `DescribeAsync` walks the same recursive `PropertyModel` graph as validation and reuses the shared collection-enumeration guards. Descriptor hints are collected from `PropertyAspect.RegisterDescriptorHints`; the default implementation contributes no hints, allowing future attributes such as redaction markers to add arbitrary string keys without coupling the generator to a serializer. It also emits file-scoped helper methods for default instance resolution and nullable relaxation.
 
 ### Nested and Collection Handling
 
 The generator supports recursive validation of nested record types and collection elements:
 
 - **Nested records** — Properties whose type is marked `[Validatable]` are processed recursively. The generator detects cycles in the type graph to prevent infinite recursion during generation.
-- **Collections** — Properties typed as supported enumerable shapes are rewritten and validated element-by-element when their element type requires work. `CollectionTypeInspector` selects a `CollectionMaterializationKind` for arrays, `List<T>`, `ImmutableArray<T>`, supported collection interfaces, and constructible concrete collections. Shared enumeration guards preserve collection absence semantics: null references are skipped, nullable value types are unwrapped only when present, and default `ImmutableArray<T>` values are never enumerated or silently converted to empty arrays.
+- **Collections** — Properties typed as supported enumerable shapes are rewritten and validated element-by-element when their element type requires work. `CollectionTypeInspector` selects a `CollectionMaterializationKind` for arrays, `List<T>`, `ImmutableArray<T>`, supported collection interfaces, and constructible concrete collections; `string` is explicitly excluded and remains a scalar despite implementing `IEnumerable<char>`. Shared enumeration guards preserve collection absence semantics across validation, interpolation, defaults, and description generation: null references are skipped, nullable value types are unwrapped only when present, and default `ImmutableArray<T>` values are never enumerated or silently converted to empty arrays.
 - **Element-targeted constraints** — Selected validation attributes can set `TargetsElements = true` to apply their constraint to each immediate collection element. The same guarded loop is shared with recursive validation of `[Validatable]` element records, while ordinary property constraints remain outside the guard. This allows repeated attributes to constrain the collection and its elements independently. Attribute-specific target checks use the element type, and element validation errors retain the parent property name while identifying the zero-based element index in the message.
 
 ## Module Loader Factory Generator

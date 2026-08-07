@@ -2,7 +2,7 @@ using System.Text;
 
 namespace Cyborg.Core.Common.Text;
 
-public sealed class IndentedStringBuilder(
+internal sealed class IndentedStringBuilder(
     StringBuilder builder,
     int indentLevel = 0,
     int indentSize = 2)

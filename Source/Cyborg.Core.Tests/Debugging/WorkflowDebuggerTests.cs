@@ -1,6 +1,8 @@
-﻿using Cyborg.Core.Modules;
+using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Debugging;
+using Cyborg.Core.Modules.Descriptors;
+using Cyborg.Core.Modules.Descriptors.Writers;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Microsoft.Extensions.Logging;
@@ -18,7 +20,7 @@ public sealed class WorkflowDebuggerTests
     {
         BreakpointRegistry registry = new();
         using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
-        WorkflowDebugger debugger = new(registry, loggerFactory);
+        WorkflowDebugger debugger = CreateDebugger(registry, loggerFactory);
         GlobalRuntimeEnvironment env = new(JsonNamingPolicy.SnakeCaseLower);
         RootModuleRuntime runtime = new(env, loggerFactory);
         ProbeModule module = new();
@@ -34,7 +36,7 @@ public sealed class WorkflowDebuggerTests
         BreakpointRegistry registry = new();
         registry.Add("probe");
         using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
-        WorkflowDebugger debugger = new(registry, loggerFactory);
+        WorkflowDebugger debugger = CreateDebugger(registry, loggerFactory);
         ScriptedFrontend frontend = new(DebugResumeAction.Continue);
         debugger.Frontend = frontend;
 
@@ -54,7 +56,7 @@ public sealed class WorkflowDebuggerTests
         BreakpointRegistry registry = new();
         registry.Add(".*");
         using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
-        WorkflowDebugger debugger = new(registry, loggerFactory)
+        WorkflowDebugger debugger = CreateDebugger(registry, loggerFactory)
         {
             Frontend = new ScriptedFrontend(DebugResumeAction.Cancel)
         };
@@ -72,7 +74,7 @@ public sealed class WorkflowDebuggerTests
         BreakpointRegistry registry = new();
         registry.Add("first");
         using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
-        WorkflowDebugger debugger = new(registry, loggerFactory);
+        WorkflowDebugger debugger = CreateDebugger(registry, loggerFactory);
         StepThenContinueFrontend frontend = new();
         debugger.Frontend = frontend;
 
@@ -84,6 +86,15 @@ public sealed class WorkflowDebuggerTests
 
         IReadOnlyList<BreakpointExpression> list = registry.List();
         Assert.Contains(static b => b.Expression == WorkflowDebugger.STEP_EXPRESSION && b.IsOneShot, list);
+    }
+
+    private static WorkflowDebugger CreateDebugger(
+        BreakpointRegistry registry,
+        ILoggerFactory loggerFactory)
+    {
+        DefaultModuleDescriptionSerializerRegistry serializers = new(
+            [TextModuleDescriptionSerializer.Instance]);
+        return new WorkflowDebugger(registry, serializers, loggerFactory);
     }
 
     private sealed record ProbeModule : ModuleBase, IModule

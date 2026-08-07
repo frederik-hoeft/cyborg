@@ -4,25 +4,24 @@ using System.Collections.Immutable;
 
 namespace Cyborg.Core.Modules.Descriptors.Builders;
 
-public sealed class CollectionDescriptionBuilder(
-    IDescriptionComponentFactory factory) : ICollectionDescriptionBuilder
+internal sealed class CollectionDescriptionBuilder : ICollectionDescriptionBuilder
 {
+    private readonly IDescriptionComponentFactory _factory;
     private readonly ImmutableArray<IDescriptionValueComponent>.Builder _items =
         ImmutableArray.CreateBuilder<IDescriptionValueComponent>();
 
     private IDescriptionCollectionComponent? _builtComponent;
 
-    public IDescriptionComponent Build() => BuildComponent();
+    internal CollectionDescriptionBuilder(IDescriptionComponentFactory factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        _factory = factory;
+    }
 
     public void AddItem<T>(ImmutableArray<string> hints, T item)
     {
         EnsureMutable();
-
-        IDescriptionValueComponent valueComponent =
-            factory.CreateValue(item, hints.OrEmpty())
-            ?? throw new InvalidOperationException(
-                "The component factory returned a null value component.");
-        _items.Add(valueComponent);
+        _items.Add(_factory.CreateValue(item, hints.OrEmpty()));
     }
 
     public void AddObjectItem(
@@ -32,7 +31,7 @@ public sealed class CollectionDescriptionBuilder(
         EnsureMutable();
         ArgumentNullException.ThrowIfNull(describe);
 
-        ObjectDescriptionBuilder objectBuilder = new(factory);
+        ObjectDescriptionBuilder objectBuilder = new(_factory);
         describe(objectBuilder);
         _items.Add(objectBuilder.BuildComponent(hints.OrEmpty()));
     }
@@ -44,18 +43,16 @@ public sealed class CollectionDescriptionBuilder(
         EnsureMutable();
         ArgumentNullException.ThrowIfNull(describe);
 
-        CollectionDescriptionBuilder collectionBuilder = new(factory);
+        CollectionDescriptionBuilder collectionBuilder = new(_factory);
         describe(collectionBuilder);
         _items.Add(collectionBuilder.BuildComponent(hints.OrEmpty()));
     }
 
     internal IDescriptionCollectionComponent BuildComponent(
         ImmutableArray<string> hints = default)
-        => _builtComponent ??= factory.CreateCollection(
+        => _builtComponent ??= _factory.CreateCollection(
             _items.ToImmutable(),
-            hints.OrEmpty())
-            ?? throw new InvalidOperationException(
-                "The component factory returned a null collection component.");
+            hints.OrEmpty());
 
     private void EnsureMutable()
     {

@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 
 namespace Cyborg.Core.Modules.Descriptors.Builders;
 
-public interface ICollectionDescriptionBuilder : IDescriptionBuilder
+public interface ICollectionDescriptionBuilder
 {
     void AddItem<T>(ImmutableArray<string> hints, T item);
 

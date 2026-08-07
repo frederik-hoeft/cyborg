@@ -22,9 +22,9 @@ public interface IDebugPauseContext
     IBreakpointRegistry Breakpoints { get; }
 
     /// <summary>
-    /// Full recursive state dump of the validated module instance.
+    /// Returns a recursive text description of the validated module state.
     /// </summary>
-    string Inspect();
+    ValueTask<string> InspectAsync(CancellationToken cancellationToken);
 
     /// <summary>
     /// Requests a one-shot break at the next module executed through the runtime (step).

@@ -1,51 +1,51 @@
-﻿using Cyborg.Core.Common.Text;
 using Cyborg.Core.Modules.Descriptors.Builders;
 using Cyborg.Core.Modules.Descriptors.Model;
 using Cyborg.Core.Modules.Descriptors.Writers;
-using System.Text;
-using System.Text.Json;
 
 namespace Cyborg.Core.Modules.Descriptors;
 
 public static class ModuleDescription
 {
-    public static IDescriptionObjectComponent Build(IModuleDescriptor descriptor)
+    public static async ValueTask<IDescriptionObjectComponent> BuildAsync(
+        IModuleDescriptor descriptor,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
+        cancellationToken.ThrowIfCancellationRequested();
 
         ObjectDescriptionBuilder builder = new(new DefaultDescriptionComponentFactory());
-        descriptor.Describe(builder);
+        await descriptor.DescribeAsync(builder, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
         return builder.BuildComponent();
     }
 
-    public static string ToText(IModuleDescriptor descriptor)
+    public static async ValueTask<string> SerializeAsync(
+        IModuleDescriptor descriptor,
+        IModuleDescriptionSerializer serializer,
+        CancellationToken cancellationToken = default)
     {
-        IDescriptionObjectComponent description = Build(descriptor);
-        StringBuilder builder = new();
-        TextModuleDescriptionComponentWriter writer =
-            new(new IndentedStringBuilder(builder));
+        ArgumentNullException.ThrowIfNull(serializer);
 
-        description.AcceptAsync(writer, CancellationToken.None)
-            .GetAwaiter()
-            .GetResult();
-
-        return builder.ToString();
+        IDescriptionObjectComponent description =
+            await BuildAsync(descriptor, cancellationToken).ConfigureAwait(false);
+        return await serializer.SerializeAsync(description, cancellationToken)
+            .ConfigureAwait(false);
     }
 
-    public static string ToJson(IModuleDescriptor descriptor, bool indented = true)
-    {
-        IDescriptionObjectComponent description = Build(descriptor);
-        using MemoryStream stream = new();
-        using Utf8JsonWriter jsonWriter = new(
-            stream,
-            new JsonWriterOptions { Indented = indented });
+    public static ValueTask<string> ToTextAsync(
+        IModuleDescriptor descriptor,
+        CancellationToken cancellationToken = default)
+        => SerializeAsync(
+            descriptor,
+            TextModuleDescriptionSerializer.Instance,
+            cancellationToken);
 
-        JsonModuleDescriptionComponentWriter writer = new(jsonWriter);
-        description.AcceptAsync(writer, CancellationToken.None)
-            .GetAwaiter()
-            .GetResult();
-        jsonWriter.Flush();
-
-        return Encoding.UTF8.GetString(stream.ToArray());
-    }
+    public static ValueTask<string> ToJsonAsync(
+        IModuleDescriptor descriptor,
+        bool indented = true,
+        CancellationToken cancellationToken = default)
+        => SerializeAsync(
+            descriptor,
+            new JsonModuleDescriptionSerializer(indented),
+            cancellationToken);
 }

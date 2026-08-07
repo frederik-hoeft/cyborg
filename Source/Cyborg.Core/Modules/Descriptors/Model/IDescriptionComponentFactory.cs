@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 
 namespace Cyborg.Core.Modules.Descriptors.Model;
 
-public interface IDescriptionComponentFactory
+internal interface IDescriptionComponentFactory
 {
     IDescriptionPropertyComponent CreateProperty(
         string name,

@@ -4,15 +4,19 @@ using System.Collections.Immutable;
 
 namespace Cyborg.Core.Modules.Descriptors.Builders;
 
-public sealed class ObjectDescriptionBuilder(
-    IDescriptionComponentFactory factory) : IObjectDescriptionBuilder
+internal sealed class ObjectDescriptionBuilder : IObjectDescriptionBuilder
 {
+    private readonly IDescriptionComponentFactory _factory;
     private readonly ImmutableArray<IDescriptionPropertyComponent>.Builder _properties =
         ImmutableArray.CreateBuilder<IDescriptionPropertyComponent>();
 
     private IDescriptionObjectComponent? _builtComponent;
 
-    public IDescriptionComponent Build() => BuildComponent();
+    internal ObjectDescriptionBuilder(IDescriptionComponentFactory factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        _factory = factory;
+    }
 
     public void AddProperty<T>(
         string name,
@@ -23,7 +27,7 @@ public sealed class ObjectDescriptionBuilder(
         ValidateName(name);
 
         IDescriptionValueComponent valueComponent =
-            factory.CreateValue(value, hints: []);
+            _factory.CreateValue(value, hints: []);
         AddPropertyComponent(name, hints.OrEmpty(), valueComponent);
     }
 
@@ -36,7 +40,7 @@ public sealed class ObjectDescriptionBuilder(
         ValidateName(name);
         ArgumentNullException.ThrowIfNull(describe);
 
-        ObjectDescriptionBuilder objectBuilder = new(factory);
+        ObjectDescriptionBuilder objectBuilder = new(_factory);
         describe(objectBuilder);
         AddPropertyComponent(
             name,
@@ -53,7 +57,7 @@ public sealed class ObjectDescriptionBuilder(
         ValidateName(name);
         ArgumentNullException.ThrowIfNull(describe);
 
-        CollectionDescriptionBuilder collectionBuilder = new(factory);
+        CollectionDescriptionBuilder collectionBuilder = new(_factory);
         describe(collectionBuilder);
         AddPropertyComponent(
             name,
@@ -63,11 +67,9 @@ public sealed class ObjectDescriptionBuilder(
 
     internal IDescriptionObjectComponent BuildComponent(
         ImmutableArray<string> hints = default)
-        => _builtComponent ??= factory.CreateObject(
+        => _builtComponent ??= _factory.CreateObject(
             _properties.ToImmutable(),
-            hints.OrEmpty())
-            ?? throw new InvalidOperationException(
-                "The component factory returned a null object component.");
+            hints.OrEmpty());
 
     private void AddPropertyComponent(
         string name,
@@ -77,9 +79,7 @@ public sealed class ObjectDescriptionBuilder(
         ArgumentNullException.ThrowIfNull(value);
 
         IDescriptionPropertyComponent property =
-            factory.CreateProperty(name, value, hints)
-            ?? throw new InvalidOperationException(
-                "The component factory returned a null property component.");
+            _factory.CreateProperty(name, value, hints);
         _properties.Add(property);
     }
 

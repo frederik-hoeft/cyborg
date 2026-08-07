@@ -6,7 +6,7 @@ using System.Text;
 
 namespace Cyborg.Core.Modules.Descriptors.Writers;
 
-public sealed class TextModuleDescriptionComponentWriter(
+internal sealed class TextModuleDescriptionComponentWriter(
     IndentedStringBuilder builder) : IDescriptionComponentWriter
 {
     public ValueTask WriteAtomAsync<T>(
@@ -35,7 +35,7 @@ public sealed class TextModuleDescriptionComponentWriter(
 
         foreach (IDescriptionPropertyComponent property in objectComponent.Properties)
         {
-            await property.AcceptAsync(this, cancellationToken);
+            await property.AcceptAsync(this, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -62,23 +62,15 @@ public sealed class TextModuleDescriptionComponentWriter(
                 builder.GetInnerBuilder().AppendLine();
                 TextModuleDescriptionComponentWriter nestedWriter =
                     new(builder.IncreaseIndent());
-                await item.AcceptAsync(nestedWriter, cancellationToken);
+                await item.AcceptAsync(nestedWriter, cancellationToken)
+                    .ConfigureAwait(false);
             }
             else
             {
                 builder.GetInnerBuilder().Append(' ');
-                await item.AcceptAsync(this, cancellationToken);
+                await item.AcceptAsync(this, cancellationToken).ConfigureAwait(false);
             }
         }
-    }
-
-    public ValueTask WriteAsync(
-        IDescriptionValueComponent valueComponent,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(valueComponent);
-        cancellationToken.ThrowIfCancellationRequested();
-        return valueComponent.AcceptAsync(this, cancellationToken);
     }
 
     public async ValueTask WriteAsync(
@@ -98,12 +90,13 @@ public sealed class TextModuleDescriptionComponentWriter(
                 new(builder.IncreaseIndent());
             await propertyComponent.Value.AcceptAsync(
                 nestedWriter,
-                cancellationToken);
+                cancellationToken).ConfigureAwait(false);
         }
         else
         {
             builder.GetInnerBuilder().Append(' ');
-            await propertyComponent.Value.AcceptAsync(this, cancellationToken);
+            await propertyComponent.Value.AcceptAsync(this, cancellationToken)
+                .ConfigureAwait(false);
         }
     }
 
@@ -115,16 +108,25 @@ public sealed class TextModuleDescriptionComponentWriter(
                 builder.Append("null");
                 break;
             case string text:
-                builder.Append('"')
-                    .Append(text.Replace("\\", "\\\\", StringComparison.Ordinal)
-                        .Replace("\"", "\\\"", StringComparison.Ordinal))
-                    .Append('"');
+                AppendQuotedString(builder, text, '"');
                 break;
             case char character:
-                builder.Append('\'').Append(character).Append('\'');
+                AppendQuotedString(builder, character.ToString(), '\'');
                 break;
             case bool flag:
                 builder.Append(flag ? "true" : "false");
+                break;
+            case DateTime dateTime:
+                builder.Append(dateTime.ToString("O", CultureInfo.InvariantCulture));
+                break;
+            case DateTimeOffset dateTimeOffset:
+                builder.Append(dateTimeOffset.ToString("O", CultureInfo.InvariantCulture));
+                break;
+            case TimeSpan timeSpan:
+                builder.Append(timeSpan.ToString("c", CultureInfo.InvariantCulture));
+                break;
+            case Guid guid:
+                builder.Append(guid.ToString("D"));
                 break;
             case Enum:
                 builder.Append(value.GetType().Name)
@@ -137,5 +139,64 @@ public sealed class TextModuleDescriptionComponentWriter(
                     ?? value.GetType().Name);
                 break;
         }
+    }
+
+    private static void AppendQuotedString(
+        StringBuilder builder,
+        string value,
+        char quote)
+    {
+        builder.Append(quote);
+        foreach (char character in value)
+        {
+            switch (character)
+            {
+                case '\\':
+                    builder.Append("\\\\");
+                    break;
+                case '"' when quote == '"':
+                    builder.Append("\\\"");
+                    break;
+                case '\'' when quote == '\'':
+                    builder.Append("\\'");
+                    break;
+                case '\0':
+                    builder.Append("\\0");
+                    break;
+                case '\a':
+                    builder.Append("\\a");
+                    break;
+                case '\b':
+                    builder.Append("\\b");
+                    break;
+                case '\f':
+                    builder.Append("\\f");
+                    break;
+                case '\n':
+                    builder.Append("\\n");
+                    break;
+                case '\r':
+                    builder.Append("\\r");
+                    break;
+                case '\t':
+                    builder.Append("\\t");
+                    break;
+                case '\v':
+                    builder.Append("\\v");
+                    break;
+                default:
+                    if (char.IsControl(character))
+                    {
+                        builder.Append("\\u")
+                            .Append(((int)character).ToString("X4", CultureInfo.InvariantCulture));
+                    }
+                    else
+                    {
+                        builder.Append(character);
+                    }
+                    break;
+            }
+        }
+        builder.Append(quote);
     }
 }

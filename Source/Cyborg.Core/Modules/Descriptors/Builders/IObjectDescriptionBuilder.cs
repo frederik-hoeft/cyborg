@@ -5,7 +5,7 @@ namespace Cyborg.Core.Modules.Descriptors.Builders;
 
 [GeneratorContractRegistration<ModuleValidationGeneratorContract>(
     ModuleValidationGeneratorContract.IObjectDescriptionBuilder)]
-public interface IObjectDescriptionBuilder : IDescriptionBuilder
+public interface IObjectDescriptionBuilder
 {
     void AddProperty<T>(string name, ImmutableArray<string> hints, T value);
 
