@@ -5,7 +5,7 @@ using System.Collections.Immutable;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
 
-internal sealed class DefaultApplicationRenderer(ValidationContractInfo contractInfo, DiagnosticsReporter diagnosticsReporter, string rootModuleVariable, string contextVariable)
+internal sealed class DefaultApplicationRenderer(SectionRenderer parent)
 {
     public bool AppendDefaultApplicationForObject(IndentedStringBuilder builder, ImmutableArray<PropertyModel> properties, string targetVariable, string diagnosticsPhase)
     {
@@ -13,7 +13,7 @@ internal sealed class DefaultApplicationRenderer(ValidationContractInfo contract
         foreach (PropertyModel property in properties)
         {
             string propertyAccessExpression = $"{targetVariable}.{property.Name}";
-            PropertyRewriteContext rewriteContext = new(property, contractInfo, diagnosticsReporter, rootModuleVariable, contextVariable, propertyAccessExpression);
+            PropertyRewriteContext rewriteContext = new(property, parent, propertyAccessExpression);
             string? directExpression = CreateDefaultAssignmentExpression(rewriteContext);
             bool hasDirectAssignment = !string.IsNullOrEmpty(directExpression);
             bool hasNestedValidatableAssignments = property.HasValidatableChildren && property.Children.Any(child => HasDefaultWork(child, rewriteContext));
@@ -25,9 +25,9 @@ internal sealed class DefaultApplicationRenderer(ValidationContractInfo contract
             {
                 continue;
             }
-            if (property.Symbol.SetMethod is not { } setter || !contractInfo.Compilation.IsSymbolAccessibleWithin(setter, property.Symbol.Type))
+            if (property.Symbol.SetMethod is not { } setter || !parent.VisibilityContext.IsVisible(setter))
             {
-                diagnosticsReporter.Report(ValidationGeneratorDiagnostics.PropertyMustBeSettable,
+                parent.DiagnosticsReporter.Report(ValidationGeneratorDiagnostics.PropertyMustBeSettable,
                     property.Symbol.Locations.FirstOrDefault() ?? Location.None,
                     property.Symbol.Name,
                     property.Symbol.ContainingType,

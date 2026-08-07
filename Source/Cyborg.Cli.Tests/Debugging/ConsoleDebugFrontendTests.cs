@@ -1,10 +1,12 @@
-using Cyborg.Cli.Debugging;
+﻿using Cyborg.Cli.Debugging;
 using Cyborg.Core.Aot.Modules.Validation;
 using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Debugging;
+using Cyborg.Core.Modules.Debugging.Breakpoints;
 using Cyborg.Core.Modules.Descriptors;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
+using Cyborg.TestModules.Cli;
 using Microsoft.Extensions.Logging;
 using System.Text;
 using System.Text.Json;
@@ -44,7 +46,7 @@ public sealed class ConsoleDebugFrontendTests
     [TestMethod]
     public async Task PauseAsync_RepeatedPauses_ReuseDispatcherAsync()
     {
-        (DebugResumeAction action, _) = await RunReplWithRegistryAsync(
+        (DebugResumeAction action, _, _) = await RunReplWithRegistryAsync(
             "continue\ncontinue\n",
             new BreakpointRegistry(),
             pauseCount: 2);
@@ -258,25 +260,8 @@ public sealed class ConsoleDebugFrontendTests
 
         public IBreakpointRegistry Breakpoints { get; } = breakpoints;
 
-        public ValueTask<string> InspectAsync(CancellationToken cancellationToken)
-        {
-            if (Module is IModuleDescriptor descriptor)
-            {
-                return ModuleDescription.ToTextAsync(descriptor, cancellationToken);
-            }
-
-            cancellationToken.ThrowIfCancellationRequested();
-            return ValueTask.FromResult(ModuleIdentity);
-        }
-
         public void RequestStep() => requestStep();
 
         public void Detach() => detach();
     }
-}
-
-[GeneratedModuleValidation]
-internal sealed partial record ProbeModule : ModuleBase, IModule
-{
-    public static string ModuleId => "cyborg.tests.probe.v1";
 }

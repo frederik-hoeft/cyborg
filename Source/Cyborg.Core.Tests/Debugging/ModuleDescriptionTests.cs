@@ -1,4 +1,4 @@
-using Cyborg.Core.Modules.Descriptors;
+﻿using Cyborg.Core.Modules.Descriptors;
 using Cyborg.Core.Modules.Descriptors.Builders;
 using Cyborg.Core.Modules.Descriptors.Model;
 using Cyborg.Core.Modules.Descriptors.Writers;
@@ -55,16 +55,12 @@ public sealed class ModuleDescriptionTests
     {
         HintDescriptor descriptor = new();
 
-        IDescriptionObjectComponent result = await ModuleDescription.BuildAsync(
-            descriptor,
-            TestContext.CancellationToken);
+        IDescriptionObjectComponent result = await ModuleDescription.BuildAsync(descriptor, TestContext.CancellationToken);
 
-        Assert.AreEqual(1, result.Properties.Length);
+        Assert.HasCount(1, result.Properties);
         IDescriptionPropertyComponent property = result.Properties[0];
         Assert.AreEqual("Password", property.Name);
-        CollectionAssert.AreEqual(
-            new[] { "secret", "application-specific" },
-            property.Hints.ToArray());
+        Assert.AreSequenceEqual(["secret", "application-specific"], property.Hints);
     }
 
     [TestMethod]
@@ -134,10 +130,10 @@ public sealed class ModuleDescriptionTests
         CustomDescriptionSerializer serializer = new();
         DefaultModuleDescriptionSerializerRegistry registry = new([serializer]);
 
-        IModuleDescriptionSerializer result = registry.GetRequired("CUSTOM");
+        IModuleDescriptionSerializer result = registry.GetRequiredSerializer("CUSTOM");
 
         Assert.AreSame(serializer, result);
-        Assert.IsTrue(registry.TryGet("custom", out IModuleDescriptionSerializer? found));
+        Assert.IsTrue(registry.TryGetSerializer("custom", out IModuleDescriptionSerializer? found));
         Assert.AreSame(serializer, found);
     }
 

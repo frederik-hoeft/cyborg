@@ -1,12 +1,10 @@
-using Cyborg.Core.Configuration;
+﻿using Cyborg.Core.Configuration;
 using Cyborg.Core.Configuration.Model;
 using Cyborg.Core.Configuration.Serialization;
 using Cyborg.Core.Configuration.Serialization.Dynamics;
 using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Debugging;
-using Cyborg.Core.Modules.Descriptors;
-using Cyborg.Core.Modules.Descriptors.Writers;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Runtime.Environments.Artifacts;
@@ -24,6 +22,7 @@ namespace Cyborg.Core;
 [ServiceProviderModule]
 [Import<IDynamicValueProviderServices>]
 [Import<IConfigurationTrustServices>]
+[Import<IDebugServices>]
 [Singleton<IConfiguration, DefaultConfiguration>]
 [Singleton<IConfigurationLoader, DefaultConfigurationLoader>]
 [Singleton<INamedServiceProvider, NamedServiceProvider>]
@@ -50,28 +49,13 @@ namespace Cyborg.Core;
 [Singleton<IPosixShellCommandBuilder, PosixShellCommandBuilder>]
 [Singleton<MetricsCollectorOptions>]
 [Singleton<IMetricsCollector, MetricsCollector>]
-[Singleton<IModuleDescriptionSerializer>(Factory = nameof(CreateTextModuleDescriptionSerializer))]
-[Singleton<IModuleDescriptionSerializer>(Factory = nameof(CreateJsonModuleDescriptionSerializer))]
-[Singleton<IModuleDescriptionSerializerRegistry>(Factory = nameof(CreateModuleDescriptionSerializerRegistry))]
-[Singleton<IBreakpointRegistry, BreakpointRegistry>]
-[Singleton<IWorkflowDebugger, WorkflowDebugger>]
 [Singleton<GlobalRuntimeEnvironment>]
 [Singleton<JsonSerializerContext>(Factory = nameof(GetCoreJsonSerializerContext))]
 public interface ICyborgCoreServices
 {
-    public static CoreJsonSerializerContext GetCoreJsonSerializerContext() => CoreJsonSerializerContext.Default;
+    static CoreJsonSerializerContext GetCoreJsonSerializerContext() => CoreJsonSerializerContext.Default;
 
-    public static IModuleDescriptionSerializer CreateTextModuleDescriptionSerializer() =>
-        TextModuleDescriptionSerializer.Instance;
+    static JsonConverter CreateEnvironmentScopeConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<EnvironmentScope>(namingPolicy);
 
-    public static IModuleDescriptionSerializer CreateJsonModuleDescriptionSerializer() =>
-        new JsonModuleDescriptionSerializer();
-
-    public static IModuleDescriptionSerializerRegistry CreateModuleDescriptionSerializerRegistry(
-        IEnumerable<IModuleDescriptionSerializer> serializers) =>
-        new DefaultModuleDescriptionSerializerRegistry(serializers);
-
-    public static JsonConverter CreateEnvironmentScopeConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<EnvironmentScope>(namingPolicy);
-
-    public static JsonConverter CreateDecompositionStrategyConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<DecompositionStrategy>(namingPolicy);
+    static JsonConverter CreateDecompositionStrategyConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<DecompositionStrategy>(namingPolicy);
 }

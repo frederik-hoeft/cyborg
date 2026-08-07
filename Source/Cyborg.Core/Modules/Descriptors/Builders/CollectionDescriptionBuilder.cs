@@ -1,4 +1,4 @@
-using Cyborg.Core.Common.Extensions;
+﻿using Cyborg.Core.Common.Extensions;
 using Cyborg.Core.Modules.Descriptors.Model;
 using System.Collections.Immutable;
 
@@ -33,7 +33,7 @@ internal sealed class CollectionDescriptionBuilder : ICollectionDescriptionBuild
 
         ObjectDescriptionBuilder objectBuilder = new(_factory);
         describe(objectBuilder);
-        _items.Add(objectBuilder.BuildComponent(hints.OrEmpty()));
+        _items.Add(objectBuilder.Build(hints.OrEmpty()));
     }
 
     public void AddCollectionItem(

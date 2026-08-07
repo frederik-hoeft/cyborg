@@ -1,4 +1,5 @@
-﻿using Cyborg.Core.Modules.Runtime;
+﻿using Cyborg.Core.Modules.Debugging.Breakpoints;
+using Cyborg.Core.Modules.Runtime;
 
 namespace Cyborg.Core.Modules.Debugging;
 
@@ -12,13 +13,6 @@ public interface IWorkflowDebugger
     /// True when at least one breakpoint is registered or a step is pending.
     /// </summary>
     bool IsEnabled { get; }
-
-    IBreakpointRegistry Breakpoints { get; }
-
-    /// <summary>
-    /// Optional interactive frontend. When null, matched breakpoints are logged/skipped as continue.
-    /// </summary>
-    IDebugFrontend? Frontend { get; set; }
 
     /// <summary>
     /// Evaluates breakpoints for the module about to execute (after load/init/validation).

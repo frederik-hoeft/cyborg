@@ -6,30 +6,29 @@ using System.Collections.Immutable;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
 
-internal sealed class InterpolationSectionRenderer(ValidationContractInfo contractInfo, string rootModuleVariable) : ISectionRenderer
+internal sealed class InterpolationSectionRenderer(ValidationContractInfo contractInfo, VisibilityContext visibilityContext, DiagnosticsReporter diagnosticsReporter)
+    : SectionRenderer(contractInfo, visibilityContext, diagnosticsReporter)
 {
-    private const string CONTEXT_VARIABLE = "context";
-
-    public void RenderSection(IndentedStringBuilder builder, ModuleModel model)
+    public override void RenderSection(IndentedStringBuilder builder, ModuleModel model)
     {
         string qualifiedType = model.FullyQualifiedTypeName;
         builder.AppendBlock(
             $$"""
             private async {{KnownTypes.ValueTaskOfT(qualifiedType)}} {{ModuleValidationRenderer.ApplyInterpolationAsync}}(
-                {{contractInfo.ModuleValidationContext.RenderGlobal()}} {{CONTEXT_VARIABLE}},
+                {{ContractInfo.ModuleValidationContext.RenderGlobal()}} {{ContextVariable}},
                 {{KnownTypes.CancellationToken}} cancellationToken)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                {{qualifiedType}} {{rootModuleVariable}} = this;
+                {{qualifiedType}} {{RootModuleVariable}} = this;
             """);
 
         builder = builder.IncreaseIndent();
-        AppendInterpolationForObject(builder, model.Properties, rootModuleVariable);
+        AppendInterpolationForObject(builder, model.Properties, RootModuleVariable);
         builder = builder.DecreaseIndent();
         builder.AppendBlock(
             $$"""
                 await {{KnownTypes.Task}}.CompletedTask;
-                return {{rootModuleVariable}};
+                return {{RootModuleVariable}};
             }
             """);
     }
@@ -58,7 +57,7 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
             }
 
             // Skip properties that cannot be rewritten via a 'with' expression.
-            if (property.Symbol.SetMethod is null || !contractInfo.Compilation.IsSymbolAccessibleWithin(property.Symbol.SetMethod, property.Symbol.ContainingType))
+            if (property.Symbol.SetMethod is not { } setter || !VisibilityContext.IsVisible(setter))
             {
                 continue;
             }
@@ -92,17 +91,17 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
         return true;
     }
 
-    private static void EmitStringInterpolation(IndentedStringBuilder builder, PropertyModel property, string localName, string propertyAccess)
+    private void EmitStringInterpolation(IndentedStringBuilder builder, PropertyModel property, string localName, string propertyAccess)
     {
         if (property.IsNullable)
         {
-            builder.AppendLine($"{property.NullableTypeName} {localName} = {propertyAccess} is not null ? {CONTEXT_VARIABLE}.Interpolate({propertyAccess}) : null;");
+            builder.AppendLine($"{property.NullableTypeName} {localName} = {propertyAccess} is not null ? {ContextVariable}.Interpolate({propertyAccess}) : null;");
         }
         else
         {
             // Non-nullable: guard against null defensively (validation will catch it if it is null).
             // Use ! on the fallback so the ternary stays typed as non-nullable and avoids CS8600/CS8601.
-            builder.AppendLine($"{property.NullableTypeName} {localName} = {propertyAccess} is not null ? {CONTEXT_VARIABLE}.Interpolate({propertyAccess}) : {propertyAccess}!;");
+            builder.AppendLine($"{property.NullableTypeName} {localName} = {propertyAccess} is not null ? {ContextVariable}.Interpolate({propertyAccess}) : {propertyAccess}!;");
         }
     }
 
@@ -189,7 +188,7 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
             IndentedStringBuilder ifBuilder = loopBuilder.IncreaseIndent();
             if (isStringElem)
             {
-                ifBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elemValueVar} = {CONTEXT_VARIABLE}.Interpolate({elemCurrentVar}!);");
+                ifBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elemValueVar} = {ContextVariable}.Interpolate({elemCurrentVar}!);");
                 ifBuilder.AppendLine($"{elemCurrentVar} = {elemValueVar};");
             }
             else
@@ -209,7 +208,7 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
         {
             if (isStringElem)
             {
-                loopBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elemCurrentVar} = {CONTEXT_VARIABLE}.Interpolate({elemVar});");
+                loopBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elemCurrentVar} = {ContextVariable}.Interpolate({elemVar});");
             }
             else
             {

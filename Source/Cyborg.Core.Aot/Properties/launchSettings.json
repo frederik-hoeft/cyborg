@@ -2,7 +2,7 @@
   "profiles": {
     "Profile 1": {
       "commandName": "DebugRoslynComponent",
-      "targetProject": "..\\Cyborg.Modules\\Cyborg.Modules.csproj"
+      "targetProject": "..\\Cyborg.TestModules\\Cyborg.TestModules.csproj"
     }
   }
 }

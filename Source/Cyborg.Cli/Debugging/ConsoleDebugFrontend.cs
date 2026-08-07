@@ -1,4 +1,4 @@
-using Cyborg.Core.Modules.Debugging;
+﻿using Cyborg.Core.Modules.Debugging;
 
 namespace Cyborg.Cli.Debugging;
 
@@ -6,18 +6,14 @@ namespace Cyborg.Cli.Debugging;
 /// Console-based debug frontend. The frontend owns REPL lifecycle and I/O while
 /// ConsoleAppFramework owns command grammar, aliases, validation, and help generation.
 /// </summary>
-internal sealed class ConsoleDebugFrontend(
-    IDebugReplIo io,
-    DebugCommandDispatcher commandDispatcher) : IDebugFrontend
+internal sealed class ConsoleDebugFrontend(IDebugReplIo io, DebugCommandDispatcher commandDispatcher) : IDebugFrontend
 {
-    private readonly IDebugReplIo _io =
-        io ?? throw new ArgumentNullException(nameof(io));
-    private readonly DebugCommandDispatcher _commandDispatcher =
-        commandDispatcher ?? throw new ArgumentNullException(nameof(commandDispatcher));
+    private readonly IDebugReplIo _io = io ?? throw new ArgumentNullException(nameof(io));
+    private readonly DebugCommandDispatcher _commandDispatcher = commandDispatcher ?? throw new ArgumentNullException(nameof(commandDispatcher));
 
-    public async ValueTask<DebugResumeAction> PauseAsync(
-        IDebugPauseContext context,
-        CancellationToken cancellationToken)
+    public string Key => "console";
+
+    public async ValueTask<DebugResumeAction> PauseAsync(IDebugPauseContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
 
@@ -43,10 +39,7 @@ internal sealed class ConsoleDebugFrontend(
                 continue;
             }
 
-            DebugResumeAction? action = await _commandDispatcher.DispatchAsync(
-                line,
-                context,
-                cancellationToken).ConfigureAwait(false);
+            DebugResumeAction? action = await _commandDispatcher.DispatchAsync(line, context, cancellationToken).ConfigureAwait(false);
             if (action is not null)
             {
                 return action.Value;

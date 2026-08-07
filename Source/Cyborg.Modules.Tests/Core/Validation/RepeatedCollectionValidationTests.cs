@@ -50,13 +50,7 @@ public sealed class RepeatedCollectionValidationTests : ModuleTestBase
             result.Errors);
     }
 
-    private static ValidationPipelineTestModule CreateModule() => new(
-        RequiredItems: [],
-        OptionalItems: [],
-        NullableItems: null,
-        InterpolatedValue: "literal",
-        DeferredValue: "literal",
-        Tags: null);
+    private static ValidationPipelineTestModule CreateModule() => new(RequiredItems: [], OptionalItems: [], NullableItems: null, InterpolatedValue: "literal", DeferredValue: "literal", Tags: null);
 
     private TestModuleRuntimeScope CreateValidationScope()
     {

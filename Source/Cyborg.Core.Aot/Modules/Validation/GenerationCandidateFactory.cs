@@ -35,6 +35,7 @@ internal sealed class GenerationCandidateFactory
             .Replace('.', '_');
 
         ModuleModel model = new(
+            ModuleSymbol: TypeSymbol,
             Namespace: ns,
             TypeName: TypeSymbol.Name,
             FullyQualifiedTypeName: fullyQualifiedTypeName,

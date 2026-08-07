@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Aot.Modules.Validation.Models;
+using Cyborg.Core.Aot.Modules.Validation.Rendering;
 
 namespace Cyborg.Core.Aot.Modules.Validation;
 
@@ -29,5 +30,10 @@ internal record PropertyRewriteContext
         DiagnosticsReporter = diagnosticsReporter;
         PropertyAccessExpression = propertyAccessExpression;
         Property = property;
+    }
+
+    public PropertyRewriteContext(PropertyModel property, SectionRenderer renderer, string propertyAccessExpression)
+        : this(property, renderer.ContractInfo, renderer.DiagnosticsReporter, renderer.RootModuleVariable, renderer.ContextVariable, propertyAccessExpression)
+    {
     }
 }

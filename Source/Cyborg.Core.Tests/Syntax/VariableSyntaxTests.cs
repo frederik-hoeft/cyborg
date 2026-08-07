@@ -111,10 +111,7 @@ public sealed class VariableSyntaxTests
     [DataRow("${\u00E4}", false, "")]
     [DataRow("${name}\n", false, "")]
     [DataRow("${name}\r\n", false, "")]
-    public void Test_IndirectionRegex_ReturnsExpectedMatch(
-        string value,
-        bool expected,
-        string expectedExpression)
+    public void Test_IndirectionRegex_ReturnsExpectedMatch(string value, bool expected, string expectedExpression)
     {
         VariableSyntaxBuilder builder = CreateBuilder();
 
@@ -128,7 +125,7 @@ public sealed class VariableSyntaxTests
         }
 
         Assert.AreEqual(0, match.Index);
-        Assert.AreEqual(value.Length, match.Length);
+        Assert.AreEqual(value?.Length, match.Length);
         Assert.AreEqual(expectedExpression, match.Groups["expression"].Value);
     }
 
@@ -181,16 +178,12 @@ public sealed class VariableSyntaxTests
     [DataRow("${name}}", 1, "name")]
     [DataRow("{{${name}}}", 1, "name")]
     [DataRow("${\u00E4}", 0, "")]
-    public void Test_InterpolationRegex_Input_ReturnsExpectedMatches(
-        string value,
-        int expectedCount,
-        string expectedExpressions)
+    public void Test_InterpolationRegex_Input_ReturnsExpectedMatches(string value, int expectedCount, string expectedExpressions)
     {
         VariableSyntaxBuilder builder = CreateBuilder();
 
-        System.Text.RegularExpressions.MatchCollection matches =
-            builder.InterpolationRegex.Matches(value);
-        List<string> actualExpressions = [with(matches.Count)];
+        System.Text.RegularExpressions.MatchCollection matches = builder.InterpolationRegex.Matches(value);
+        List<string> actualExpressions = new(matches.Count);
 
         foreach (System.Text.RegularExpressions.Match match in matches)
         {
@@ -213,7 +206,7 @@ public sealed class VariableSyntaxTests
         VariableSyntaxBuilder builder = CreateBuilder();
 
         System.Text.RegularExpressions.MatchCollection matches = builder.HashLiteralRegex.Matches(value);
-        List<string> actualMatches = [with(matches.Count)];
+        List<string> actualMatches = new(matches.Count);
         foreach (System.Text.RegularExpressions.Match match in matches)
         {
             actualMatches.Add($"{match.Groups["hashes"].Value}|{match.Groups["content"].Value}");

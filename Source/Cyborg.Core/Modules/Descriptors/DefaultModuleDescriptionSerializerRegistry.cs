@@ -1,14 +1,12 @@
-using System.Collections.Frozen;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Collections.Frozen;
 
 namespace Cyborg.Core.Modules.Descriptors;
 
-internal sealed class DefaultModuleDescriptionSerializerRegistry : IModuleDescriptionSerializerRegistry
+public sealed class DefaultModuleDescriptionSerializerRegistry : IModuleDescriptionSerializerRegistry
 {
     private readonly FrozenDictionary<string, IModuleDescriptionSerializer> _serializers;
 
-    internal DefaultModuleDescriptionSerializerRegistry(
-        IEnumerable<IModuleDescriptionSerializer> serializers)
+    public DefaultModuleDescriptionSerializerRegistry(IEnumerable<IModuleDescriptionSerializer> serializers)
     {
         ArgumentNullException.ThrowIfNull(serializers);
 
@@ -30,17 +28,17 @@ internal sealed class DefaultModuleDescriptionSerializerRegistry : IModuleDescri
         _serializers = serializersByFormat.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
     }
 
-    public IModuleDescriptionSerializer GetRequired(string format)
+    public IModuleDescriptionSerializer GetRequiredSerializer(string format)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(format);
 
-        return TryGet(format, out IModuleDescriptionSerializer? serializer)
+        return TryGetSerializer(format, out IModuleDescriptionSerializer? serializer)
             ? serializer
             : throw new KeyNotFoundException(
                 $"No module description serializer is registered for format '{format}'.");
     }
 
-    public bool TryGet(
+    public bool TryGetSerializer(
         string format,
         [NotNullWhen(true)] out IModuleDescriptionSerializer? serializer)
     {

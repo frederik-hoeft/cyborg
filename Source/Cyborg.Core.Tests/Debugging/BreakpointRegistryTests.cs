@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Modules.Debugging;
+﻿using Cyborg.Core.Modules.Debugging.Breakpoints;
 
 namespace Cyborg.Core.Tests.Debugging;
 

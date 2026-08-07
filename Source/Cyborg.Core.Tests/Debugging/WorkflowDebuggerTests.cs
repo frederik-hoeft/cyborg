@@ -1,6 +1,7 @@
-using Cyborg.Core.Modules;
+﻿using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Debugging;
+using Cyborg.Core.Modules.Debugging.Breakpoints;
 using Cyborg.Core.Modules.Descriptors;
 using Cyborg.Core.Modules.Descriptors.Writers;
 using Cyborg.Core.Modules.Runtime;
@@ -56,10 +57,8 @@ public sealed class WorkflowDebuggerTests
         BreakpointRegistry registry = new();
         registry.Add(".*");
         using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
-        WorkflowDebugger debugger = CreateDebugger(registry, loggerFactory)
-        {
-            Frontend = new ScriptedFrontend(DebugResumeAction.Cancel)
-        };
+        WorkflowDebugger debugger = CreateDebugger(registry, loggerFactory);
+        debugger.Frontend = new ScriptedFrontend(DebugResumeAction.Cancel);
 
         GlobalRuntimeEnvironment env = new(JsonNamingPolicy.SnakeCaseLower);
         RootModuleRuntime runtime = new(env, loggerFactory);
@@ -88,12 +87,9 @@ public sealed class WorkflowDebuggerTests
         Assert.Contains(static b => b.Expression == WorkflowDebugger.STEP_EXPRESSION && b.IsOneShot, list);
     }
 
-    private static WorkflowDebugger CreateDebugger(
-        BreakpointRegistry registry,
-        ILoggerFactory loggerFactory)
+    private static WorkflowDebugger CreateDebugger(BreakpointRegistry registry, ILoggerFactory loggerFactory)
     {
-        DefaultModuleDescriptionSerializerRegistry serializers = new(
-            [TextModuleDescriptionSerializer.Instance]);
+        DefaultModuleDescriptionSerializerRegistry serializers = new([TextModuleDescriptionSerializer.Instance]);
         return new WorkflowDebugger(registry, serializers, loggerFactory);
     }
 

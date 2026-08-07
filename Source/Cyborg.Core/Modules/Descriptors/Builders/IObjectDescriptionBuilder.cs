@@ -1,21 +1,17 @@
-using Cyborg.Core.Aot.Contracts;
+﻿using Cyborg.Core.Aot.Contracts;
+using Cyborg.Core.Modules.Descriptors.Model;
 using System.Collections.Immutable;
 
 namespace Cyborg.Core.Modules.Descriptors.Builders;
 
-[GeneratorContractRegistration<ModuleValidationGeneratorContract>(
-    ModuleValidationGeneratorContract.IObjectDescriptionBuilder)]
+[GeneratorContractRegistration<ModuleValidationGeneratorContract>(ModuleValidationGeneratorContract.IObjectDescriptionBuilder)]
 public interface IObjectDescriptionBuilder
 {
     void AddProperty<T>(string name, ImmutableArray<string> hints, T value);
 
-    void AddObject(
-        string name,
-        ImmutableArray<string> hints,
-        Action<IObjectDescriptionBuilder> describe);
+    void AddObject(string name, ImmutableArray<string> hints, Action<IObjectDescriptionBuilder> describe);
 
-    void AddCollection(
-        string name,
-        ImmutableArray<string> hints,
-        Action<ICollectionDescriptionBuilder> describe);
+    void AddCollection(string name, ImmutableArray<string> hints, Action<ICollectionDescriptionBuilder> describe);
+
+    IDescriptionObjectComponent Build(ImmutableArray<string> hints = default);
 }

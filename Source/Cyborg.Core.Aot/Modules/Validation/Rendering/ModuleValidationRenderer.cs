@@ -1,4 +1,4 @@
-using Cyborg.Core.Aot.Extensions;
+﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using System.Text;
 
@@ -27,13 +27,14 @@ internal static class ModuleValidationRenderer
 
     public static string Render(ModuleModel model, ValidationContractInfo contractInfo, DiagnosticsReporter diagnosticsReporter)
     {
+        VisibilityContext visibilityContext = new(contractInfo.Compilation, model.ModuleSymbol);
         ReadOnlySpan<ISectionRenderer> renderPipeline =
         [
-            new DefaultsSectionRenderer(contractInfo, MODULE_VARIABLE, diagnosticsReporter),
-            new OverrideSectionRenderer(contractInfo, MODULE_VARIABLE, diagnosticsReporter),
-            new InterpolationSectionRenderer(contractInfo, MODULE_VARIABLE),
-            new ValidationSectionRenderer(contractInfo, diagnosticsReporter),
-            new InspectionSectionRenderer(contractInfo, diagnosticsReporter),
+            new DefaultsSectionRenderer(contractInfo, visibilityContext, diagnosticsReporter),
+            new OverrideSectionRenderer(contractInfo, visibilityContext, diagnosticsReporter),
+            new InterpolationSectionRenderer(contractInfo, visibilityContext, diagnosticsReporter),
+            new ValidationSectionRenderer(contractInfo, visibilityContext, diagnosticsReporter),
+            new InspectionSectionRenderer(contractInfo, visibilityContext, diagnosticsReporter),
         ];
 
         StringBuilder builder = new();

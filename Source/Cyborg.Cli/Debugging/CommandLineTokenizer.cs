@@ -1,13 +1,10 @@
-using System.Text;
+﻿using System.Text;
 
 namespace Cyborg.Cli.Debugging;
 
 internal static class CommandLineTokenizer
 {
-    public static bool TryTokenize(
-        string commandLine,
-        out string[] arguments,
-        out string? error)
+    public static bool TryTokenize(string commandLine, out string[] arguments, out string? error)
     {
         ArgumentNullException.ThrowIfNull(commandLine);
 
@@ -71,10 +68,7 @@ internal static class CommandLineTokenizer
         return true;
     }
 
-    private static void FlushToken(
-        List<string> tokens,
-        StringBuilder current,
-        ref bool tokenStarted)
+    private static void FlushToken(List<string> tokens, StringBuilder current, ref bool tokenStarted)
     {
         if (!tokenStarted)
         {

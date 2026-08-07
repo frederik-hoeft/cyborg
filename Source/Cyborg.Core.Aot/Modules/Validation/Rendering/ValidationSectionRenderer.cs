@@ -5,49 +5,48 @@ using System.Text;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
 
-internal sealed class ValidationSectionRenderer(ValidationContractInfo contractInfo, DiagnosticsReporter diagnosticsReporter) : ISectionRenderer
+internal sealed class ValidationSectionRenderer(ValidationContractInfo contractInfo, VisibilityContext visibilityContext, DiagnosticsReporter diagnosticsReporter)
+    : SectionRenderer(contractInfo, visibilityContext, diagnosticsReporter)
 {
-    private const string CONTEXT_VARIABLE = "context";
-    private const string MODULE_VARIABLE = "module";
     private const string ERRORS_VARIABLE = "errors";
 
-    public void RenderSection(IndentedStringBuilder builder, ModuleModel model)
+    public override void RenderSection(IndentedStringBuilder builder, ModuleModel model)
     {
         string qualifiedType = model.FullyQualifiedTypeName;
-        string validationContextType = contractInfo.ModuleValidationContext.RenderGlobal();
+        string validationContextType = ContractInfo.ModuleValidationContext.RenderGlobal();
 
         builder.AppendBlock(
             $$"""
-            public async {{KnownTypes.ValueTaskOfT(contractInfo.ValidationResultT.RenderGlobalWithGenerics(qualifiedType))}} {{ModuleValidationRenderer.ValidateAsync}}(
-                {{contractInfo.IModuleRuntime.RenderGlobal()}} runtime,
+            public async {{KnownTypes.ValueTaskOfT(ContractInfo.ValidationResultT.RenderGlobalWithGenerics(qualifiedType))}} {{ModuleValidationRenderer.ValidateAsync}}(
+                {{ContractInfo.IModuleRuntime.RenderGlobal()}} runtime,
                 {{KnownTypes.IServiceProvider}} serviceProvider,
                 {{KnownTypes.CancellationToken}} cancellationToken)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                {{validationContextType}} {{CONTEXT_VARIABLE}} = {{validationContextType}}.Create(runtime, serviceProvider);
+                {{validationContextType}} {{ContextVariable}} = {{validationContextType}}.Create(runtime, serviceProvider);
                 // apply defaults first to avoid overriding properties of null objects
-                {{qualifiedType}} {{MODULE_VARIABLE}} = await this.{{ModuleValidationRenderer.ApplyDefaultsAsync}}({{CONTEXT_VARIABLE}}, cancellationToken);
+                {{qualifiedType}} {{RootModuleVariable}} = await this.{{ModuleValidationRenderer.ApplyDefaultsAsync}}({{ContextVariable}}, cancellationToken);
                 // resolve any overrides that may have been applied to the module
-                {{MODULE_VARIABLE}} = await {{MODULE_VARIABLE}}.{{ModuleValidationRenderer.ResolveOverridesAsync}}({{CONTEXT_VARIABLE}}, cancellationToken);
+                {{RootModuleVariable}} = await {{RootModuleVariable}}.{{ModuleValidationRenderer.ResolveOverridesAsync}}({{ContextVariable}}, cancellationToken);
                 // ensure that defaults are also applied to values injected via overrides
-                {{MODULE_VARIABLE}} = await {{MODULE_VARIABLE}}.{{ModuleValidationRenderer.ApplyDefaultsAsync}}({{CONTEXT_VARIABLE}}, cancellationToken);
+                {{RootModuleVariable}} = await {{RootModuleVariable}}.{{ModuleValidationRenderer.ApplyDefaultsAsync}}({{ContextVariable}}, cancellationToken);
                 // interpolate all string members against the runtime environment
-                {{MODULE_VARIABLE}} = await {{MODULE_VARIABLE}}.{{ModuleValidationRenderer.ApplyInterpolationAsync}}({{CONTEXT_VARIABLE}}, cancellationToken);
-                {{KnownTypes.ListOfT(contractInfo.ValidationError.RenderGlobal())}} {{ERRORS_VARIABLE}} = [];
+                {{RootModuleVariable}} = await {{RootModuleVariable}}.{{ModuleValidationRenderer.ApplyInterpolationAsync}}({{ContextVariable}}, cancellationToken);
+                {{KnownTypes.ListOfT(ContractInfo.ValidationError.RenderGlobal())}} {{ERRORS_VARIABLE}} = [];
 
             """);
 
         builder = builder.IncreaseIndent();
         foreach (PropertyModel property in model.Properties)
         {
-            AppendValidationForProperty(builder, property, MODULE_VARIABLE, $"{MODULE_VARIABLE}.{property.Name}");
+            AppendValidationForProperty(builder, property, RootModuleVariable, $"{RootModuleVariable}.{property.Name}");
         }
         builder = builder.DecreaseIndent();
         builder.AppendBlock(
             $$"""
                 return {{ERRORS_VARIABLE}}.Count == 0
-                    ? {{contractInfo.ValidationResultT.RenderGlobalWithGenerics(qualifiedType)}}.Valid({{MODULE_VARIABLE}})
-                    : {{contractInfo.ValidationResultT.RenderGlobalWithGenerics(qualifiedType)}}.Invalid({{ERRORS_VARIABLE}});
+                    ? {{ContractInfo.ValidationResultT.RenderGlobalWithGenerics(qualifiedType)}}.Valid({{RootModuleVariable}})
+                    : {{ContractInfo.ValidationResultT.RenderGlobalWithGenerics(qualifiedType)}}.Invalid({{ERRORS_VARIABLE}});
             }
             """);
     }
@@ -58,7 +57,7 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
         {
             if (aspect is not CollectionElementValidationAspect)
             {
-                aspect.EmitValidation(builder, contractInfo, diagnosticsReporter, property, moduleVariableName, propertyAccessExpression);
+                aspect.EmitValidation(builder, ContractInfo, DiagnosticsReporter, property, moduleVariableName, propertyAccessExpression);
             }
         }
 
@@ -138,8 +137,8 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
             {
                 elementValidationAspect.ValidationAspect.EmitCollectionElementValidation(
                     loopBuilder,
-                    contractInfo,
-                    diagnosticsReporter,
+                    ContractInfo,
+                    DiagnosticsReporter,
                     property,
                     moduleVariableName,
                     propertyAccessExpression,

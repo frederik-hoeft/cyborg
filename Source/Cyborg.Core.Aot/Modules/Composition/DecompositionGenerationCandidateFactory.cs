@@ -31,7 +31,7 @@ internal static class DecompositionGenerationCandidateFactory
         ImmutableArray<IPropertySymbol> decomposableProperties =
         [
             .. typeSymbol.GetMembers().OfType<IPropertySymbol>()
-                .Where(static property => property.DeclaredAccessibility is Accessibility.Public)
+                .Where(static property => property is { DeclaredAccessibility: Accessibility.Public, IsStatic: false })
                 .Where(static property => !property.GetAttributes().Any(static attr => attr.AttributeClass?.ToDisplayString() == typeof(DecomposeIgnoreAttribute).FullName))
         ];
 

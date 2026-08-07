@@ -1,8 +1,9 @@
-namespace Cyborg.Core.Aot.Contracts;
+﻿namespace Cyborg.Core.Aot.Contracts;
 
 internal enum ModuleValidationGeneratorContract
 {
     IModuleRuntime,
+    IModule,
     IModuleT,
     ModuleValidationContext,
     ValidationResultT,

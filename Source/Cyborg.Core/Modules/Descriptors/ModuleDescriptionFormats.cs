@@ -1,7 +1,8 @@
-namespace Cyborg.Core.Modules.Descriptors;
+﻿namespace Cyborg.Core.Modules.Descriptors;
 
 public static class ModuleDescriptionFormats
 {
-    public const string JSON = "json";
-    public const string TEXT = "text";
+    public static string Json => "application/json";
+
+    public static string Text => "text/plain";
 }

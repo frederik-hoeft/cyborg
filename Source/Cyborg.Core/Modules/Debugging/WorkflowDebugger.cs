@@ -1,38 +1,29 @@
-using Cyborg.Core.Modules.Descriptors;
+﻿using Cyborg.Core.Configuration;
+using Cyborg.Core.Modules.Debugging.Breakpoints;
 using Cyborg.Core.Modules.Runtime;
+using Cyborg.Core.Services.Default;
 using Microsoft.Extensions.Logging;
 
 namespace Cyborg.Core.Modules.Debugging;
 
-public sealed class WorkflowDebugger(
+public sealed class WorkflowDebugger
+(
+    IServiceProvider serviceProvider,
     IBreakpointRegistry breakpoints,
-    IModuleDescriptionSerializerRegistry descriptionSerializers,
-    ILoggerFactory loggerFactory) : IWorkflowDebugger
+    ILoggerFactory loggerFactory,
+    IDefault<IDebugFrontend> defaultFrontend
+) : IWorkflowDebugger
 {
     /// <summary>
     /// Expression used to implement <c>step</c> via the shared breakpoint matcher.
     /// </summary>
     public const string STEP_EXPRESSION = ".*";
 
-    private readonly IModuleDescriptionSerializer _textSerializer =
-        (descriptionSerializers ?? throw new ArgumentNullException(nameof(descriptionSerializers)))
-        .GetRequired(ModuleDescriptionFormats.TEXT);
-    private readonly ILogger _logger =
-        (loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory)))
-        .CreateLogger("cyborg.core.debugging");
+    private readonly ILogger _logger = loggerFactory.CreateLogger("cyborg.core.debugging");
 
-    public IBreakpointRegistry Breakpoints { get; } =
-        breakpoints ?? throw new ArgumentNullException(nameof(breakpoints));
+    public bool IsEnabled => breakpoints.Count > 0;
 
-    public IDebugFrontend? Frontend { get; set; }
-
-    public bool IsEnabled => Breakpoints.Count > 0;
-
-    public async ValueTask<DebugResumeAction> EvaluatePreExecutionAsync(
-        IModule module,
-        string moduleId,
-        IModuleRuntime runtime,
-        CancellationToken cancellationToken)
+    public async ValueTask<DebugResumeAction> EvaluatePreExecutionAsync(IModule module, string moduleId, IModuleRuntime runtime, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(module);
         ArgumentException.ThrowIfNullOrWhiteSpace(moduleId);
@@ -43,39 +34,37 @@ public sealed class WorkflowDebugger(
             return DebugResumeAction.Continue;
         }
 
-        // CONSIDER: pass match context (id, name, group) as a composite object to avoid parameter creep as more match criteria are added in the future.
-        if (!Breakpoints.TryMatchAndConsume(
-            moduleId,
-            module.Name,
-            module.Group,
-            out BreakpointExpression? matched))
+        BreakpointContext context = new(moduleId, module.Name, module.Group);
+        if (!breakpoints.TryMatchAndConsume(in context, out BreakpointExpression? matched))
         {
             return DebugResumeAction.Continue;
         }
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        DebugPauseContext pauseContext = new(
+        DebugPauseContext pauseContext = new
+        (
+            serviceProvider,
             module,
             moduleId,
             runtime,
-            Breakpoints,
-            _textSerializer,
-            requestStep: () => Breakpoints.Add(STEP_EXPRESSION, isOneShot: true),
-            detach: Breakpoints.Clear);
+            breakpoints,
+            RequestStepAction: () => breakpoints.Add(STEP_EXPRESSION, isOneShot: true),
+            DetachAction: breakpoints.Clear
+        );
 
-        // TODO: use ZLogger
+        // FIXME: use ZLogger (everywhere in the debugger) for structured logging and performance.
         _logger.LogDebug(
             "Breakpoint hit for module '{ModuleIdentity}' (expression {Expression})",
             pauseContext.ModuleIdentity,
             matched!.Expression);
 
-        if (Frontend is null)
+        if (defaultFrontend.GetDefault() is not { } frontend)
         {
             // No interactive adapter: treat as a soft break and continue.
             return DebugResumeAction.Continue;
         }
 
-        return await Frontend.PauseAsync(pauseContext, cancellationToken).ConfigureAwait(false);
+        return await frontend.PauseAsync(pauseContext, cancellationToken).ConfigureAwait(false);
     }
 }

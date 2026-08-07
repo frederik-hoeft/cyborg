@@ -1,4 +1,4 @@
-using Cyborg.Core.Modules.Descriptors.Model;
+﻿using Cyborg.Core.Modules.Descriptors.Model;
 
 namespace Cyborg.Core.Modules.Descriptors;
 
@@ -10,7 +10,5 @@ public interface IModuleDescriptionSerializer
 {
     string Format { get; }
 
-    ValueTask<string> SerializeAsync(
-        IDescriptionObjectComponent description,
-        CancellationToken cancellationToken);
+    ValueTask<string> SerializeAsync(IDescriptionObjectComponent description, CancellationToken cancellationToken);
 }

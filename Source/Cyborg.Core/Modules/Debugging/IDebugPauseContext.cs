@@ -1,3 +1,5 @@
+﻿using Cyborg.Core.Modules.Debugging.Breakpoints;
+using Cyborg.Core.Modules.Descriptors;
 using Cyborg.Core.Modules.Runtime;
 
 namespace Cyborg.Core.Modules.Debugging;
@@ -21,10 +23,7 @@ public interface IDebugPauseContext
 
     IBreakpointRegistry Breakpoints { get; }
 
-    /// <summary>
-    /// Returns a recursive text description of the validated module state.
-    /// </summary>
-    ValueTask<string> InspectAsync(CancellationToken cancellationToken);
+    IServiceProvider ServiceProvider { get; }
 
     /// <summary>
     /// Requests a one-shot break at the next module executed through the runtime (step).

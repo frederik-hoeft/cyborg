@@ -6,6 +6,7 @@ using Cyborg.Core.Configuration;
 using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Debugging;
+using Cyborg.Core.Modules.Debugging.Breakpoints;
 using Cyborg.Core.Modules.Extensions;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
@@ -124,8 +125,7 @@ internal sealed class Commands
             return;
         }
 
-        IWorkflowDebugger debugger = services.GetRequiredService<IWorkflowDebugger>();
-        debugger.Frontend = services.GetRequiredService<IDebugFrontend>();
+        IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
         foreach (string expression in breakAt)
         {
             if (string.IsNullOrWhiteSpace(expression))
@@ -135,7 +135,7 @@ internal sealed class Commands
 
             try
             {
-                debugger.Breakpoints.Add(expression);
+                breakpoints.Add(expression);
             }
             catch (ArgumentException ex)
             {
