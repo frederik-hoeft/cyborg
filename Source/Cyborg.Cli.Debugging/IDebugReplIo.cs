@@ -1,17 +1,17 @@
 ﻿namespace Cyborg.Cli.Debugging;
 
 /// <summary>
-/// Abstraction over console I/O for the debug REPL, enabling tests to feed scripted input
-/// without blocking on a real terminal.
+/// I/O abstraction for interactive debugger REPLs. Implementations may provide richer prompt and output rendering without affecting command execution.
 /// </summary>
-internal interface IDebugReplIo
+public interface IDebugReplIo
 {
-    void WriteLine(string message);
+    void Write(string message, DebugReplOutputKind kind = DebugReplOutputKind.Text);
 
-    void Write(string message);
+    void WriteLine(string message, DebugReplOutputKind kind = DebugReplOutputKind.Text);
 
     /// <summary>
-    /// Reads the next line of user input, or null on EOF.
+    /// Renders <paramref name="prompt"/> and reads the next line of user input, or returns null on EOF.
+    /// Keeping prompt rendering within this operation allows richer implementations to own interactive prompt behavior.
     /// </summary>
-    ValueTask<string?> ReadLineAsync(CancellationToken cancellationToken);
+    ValueTask<string?> ReadLineAsync(string prompt, CancellationToken cancellationToken);
 }

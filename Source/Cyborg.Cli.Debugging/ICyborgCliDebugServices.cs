@@ -1,17 +1,19 @@
 ﻿using Cyborg.Core.Modules.Debugging;
-using Cyborg.Core.Modules.Descriptors;
 using Jab;
 
 namespace Cyborg.Cli.Debugging;
 
 [ServiceProviderModule]
+[Singleton<IDebugReplIo>(Factory = nameof(CreateConsoleDebugReplIo))]
 [Singleton<IDebugFrontend>(Factory = nameof(CreateConsoleDebugFrontend))]
 public interface ICyborgCliDebugServices
 {
-    public static IDebugFrontend CreateConsoleDebugFrontend(IModuleSerializationService serializationService)
+    public static IDebugReplIo CreateConsoleDebugReplIo() => new ConsoleDebugReplIo();
+
+    public static IDebugFrontend CreateConsoleDebugFrontend(IDebugReplIo io)
     {
-        ConsoleDebugReplIo io = new();
-        DebugCommandDispatcher dispatcher = new(io, serializationService);
+        CafDebugCommandRouter router = new();
+        DebugCommandDispatcher dispatcher = new(io, router);
         return new ConsoleDebugFrontend(io, dispatcher);
     }
 }

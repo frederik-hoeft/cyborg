@@ -3,11 +3,11 @@
 namespace Cyborg.Cli.Debugging;
 
 /// <summary>
-/// Console-based debug frontend. The frontend owns REPL lifecycle and I/O while
-/// ConsoleAppFramework owns command grammar, aliases, validation, and help generation.
+/// Console-based debug frontend. The frontend owns REPL lifecycle and I/O while command dispatch and grammar are separate services.
 /// </summary>
 internal sealed class ConsoleDebugFrontend(IDebugReplIo io, DebugCommandDispatcher commandDispatcher) : IDebugFrontend
 {
+    private const string PROMPT = "(cyborg-dbg) ";
     private readonly IDebugReplIo _io = io ?? throw new ArgumentNullException(nameof(io));
     private readonly DebugCommandDispatcher _commandDispatcher = commandDispatcher ?? throw new ArgumentNullException(nameof(commandDispatcher));
 
@@ -18,14 +18,13 @@ internal sealed class ConsoleDebugFrontend(IDebugReplIo io, DebugCommandDispatch
         ArgumentNullException.ThrowIfNull(context);
 
         _io.WriteLine(string.Empty);
-        _io.WriteLine($"Breakpoint hit: {context.ModuleIdentity}");
-        _io.WriteLine("Type 'help' for available commands.");
+        _io.WriteLine($"Breakpoint hit: {context.ModuleIdentity}", DebugReplOutputKind.Status);
+        _io.WriteLine("Type 'help' for available commands.", DebugReplOutputKind.Status);
 
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            _io.Write("(cyborg-dbg) ");
-            string? line = await _io.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+            string? line = await _io.ReadLineAsync(PROMPT, cancellationToken).ConfigureAwait(false);
             if (line is null)
             {
                 // EOF: detach and continue so unattended pipes do not hang forever.

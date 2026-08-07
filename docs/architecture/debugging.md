@@ -77,17 +77,33 @@ public interface IDebugFrontend : IKeyedService
 | `Module` / `ModuleId` | Current module and canonical id |
 | `ModuleIdentity` | Compact id/name/group string |
 | `Runtime` | Ambient module runtime for future debugger features |
+| `Services` | Host service provider associated with the executing module; used as the fallback for dispatch-local command DI |
 | `Breakpoints` | Session breakpoint registry |
 | `RequestStep()` | Register the one-shot step breakpoint |
 | `Detach()` | Clear breakpoint state |
 
-The pause context intentionally does not expose `IServiceProvider` and does not own description serialization. Frontends receive their own dependencies through DI, keeping the pause model free of service-locator behavior.
+`Services` is intentionally carried with the pause because debugger commands execute inside the same host/runtime composition as the worker being inspected. Frontends should not treat it as a general service locator. The console frontend uses it only as the fallback behind a dispatch-local DI proxy so CAF command classes can receive ordinary host services through constructor injection while pause-local command state is supplied separately.
 
 ## Console REPL and CAF Isolation
 
-`ConsoleDebugFrontend` owns the interactive lifecycle: print the breakpoint banner, read one line through `IDebugReplIo`, dispatch it, and repeat until a command returns a resume action. EOF is treated as detach + continue.
+`ConsoleDebugFrontend` owns only the interactive lifecycle: print the breakpoint banner, request one prompt-aware line through `IDebugReplIo`, dispatch it, and repeat until a command returns a resume action. EOF is treated as detach + continue.
 
-CAF owns command routing, aliases, typed argument binding, validation/error output, and generated help. The only parser Cyborg retains is `CommandLineTokenizer`, because a REPL receives one command-line string while CAF consumes an argument vector. The tokenizer is lexical only: it handles whitespace, single/double quotes, empty quoted arguments, and escaping, but knows nothing about debugger command grammar.
+The command path is split further so console interaction, lexical dispatch, CAF integration, and command behavior remain independent:
+
+```text
+ConsoleDebugFrontend
+  -> IDebugReplIo                    prompt/read/write abstraction
+  -> DebugCommandDispatcher          tokenize one REPL line; create dispatch-local result/provider
+      -> CafDebugCommandRouter        CAF invocation + generated help/error hooks
+          -> DebugCommandRegistration Add<T> registrations only
+              -> DebugExecutionCommands
+              -> DebugInspectionCommands
+              -> DebugBreakpointCommands
+```
+
+CAF owns command routing, aliases, typed argument binding, validation/error output, generated help, and constructor injection for the command classes. The only parser Cyborg retains is `CommandLineTokenizer`, because a REPL receives one command-line string while CAF consumes an argument vector. The tokenizer is lexical only: it handles whitespace, single/double quotes, empty quoted arguments, and escaping, but knows nothing about debugger command grammar.
+
+Each dispatch creates a private `DebugCommandResult` and a delegating `DebugCommandServiceProvider`. The provider resolves the current `IDebugPauseContext`, result sink, and active `IDebugReplIo` locally, then delegates all other service requests to `IDebugPauseContext.Services`, which is the original Jab/runtime provider. Command classes therefore receive both host services and pause-local state through constructor injection; the dispatcher itself has no mutable pause context, cancellation token, or resume-action fields. Cancellation tokens remain CAF special parameters on async command methods rather than command-session state.
 
 CAF v5 generates its command router from registration call sites in the consuming compilation. The main CLI and debug REPL therefore deliberately live in different compilations:
 
@@ -96,10 +112,14 @@ Cyborg.Cli
   Program / Commands                 -> main CAF router (`run`, ...)
 
 Cyborg.Cli.Debugging
-  DebugCommandDispatcher             -> debug CAF router (`continue`, `break`, ...)
+  CafDebugCommandRouter / commands   -> debug CAF router (`continue`, `break`, ...)
 ```
 
 This prevents debug `help` or command routing from exposing the global CLI command set, and prevents the REPL from recursively invoking the main process command surface. `Cyborg.Cli` references and imports `ICyborgCliDebugServices`, but the debug assembly owns its CAF registrations and generated router.
+
+CAF exposes `ConsoleApp.ServiceProvider`, `ConsoleApp.Log`, and `ConsoleApp.LogError` as assembly-local generated static hooks. The router temporarily installs the dispatch-local provider and REPL output delegates around `RunAsync`, then restores the previous values. Because those hooks are shared by every CAF builder in the debug assembly, a static async gate serializes CAF dispatch across router instances; this synchronization is framework integration state, not debugger command state.
+
+`IDebugReplIo` is the presentation extension boundary for the console frontend. `ReadLineAsync` receives the prompt so a richer implementation can render and edit prompts itself, while `Write`/`WriteLine` carry `DebugReplOutputKind` (`Text`, `Status`, `Success`, `Warning`, or `Error`) so implementations such as a future Spectre.Console frontend can style output by semantic purpose without commands depending on a particular terminal library. The current console and scripted implementations intentionally render all categories as plain text.
 
 Breakpoint expressions may consume multiple positional tokens, so `break at backup group` is interpreted as the expression `backup group`. Quoting remains available when whitespace grouping must be explicit, for example `break at "backup  group"`.
 
@@ -117,7 +137,7 @@ Breakpoint expressions may consume multiple positional tokens, so `break at back
 | `cancel` | `q`, `quit` | Return the workflow cancellation action |
 | `help [command]` | `h`, `?` | Translate to CAF's generated help |
 
-The old `IDebugReplCommand` abstraction no longer exists. Adding a console-debugger command means registering another CAF command in `DebugCommandDispatcher`; that CLI-specific API remains internal.
+The old `IDebugReplCommand` abstraction no longer exists. New console-debugger commands belong in a focused command class and are enrolled through `DebugCommandRegistration` with CAF's `Add<T>` API. Command classes and the CAF router remain internal; `IDebugReplIo` is public because presentation is the intended external extension point.
 
 ## Module Identity and Descriptor Capability
 
@@ -194,6 +214,7 @@ IDebugServices
   frontend selection/default service
 
 ICyborgCliDebugServices (Cyborg.Cli.Debugging)
+  default IDebugReplIo
   console IDebugFrontend factory
 ```
 
@@ -203,4 +224,4 @@ Jab generates consuming providers in the project that imports a service module. 
 
 Description tests should consume `IModuleDescriptionServices` through a small Jab test provider so the same registration boundary used by applications is exercised. Generator-backed tests must cover scalar strings, nested objects/collections, nullable shapes, default/empty `ImmutableArray<T>`, hints, custom serializers, and cancellation propagation.
 
-Console debugger tests should execute the real `Cyborg.Cli.Debugging` dispatcher and verify aliases, nested commands, quoted/unquoted expressions, repeated pauses, EOF, inspection, and generated help. A regression assertion must ensure debug help does not contain the main CLI `run` command; this protects the separate-CAF-compilation invariant.
+Console debugger tests should execute the real `Cyborg.Cli.Debugging` dispatcher/router and verify aliases, nested commands, quoted/unquoted expressions, repeated pauses, EOF, inspection, and generated help. A regression assertion must ensure debug help does not contain the main CLI `run` command; this protects the separate-CAF-compilation invariant. Tests should also preserve the prompt-aware `IDebugReplIo` contract and semantic output categories so future rich I/O implementations can replace plain text without changing command behavior.

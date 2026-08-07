@@ -78,7 +78,7 @@ public abstract class ModuleWorker<TModule>(IWorkerContext<TModule> context) : I
         IWorkflowDebugger? debugger = ServiceProvider.GetService<IWorkflowDebugger>();
         if (debugger is { IsEnabled: true })
         {
-            DebugResumeAction resumeAction = await debugger.EvaluatePreExecutionAsync(Module, ModuleId, runtime, cancellationToken);
+            DebugResumeAction resumeAction = await debugger.EvaluatePreExecutionAsync(Module, ModuleId, runtime, ServiceProvider, cancellationToken);
             if (resumeAction is DebugResumeAction.Cancel)
             {
                 return runtime.Exit(Canceled());
@@ -88,5 +88,6 @@ public abstract class ModuleWorker<TModule>(IWorkerContext<TModule> context) : I
         return await ExecuteAsync(runtime, cancellationToken);
     }
 
-    protected virtual ValueTask<ValidationResult<TModule>> ModuleValidationCallbackAsync(ValidationResult<TModule> validationResult, TModule originalModule, CancellationToken cancellationToken) => new(validationResult);
+    protected virtual ValueTask<ValidationResult<TModule>> ModuleValidationCallbackAsync(
+        ValidationResult<TModule> validationResult, TModule originalModule, CancellationToken cancellationToken) => new(validationResult);
 }

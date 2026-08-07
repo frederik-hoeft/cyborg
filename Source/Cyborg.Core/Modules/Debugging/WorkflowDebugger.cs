@@ -14,11 +14,12 @@ internal sealed class WorkflowDebugger(IBreakpointRegistry breakpoints, ILoggerF
 
     public bool IsEnabled => breakpoints.Count > 0;
 
-    public async ValueTask<DebugResumeAction> EvaluatePreExecutionAsync(IModule module, string moduleId, IModuleRuntime runtime, CancellationToken cancellationToken)
+    public async ValueTask<DebugResumeAction> EvaluatePreExecutionAsync(IModule module, string moduleId, IModuleRuntime runtime, IServiceProvider services, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(module);
         ArgumentException.ThrowIfNullOrWhiteSpace(moduleId);
         ArgumentNullException.ThrowIfNull(runtime);
+        ArgumentNullException.ThrowIfNull(services);
 
         if (!IsEnabled)
         {
@@ -32,7 +33,8 @@ internal sealed class WorkflowDebugger(IBreakpointRegistry breakpoints, ILoggerF
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        DebugPauseContext pauseContext = new(module, moduleId, runtime, breakpoints, RequestStepAction: () => breakpoints.Add(STEP_EXPRESSION, isOneShot: true), DetachAction: breakpoints.Clear);
+        DebugPauseContext pauseContext = new(
+            module, moduleId, runtime, services, breakpoints, RequestStepAction: () => breakpoints.Add(STEP_EXPRESSION, isOneShot: true), DetachAction: breakpoints.Clear);
 
         _logger.LogBreakpointHit(pauseContext.ModuleIdentity, matched!.Expression);
 

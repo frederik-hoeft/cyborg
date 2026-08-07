@@ -18,5 +18,5 @@ public interface IWorkflowDebugger
     /// Evaluates breakpoints for the module about to execute (after load/init/validation).
     /// Returns <see cref="DebugResumeAction.Continue"/> immediately when no breakpoint matches.
     /// </summary>
-    ValueTask<DebugResumeAction> EvaluatePreExecutionAsync(IModule module, string moduleId, IModuleRuntime runtime, CancellationToken cancellationToken);
+    ValueTask<DebugResumeAction> EvaluatePreExecutionAsync(IModule module, string moduleId, IModuleRuntime runtime, IServiceProvider services, CancellationToken cancellationToken);
 }

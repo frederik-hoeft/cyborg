@@ -15,6 +15,11 @@ public interface IDebugPauseContext
 
     IModuleRuntime Runtime { get; }
 
+    /// <summary>
+    /// Service provider associated with the executing module. Frontends may use it as the fallback provider for dispatch-local command dependency injection.
+    /// </summary>
+    IServiceProvider Services { get; }
+
     IBreakpointRegistry Breakpoints { get; }
 
     /// <summary>Requests a one-shot break at the next module executed through the runtime (step).</summary>

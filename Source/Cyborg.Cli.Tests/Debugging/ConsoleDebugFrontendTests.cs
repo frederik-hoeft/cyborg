@@ -3,7 +3,6 @@ using Cyborg.Cli.Debugging;
 using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Debugging;
 using Cyborg.Core.Modules.Debugging.Breakpoints;
-using Cyborg.Core.Modules.Descriptors;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Services.Default;
@@ -196,6 +195,26 @@ public sealed class ConsoleDebugFrontendTests
         Assert.AreEqual(0, breakpoints.Count);
     }
 
+    [TestMethod]
+    public async Task PauseAsync_UsesPromptAwareIoAndSemanticOutputKindsAsync()
+    {
+        BreakpointRegistry registry = new();
+        RecordingDebugReplIo io = new(["break at other", "continue"]);
+        using DefaultServiceProvider services = new();
+        using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
+        GlobalRuntimeEnvironment environment = new(JsonNamingPolicy.SnakeCaseLower);
+        RootModuleRuntime runtime = new(environment, loggerFactory);
+        ProbeModule module = new() { Name = "probe" };
+        DebugPauseContextStub context = new(module, ProbeModule.ModuleId, runtime, services, registry, requestStep: () => registry.Add(".*", isOneShot: true), detach: registry.Clear);
+
+        DebugResumeAction action = await CreateFrontend(io).PauseAsync(context, TestContext.CancellationToken);
+
+        Assert.AreEqual(DebugResumeAction.Continue, action);
+        Assert.Contains(static prompt => prompt == "(cyborg-dbg) ", io.Prompts);
+        Assert.Contains(static write => write.Message == "Breakpoint 1 set: other" && write.Kind == DebugReplOutputKind.Success, io.Writes);
+        Assert.Contains(static write => write.Message.StartsWith("Breakpoint hit:", StringComparison.Ordinal) && write.Kind == DebugReplOutputKind.Status, io.Writes);
+    }
+
     private async Task<(DebugResumeAction Action, string Output)> RunReplAsync(string script, string[]? seedBreakpoints = null)
     {
         BreakpointRegistry registry = new();
@@ -218,16 +237,14 @@ public sealed class ConsoleDebugFrontendTests
         using StringWriter output = new(outputBuilder);
         TextDebugReplIo io = new(input, output);
         using DefaultServiceProvider services = new();
-        IModuleSerializationService serializationService = services.GetRequiredService<IModuleSerializationService>();
-        DebugCommandDispatcher dispatcher = new(io, serializationService);
-        ConsoleDebugFrontend frontend = new(io, dispatcher);
+        ConsoleDebugFrontend frontend = CreateFrontend(io);
 
         using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
         GlobalRuntimeEnvironment environment = new(JsonNamingPolicy.SnakeCaseLower);
         RootModuleRuntime runtime = new(environment, loggerFactory);
         ProbeModule module = new() { Name = "probe" };
 
-        DebugPauseContextStub context = new(module, ProbeModule.ModuleId, runtime, registry, requestStep: () => registry.Add(".*", isOneShot: true), detach: registry.Clear);
+        DebugPauseContextStub context = new(module, ProbeModule.ModuleId, runtime, services, registry, requestStep: () => registry.Add(".*", isOneShot: true), detach: registry.Clear);
 
         DebugResumeAction action = default;
         for (int index = 0; index < pauseCount; index++)
@@ -238,8 +255,10 @@ public sealed class ConsoleDebugFrontendTests
         return (action, outputBuilder.ToString(), registry);
     }
 
-    private sealed class DebugPauseContextStub(IModule module, string moduleId, IModuleRuntime runtime, IBreakpointRegistry breakpoints, Action requestStep, Action detach)
-        : IDebugPauseContext
+    private static ConsoleDebugFrontend CreateFrontend(IDebugReplIo io) => new(io, new DebugCommandDispatcher(io, new CafDebugCommandRouter()));
+
+    private sealed class DebugPauseContextStub(
+        IModule module, string moduleId, IModuleRuntime runtime, IServiceProvider services, IBreakpointRegistry breakpoints, Action requestStep, Action detach) : IDebugPauseContext
     {
         public IModule Module { get; } = module;
 
@@ -249,10 +268,32 @@ public sealed class ConsoleDebugFrontendTests
 
         public IModuleRuntime Runtime { get; } = runtime;
 
+        public IServiceProvider Services { get; } = services;
+
         public IBreakpointRegistry Breakpoints { get; } = breakpoints;
 
         public void RequestStep() => requestStep();
 
         public void Detach() => detach();
+    }
+
+    private sealed class RecordingDebugReplIo(IEnumerable<string?> input) : IDebugReplIo
+    {
+        private readonly Queue<string?> _input = new(input);
+
+        public List<string> Prompts { get; } = [];
+
+        public List<(string Message, DebugReplOutputKind Kind)> Writes { get; } = [];
+
+        public void Write(string message, DebugReplOutputKind kind = DebugReplOutputKind.Text) => Writes.Add((message, kind));
+
+        public void WriteLine(string message, DebugReplOutputKind kind = DebugReplOutputKind.Text) => Writes.Add((message, kind));
+
+        public ValueTask<string?> ReadLineAsync(string prompt, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Prompts.Add(prompt);
+            return new(_input.Count == 0 ? null : _input.Dequeue());
+        }
     }
 }

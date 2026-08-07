@@ -13,6 +13,8 @@ namespace Cyborg.Core.Tests.Debugging;
 [TestClass]
 public sealed class WorkflowDebuggerTests
 {
+    private static readonly IServiceProvider s_services = new EmptyServiceProvider();
+
     public TestContext TestContext { get; set; }
 
     [TestMethod]
@@ -23,7 +25,7 @@ public sealed class WorkflowDebuggerTests
         WorkflowDebugger debugger = CreateDebugger(registry, loggerFactory, frontend: null);
         RootModuleRuntime runtime = new(new GlobalRuntimeEnvironment(JsonNamingPolicy.SnakeCaseLower), loggerFactory);
 
-        DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(new ProbeModule(), ProbeModule.ModuleId, runtime, TestContext.CancellationToken);
+        DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(new ProbeModule(), ProbeModule.ModuleId, runtime, s_services, TestContext.CancellationToken);
 
         Assert.AreEqual(DebugResumeAction.Continue, action);
         Assert.IsFalse(debugger.IsEnabled);
@@ -40,7 +42,7 @@ public sealed class WorkflowDebuggerTests
         RootModuleRuntime runtime = new(new GlobalRuntimeEnvironment(JsonNamingPolicy.SnakeCaseLower), loggerFactory);
         ProbeModule module = new() { Name = "probe-step" };
 
-        DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(module, ProbeModule.ModuleId, runtime, TestContext.CancellationToken);
+        DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(module, ProbeModule.ModuleId, runtime, s_services, TestContext.CancellationToken);
 
         Assert.AreEqual(DebugResumeAction.Continue, action);
         Assert.AreEqual(1, frontend.PauseCount);
@@ -56,7 +58,7 @@ public sealed class WorkflowDebuggerTests
         WorkflowDebugger debugger = CreateDebugger(registry, loggerFactory, new ScriptedFrontend(DebugResumeAction.Cancel));
         RootModuleRuntime runtime = new(new GlobalRuntimeEnvironment(JsonNamingPolicy.SnakeCaseLower), loggerFactory);
 
-        DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(new ProbeModule(), ProbeModule.ModuleId, runtime, TestContext.CancellationToken);
+        DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(new ProbeModule(), ProbeModule.ModuleId, runtime, s_services, TestContext.CancellationToken);
 
         Assert.AreEqual(DebugResumeAction.Cancel, action);
     }
@@ -71,7 +73,7 @@ public sealed class WorkflowDebuggerTests
         RootModuleRuntime runtime = new(new GlobalRuntimeEnvironment(JsonNamingPolicy.SnakeCaseLower), loggerFactory);
         ProbeModule module = new() { Name = "first" };
 
-        await debugger.EvaluatePreExecutionAsync(module, ProbeModule.ModuleId, runtime, TestContext.CancellationToken);
+        await debugger.EvaluatePreExecutionAsync(module, ProbeModule.ModuleId, runtime, s_services, TestContext.CancellationToken);
 
         IReadOnlyList<BreakpointExpression> breakpoints = registry.List();
         Assert.Contains(static breakpoint => breakpoint.Expression == WorkflowDebugger.STEP_EXPRESSION && breakpoint.IsOneShot, breakpoints);
@@ -88,7 +90,7 @@ public sealed class WorkflowDebuggerTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
         {
-            await debugger.EvaluatePreExecutionAsync(new ProbeModule(), ProbeModule.ModuleId, runtime, TestContext.CancellationToken);
+            await debugger.EvaluatePreExecutionAsync(new ProbeModule(), ProbeModule.ModuleId, runtime, s_services, TestContext.CancellationToken);
         });
     }
 
@@ -134,5 +136,10 @@ public sealed class WorkflowDebuggerTests
             context.RequestStep();
             return ValueTask.FromResult(DebugResumeAction.Continue);
         }
+    }
+
+    private sealed class EmptyServiceProvider : IServiceProvider
+    {
+        public object? GetService(Type serviceType) => serviceType == typeof(IServiceProvider) ? this : null;
     }
 }
