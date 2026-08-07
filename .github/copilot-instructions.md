@@ -171,6 +171,7 @@ Follow `/code-style.md` and `.editorconfig`. In particular:
 - Prefer `nameof(...)`, `string.Empty`, target-typed `new()` with an explicit left-hand type, and named arguments for unclear constants.
 - Use Unicode escape sequences rather than literal non-ASCII source characters.
 - Keep one top-level type per file unless tightly coupled types clearly benefit from co-location.
+- Keep source lines at or below 196 characters. Do not wrap code to an 80-column convention; keep related parameter and argument lists together when they remain readable within 196 characters, and do not introduce context objects or temporary abstractions solely to shorten lines.
 
 Match the established style in adjacent code. Avoid unrelated cleanup in focused changes.
 
