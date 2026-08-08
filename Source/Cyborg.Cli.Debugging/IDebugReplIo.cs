@@ -5,9 +5,9 @@
 /// </summary>
 public interface IDebugReplIo
 {
-    void Write(string message, DebugReplOutputKind kind = DebugReplOutputKind.Text);
+    ValueTask WriteAsync(string message, OutputKind kind, CancellationToken cancellationToken = default);
 
-    void WriteLine(string message, DebugReplOutputKind kind = DebugReplOutputKind.Text);
+    ValueTask WriteLineAsync(string message, OutputKind kind, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Renders <paramref name="prompt"/> and reads the next line of user input, or returns null on EOF.

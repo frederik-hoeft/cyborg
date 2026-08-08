@@ -6,61 +6,58 @@ namespace Cyborg.Cli.Debugging.Commands;
 
 internal sealed class DebugBreakpointCommands(IDebugPauseContext context, IDebugReplIo io)
 {
-    private readonly IDebugPauseContext _context = context ?? throw new ArgumentNullException(nameof(context));
-    private readonly IDebugReplIo _io = io ?? throw new ArgumentNullException(nameof(io));
-
     /// <summary>Add a persistent breakpoint expression.</summary>
     /// <param name="expression">Regular expression matched against module id, name, and group.</param>
     [Command("break at|b at")]
-    public void Add([Argument] params string[] expression)
+    public async Task AddAsync([Argument] string[] expression, CancellationToken cancellationToken)
     {
         if (expression.Length == 0)
         {
-            _io.WriteLine("A breakpoint expression is required.", DebugReplOutputKind.Error);
+            await io.WriteLineAsync("A breakpoint expression is required.", OutputKind.Error, cancellationToken);
             return;
         }
 
         string breakpointExpression = string.Join(' ', expression);
         try
         {
-            int id = _context.Breakpoints.Add(breakpointExpression);
-            _io.WriteLine($"Breakpoint {id} set: {breakpointExpression}", DebugReplOutputKind.Success);
+            int id = context.Breakpoints.Add(breakpointExpression);
+            await io.WriteLineAsync($"Breakpoint {id} set: {breakpointExpression}", OutputKind.Success, cancellationToken);
         }
         catch (ArgumentException exception)
         {
-            _io.WriteLine($"Invalid breakpoint expression: {exception.Message}", DebugReplOutputKind.Error);
+            await io.WriteLineAsync($"Invalid breakpoint expression: {exception.Message}", OutputKind.Error, cancellationToken);
         }
     }
 
     /// <summary>List registered breakpoints.</summary>
     [Command("break ls|break list|b ls|b list")]
-    public void List()
+    public async Task ListAsync(CancellationToken cancellationToken)
     {
-        IReadOnlyList<BreakpointExpression> breakpoints = _context.Breakpoints.List();
+        IReadOnlyList<BreakpointExpression> breakpoints = context.Breakpoints.ToList();
         if (breakpoints.Count == 0)
         {
-            _io.WriteLine("No breakpoints set.", DebugReplOutputKind.Status);
+            await io.WriteLineAsync("No breakpoints set.", OutputKind.Status, cancellationToken);
             return;
         }
 
         foreach (BreakpointExpression breakpoint in breakpoints)
         {
-            _io.WriteLine(breakpoint.ToString());
+            await io.WriteLineAsync(breakpoint.ToString(), OutputKind.Text, cancellationToken);
         }
     }
 
     /// <summary>Remove a breakpoint by its numeric id.</summary>
     /// <param name="id">Breakpoint id shown by <c>break ls</c>.</param>
     [Command("break rm|break remove|b rm|b remove")]
-    public void Remove([Argument] int id)
+    public async Task RemoveAsync([Argument] int id, CancellationToken cancellationToken)
     {
-        if (_context.Breakpoints.Remove(id))
+        if (context.Breakpoints.Remove(id))
         {
-            _io.WriteLine($"Removed breakpoint {id}.", DebugReplOutputKind.Success);
+            await io.WriteLineAsync($"Removed breakpoint {id}.", OutputKind.Success, cancellationToken);
         }
         else
         {
-            _io.WriteLine($"No breakpoint with number {id}.", DebugReplOutputKind.Warning);
+            await io.WriteLineAsync($"No breakpoint with number {id}.", OutputKind.Warning, cancellationToken);
         }
     }
 }

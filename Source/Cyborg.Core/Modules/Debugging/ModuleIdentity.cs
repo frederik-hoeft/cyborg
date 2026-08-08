@@ -27,7 +27,7 @@ public static class ModuleIdentity
         return builder.ToString();
     }
 
-    public static string Format(IModule module, string moduleId)
+    public static string Format(string moduleId, IModule module)
     {
         ArgumentNullException.ThrowIfNull(module);
         return Format(moduleId, module.Name, module.Group);

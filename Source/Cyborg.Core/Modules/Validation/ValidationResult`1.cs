@@ -1,25 +1,22 @@
-﻿using Cyborg.Core.Aot.Contracts;
-
-namespace Cyborg.Core.Modules.Validation;
+﻿namespace Cyborg.Core.Modules.Validation;
 
 /// <summary>
-/// Represents the outcome of a module validation operation, including the validated module instance, any validation
-/// errors encountered, and the overall validity status.
+/// Represents the outcome of a module validation operation, including the prepared module instance when available, any validation errors encountered, and the overall validity status.
 /// </summary>
-/// <remarks>Use the static methods <see cref="Valid(TSelf)"/> and <see
-/// cref="Invalid(IEnumerable{ValidationError})"/> to create instances of <see cref="ValidationResult{TSelf}"/>. These
-/// methods ensure proper initialization based on the validation outcome.</remarks>
-/// <typeparam name="TSelf">The type of the module being validated.</typeparam>
-/// <param name="Module">The validated module instance. This value is null if the validation failed.</param>
+/// <remarks>
+/// Generated validation retains the post-default/override/interpolation module even when constraints fail so diagnostic consumers can inspect the failed prepared state.
+/// </remarks>
+/// <typeparam name="TModule">The type of the module being validated.</typeparam>
+/// <param name="Module">The prepared module instance.</param>
 /// <param name="Errors">A read-only list containing validation errors found during the validation process.</param>
-/// <param name="IsValid">Indicates whether the module passed validation. <see langword="true"/> if valid; otherwise, <see langword="false"/>.</param>
-[GeneratorContractRegistration<ModuleValidationGeneratorContract>(ModuleValidationGeneratorContract.ValidationResultT)]
-public sealed record ValidationResult<TSelf>(TSelf? Module, IReadOnlyList<ValidationError> Errors)
+public sealed record ValidationResult<TModule>(TModule Module, IReadOnlyList<ValidationError> Errors) : IValidationResult<TModule> where TModule : class, IModule
 {
-    [MemberNotNullWhen(true, nameof(Module))]
-    public bool IsValid => Errors is not { Count: > 0 } && Module is not null;
+    public bool IsValid => Errors is not { Count: > 0 };
 
-    [MemberNotNull(nameof(Module))]
+    /// <summary>
+    /// Ensures that the validation result is valid. If the result is invalid, it throws a <see cref="ValidationException"/> containing the validation errors.
+    /// </summary>
+    /// <exception cref="ValidationException">thrown when the validation result is invalid, containing the list of validation errors.</exception>
     public void EnsureValid()
     {
         if (!IsValid)
@@ -27,9 +24,4 @@ public sealed record ValidationResult<TSelf>(TSelf? Module, IReadOnlyList<Valida
             throw new ValidationException(Errors);
         }
     }
-
-    public static ValidationResult<TSelf> Valid(TSelf module) => new(module, Array.Empty<ValidationError>());
-
-    public static ValidationResult<TSelf> Invalid(IEnumerable<ValidationError> errors) =>
-        new(default, errors is IReadOnlyList<ValidationError> list ? list : new List<ValidationError>(errors));
 }

@@ -1,4 +1,6 @@
-﻿namespace Cyborg.Core.Modules;
+﻿using Cyborg.Core.Modules.Descriptors;
+
+namespace Cyborg.Core.Modules;
 
 public interface IModule
 {
@@ -6,5 +8,5 @@ public interface IModule
 
     string? Group { get; }
 
-    static abstract string ModuleId { get; }
+    IModuleDescriptor GetDescriptor();
 }

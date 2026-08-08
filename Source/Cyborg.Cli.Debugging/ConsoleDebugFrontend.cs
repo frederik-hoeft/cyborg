@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Modules.Debugging;
+using System.Runtime.InteropServices;
 
 namespace Cyborg.Cli.Debugging;
 
@@ -8,8 +9,6 @@ namespace Cyborg.Cli.Debugging;
 internal sealed class ConsoleDebugFrontend(IDebugReplIo io, DebugCommandDispatcher commandDispatcher) : IDebugFrontend
 {
     private const string PROMPT = "(cyborg-dbg) ";
-    private readonly IDebugReplIo _io = io ?? throw new ArgumentNullException(nameof(io));
-    private readonly DebugCommandDispatcher _commandDispatcher = commandDispatcher ?? throw new ArgumentNullException(nameof(commandDispatcher));
 
     public string Key => "console";
 
@@ -17,14 +16,19 @@ internal sealed class ConsoleDebugFrontend(IDebugReplIo io, DebugCommandDispatch
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        _io.WriteLine(string.Empty);
-        _io.WriteLine($"Breakpoint hit: {context.ModuleIdentity}", DebugReplOutputKind.Status);
-        _io.WriteLine("Type 'help' for available commands.", DebugReplOutputKind.Status);
+        await io.WriteLineAsync(string.Empty, OutputKind.Text, cancellationToken);
+        OutputKind titleKind = context.ValidationResult.IsValid ? OutputKind.Status : OutputKind.Error;
+        string errorLabel = context.ValidationResult.Errors.Count == 1 ? "error" : "errors";
+        string validationSuffix = context.ValidationResult.IsValid ? string.Empty : $" [validation failed: {context.ValidationResult.Errors.Count} {errorLabel}]";
+        await io.WriteLineAsync($"Breakpoint hit: {context.GetModuleIdentity()}{validationSuffix}", titleKind, cancellationToken);
+        await DebugValidationOutput.WriteErrorsAsync(io, context.ValidationResult.Errors, cancellationToken);
+        await io.WriteLineAsync("Type 'help' for available commands.", OutputKind.Status, cancellationToken);
+        await io.WriteLineAsync(string.Empty, OutputKind.Text, cancellationToken);
 
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            string? line = await _io.ReadLineAsync(PROMPT, cancellationToken).ConfigureAwait(false);
+            string? line = await io.ReadLineAsync(PROMPT, cancellationToken).ConfigureAwait(false);
             if (line is null)
             {
                 // EOF: detach and continue so unattended pipes do not hang forever.
@@ -38,7 +42,7 @@ internal sealed class ConsoleDebugFrontend(IDebugReplIo io, DebugCommandDispatch
                 continue;
             }
 
-            DebugResumeAction? action = await _commandDispatcher.DispatchAsync(line, context, cancellationToken).ConfigureAwait(false);
+            DebugResumeAction? action = await commandDispatcher.DispatchAsync(line, context, cancellationToken).ConfigureAwait(false);
             if (action is not null)
             {
                 return action.Value;

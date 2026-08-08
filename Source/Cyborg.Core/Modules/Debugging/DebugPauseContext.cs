@@ -1,12 +1,13 @@
 ﻿using Cyborg.Core.Modules.Debugging.Breakpoints;
 using Cyborg.Core.Modules.Runtime;
+using Cyborg.Core.Modules.Validation;
 
 namespace Cyborg.Core.Modules.Debugging;
 
 internal sealed record DebugPauseContext
 (
-    IModule Module,
     string ModuleId,
+    IValidationResult<IModule> ValidationResult,
     IModuleRuntime Runtime,
     IServiceProvider Services,
     IBreakpointRegistry Breakpoints,
@@ -14,8 +15,6 @@ internal sealed record DebugPauseContext
     Action DetachAction
 ) : IDebugPauseContext
 {
-    public string ModuleIdentity { get; } = Debugging.ModuleIdentity.Format(Module, ModuleId);
-
     public void RequestStep() => RequestStepAction();
 
     public void Detach() => DetachAction();

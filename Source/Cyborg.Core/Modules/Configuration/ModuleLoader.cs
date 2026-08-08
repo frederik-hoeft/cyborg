@@ -7,7 +7,7 @@ namespace Cyborg.Core.Modules.Configuration;
 [GeneratorContractRegistration<ModuleLoaderFactoryGeneratorContract>(ModuleLoaderFactoryGeneratorContract.ModuleLoaderT)]
 public abstract class ModuleLoader<TModuleWorker, TModule>(IServiceProvider serviceProvider) : IModuleLoader<TModule>
     where TModuleWorker : class, IModuleWorker
-    where TModule : class, IModule
+    where TModule : class, IModuleDefinition
 {
     public virtual string ModuleId => TModule.ModuleId;
 

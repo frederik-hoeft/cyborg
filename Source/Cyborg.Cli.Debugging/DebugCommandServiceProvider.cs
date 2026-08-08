@@ -1,4 +1,6 @@
 ﻿using Cyborg.Core.Modules.Debugging;
+using System.Collections.Frozen;
+using DIKvp = (System.Type Key, object? Value);
 
 namespace Cyborg.Cli.Debugging;
 
@@ -7,9 +9,17 @@ namespace Cyborg.Cli.Debugging;
 /// </summary>
 internal sealed class DebugCommandServiceProvider(IDebugPauseContext pauseContext, DebugCommandResult result, IDebugReplIo io) : IServiceProvider
 {
-    private readonly IDebugPauseContext _pauseContext = pauseContext ?? throw new ArgumentNullException(nameof(pauseContext));
-    private readonly DebugCommandResult _result = result ?? throw new ArgumentNullException(nameof(result));
-    private readonly IDebugReplIo _io = io ?? throw new ArgumentNullException(nameof(io));
+    private readonly FrozenDictionary<Type, object?> _injectedServices = ((DIKvp[])
+    [
+        SingletonOf(pauseContext),
+        SingletonOf(result),
+        SingletonOf(io),
+        SingletonOf(pauseContext.ValidationResult),
+        SingletonOf(pauseContext.ValidationResult.Module),
+        SingletonOf(pauseContext.ValidationResult.Errors),
+    ]).ToFrozenDictionary(static kvp => kvp.Key, static kvp => kvp.Value);
+
+    private static DIKvp SingletonOf<T>(T instance) where T : class => (typeof(T), instance ?? throw new ArgumentNullException(nameof(instance)));
 
     public object? GetService(Type serviceType)
     {
@@ -19,19 +29,10 @@ internal sealed class DebugCommandServiceProvider(IDebugPauseContext pauseContex
         {
             return this;
         }
-        if (serviceType == typeof(IDebugPauseContext))
+        if (_injectedServices.TryGetValue(serviceType, out object? service))
         {
-            return _pauseContext;
+            return service;
         }
-        if (serviceType == typeof(DebugCommandResult))
-        {
-            return _result;
-        }
-        if (serviceType == typeof(IDebugReplIo))
-        {
-            return _io;
-        }
-
-        return _pauseContext.Services.GetService(serviceType);
+        return pauseContext.Services.GetService(serviceType);
     }
 }

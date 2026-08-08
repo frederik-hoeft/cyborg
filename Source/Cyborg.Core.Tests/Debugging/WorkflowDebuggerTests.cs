@@ -3,6 +3,7 @@ using Cyborg.Core.Modules.Debugging;
 using Cyborg.Core.Modules.Debugging.Breakpoints;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
+using Cyborg.Core.Modules.Validation;
 using Cyborg.Core.Services.Default;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
@@ -24,7 +25,7 @@ public sealed class WorkflowDebuggerTests
         WorkflowDebugger debugger = CreateDebugger(registry, loggerFactory, frontend: null);
         RootModuleRuntime runtime = new(new GlobalRuntimeEnvironment(JsonNamingPolicy.SnakeCaseLower), loggerFactory);
 
-        DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(new ProbeModule(), ProbeModule.ModuleId, runtime, s_services, TestContext.CancellationToken);
+        DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(ProbeModule.ModuleId, ValidationResult.Valid(new ProbeModule()), runtime, s_services, TestContext.CancellationToken);
 
         Assert.AreEqual(DebugResumeAction.Continue, action);
         Assert.IsFalse(debugger.IsEnabled);
@@ -41,7 +42,7 @@ public sealed class WorkflowDebuggerTests
         RootModuleRuntime runtime = new(new GlobalRuntimeEnvironment(JsonNamingPolicy.SnakeCaseLower), loggerFactory);
         ProbeModule module = new() { Name = "probe-step" };
 
-        DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(module, ProbeModule.ModuleId, runtime, s_services, TestContext.CancellationToken);
+        DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(ProbeModule.ModuleId, ValidationResult.Valid(module), runtime, s_services, TestContext.CancellationToken);
 
         Assert.AreEqual(DebugResumeAction.Continue, action);
         Assert.AreEqual(1, frontend.PauseCount);
@@ -57,7 +58,7 @@ public sealed class WorkflowDebuggerTests
         WorkflowDebugger debugger = CreateDebugger(registry, loggerFactory, new ScriptedFrontend(DebugResumeAction.Cancel));
         RootModuleRuntime runtime = new(new GlobalRuntimeEnvironment(JsonNamingPolicy.SnakeCaseLower), loggerFactory);
 
-        DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(new ProbeModule(), ProbeModule.ModuleId, runtime, s_services, TestContext.CancellationToken);
+        DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(ProbeModule.ModuleId, ValidationResult.Valid(new ProbeModule()), runtime, s_services, TestContext.CancellationToken);
 
         Assert.AreEqual(DebugResumeAction.Cancel, action);
     }
@@ -72,10 +73,31 @@ public sealed class WorkflowDebuggerTests
         RootModuleRuntime runtime = new(new GlobalRuntimeEnvironment(JsonNamingPolicy.SnakeCaseLower), loggerFactory);
         ProbeModule module = new() { Name = "first" };
 
-        await debugger.EvaluatePreExecutionAsync(module, ProbeModule.ModuleId, runtime, s_services, TestContext.CancellationToken);
+        await debugger.EvaluatePreExecutionAsync(ProbeModule.ModuleId, ValidationResult.Valid(module), runtime, s_services, TestContext.CancellationToken);
 
-        IReadOnlyList<BreakpointExpression> breakpoints = registry.List();
+        IReadOnlyList<BreakpointExpression> breakpoints = registry.ToList();
         Assert.Contains(static breakpoint => breakpoint.Expression == WorkflowDebugger.STEP_EXPRESSION && breakpoint.IsOneShot, breakpoints);
+    }
+
+    [TestMethod]
+    public async Task EvaluatePreExecutionAsync_InvalidResult_PassesPreparedModuleAndErrorsToFrontendAsync()
+    {
+        BreakpointRegistry registry = new();
+        registry.Add("probe");
+        using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
+        ScriptedFrontend frontend = new(DebugResumeAction.Continue);
+        WorkflowDebugger debugger = CreateDebugger(registry, loggerFactory, frontend);
+        RootModuleRuntime runtime = new(new GlobalRuntimeEnvironment(JsonNamingPolicy.SnakeCaseLower), loggerFactory);
+        ProbeModule module = new() { Name = "probe-invalid" };
+        ValidationError error = new(nameof(ProbeModule.Name), "test-rule", "The probe is invalid.");
+        IValidationResult<ProbeModule> validationResult = ValidationResult.Invalid(module, [error]);
+
+        DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(ProbeModule.ModuleId, validationResult, runtime, s_services, TestContext.CancellationToken);
+
+        Assert.AreEqual(DebugResumeAction.Continue, action);
+        Assert.IsFalse(frontend.LastIsValid);
+        Assert.AreEqual(module, frontend.LastModule);
+        Assert.AreSequenceEqual([error], frontend.LastValidationErrors);
     }
 
     [TestMethod]
@@ -87,7 +109,8 @@ public sealed class WorkflowDebuggerTests
         WorkflowDebugger debugger = CreateDebugger(registry, loggerFactory, frontend: null);
         RootModuleRuntime runtime = new(new GlobalRuntimeEnvironment(JsonNamingPolicy.SnakeCaseLower), loggerFactory);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(async () => await debugger.EvaluatePreExecutionAsync(new ProbeModule(), ProbeModule.ModuleId, runtime, s_services, TestContext.CancellationToken));
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await debugger.EvaluatePreExecutionAsync(ProbeModule.ModuleId, ValidationResult.Valid(new ProbeModule()), runtime, s_services, TestContext.CancellationToken));
     }
 
     private static WorkflowDebugger CreateDebugger(BreakpointRegistry registry, ILoggerFactory loggerFactory, IDebugFrontend? frontend) =>
@@ -113,11 +136,20 @@ public sealed class WorkflowDebuggerTests
 
         public string? LastIdentity { get; private set; }
 
+        public IModule? LastModule { get; private set; }
+
+        public bool LastIsValid { get; private set; }
+
+        public IReadOnlyList<ValidationError> LastValidationErrors { get; private set; } = [];
+
         public ValueTask<DebugResumeAction> PauseAsync(IDebugPauseContext context, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             PauseCount++;
-            LastIdentity = context.ModuleIdentity;
+            LastIdentity = context.GetModuleIdentity();
+            LastModule = context.ValidationResult.Module;
+            LastIsValid = context.ValidationResult.IsValid;
+            LastValidationErrors = context.ValidationResult.Errors;
             return ValueTask.FromResult(action);
         }
     }

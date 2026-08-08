@@ -27,12 +27,12 @@ public sealed class BreakpointRegistry : IBreakpointRegistry
 
     public void Clear() => _breakpoints.Clear();
 
-    public IReadOnlyList<BreakpointExpression> List() => _breakpoints.Values.OrderBy(b => b.Id).ToList();
+    public IReadOnlyList<BreakpointExpression> ToList() => _breakpoints.Values.OrderBy(b => b.Id).ToList();
 
-    public bool TryMatchAndConsume(ref readonly BreakpointContext context, out BreakpointExpression? matched) =>
+    public bool TryMatchAndConsume(ref readonly BreakpointContext context, [NotNullWhen(true)] out BreakpointExpression? matched) =>
         TryMatchAndConsume(context.GetMatchTargets(), out matched);
 
-    public bool TryMatchAndConsume(IEnumerable<string> targets, out BreakpointExpression? matched)
+    public bool TryMatchAndConsume(IEnumerable<string> targets, [NotNullWhen(true)] out BreakpointExpression? matched)
     {
         ArgumentNullException.ThrowIfNull(targets);
         // ConcurrentDictionary supports snapshot enumeration, so this is fine

@@ -17,10 +17,7 @@ public sealed class RepeatedCollectionValidationTests : ModuleTestBase
         };
 
         await using TestModuleRuntimeScope scope = CreateValidationScope();
-        ValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(
-            scope.Runtime,
-            scope.ServiceProvider,
-            TestContext.CancellationToken);
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(scope.Runtime, scope.ServiceProvider, TestContext.CancellationToken);
 
         MSAssert.HasCount(1, result.Errors);
         MSAssert.Contains(
@@ -38,10 +35,7 @@ public sealed class RepeatedCollectionValidationTests : ModuleTestBase
         };
 
         await using TestModuleRuntimeScope scope = CreateValidationScope();
-        ValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(
-            scope.Runtime,
-            scope.ServiceProvider,
-            TestContext.CancellationToken);
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(scope.Runtime, scope.ServiceProvider, TestContext.CancellationToken);
 
         MSAssert.HasCount(1, result.Errors);
         MSAssert.Contains(
@@ -50,8 +44,15 @@ public sealed class RepeatedCollectionValidationTests : ModuleTestBase
             result.Errors);
     }
 
-    private static ValidationPipelineTestModule CreateModule() =>
-        new(RequiredItems: [], OptionalItems: [], NullableItems: null, InterpolatedValue: "literal", DeferredValue: "literal", Tags: null);
+    private static ValidationPipelineTestModule CreateModule() => new
+    (
+        RequiredItems: [],
+        OptionalItems: [],
+        NullableItems: null,
+        InterpolatedValue: "literal",
+        DeferredValue: "literal",
+        Tags: null
+    );
 
     private TestModuleRuntimeScope CreateValidationScope()
     {

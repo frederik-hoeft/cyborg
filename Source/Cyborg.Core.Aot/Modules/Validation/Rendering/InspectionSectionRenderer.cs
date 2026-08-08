@@ -17,6 +17,8 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
             $$"""
             public override string ToString() => {{ContractInfo.ModuleIdentity.RenderGlobal()}}.Format(ModuleId, Name, Group);
 
+            public override {{ContractInfo.IModuleDescriptor.RenderGlobal()}} GetDescriptor() => this;
+
             public {{KnownTypes.ValueTask}} DescribeAsync(
                 {{ContractInfo.IObjectDescriptionBuilder.RenderGlobal()}} builder,
                 {{KnownTypes.CancellationToken}} cancellationToken)
@@ -24,7 +26,7 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
                 {{KnownTypes.ArgumentNullException}}.ThrowIfNull(builder);
                 cancellationToken.ThrowIfCancellationRequested();
 
-                builder.AddProperty("ModuleId", [], ModuleId);
+                builder.AddProperty("ModuleId", ModuleId);
             """);
 
         IndentedStringBuilder body = builder.IncreaseIndent();
@@ -41,7 +43,7 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
 
     private void AppendNode(IndentedStringBuilder builder, PropertyModel property, string builderVariableName, string nodeAccessExpression, string displayName, string symbolPath, bool isProperty)
     {
-        string hintsExpression = CreateHintsExpression(property);
+        string? hintsExpression = CreateHintsExpression(property);
 
         if (property.Collection is not null)
         {
@@ -57,15 +59,19 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
         }
     }
 
-    private static void AppendAtom(IndentedStringBuilder builder, string builderVariableName, string nodeAccessExpression, string displayName, string hintsExpression, bool isProperty)
+    private static void AppendAtom(IndentedStringBuilder builder, string builderVariableName, string nodeAccessExpression, string displayName, string? hintsExpression, bool isProperty)
     {
-        builder.AppendLine(isProperty
-            ? $"{builderVariableName}.AddProperty(\"{displayName}\", {hintsExpression}, {nodeAccessExpression});"
-            : $"{builderVariableName}.AddItem({hintsExpression}, {nodeAccessExpression});");
+        builder.AppendLine((isProperty, hintsExpression) switch
+        {
+            (true, null) => $"{builderVariableName}.AddProperty(\"{displayName}\", {nodeAccessExpression});",
+            (true, not null) => $"{builderVariableName}.AddProperty(\"{displayName}\", {hintsExpression}, {nodeAccessExpression});",
+            (false, null) => $"{builderVariableName}.AddItem({nodeAccessExpression});",
+            (false, not null) => $"{builderVariableName}.AddItem({hintsExpression}, {nodeAccessExpression});",
+        });
     }
 
     private void AppendObject(IndentedStringBuilder builder, PropertyModel property, string builderVariableName, string nodeAccessExpression, string displayName,
-        string symbolPath, string hintsExpression, bool isProperty)
+        string symbolPath, string? hintsExpression, bool isProperty)
     {
         string childBuilderName = SymbolNameGenerator.MakeCamelCase($"{symbolPath}Builder");
         bool requiresNullCheck = property.IsNullable || !property.Symbol.Type.IsValueType;
@@ -94,11 +100,11 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
     }
 
     private void AppendObjectBody(IndentedStringBuilder builder, PropertyModel property, string builderVariableName, string objectAccessExpression, string displayName,
-        string symbolPath, string hintsExpression, bool isProperty, string childBuilderName)
+        string symbolPath, string? hintsExpression, bool isProperty, string childBuilderName)
     {
         string invocation = isProperty
-            ? $"{builderVariableName}.AddObject(\"{displayName}\", {hintsExpression}, {childBuilderName} =>"
-            : $"{builderVariableName}.AddObjectItem({hintsExpression}, {childBuilderName} =>";
+            ? $"{builderVariableName}.AddObject(\"{displayName}\", {childBuilderName} =>"
+            : $"{builderVariableName}.AddObjectItem({childBuilderName} =>";
         builder.AppendBlock(
             $$"""
             {{invocation}}
@@ -110,12 +116,18 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
         {
             AppendNode(childBody, child, childBuilderName, nodeAccessExpression: $"{objectAccessExpression}.{child.Name}", child.Name, symbolPath: $"{symbolPath}_{child.Name}", isProperty: true);
         }
-
-        builder.AppendLine("});");
+        if (hintsExpression is not null)
+        {
+            builder.AppendLine($"}}, {hintsExpression});");
+        }
+        else
+        {
+            builder.AppendLine("});");
+        }
     }
 
     private void AppendCollection(IndentedStringBuilder builder, PropertyModel property, string builderVariableName, string nodeAccessExpression, string displayName,
-        string symbolPath, string hintsExpression, bool isProperty)
+        string symbolPath, string? hintsExpression, bool isProperty)
     {
         if (!CollectionHelpers.TryConstructEnumerationGuardExpression(property, nodeAccessExpression, out string? guardExpression, out string valueExpression))
         {
@@ -139,15 +151,15 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
     }
 
     private void AppendCollectionBody(IndentedStringBuilder builder, PropertyModel property, string builderVariableName, string collectionAccessExpression,
-        string displayName, string symbolPath, string hintsExpression, bool isProperty)
+        string displayName, string symbolPath, string? hintsExpression, bool isProperty)
     {
         CollectionModel collection = property.Collection!;
         string collectionBuilderName = SymbolNameGenerator.MakeCamelCase($"{symbolPath}Builder");
         string elementName = SymbolNameGenerator.MakeCamelCase($"{symbolPath}Element");
 
         string invocation = isProperty
-            ? $"{builderVariableName}.AddCollection(\"{displayName}\", {hintsExpression}, {collectionBuilderName} =>"
-            : $"{builderVariableName}.AddCollectionItem({hintsExpression}, {collectionBuilderName} =>";
+            ? $"{builderVariableName}.AddCollection(\"{displayName}\", {collectionBuilderName} =>"
+            : $"{builderVariableName}.AddCollectionItem({collectionBuilderName} =>";
         builder.AppendBlock(
             $$"""
             {{invocation}}
@@ -165,11 +177,15 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
         {
             elementBody.AppendLine($"{collectionBuilderName}.AddItem([], {elementName});");
         }
-        builder.AppendBlock(
-            $$"""
-                }
-            });
-            """);
+        builder.IncreaseIndent().AppendLine("}");
+        if (hintsExpression is not null)
+        {
+            builder.AppendLine($"}}, {hintsExpression});");
+        }
+        else
+        {
+            builder.AppendLine("});");
+        }
     }
 
     private void AppendCollectionObjectElement(IndentedStringBuilder builder, CollectionModel collection, string collectionBuilderName, string elementName, string symbolPath)
@@ -226,7 +242,7 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
         }
     }
 
-    private string CreateHintsExpression(PropertyModel property)
+    private string? CreateHintsExpression(PropertyModel property)
     {
         List<string> hints = [];
         foreach (PropertyAspect aspect in property.Aspects)
@@ -234,6 +250,6 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
             aspect.RegisterDescriptorHints(hints, DiagnosticsReporter, property);
         }
 
-        return hints.Count == 0 ? "[]" : $"[{string.Join(", ", hints.Select(static hint => SymbolDisplay.FormatLiteral(hint, quote: true)))}]";
+        return hints.Count == 0 ? null : $"[{string.Join(", ", hints.Select(static hint => SymbolDisplay.FormatLiteral(hint, quote: true)))}]";
     }
 }

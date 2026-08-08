@@ -179,7 +179,7 @@ public abstract class CyborgTestBase
     /// <param name="moduleJson">Optional module JSON. Falls back to <see cref="GetDefaultModuleJsonAsync"/> when <see langword="null"/>.</param>
     /// <param name="assertion">The async test body receiving the validation result.</param>
     /// <param name="configureServices">Optional per-test-case service configuration.</param>
-    protected async Task TestValidationAsync<TModule>(string? moduleJson, Func<ValidationResult<TModule>, Task> assertion, Action<IServiceCollection>? configureServices = null)
+    protected async Task TestValidationAsync<TModule>(string? moduleJson, Func<IValidationResult<TModule>, Task> assertion, Action<IServiceCollection>? configureServices = null)
         where TModule : ModuleBase, IModule<TModule>
     {
         ArgumentNullException.ThrowIfNull(assertion);
@@ -187,15 +187,15 @@ public abstract class CyborgTestBase
         await using TestModuleRuntimeScope scope = CreateScope(configureServices);
         IModuleWorker worker = scope.DeserializeModule(resolvedJson);
         TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(worker);
-        ValidationResult<TModule> validationResult = await module.ValidateAsync(scope.Runtime, scope.ServiceProvider, TestContext.CancellationToken);
+        IValidationResult<TModule> validationResult = await module.ValidateAsync(scope.Runtime, scope.ServiceProvider, TestContext.CancellationToken);
         await assertion(validationResult);
     }
 
     /// <summary>
-    /// Overload of <see cref="TestValidationAsync{TModule}(string?,Func{ValidationResult{TModule},Task},Action{IServiceCollection}?)"/>
+    /// Overload of <see cref="TestValidationAsync{TModule}(string?,Func{IValidationResult{TModule},Task},Action{IServiceCollection}?)"/>
     /// with a synchronous assertion body for simpler test cases that don't need async assertions.
     /// </summary>
-    protected Task TestValidationAsync<TModule>(string? moduleJson, Action<ValidationResult<TModule>> assertion, Action<IServiceCollection>? configureServices = null)
+    protected Task TestValidationAsync<TModule>(string? moduleJson, Action<IValidationResult<TModule>> assertion, Action<IServiceCollection>? configureServices = null)
         where TModule : ModuleBase, IModule<TModule>
     {
         ArgumentNullException.ThrowIfNull(assertion);
@@ -226,7 +226,7 @@ public abstract class CyborgTestBase
         await using TestModuleRuntimeScope scope = CreateScope(configureServices);
         IModuleWorker worker = scope.DeserializeModule(resolvedJson);
         TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(worker);
-        ValidationResult<TModule> validationResult = await module.ValidateAsync(scope.Runtime, scope.ServiceProvider, TestContext.CancellationToken);
+        IValidationResult<TModule> validationResult = await module.ValidateAsync(scope.Runtime, scope.ServiceProvider, TestContext.CancellationToken);
         validationResult.EnsureValid();
         await assertion(validationResult.Module, scope);
     }
@@ -256,7 +256,7 @@ public abstract class CyborgTestBase
         environmentSetup(scope.GlobalEnvironment);
         IModuleWorker worker = scope.DeserializeModule(resolvedJson);
         TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(worker);
-        ValidationResult<TModule> validationResult = await module.ValidateAsync(scope.Runtime, scope.ServiceProvider, TestContext.CancellationToken);
+        IValidationResult<TModule> validationResult = await module.ValidateAsync(scope.Runtime, scope.ServiceProvider, TestContext.CancellationToken);
         validationResult.EnsureValid();
         await assertion(validationResult.Module);
     }

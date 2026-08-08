@@ -154,12 +154,12 @@ public sealed class ModuleDescriptionTests : CyborgCoreTestBase
         public ValueTask DescribeAsync(IObjectDescriptionBuilder builder, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            builder.AddProperty("ModuleId", [], "cyborg.tests.description.v1");
-            builder.AddObject("Options", [], static options => options.AddProperty("Enabled", [], true));
-            builder.AddCollection("Items", [], static items =>
+            builder.AddProperty("ModuleId", "cyborg.tests.description.v1");
+            builder.AddObject("Options", static options => options.AddProperty("Enabled", true));
+            builder.AddCollection("Items", static items =>
             {
                 items.AddItem([], "first");
-                items.AddObjectItem([], static item => item.AddProperty("Value", [], 42));
+                items.AddObjectItem([], static item => item.AddProperty("Value", 42));
             });
             return ValueTask.CompletedTask;
         }
@@ -170,7 +170,7 @@ public sealed class ModuleDescriptionTests : CyborgCoreTestBase
         public ValueTask DescribeAsync(IObjectDescriptionBuilder builder, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            builder.AddProperty("Password", ["secret", "application-specific"], "sensitive");
+            builder.AddProperty("Password", "sensitive", ["secret", "application-specific"]);
             return ValueTask.CompletedTask;
         }
     }
@@ -180,8 +180,8 @@ public sealed class ModuleDescriptionTests : CyborgCoreTestBase
         public ValueTask DescribeAsync(IObjectDescriptionBuilder builder, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            builder.AddProperty("Text", [], "line\n\t\\\"\0");
-            builder.AddProperty("Quote", [], '\'');
+            builder.AddProperty("Text", "line\n\t\\\"\0");
+            builder.AddProperty("Quote", '\'');
             return ValueTask.CompletedTask;
         }
     }
@@ -191,13 +191,13 @@ public sealed class ModuleDescriptionTests : CyborgCoreTestBase
         public ValueTask DescribeAsync(IObjectDescriptionBuilder builder, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            builder.AddProperty("Null", [], (string?)null);
-            builder.AddProperty("Decimal", [], 12.5m);
-            builder.AddProperty("DateTime", [], new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc));
-            builder.AddProperty("DateTimeOffset", [], new DateTimeOffset(2026, 1, 2, 3, 4, 5, TimeSpan.FromHours(2)));
-            builder.AddProperty("Duration", [], new TimeSpan(1, 2, 3));
-            builder.AddProperty("Guid", [], Guid.Parse("01234567-89ab-cdef-0123-456789abcdef"));
-            builder.AddProperty("Enum", [], DayOfWeek.Monday);
+            builder.AddProperty<string?>("Null", null);
+            builder.AddProperty("Decimal", 12.5m);
+            builder.AddProperty("DateTime", new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc));
+            builder.AddProperty("DateTimeOffset", new DateTimeOffset(2026, 1, 2, 3, 4, 5, TimeSpan.FromHours(2)));
+            builder.AddProperty("Duration", new TimeSpan(1, 2, 3));
+            builder.AddProperty("Guid", Guid.Parse("01234567-89ab-cdef-0123-456789abcdef"));
+            builder.AddProperty("Enum", DayOfWeek.Monday);
             return ValueTask.CompletedTask;
         }
     }
@@ -264,7 +264,7 @@ public sealed class ModuleDescriptionTests : CyborgCoreTestBase
         public ValueTask DescribeAsync(IObjectDescriptionBuilder builder, CancellationToken cancellationToken)
         {
             CancellationToken = cancellationToken;
-            builder.AddProperty("Value", [], 1);
+            builder.AddProperty("Value", 1);
             return ValueTask.CompletedTask;
         }
     }

@@ -6,7 +6,7 @@ For the surrounding execution model, see [Architecture Overview](architecture-ov
 
 ## Overview
 
-Cyborg debugging operates at module execution boundaries. When a breakpoint matches, the module has already passed defaults, override resolution, interpolation, and validation, but its worker has not executed yet. A frontend can therefore inspect the final validated configuration, manage breakpoints, step, continue, or cancel before module side effects begin.
+Cyborg debugging operates at module execution boundaries. When a breakpoint matches, defaults, override resolution, interpolation, and constraint evaluation have completed, but validation has not yet been enforced for execution and the worker has not run. The debugger therefore receives the complete `ValidationResult<TModule>` state: the prepared module plus any validation errors. This allows stepping to stop on invalid configurations, inspect the exact failed prepared state, and only enforce validity after the frontend resumes execution.
 
 The subsystem is split into three layers:
 
@@ -18,19 +18,22 @@ The subsystem is split into three layers:
 
 ## Execution Boundary
 
-The debugger hook is in `ModuleWorker<TModule>` after the configuration pipeline and before the worker's `ExecuteAsync` implementation:
+The debugger hook is in `ModuleWorker<TModule>` after generated preparation/constraint evaluation and the optional `ModuleValidationCallbackAsync`, but before `EnsureValid()` and the worker's `ExecuteAsync` implementation:
 
 ```text
-Load -> ApplyDefaults -> ResolveOverrides -> Interpolate -> Validate -> [DEBUG HOOK] -> ExecuteAsync -> Exit
+Load -> ApplyDefaults -> ResolveOverrides -> Interpolate -> Evaluate Constraints -> ValidationResult<TModule> -> [DEBUG HOOK] -> EnsureValid -> ExecuteAsync -> Exit
 ```
+
+Generated invalid results retain the prepared module alongside their errors. `ModuleWorker<TModule>` also supplies a module fallback for legacy/custom invalid results created through the older `Invalid(errors)` API before passing the result to the debugger.
 
 At the hook:
 
 1. Resolve the optional `IWorkflowDebugger`.
 2. Return immediately when the debugger is absent or disabled.
-3. Evaluate the breakpoint registry for the current module.
-4. If a breakpoint matches, resolve the configured `IDebugFrontend` and call it.
-5. Resume execution for `DebugResumeAction.Continue`, or return the cancellation path for `DebugResumeAction.Cancel`.
+3. Evaluate the breakpoint registry against the prepared module carried by the validation result.
+4. If a breakpoint matches, resolve the configured `IDebugFrontend` and call it with the prepared module, validity state, and validation errors.
+5. `DebugResumeAction.Cancel` exits through the cancellation path without executing or enforcing the invalid configuration.
+6. `DebugResumeAction.Continue` returns to `ModuleWorker<TModule>`, which calls `EnsureValid()` before initializing normal execution state and invoking `ExecuteAsync`.
 
 The frontend is selected through `IDefault<IDebugFrontend>` and the `cyborg.core.debug:frontend` selection key. When the key is absent, `DebugOptions.Default.Frontend` supplies the default (`console`). If a breakpoint is hit but the selected frontend is unavailable, debugging fails explicitly instead of silently consuming the breakpoint.
 
@@ -74,8 +77,9 @@ public interface IDebugFrontend : IKeyedService
 
 | Member | Purpose |
 |---|---|
-| `Module` / `ModuleId` | Current module and canonical id |
+| `Module` / `ModuleId` | Prepared module from the validation result and canonical id |
 | `ModuleIdentity` | Compact id/name/group string |
+| `IsValid` / `ValidationErrors` | Validation status and constraint errors for the prepared module |
 | `Runtime` | Ambient module runtime for future debugger features |
 | `Services` | Host service provider associated with the executing module; used as the fallback for dispatch-local command DI |
 | `Breakpoints` | Session breakpoint registry |
@@ -86,7 +90,7 @@ public interface IDebugFrontend : IKeyedService
 
 ## Console REPL and CAF Isolation
 
-`ConsoleDebugFrontend` owns only the interactive lifecycle: print the breakpoint banner, request one prompt-aware line through `IDebugReplIo`, dispatch it, and repeat until a command returns a resume action. EOF is treated as detach + continue.
+`ConsoleDebugFrontend` owns only the interactive lifecycle: print the breakpoint banner, including validation failure state and errors when present, request one prompt-aware line through `IDebugReplIo`, dispatch it, and repeat until a command returns a resume action. EOF is treated as detach + continue. The `inspect` command prints the prepared module description and repeats the associated validation errors alongside it so failed configuration can be correlated with the rendered state.
 
 The command path is split further so console interaction, lexical dispatch, CAF integration, and command behavior remain independent:
 
@@ -130,7 +134,7 @@ Breakpoint expressions may consume multiple positional tokens, so `break at back
 | `continue` | `c`, `resume` | Resume until the next breakpoint |
 | `step` | `s` | Add one-shot `.*` and resume |
 | `detach` | none | Clear breakpoints and resume |
-| `inspect` | `i` | Serialize and print the current module when it implements `IModuleDescriptor` |
+| `inspect` | `i` | Serialize and print the prepared module and any associated validation errors when it implements `IModuleDescriptor` |
 | `break at <expression>` | `b at ...` | Add a persistent breakpoint |
 | `break ls` | `break list`, `b ls`, `b list` | List breakpoints |
 | `break rm <id>` | `break remove`, `b rm`, `b remove` | Remove one breakpoint |

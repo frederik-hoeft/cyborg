@@ -12,7 +12,7 @@ public sealed class BreakpointRegistryTests
         int id1 = registry.Add("foo");
         int id2 = registry.Add("bar");
 
-        IReadOnlyList<BreakpointExpression> list = registry.List();
+        IReadOnlyList<BreakpointExpression> list = registry.ToList();
         Assert.HasCount(2, list);
         Assert.AreEqual(id1, list[0].Id);
         Assert.AreEqual("foo", list[0].Expression);

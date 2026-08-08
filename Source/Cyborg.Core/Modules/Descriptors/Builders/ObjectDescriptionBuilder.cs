@@ -9,15 +9,15 @@ internal sealed class ObjectDescriptionBuilder(IDescriptionComponentFactory fact
     private readonly ImmutableArray<IDescriptionPropertyComponent>.Builder _properties = ImmutableArray.CreateBuilder<IDescriptionPropertyComponent>();
     private IDescriptionObjectComponent? _builtComponent;
 
-    public void AddProperty<T>(string name, ImmutableArray<string> hints, T value)
+    public void AddProperty<T>(string name, T value, ImmutableArray<string> hints = default)
     {
         EnsureMutable();
         ValidateName(name);
         IDescriptionValueComponent valueComponent = factory.CreateValue(value, hints: []);
-        AddPropertyComponent(name, hints.OrEmpty(), valueComponent);
+        AddPropertyComponent(name, valueComponent, hints);
     }
 
-    public void AddObject(string name, ImmutableArray<string> hints, Action<IObjectDescriptionBuilder> describe)
+    public void AddObject(string name, Action<IObjectDescriptionBuilder> describe, ImmutableArray<string> hints = default)
     {
         EnsureMutable();
         ValidateName(name);
@@ -25,10 +25,10 @@ internal sealed class ObjectDescriptionBuilder(IDescriptionComponentFactory fact
 
         ObjectDescriptionBuilder objectBuilder = new(factory);
         describe(objectBuilder);
-        AddPropertyComponent(name, hints.OrEmpty(), objectBuilder.BuildComponent());
+        AddPropertyComponent(name, objectBuilder.BuildComponent(), hints);
     }
 
-    public void AddCollection(string name, ImmutableArray<string> hints, Action<ICollectionDescriptionBuilder> describe)
+    public void AddCollection(string name, Action<ICollectionDescriptionBuilder> describe, ImmutableArray<string> hints = default)
     {
         EnsureMutable();
         ValidateName(name);
@@ -36,15 +36,15 @@ internal sealed class ObjectDescriptionBuilder(IDescriptionComponentFactory fact
 
         CollectionDescriptionBuilder collectionBuilder = new(factory);
         describe(collectionBuilder);
-        AddPropertyComponent(name, hints.OrEmpty(), collectionBuilder.BuildComponent());
+        AddPropertyComponent(name, collectionBuilder.BuildComponent(), hints);
     }
 
-    internal IDescriptionObjectComponent BuildComponent(ImmutableArray<string> hints = default) => _builtComponent ??= factory.CreateObject(_properties.ToImmutable(), hints.OrEmpty());
+    internal IDescriptionObjectComponent BuildComponent(ImmutableArray<string> hints = default) => _builtComponent ??= factory.CreateObject(_properties.ToImmutable(), hints);
 
-    private void AddPropertyComponent(string name, ImmutableArray<string> hints, IDescriptionValueComponent value)
+    private void AddPropertyComponent(string name, IDescriptionValueComponent value, ImmutableArray<string> hints = default)
     {
         ArgumentNullException.ThrowIfNull(value);
-        _properties.Add(factory.CreateProperty(name, value, hints));
+        _properties.Add(factory.CreateProperty(name, value, hints.OrEmpty()));
     }
 
     private void EnsureMutable()

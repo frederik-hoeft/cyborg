@@ -7,17 +7,19 @@ namespace Cyborg.Modules.Guard;
 
 public sealed partial class GuardModuleWorker(IWorkerContext<GuardModule> context) : ModuleWorker<GuardModule>(context)
 {
-    protected override ValueTask<ValidationResult<GuardModule>> ModuleValidationCallbackAsync(ValidationResult<GuardModule> validationResult, GuardModule originalModule, CancellationToken cancellationToken)
+    protected override ValueTask<IValidationResult<GuardModule>> ModuleValidationCallbackAsync(IValidationResult<GuardModule> validationResult, GuardModule originalModule, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(validationResult);
-        GuardModule? module = validationResult.Module;
-        if (module is { Catch: null, Finally: null })
+        if (validationResult.Module is { Catch: null, Finally: null })
         {
-            return new ValueTask<ValidationResult<GuardModule>>(ValidationResult<GuardModule>.Invalid(
-            [
-                ..validationResult.Errors,
-                new ValidationError(nameof(Module.Catch), "GuardModuleMustDefineCatchOrFinally", "A GuardModule must define at least a Catch or Finally block.")
-            ]));
+            return ValueTask.FromResult(ValidationResult.Invalid
+            (
+                validationResult.Module,
+                [
+                    ..validationResult.Errors,
+                    new ValidationError(nameof(Module.Catch), "GuardModuleMustDefineCatchOrFinally", "A GuardModule must define at least a Catch or Finally block.")
+                ]
+            ));
         }
 
         return base.ModuleValidationCallbackAsync(validationResult, originalModule, cancellationToken);

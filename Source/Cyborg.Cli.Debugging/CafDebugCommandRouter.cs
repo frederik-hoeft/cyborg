@@ -31,8 +31,10 @@ internal sealed class CafDebugCommandRouter
         int originalExitCode = Environment.ExitCode;
 
         ConsoleApp.ServiceProvider = services;
-        ConsoleApp.Log = message => io.WriteLine(message, DebugReplOutputKind.Status);
-        ConsoleApp.LogError = message => io.WriteLine(message, DebugReplOutputKind.Error);
+        // ConsoleAppFramework exposes synchronous output callbacks.
+        // Bridge the asynchronous REPL I/O API here; keep sync-over-async isolated to this adapter.
+        ConsoleApp.Log = message => io.WriteLineAsync(message, OutputKind.Status).AsTask().Wait();
+        ConsoleApp.LogError = message => io.WriteLineAsync(message, OutputKind.Error).AsTask().Wait();
 
         try
         {

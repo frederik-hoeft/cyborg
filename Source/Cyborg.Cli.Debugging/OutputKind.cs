@@ -3,7 +3,7 @@
 /// <summary>
 /// Semantic output categories emitted by the debugger REPL. Frontends may render categories differently while plain-text implementations may ignore them.
 /// </summary>
-public enum DebugReplOutputKind
+public enum OutputKind
 {
     Text = 0,
     Status = 1,

@@ -1,17 +1,15 @@
 ﻿using Cyborg.Core.Modules.Debugging.Breakpoints;
 using Cyborg.Core.Modules.Runtime;
+using Cyborg.Core.Modules.Validation;
 
 namespace Cyborg.Core.Modules.Debugging;
 
 /// <summary>Context exposed to debug frontends when execution is paused at a module boundary.</summary>
 public interface IDebugPauseContext
 {
-    IModule Module { get; }
-
     string ModuleId { get; }
 
-    /// <summary>Short identity representation of the current module (id/name/group).</summary>
-    string ModuleIdentity { get; }
+    IValidationResult<IModule> ValidationResult { get; }
 
     IModuleRuntime Runtime { get; }
 

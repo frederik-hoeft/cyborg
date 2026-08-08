@@ -17,7 +17,7 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
 
         builder.AppendBlock(
             $$"""
-            public async {{KnownTypes.ValueTaskOfT(ContractInfo.ValidationResultT.RenderGlobalWithGenerics(qualifiedType))}} {{ModuleValidationRenderer.ValidateAsync}}(
+            public async {{KnownTypes.ValueTaskOfT(ContractInfo.IValidationResultT.RenderGlobalWithGenerics(qualifiedType))}} {{ModuleValidationRenderer.ValidateAsync}}(
                 {{ContractInfo.IModuleRuntime.RenderGlobal()}} runtime,
                 {{KnownTypes.IServiceProvider}} serviceProvider,
                 {{KnownTypes.CancellationToken}} cancellationToken)
@@ -45,8 +45,8 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
         builder.AppendBlock(
             $$"""
                 return {{ERRORS_VARIABLE}}.Count == 0
-                    ? {{ContractInfo.ValidationResultT.RenderGlobalWithGenerics(qualifiedType)}}.Valid({{RootModuleVariable}})
-                    : {{ContractInfo.ValidationResultT.RenderGlobalWithGenerics(qualifiedType)}}.Invalid({{ERRORS_VARIABLE}});
+                    ? {{ContractInfo.ValidationResult.RenderGlobal()}}.Valid({{RootModuleVariable}})
+                    : {{ContractInfo.ValidationResult.RenderGlobal()}}.Invalid({{RootModuleVariable}}, {{ERRORS_VARIABLE}});
             }
             """);
     }

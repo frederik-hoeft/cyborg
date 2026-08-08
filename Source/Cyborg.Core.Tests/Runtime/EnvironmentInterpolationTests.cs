@@ -196,7 +196,7 @@ public sealed class EnvironmentInterpolationTests
 
     private static GlobalRuntimeEnvironment CreateEnvironment() => new(JsonNamingPolicy.SnakeCaseLower);
 
-    private sealed record ProbeModule(string? Value, int Port) : ModuleBase, IModule
+    private sealed record ProbeModule(string? Value, int Port) : ModuleBase, IModuleDefinition
     {
         public static string ModuleId => "cyborg.tests.interpolation-probe.v1";
     }

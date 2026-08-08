@@ -7,9 +7,6 @@ namespace Cyborg.Cli.Debugging;
 /// </summary>
 internal sealed class DebugCommandDispatcher(IDebugReplIo io, CafDebugCommandRouter router)
 {
-    private readonly IDebugReplIo _io = io ?? throw new ArgumentNullException(nameof(io));
-    private readonly CafDebugCommandRouter _router = router ?? throw new ArgumentNullException(nameof(router));
-
     internal async ValueTask<DebugResumeAction?> DispatchAsync(string commandLine, IDebugPauseContext context, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(commandLine);
@@ -18,7 +15,7 @@ internal sealed class DebugCommandDispatcher(IDebugReplIo io, CafDebugCommandRou
 
         if (!CommandLineTokenizer.TryTokenize(commandLine, out string[] arguments, out string? error))
         {
-            _io.WriteLine(error!, DebugReplOutputKind.Error);
+            await io.WriteLineAsync(error!, OutputKind.Error, cancellationToken);
             return null;
         }
         if (arguments.Length == 0)
@@ -27,8 +24,8 @@ internal sealed class DebugCommandDispatcher(IDebugReplIo io, CafDebugCommandRou
         }
 
         DebugCommandResult result = new();
-        DebugCommandServiceProvider services = new(context, result, _io);
-        await _router.RunAsync(arguments, services, _io, cancellationToken).ConfigureAwait(false);
+        DebugCommandServiceProvider services = new(context, result, io);
+        await router.RunAsync(arguments, services, io, cancellationToken).ConfigureAwait(false);
         return result.ResumeAction;
     }
 }

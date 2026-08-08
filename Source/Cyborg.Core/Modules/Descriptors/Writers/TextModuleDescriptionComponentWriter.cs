@@ -1,5 +1,7 @@
 ﻿using Cyborg.Core.Common.Text;
+using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Descriptors.Model;
+using System.Collections;
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
@@ -11,8 +13,7 @@ internal sealed class TextModuleDescriptionComponentWriter(IndentedStringBuilder
     public ValueTask WriteAtomAsync<T>(T value, ImmutableArray<string> hints, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        WriteAtom(builder.GetInnerBuilder(), value);
-        builder.GetInnerBuilder().AppendLine();
+        WriteAtom(builder, value);
         return ValueTask.CompletedTask;
     }
 
@@ -83,95 +84,44 @@ internal sealed class TextModuleDescriptionComponentWriter(IndentedStringBuilder
         }
     }
 
-    private static void WriteAtom<T>(StringBuilder builder, T value)
+    private static IndentedStringBuilder WriteAtom<T>(IndentedStringBuilder builder, T value) => value switch
     {
-        switch (value)
-        {
-            case null:
-                builder.Append("null");
-                break;
-            case string text:
-                AppendQuotedString(builder, text, '"');
-                break;
-            case char character:
-                AppendQuotedString(builder, character.ToString(), '\'');
-                break;
-            case bool flag:
-                builder.Append(flag ? "true" : "false");
-                break;
-            case DateTime dateTime:
-                builder.Append(dateTime.ToString("O", CultureInfo.InvariantCulture));
-                break;
-            case DateTimeOffset dateTimeOffset:
-                builder.Append(dateTimeOffset.ToString("O", CultureInfo.InvariantCulture));
-                break;
-            case TimeSpan timeSpan:
-                builder.Append(timeSpan.ToString("c", CultureInfo.InvariantCulture));
-                break;
-            case Guid guid:
-                builder.Append(guid.ToString("D"));
-                break;
-            case Enum:
-                builder.Append(value.GetType().Name).Append('.').Append(value);
-                break;
-            default:
-                builder.Append(Convert.ToString(value, CultureInfo.InvariantCulture) ?? value.GetType().Name);
-                break;
-        }
-    }
+        null => builder.AppendLine("null"),
+        string text => AppendQuotedString(builder, text, '"'),
+        char character => AppendQuotedString(builder, character.ToString(), '\''),
+        bool flag => builder.AppendLine(flag ? "true" : "false"),
+        DateTime dateTime => builder.AppendLine(dateTime.ToString("O", CultureInfo.InvariantCulture)),
+        DateTimeOffset dateTimeOffset => builder.AppendLine(dateTimeOffset.ToString("O", CultureInfo.InvariantCulture)),
+        TimeSpan timeSpan => builder.AppendLine(timeSpan.ToString("c", CultureInfo.InvariantCulture)),
+        Guid guid => builder.AppendLine(guid.ToString("D")),
+        Enum e => builder.AppendLine(e.ToString()),
+        // cyborg types
+        ModuleReference moduleReference => builder.AppendLine($"-> {moduleReference.Module.ModuleId}"),
+        _ => builder.AppendLine(Convert.ToString(value, CultureInfo.InvariantCulture) ?? value.GetType().Name)
+    };
 
-    private static void AppendQuotedString(StringBuilder builder, string value, char quote)
+    private static IndentedStringBuilder AppendQuotedString(IndentedStringBuilder builder, string value, char quote)
     {
         builder.Append(quote);
         foreach (char character in value)
         {
-            switch (character)
+            _ = character switch
             {
-                case '\\':
-                    builder.Append("\\\\");
-                    break;
-                case '"' when quote == '"':
-                    builder.Append("\\\"");
-                    break;
-                case '\'' when quote == '\'':
-                    builder.Append("\\'");
-                    break;
-                case '\0':
-                    builder.Append("\\0");
-                    break;
-                case '\a':
-                    builder.Append("\\a");
-                    break;
-                case '\b':
-                    builder.Append("\\b");
-                    break;
-                case '\f':
-                    builder.Append("\\f");
-                    break;
-                case '\n':
-                    builder.Append("\\n");
-                    break;
-                case '\r':
-                    builder.Append("\\r");
-                    break;
-                case '\t':
-                    builder.Append("\\t");
-                    break;
-                case '\v':
-                    builder.Append("\\v");
-                    break;
-                default:
-                    if (char.IsControl(character))
-                    {
-                        builder.Append("\\u").Append(((int)character).ToString("X4", CultureInfo.InvariantCulture));
-                    }
-                    else
-                    {
-                        builder.Append(character);
-                    }
-                    break;
-            }
+                '\\' => builder.Append("\\\\"),
+                '"' when quote == '"' => builder.Append("\\\""),
+                '\'' when quote == '\'' => builder.Append("\\'"),
+                '\0' => builder.Append("\\0"),
+                '\a' => builder.Append("\\a"),
+                '\b' => builder.Append("\\b"),
+                '\f' => builder.Append("\\f"),
+                '\n' => builder.Append("\\n"),
+                '\r' => builder.Append("\\r"),
+                '\t' => builder.Append("\\t"),
+                '\v' => builder.Append("\\v"),
+                _ when char.IsControl(character) => builder.Append("\\u").Append(((int)character).ToString("X4", CultureInfo.InvariantCulture)),
+                _ => builder.Append(character)
+            };
         }
-        builder.Append(quote);
+        return builder.AppendLine(quote);
     }
 }

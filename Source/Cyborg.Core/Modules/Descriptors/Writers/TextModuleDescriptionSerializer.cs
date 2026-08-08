@@ -16,7 +16,7 @@ internal sealed class TextModuleDescriptionSerializer : IModuleDescriptionSerial
         cancellationToken.ThrowIfCancellationRequested();
 
         StringBuilder builder = new();
-        TextModuleDescriptionComponentWriter writer = new(new IndentedStringBuilder(builder));
+        TextModuleDescriptionComponentWriter writer = new(new IndentedStringBuilder(builder, indentSize: 2));
         await description.AcceptAsync(writer, cancellationToken);
         return builder.ToString();
     }

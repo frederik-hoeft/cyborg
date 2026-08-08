@@ -1,5 +1,6 @@
 ﻿using Cyborg.Core.Modules.Debugging.Breakpoints;
 using Cyborg.Core.Modules.Runtime;
+using Cyborg.Core.Modules.Validation;
 using Cyborg.Core.Services.Default;
 using Microsoft.Extensions.Logging;
 
@@ -14,10 +15,11 @@ internal sealed class WorkflowDebugger(IBreakpointRegistry breakpoints, ILoggerF
 
     public bool IsEnabled => breakpoints.Count > 0;
 
-    public async ValueTask<DebugResumeAction> EvaluatePreExecutionAsync(IModule module, string moduleId, IModuleRuntime runtime, IServiceProvider services, CancellationToken cancellationToken)
+    public async ValueTask<DebugResumeAction> EvaluatePreExecutionAsync(string moduleId, IValidationResult<IModule> validationResult, IModuleRuntime runtime,
+        IServiceProvider services, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(module);
         ArgumentException.ThrowIfNullOrWhiteSpace(moduleId);
+        ArgumentNullException.ThrowIfNull(validationResult);
         ArgumentNullException.ThrowIfNull(runtime);
         ArgumentNullException.ThrowIfNull(services);
 
@@ -26,6 +28,7 @@ internal sealed class WorkflowDebugger(IBreakpointRegistry breakpoints, ILoggerF
             return DebugResumeAction.Continue;
         }
 
+        IModule module = validationResult.Module;
         BreakpointContext context = new(moduleId, module.Name, module.Group);
         if (!breakpoints.TryMatchAndConsume(in context, out BreakpointExpression? matched))
         {
@@ -34,9 +37,15 @@ internal sealed class WorkflowDebugger(IBreakpointRegistry breakpoints, ILoggerF
 
         cancellationToken.ThrowIfCancellationRequested();
         DebugPauseContext pauseContext = new(
-            module, moduleId, runtime, services, breakpoints, RequestStepAction: () => breakpoints.Add(STEP_EXPRESSION, isOneShot: true), DetachAction: breakpoints.Clear);
+            moduleId,
+            validationResult,
+            runtime,
+            services,
+            breakpoints,
+            RequestStepAction: () => breakpoints.Add(STEP_EXPRESSION, isOneShot: true),
+            DetachAction: breakpoints.Clear);
 
-        _logger.LogBreakpointHit(pauseContext.ModuleIdentity, matched!.Expression);
+        _logger.LogBreakpointHit(pauseContext.GetModuleIdentity(), matched.Expression);
 
         IDebugFrontend frontend = defaultFrontend.GetRequiredDefault();
         return await frontend.PauseAsync(pauseContext, cancellationToken).ConfigureAwait(false);
