@@ -1,6 +1,4 @@
-﻿using Cyborg.Core.Aot.Modules.Validation.Attributes;
-using Cyborg.Core.Modules;
-using Cyborg.Core.Modules.Descriptors;
+﻿using Cyborg.Core.Modules.Descriptors;
 using Cyborg.TestModules.Description;
 using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Immutable;
@@ -9,23 +7,13 @@ using System.Text.Json;
 namespace Cyborg.Core.Tests.Debugging;
 
 [TestClass]
-public sealed class GeneratedModuleDescriptionTests
+public sealed class GeneratedModuleDescriptionTests : CyborgCoreTestBase
 {
-    private DescriptionTestServiceProvider _services = null!;
-    private IModuleSerializationService _serializationService = null!;
-
-    public TestContext TestContext { get; set; }
-
-    [TestInitialize]
-    public void Initialize()
-    {
-        _services = new DescriptionTestServiceProvider();
-        _serializationService = _services.GetRequiredService<IModuleSerializationService>();
-    }
-
     [TestMethod]
-    public async Task ToJsonAsync_StringProperty_IsScalarAsync()
+    public Task ToJsonAsync_StringProperty_IsScalarAsync() => TestWithDIAsync(async services =>
     {
+        IModuleSerializationService serializationService = services.GetRequiredService<IModuleSerializationService>();
+
         GeneratedDescriptionTestModule module = new()
         {
             Text = "hello",
@@ -34,7 +22,7 @@ public sealed class GeneratedModuleDescriptionTests
             Values = ["first", "second"],
         };
 
-        string json = await _serializationService.ToJsonAsync(module, TestContext.CancellationToken);
+        string json = await serializationService.ToJsonAsync(module, TestContext.CancellationToken);
         using JsonDocument document = JsonDocument.Parse(json);
 
         JsonElement root = document.RootElement;
@@ -49,11 +37,12 @@ public sealed class GeneratedModuleDescriptionTests
         Assert.AreEqual("x", root.GetProperty(nameof(module.Marker)).GetString());
         Assert.AreEqual(JsonValueKind.Array, root.GetProperty(nameof(module.Values)).ValueKind);
         Assert.AreEqual("first", root.GetProperty(nameof(module.Values))[0].GetString());
-    }
+    });
 
     [TestMethod]
-    public async Task ToJsonAsync_NestedObjectAndCollection_AreRecursiveAsync()
+    public Task ToJsonAsync_NestedObjectAndCollection_AreRecursiveAsync() => TestWithDIAsync(async services =>
     {
+        IModuleSerializationService serializationService = services.GetRequiredService<IModuleSerializationService>();
         GeneratedDescriptionTestModule module = new()
         {
             Text = "root",
@@ -66,7 +55,7 @@ public sealed class GeneratedModuleDescriptionTests
             Values = ["value"],
         };
 
-        string json = await _serializationService.ToJsonAsync(module, TestContext.CancellationToken);
+        string json = await serializationService.ToJsonAsync(module, TestContext.CancellationToken);
         using JsonDocument document = JsonDocument.Parse(json);
 
         JsonElement root = document.RootElement;
@@ -76,11 +65,12 @@ public sealed class GeneratedModuleDescriptionTests
         Assert.AreEqual(
             "second",
             root.GetProperty(nameof(module.Children))[1].GetProperty(nameof(DescriptionTestChild.Value)).GetString());
-    }
+    });
 
     [TestMethod]
-    public async Task ToJsonAsync_NullAndNullableCollections_PreserveShapeAsync()
+    public Task ToJsonAsync_NullAndNullableCollections_PreserveShapeAsync() => TestWithDIAsync(async services =>
     {
+        IModuleSerializationService serializationService = services.GetRequiredService<IModuleSerializationService>();
         GeneratedDescriptionTestModule module = new()
         {
             Text = "root",
@@ -95,57 +85,48 @@ public sealed class GeneratedModuleDescriptionTests
             Values = ["value"],
         };
 
-        string json = await _serializationService.ToJsonAsync(module, TestContext.CancellationToken);
+        string json = await serializationService.ToJsonAsync(module, TestContext.CancellationToken);
         using JsonDocument document = JsonDocument.Parse(json);
 
         JsonElement root = document.RootElement;
         Assert.AreEqual(JsonValueKind.Null, root.GetProperty(nameof(module.Child)).ValueKind);
-        Assert.AreEqual(
-            JsonValueKind.Null,
-            root.GetProperty(nameof(module.OptionalValues)).ValueKind);
-        Assert.AreEqual(
-            "array-value",
-            root.GetProperty(nameof(module.ArrayValues))[0].GetString());
-        Assert.AreEqual(
-            JsonValueKind.Null,
-            root.GetProperty(nameof(module.NullableChildren))[0].ValueKind);
-        Assert.AreEqual(
-            "present",
-            root.GetProperty(nameof(module.NullableChildren))[1]
-                .GetProperty(nameof(DescriptionTestChild.Value))
-                .GetString());
-        Assert.AreEqual(
-            0,
-            root.GetProperty(nameof(module.OptionalImmutableValues)).GetArrayLength());
-    }
+        Assert.AreEqual(JsonValueKind.Null, root.GetProperty(nameof(module.OptionalValues)).ValueKind);
+        Assert.AreEqual("array-value", root.GetProperty(nameof(module.ArrayValues))[0].GetString());
+        Assert.AreEqual(JsonValueKind.Null, root.GetProperty(nameof(module.NullableChildren))[0].ValueKind);
+        Assert.AreEqual("present", root.GetProperty(nameof(module.NullableChildren))[1]
+            .GetProperty(nameof(DescriptionTestChild.Value))
+            .GetString());
+        Assert.AreEqual(0, root.GetProperty(nameof(module.OptionalImmutableValues)).GetArrayLength());
+    });
 
     [TestMethod]
-    public async Task ToTextAsync_EmptyImmutableArray_RendersEmptyCollectionAsync()
+    public Task ToTextAsync_EmptyImmutableArray_RendersEmptyCollectionAsync() => TestWithDIAsync(async services =>
     {
+        IModuleSerializationService serializationService = services.GetRequiredService<IModuleSerializationService>();
         GeneratedDescriptionTestModule module = new()
         {
             Text = "root",
             Values = [],
         };
 
-        string text = await _serializationService.ToTextAsync(module, TestContext.CancellationToken);
+        string text = await serializationService.ToTextAsync(module, TestContext.CancellationToken);
 
         Assert.Contains($"{nameof(module.Values)}:{Environment.NewLine}  (empty)", text);
-    }
+    });
 
     [TestMethod]
-    public async Task ToTextAsync_DefaultImmutableArray_DoesNotEnumerateAsync()
+    public Task ToTextAsync_DefaultImmutableArray_DoesNotEnumerateAsync() => TestWithDIAsync(async services =>
     {
+        IModuleSerializationService serializationService = services.GetRequiredService<IModuleSerializationService>();
         GeneratedDescriptionTestModule module = new()
         {
             Text = "root",
             Values = default,
         };
 
-        string text = await _serializationService.ToTextAsync(module, TestContext.CancellationToken);
+        string text = await serializationService.ToTextAsync(module, TestContext.CancellationToken);
 
         Assert.Contains($"{nameof(module.Values)}:", text);
         Assert.DoesNotContain($"{nameof(module.Values)}: (empty)", text);
-    }
+    });
 }
-

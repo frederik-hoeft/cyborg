@@ -1,8 +1,11 @@
-﻿using Cyborg.Core.Modules;
+﻿using Cyborg.Core.Configuration;
+using Cyborg.Core.Logging;
+using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Validation;
+using Cyborg.Core.TestAdapter.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -53,10 +56,8 @@ public abstract class CyborgTestBase
 
         // Register all production Jab modules via reflection
         jabServiceDiscovery.RegisterFromModule<ICyborgCoreServices>(services);
-
-        // Provide a default (silent) logger factory — tests that need logging can override this.
-        // The logger factory is registered as a singleton and will be disposed by the service provider.
-        services.AddSingleton(_ => LoggerFactory.Create(static _ => { }));
+        services.AddSingleton(TestContext);
+        services.AddDefaultTestServices();
     }
 
     /// <summary>
@@ -71,6 +72,28 @@ public abstract class CyborgTestBase
 
     #endregion
 
+    #region DI-based Testing
+
+    protected async Task TestWithDIAsync(Func<IServiceProvider, Task> assertion, Action<IServiceCollection>? configureServices = null)
+    {
+        ArgumentNullException.ThrowIfNull(assertion);
+        await using TestModuleRuntimeScope scope = CreateScope(configureServices);
+        await assertion(scope.ServiceProvider);
+    }
+
+    protected Task TestWithDIAsync(Action<IServiceProvider> assertion, Action<IServiceCollection>? configureServices = null)
+    {
+        ArgumentNullException.ThrowIfNull(assertion);
+        return TestWithDIAsync(serviceProvider =>
+            {
+                assertion(serviceProvider);
+                return Task.CompletedTask;
+            },
+            configureServices);
+    }
+
+    #endregion
+
     #region HOF: Module Deserialization Testing
 
     /// <summary>
@@ -81,10 +104,7 @@ public abstract class CyborgTestBase
     /// <param name="moduleJson">Optional module JSON. Falls back to <see cref="GetDefaultModuleJsonAsync"/> when <see langword="null"/>.</param>
     /// <param name="assertion">The async test body receiving the deserialized module record.</param>
     /// <param name="configureServices">Optional per-test-case service configuration.</param>
-    protected async Task TestDeserializationAsync<TModule>(
-        string? moduleJson,
-        Func<TModule, Task> assertion,
-        Action<IServiceCollection>? configureServices = null)
+    protected async Task TestDeserializationAsync<TModule>(string? moduleJson, Func<TModule, Task> assertion, Action<IServiceCollection>? configureServices = null)
         where TModule : ModuleBase, IModule
     {
         ArgumentNullException.ThrowIfNull(assertion);
@@ -99,10 +119,7 @@ public abstract class CyborgTestBase
     /// Overload of <see cref="TestDeserializationAsync{TModule}(string?,Func{TModule,Task},Action{IServiceCollection}?)"/>
     /// with a synchronous assertion body for simpler test cases that don't need async assertions.
     /// </summary>
-    protected Task TestDeserializationAsync<TModule>(
-        string? moduleJson,
-        Action<TModule> assertion,
-        Action<IServiceCollection>? configureServices = null)
+    protected Task TestDeserializationAsync<TModule>(string? moduleJson, Action<TModule> assertion, Action<IServiceCollection>? configureServices = null)
         where TModule : ModuleBase, IModule
     {
         ArgumentNullException.ThrowIfNull(assertion);
@@ -123,10 +140,7 @@ public abstract class CyborgTestBase
     /// <param name="moduleContextJson">Optional module context JSON. Falls back to <see cref="GetDefaultModuleJsonAsync"/> when <see langword="null"/>.</param>
     /// <param name="assertion">The async test body receiving the deserialized module context.</param>
     /// <param name="configureServices">Optional per-test-case service configuration.</param>
-    protected async Task TestContextDeserializationAsync(
-        string? moduleContextJson,
-        Func<ModuleContext, Task> assertion,
-        Action<IServiceCollection>? configureServices = null)
+    protected async Task TestContextDeserializationAsync(string? moduleContextJson, Func<ModuleContext, Task> assertion, Action<IServiceCollection>? configureServices = null)
     {
         ArgumentNullException.ThrowIfNull(assertion);
         string resolvedJson = await ResolveModuleJsonAsync(moduleContextJson);
@@ -139,10 +153,7 @@ public abstract class CyborgTestBase
     /// Overload of <see cref="TestContextDeserializationAsync(string?,Func{ModuleContext,Task},Action{IServiceCollection}?)"/>
     /// with a synchronous assertion body for simpler test cases that don't need async assertions.
     /// </summary>
-    protected Task TestContextDeserializationAsync(
-        string? moduleContextJson,
-        Action<ModuleContext> assertion,
-        Action<IServiceCollection>? configureServices = null)
+    protected Task TestContextDeserializationAsync(string? moduleContextJson, Action<ModuleContext> assertion, Action<IServiceCollection>? configureServices = null)
     {
         ArgumentNullException.ThrowIfNull(assertion);
         return TestContextDeserializationAsync(
@@ -168,10 +179,7 @@ public abstract class CyborgTestBase
     /// <param name="moduleJson">Optional module JSON. Falls back to <see cref="GetDefaultModuleJsonAsync"/> when <see langword="null"/>.</param>
     /// <param name="assertion">The async test body receiving the validation result.</param>
     /// <param name="configureServices">Optional per-test-case service configuration.</param>
-    protected async Task TestValidationAsync<TModule>(
-        string? moduleJson,
-        Func<ValidationResult<TModule>, Task> assertion,
-        Action<IServiceCollection>? configureServices = null)
+    protected async Task TestValidationAsync<TModule>(string? moduleJson, Func<ValidationResult<TModule>, Task> assertion, Action<IServiceCollection>? configureServices = null)
         where TModule : ModuleBase, IModule<TModule>
     {
         ArgumentNullException.ThrowIfNull(assertion);
@@ -187,10 +195,7 @@ public abstract class CyborgTestBase
     /// Overload of <see cref="TestValidationAsync{TModule}(string?,Func{ValidationResult{TModule},Task},Action{IServiceCollection}?)"/>
     /// with a synchronous assertion body for simpler test cases that don't need async assertions.
     /// </summary>
-    protected Task TestValidationAsync<TModule>(
-        string? moduleJson,
-        Action<ValidationResult<TModule>> assertion,
-        Action<IServiceCollection>? configureServices = null)
+    protected Task TestValidationAsync<TModule>(string? moduleJson, Action<ValidationResult<TModule>> assertion, Action<IServiceCollection>? configureServices = null)
         where TModule : ModuleBase, IModule<TModule>
     {
         ArgumentNullException.ThrowIfNull(assertion);
@@ -213,10 +218,7 @@ public abstract class CyborgTestBase
     /// <param name="moduleJson">Optional module JSON. Falls back to <see cref="GetDefaultModuleJsonAsync"/> when <see langword="null"/>.</param>
     /// <param name="assertion">The async test body receiving the validated module and runtime scope.</param>
     /// <param name="configureServices">Optional per-test-case service configuration.</param>
-    protected async Task TestValidatedModuleAsync<TModule>(
-        string? moduleJson,
-        Func<TModule, TestModuleRuntimeScope, Task> assertion,
-        Action<IServiceCollection>? configureServices = null)
+    protected async Task TestValidatedModuleAsync<TModule>(string? moduleJson, Func<TModule, TestModuleRuntimeScope, Task> assertion, Action<IServiceCollection>? configureServices = null)
         where TModule : ModuleBase, IModule<TModule>
     {
         ArgumentNullException.ThrowIfNull(assertion);
@@ -244,11 +246,7 @@ public abstract class CyborgTestBase
     /// <param name="environmentSetup">Callback to configure environment variables before validation.</param>
     /// <param name="assertion">The async test body receiving the fully resolved module.</param>
     /// <param name="configureServices">Optional per-test-case service configuration.</param>
-    protected async Task TestOverridesAsync<TModule>(
-        string? moduleJson,
-        Action<IRuntimeEnvironment> environmentSetup,
-        Func<TModule, Task> assertion,
-        Action<IServiceCollection>? configureServices = null)
+    protected async Task TestOverridesAsync<TModule>(string? moduleJson, Action<IRuntimeEnvironment> environmentSetup, Func<TModule, Task> assertion, Action<IServiceCollection>? configureServices = null)
         where TModule : ModuleBase, IModule<TModule>
     {
         ArgumentNullException.ThrowIfNull(environmentSetup);
@@ -267,11 +265,7 @@ public abstract class CyborgTestBase
     /// Overload of <see cref="TestOverridesAsync{TModule}(string?,Action{IRuntimeEnvironment},Func{TModule,Task},Action{IServiceCollection}?)"/>
     /// with a synchronous assertion body for simpler test cases that don't need async assertions.
     /// </summary>
-    protected Task TestOverridesAsync<TModule>(
-        string? moduleJson,
-        Action<IRuntimeEnvironment> environmentSetup,
-        Action<TModule> assertion,
-        Action<IServiceCollection>? configureServices = null)
+    protected Task TestOverridesAsync<TModule>(string? moduleJson, Action<IRuntimeEnvironment> environmentSetup, Action<TModule> assertion, Action<IServiceCollection>? configureServices = null)
         where TModule : ModuleBase, IModule<TModule>
     {
         ArgumentNullException.ThrowIfNull(assertion);

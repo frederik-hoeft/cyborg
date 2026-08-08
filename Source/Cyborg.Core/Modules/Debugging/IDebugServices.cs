@@ -15,12 +15,12 @@ namespace Cyborg.Core.Modules.Debugging;
 [Singleton<IDefault<IDebugFrontend>, Default<IDebugFrontend>>]
 public interface IDebugServices
 {
-    public static ServiceSelectionKey<IDebugFrontend> DebugFrontendSelectionKey => new("cyborg.core.debug:frontend", DebugOptions.Default.Frontend);
+    static ServiceSelectionKey<IDebugFrontend> DebugFrontendSelectionKey => new("cyborg.core.debug:frontend", DebugOptions.Default.Frontend);
 
-    public static IDynamicValueProvider CreateDebugOptionsProvider() => new DebugOptionsProvider();
+    static IDynamicValueProvider CreateDebugOptionsProvider() => new DebugOptionsProvider();
 
-    public static IBreakpointRegistry CreateBreakpointRegistry() => new BreakpointRegistry();
+    static IBreakpointRegistry CreateBreakpointRegistry() => new BreakpointRegistry();
 
-    public static IWorkflowDebugger CreateWorkflowDebugger(IBreakpointRegistry breakpoints, ILoggerFactory loggerFactory, IDefault<IDebugFrontend> defaultFrontend) =>
+    static IWorkflowDebugger CreateWorkflowDebugger(IBreakpointRegistry breakpoints, ILoggerFactory loggerFactory, IDefault<IDebugFrontend> defaultFrontend) =>
         new WorkflowDebugger(breakpoints, loggerFactory, defaultFrontend);
 }

@@ -10,12 +10,12 @@ namespace Cyborg.Core.Modules.Descriptors;
 [Singleton<IModuleSerializationService>(Factory = nameof(CreateSerializationService))]
 public interface IModuleDescriptionServices
 {
-    public static IModuleDescriptionSerializer CreateTextSerializer() => TextModuleDescriptionSerializer.Instance;
+    static IModuleDescriptionSerializer CreateTextSerializer() => TextModuleDescriptionSerializer.Instance;
 
-    public static IModuleDescriptionSerializer CreateJsonSerializer() => new JsonModuleDescriptionSerializer(indented: true);
+    static IModuleDescriptionSerializer CreateJsonSerializer() => new JsonModuleDescriptionSerializer(indented: true);
 
-    public static IModuleDescriptionSerializerRegistry CreateSerializerRegistry(IEnumerable<IModuleDescriptionSerializer> serializers) =>
+    static IModuleDescriptionSerializerRegistry CreateSerializerRegistry(IEnumerable<IModuleDescriptionSerializer> serializers) =>
         new DefaultModuleDescriptionSerializerRegistry(serializers);
 
-    public static IModuleSerializationService CreateSerializationService(IModuleDescriptionSerializerRegistry serializerRegistry) => new DefaultModuleSerializationService(serializerRegistry);
+    static IModuleSerializationService CreateSerializationService(IModuleDescriptionSerializerRegistry serializerRegistry) => new DefaultModuleSerializationService(serializerRegistry);
 }

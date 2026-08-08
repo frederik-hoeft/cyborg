@@ -10,25 +10,15 @@ using System.Text.Json;
 namespace Cyborg.Core.Tests.Debugging;
 
 [TestClass]
-public sealed class ModuleDescriptionTests
+public sealed class ModuleDescriptionTests : CyborgCoreTestBase
 {
-    private DescriptionTestServiceProvider _services = null!;
-    private IModuleSerializationService _serializationService = null!;
-    public TestContext TestContext { get; set; }
-
-    [TestInitialize]
-    public void Initialize()
-    {
-        _services = new DescriptionTestServiceProvider();
-        _serializationService = _services.GetRequiredService<IModuleSerializationService>();
-    }
-
     [TestMethod]
-    public async Task ToTextAsync_RendersNestedObjectsAndCollectionsAsync()
+    public Task Test_ToTextAsync_RendersNestedObjectsAndCollectionsAsync() => TestWithDIAsync(async services =>
     {
+        IModuleSerializationService serializationService = services.GetRequiredService<IModuleSerializationService>();
         TestDescriptor descriptor = new();
 
-        string result = await _serializationService.ToTextAsync(descriptor, TestContext.CancellationToken);
+        string result = await serializationService.ToTextAsync(descriptor, TestContext.CancellationToken);
 
         Assert.Contains("ModuleId: \"cyborg.tests.description.v1\"", result);
         Assert.Contains("Options:", result);
@@ -37,14 +27,15 @@ public sealed class ModuleDescriptionTests
         Assert.Contains("  [0]: \"first\"", result);
         Assert.Contains("  [1]:", result);
         Assert.Contains("    Value: 42", result);
-    }
+    });
 
     [TestMethod]
-    public async Task ToJsonAsync_RendersValidNestedJsonAsync()
+    public Task Test_ToJsonAsync_RendersValidNestedJsonAsync() => TestWithDIAsync(async services =>
     {
+        IModuleSerializationService serializationService = services.GetRequiredService<IModuleSerializationService>();
         TestDescriptor descriptor = new();
 
-        string result = await _serializationService.ToJsonAsync(descriptor, TestContext.CancellationToken);
+        string result = await serializationService.ToJsonAsync(descriptor, TestContext.CancellationToken);
         using JsonDocument document = JsonDocument.Parse(result);
 
         JsonElement root = document.RootElement;
@@ -54,49 +45,53 @@ public sealed class ModuleDescriptionTests
         Assert.IsTrue(root.GetProperty("Options").GetProperty("Enabled").GetBoolean());
         Assert.AreEqual("first", root.GetProperty("Items")[0].GetString());
         Assert.AreEqual(42, root.GetProperty("Items")[1].GetProperty("Value").GetInt32());
-    }
+    });
 
     [TestMethod]
-    public async Task BuildAsync_PreservesArbitraryHintsAsync()
+    public Task Test_BuildAsync_PreservesArbitraryHintsAsync() => TestWithDIAsync(async services =>
     {
+        IModuleSerializationService serializationService = services.GetRequiredService<IModuleSerializationService>();
         HintDescriptor descriptor = new();
 
-        IDescriptionObjectComponent result = await _serializationService.BuildAsync(descriptor, TestContext.CancellationToken);
+        IDescriptionObjectComponent result = await serializationService.BuildAsync(descriptor, TestContext.CancellationToken);
 
         Assert.HasCount(1, result.Properties);
         IDescriptionPropertyComponent property = result.Properties[0];
         Assert.AreEqual("Password", property.Name);
         Assert.AreSequenceEqual(["secret", "application-specific"], property.Hints);
-    }
+    });
 
     [TestMethod]
-    public async Task SerializeAsync_CustomSerializerCanInterpretHintsAsync()
+    public Task Test_SerializeAsync_CustomSerializerCanInterpretHintsAsync() => TestWithDIAsync(async services =>
     {
+        IModuleSerializationService serializationService = services.GetRequiredService<IModuleSerializationService>();
         HintDescriptor descriptor = new();
         RedactingDescriptionSerializer serializer = new();
 
-        string result = await _serializationService.SerializeAsync(descriptor, serializer, TestContext.CancellationToken);
+        string result = await serializationService.SerializeAsync(descriptor, serializer, TestContext.CancellationToken);
 
         Assert.AreEqual("Password=<redacted>", result);
-    }
+    });
 
     [TestMethod]
-    public async Task ToTextAsync_EscapesScalarControlCharactersAsync()
+    public Task Test_ToTextAsync_EscapesScalarControlCharactersAsync() => TestWithDIAsync(async services =>
     {
+        IModuleSerializationService serializationService = services.GetRequiredService<IModuleSerializationService>();
         EscapingDescriptor descriptor = new();
 
-        string result = await _serializationService.ToTextAsync(descriptor, TestContext.CancellationToken);
+        string result = await serializationService.ToTextAsync(descriptor, TestContext.CancellationToken);
 
         Assert.Contains("Text: \"line\\n\\t\\\\\\\"\\0\"", result);
         Assert.Contains("Quote: '\\''", result);
-    }
+    });
 
     [TestMethod]
-    public async Task ToTextAsync_FormatsScalarsDeterministicallyAsync()
+    public Task Test_ToTextAsync_FormatsScalarsDeterministicallyAsync() => TestWithDIAsync(async services =>
     {
+        IModuleSerializationService serializationService = services.GetRequiredService<IModuleSerializationService>();
         ScalarDescriptor descriptor = new();
 
-        string result = await _serializationService.ToTextAsync(descriptor, TestContext.CancellationToken);
+        string result = await serializationService.ToTextAsync(descriptor, TestContext.CancellationToken);
 
         Assert.Contains("Null: null", result);
         Assert.Contains("Decimal: 12.5", result);
@@ -105,34 +100,34 @@ public sealed class ModuleDescriptionTests
         Assert.Contains("Duration: 01:02:03", result);
         Assert.Contains("Guid: 01234567-89ab-cdef-0123-456789abcdef", result);
         Assert.Contains("Enum: DayOfWeek.Monday", result);
-    }
+    });
 
     [TestMethod]
-    public async Task SerializeAsync_PropagatesCancellationTokenAsync()
+    public Task Test_SerializeAsync_PropagatesCancellationTokenAsync() => TestWithDIAsync(async services =>
     {
+        IModuleSerializationService serializationService = services.GetRequiredService<IModuleSerializationService>();
         CancellationTrackingDescriptor descriptor = new();
         CancellationTrackingSerializer serializer = new();
         using CancellationTokenSource cancellationSource = new();
 
-        await _serializationService.SerializeAsync(descriptor, serializer, cancellationSource.Token);
+        await serializationService.SerializeAsync(descriptor, serializer, cancellationSource.Token);
 
         Assert.AreEqual(cancellationSource.Token, descriptor.CancellationToken);
         Assert.AreEqual(cancellationSource.Token, serializer.CancellationToken);
-    }
+    });
 
     [TestMethod]
-    public async Task SerializeAsync_CustomSerializerRegisteredThroughDi_IsResolvedByFormatAsync()
+    public Task Test_SerializeAsync_CustomSerializerRegisteredThroughDi_IsResolvedByFormatAsync() => TestWithDIAsync(async services =>
     {
-        CustomDescriptionTestServiceProvider services = new();
         IModuleSerializationService serializationService = services.GetRequiredService<IModuleSerializationService>();
 
         string result = await serializationService.SerializeAsync(new TestDescriptor(), "application/x-cyborg-test", TestContext.CancellationToken);
 
         Assert.AreEqual("custom-from-di", result);
-    }
+    }, static services => services.AddSingleton<IModuleDescriptionSerializer, CustomSerializer>());
 
     [TestMethod]
-    public void SerializerRegistry_ResolvesCustomFormat()
+    public void Test_SerializerRegistry_ResolvesCustomFormat()
     {
         CustomDescriptionSerializer serializer = new();
         DefaultModuleDescriptionSerializerRegistry registry = new([serializer]);
@@ -145,7 +140,7 @@ public sealed class ModuleDescriptionTests
     }
 
     [TestMethod]
-    public void SerializerRegistry_DuplicateFormat_Throws()
+    public void Test_SerializerRegistry_DuplicateFormat_Throws()
     {
         CustomDescriptionSerializer first = new();
         CustomDescriptionSerializer second = new();
@@ -160,17 +155,11 @@ public sealed class ModuleDescriptionTests
         {
             cancellationToken.ThrowIfCancellationRequested();
             builder.AddProperty("ModuleId", [], "cyborg.tests.description.v1");
-            builder.AddObject("Options", [], static options =>
-            {
-                options.AddProperty("Enabled", [], true);
-            });
+            builder.AddObject("Options", [], static options => options.AddProperty("Enabled", [], true));
             builder.AddCollection("Items", [], static items =>
             {
                 items.AddItem([], "first");
-                items.AddObjectItem([], static item =>
-                {
-                    item.AddProperty("Value", [], 42);
-                });
+                items.AddObjectItem([], static item => item.AddProperty("Value", [], 42));
             });
             return ValueTask.CompletedTask;
         }
@@ -302,6 +291,18 @@ public sealed class ModuleDescriptionTests
             ArgumentNullException.ThrowIfNull(description);
             cancellationToken.ThrowIfCancellationRequested();
             return ValueTask.FromResult("custom");
+        }
+    }
+
+    private sealed class CustomSerializer : IModuleDescriptionSerializer
+    {
+        public string Format => "application/x-cyborg-test";
+
+        public ValueTask<string> SerializeAsync(IDescriptionObjectComponent description, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(description);
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult("custom-from-di");
         }
     }
 }

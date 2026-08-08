@@ -6,9 +6,9 @@ internal sealed class ConsoleDebugReplIo : IDebugReplIo
 
     public void Write(string message, DebugReplOutputKind kind = DebugReplOutputKind.Text) => Console.Out.Write(message);
 
-    public ValueTask<string?> ReadLineAsync(string prompt, CancellationToken cancellationToken)
+    public async ValueTask<string?> ReadLineAsync(string prompt, CancellationToken cancellationToken)
     {
-        Console.Out.Write(prompt);
-        return Console.In.ReadLineAsync(cancellationToken);
+        await Console.Out.WriteAsync(prompt);
+        return await Console.In.ReadLineAsync(cancellationToken);
     }
 }

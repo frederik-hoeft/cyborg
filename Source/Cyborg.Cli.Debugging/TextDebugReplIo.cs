@@ -9,9 +9,9 @@ internal sealed class TextDebugReplIo(TextReader input, TextWriter output) : IDe
 
     public void Write(string message, DebugReplOutputKind kind = DebugReplOutputKind.Text) => output.Write(message);
 
-    public ValueTask<string?> ReadLineAsync(string prompt, CancellationToken cancellationToken)
+    public async ValueTask<string?> ReadLineAsync(string prompt, CancellationToken cancellationToken)
     {
-        output.Write(prompt);
-        return input.ReadLineAsync(cancellationToken);
+        await output.WriteAsync(prompt);
+        return await input.ReadLineAsync(cancellationToken);
     }
 }

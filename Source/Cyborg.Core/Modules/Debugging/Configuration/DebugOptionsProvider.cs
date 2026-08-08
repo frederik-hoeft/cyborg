@@ -2,4 +2,4 @@
 
 namespace Cyborg.Core.Modules.Debugging.Configuration;
 
-internal sealed class DebugOptionsProvider : DynamicValueProviderBase<DebugOptions>("cyborg.types.core.debug.options.v1");
+public sealed class DebugOptionsProvider() : DynamicValueProviderBase<DebugOptions>("cyborg.types.core.debug.options.v1");

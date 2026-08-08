@@ -1,5 +1,4 @@
 ﻿using Cyborg.Core.Modules;
-using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Debugging;
 using Cyborg.Core.Modules.Debugging.Breakpoints;
 using Cyborg.Core.Modules.Runtime;
@@ -88,10 +87,7 @@ public sealed class WorkflowDebuggerTests
         WorkflowDebugger debugger = CreateDebugger(registry, loggerFactory, frontend: null);
         RootModuleRuntime runtime = new(new GlobalRuntimeEnvironment(JsonNamingPolicy.SnakeCaseLower), loggerFactory);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-        {
-            await debugger.EvaluatePreExecutionAsync(new ProbeModule(), ProbeModule.ModuleId, runtime, s_services, TestContext.CancellationToken);
-        });
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await debugger.EvaluatePreExecutionAsync(new ProbeModule(), ProbeModule.ModuleId, runtime, s_services, TestContext.CancellationToken));
     }
 
     private static WorkflowDebugger CreateDebugger(BreakpointRegistry registry, ILoggerFactory loggerFactory, IDebugFrontend? frontend) =>

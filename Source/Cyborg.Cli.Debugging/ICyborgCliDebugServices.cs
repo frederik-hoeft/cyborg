@@ -8,9 +8,9 @@ namespace Cyborg.Cli.Debugging;
 [Singleton<IDebugFrontend>(Factory = nameof(CreateConsoleDebugFrontend))]
 public interface ICyborgCliDebugServices
 {
-    public static IDebugReplIo CreateConsoleDebugReplIo() => new ConsoleDebugReplIo();
+    static IDebugReplIo CreateConsoleDebugReplIo() => new ConsoleDebugReplIo();
 
-    public static IDebugFrontend CreateConsoleDebugFrontend(IDebugReplIo io)
+    static IDebugFrontend CreateConsoleDebugFrontend(IDebugReplIo io)
     {
         CafDebugCommandRouter router = new();
         DebugCommandDispatcher dispatcher = new(io, router);
