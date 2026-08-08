@@ -99,7 +99,7 @@ public sealed class ModuleDescriptionTests : CyborgCoreTestBase
         Assert.Contains("DateTimeOffset: 2026-01-02T03:04:05.0000000+02:00", result);
         Assert.Contains("Duration: 01:02:03", result);
         Assert.Contains("Guid: 01234567-89ab-cdef-0123-456789abcdef", result);
-        Assert.Contains("Enum: DayOfWeek.Monday", result);
+        Assert.Contains("Enum: Monday", result);
     });
 
     [TestMethod]
@@ -158,8 +158,8 @@ public sealed class ModuleDescriptionTests : CyborgCoreTestBase
             builder.AddObject("Options", static options => options.AddProperty("Enabled", true));
             builder.AddCollection("Items", static items =>
             {
-                items.AddItem([], "first");
-                items.AddObjectItem([], static item => item.AddProperty("Value", 42));
+                items.AddItem("first");
+                items.AddObjectItem(static item => item.AddProperty("Value", 42));
             });
             return ValueTask.CompletedTask;
         }

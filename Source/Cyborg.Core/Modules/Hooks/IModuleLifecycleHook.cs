@@ -2,6 +2,6 @@
 
 namespace Cyborg.Core.Modules.Hooks;
 
-public interface IModuleExecutionHook : IPipelineHandler
+public interface IModuleLifecycleHook : IPipelineHandler
 {
 }

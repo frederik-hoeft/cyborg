@@ -8,7 +8,9 @@ internal sealed class ConsoleDebugReplIo : IDebugReplIo
         return await Console.In.ReadLineAsync(cancellationToken);
     }
 
-    public async ValueTask WriteAsync(string message, OutputKind kind, CancellationToken cancellationToken = default) => await Console.Out.WriteAsync(message);
+    public ValueTask WriteAsync(string message, OutputKind kind, CancellationToken cancellationToken = default) =>
+        new(Console.Out.WriteAsync(message.AsMemory(), cancellationToken));
 
-    public async ValueTask WriteLineAsync(string message, OutputKind kind, CancellationToken cancellationToken = default) => await Console.Out.WriteLineAsync(message);
+    public ValueTask WriteLineAsync(string message, OutputKind kind, CancellationToken cancellationToken = default) =>
+        new(Console.Out.WriteLineAsync(message.AsMemory(), cancellationToken));
 }

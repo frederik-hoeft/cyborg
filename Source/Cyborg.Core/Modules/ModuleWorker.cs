@@ -59,7 +59,7 @@ public abstract class ModuleWorker<TModule>(IWorkerContext<TModule> context) : I
         IValidationResult<TModule> moduleValidationResult = await context.Module.ValidateAsync(runtime, ServiceProvider, cancellationToken);
         IValidationResult<TModule> workerValidationResult = await ModuleValidationCallbackAsync(moduleValidationResult, context.Module, cancellationToken);
         // run validation hooks
-        ModuleValidationContext<TModule> validationContext = new(context.Module, workerValidationResult, runtime.Environment);
+        ModuleValidationContext<TModule> validationContext = new(workerValidationResult, runtime.Environment);
         foreach (IModuleValidationHook validationHook in _validationHooks)
         {
             IValidationResult<TModule> hookValidationResult = await validationHook.ExecuteAsync(validationContext, cancellationToken);
@@ -101,7 +101,7 @@ public abstract class ModuleWorker<TModule>(IWorkerContext<TModule> context) : I
         IModuleExecutionResult result = await ExecuteAsync(runtime, cancellationToken);
 
         // run post-execution hooks
-        ModulePostExecutionContext postExecutionContext = new(result, runtime, ResultBuilder);
+        ModulePostExecutionContext postExecutionContext = new(result, runtime);
         foreach (IModulePostExecutionHook postExecutionHook in _postExecutionHooks)
         {
             await postExecutionHook.ExecuteAsync(postExecutionContext, cancellationToken);

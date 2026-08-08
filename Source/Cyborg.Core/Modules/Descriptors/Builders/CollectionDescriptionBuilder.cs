@@ -17,13 +17,13 @@ internal sealed class CollectionDescriptionBuilder : ICollectionDescriptionBuild
         _factory = factory;
     }
 
-    public void AddItem<T>(ImmutableArray<string> hints, T item)
+    public void AddItem<T>(T item, ImmutableArray<string> hints = default)
     {
         EnsureMutable();
         _items.Add(_factory.CreateValue(item, hints.OrEmpty()));
     }
 
-    public void AddObjectItem(ImmutableArray<string> hints, Action<IObjectDescriptionBuilder> describe)
+    public void AddObjectItem(Action<IObjectDescriptionBuilder> describe, ImmutableArray<string> hints = default)
     {
         EnsureMutable();
         ArgumentNullException.ThrowIfNull(describe);
@@ -33,7 +33,7 @@ internal sealed class CollectionDescriptionBuilder : ICollectionDescriptionBuild
         _items.Add(objectBuilder.BuildComponent(hints.OrEmpty()));
     }
 
-    public void AddCollectionItem(ImmutableArray<string> hints, Action<ICollectionDescriptionBuilder> describe)
+    public void AddCollectionItem(Action<ICollectionDescriptionBuilder> describe, ImmutableArray<string> hints = default)
     {
         EnsureMutable();
         ArgumentNullException.ThrowIfNull(describe);

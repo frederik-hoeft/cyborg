@@ -5,11 +5,6 @@ using Cyborg.Core.Modules.Validation;
 
 namespace Cyborg.Core.Modules;
 
-public sealed class ModuleResultBuilderFactory : IModuleResultBuilderFactory
-{
-    public IModuleResultBuilder CreateResultBuilder(IModuleArtifactsBuilder artifacts) => new ModuleResultBuilder(artifacts);
-}
-
 public sealed class ModuleResultBuilder(IModuleArtifactsBuilder artifacts) : IModuleResultBuilder
 {
     IModuleExecutionResult<TModule> IModuleResultBuilder.Canceled<TModule>(TModule module) => CreateResult(module, ModuleExitStatus.Canceled, null);

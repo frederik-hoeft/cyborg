@@ -175,7 +175,7 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
         }
         else
         {
-            elementBody.AppendLine($"{collectionBuilderName}.AddItem([], {elementName});");
+            elementBody.AppendLine($"{collectionBuilderName}.AddItem({elementName});");
         }
         builder.IncreaseIndent().AppendLine("}");
         if (hintsExpression is not null)
@@ -201,11 +201,11 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
                 $$"""
                 if ({{elementName}} is null)
                 {
-                    {{collectionBuilderName}}.AddItem([], {{elementName}});
+                    {{collectionBuilderName}}.AddItem({{elementName}});
                 }
                 else
                 {
-                    {{collectionBuilderName}}.AddObjectItem([], {{elementBuilderName}} =>
+                    {{collectionBuilderName}}.AddObjectItem({{elementBuilderName}} =>
                     {
                 """);
 
@@ -220,7 +220,7 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
 
         builder.AppendBlock(
             $$"""
-            {{collectionBuilderName}}.AddObjectItem([], {{elementBuilderName}} =>
+            {{collectionBuilderName}}.AddObjectItem({{elementBuilderName}} =>
             {
             """);
         AppendCollectionElementProperties(builder.IncreaseIndent(), collection, elementBuilderName, elementAccessExpression, symbolPath);

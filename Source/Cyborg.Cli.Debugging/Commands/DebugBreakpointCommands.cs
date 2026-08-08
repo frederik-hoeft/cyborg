@@ -9,7 +9,7 @@ internal sealed class DebugBreakpointCommands(IDebugPauseContext context, IDebug
     /// <summary>Add a persistent breakpoint expression.</summary>
     /// <param name="expression">Regular expression matched against module id, name, and group.</param>
     [Command("break at|b at")]
-    public async Task AddAsync([Argument] string[] expression, CancellationToken cancellationToken)
+    public async Task AddAsync(CancellationToken cancellationToken, [Argument] params string[] expression)
     {
         if (expression.Length == 0)
         {

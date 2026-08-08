@@ -4,9 +4,9 @@ namespace Cyborg.Core.Modules.Descriptors.Builders;
 
 public interface ICollectionDescriptionBuilder
 {
-    void AddItem<T>(ImmutableArray<string> hints, T item);
+    void AddItem<T>(T item, ImmutableArray<string> hints = default);
 
-    void AddObjectItem(ImmutableArray<string> hints, Action<IObjectDescriptionBuilder> describe);
+    void AddObjectItem(Action<IObjectDescriptionBuilder> describe, ImmutableArray<string> hints = default);
 
-    void AddCollectionItem(ImmutableArray<string> hints, Action<ICollectionDescriptionBuilder> describe);
+    void AddCollectionItem(Action<ICollectionDescriptionBuilder> describe, ImmutableArray<string> hints = default);
 }

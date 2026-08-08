@@ -1,5 +1,4 @@
 ﻿using Cyborg.Core.Modules.Debugging;
-using System.Collections.Frozen;
 using DIKvp = (System.Type Key, object? Value);
 
 namespace Cyborg.Cli.Debugging;
@@ -9,7 +8,7 @@ namespace Cyborg.Cli.Debugging;
 /// </summary>
 internal sealed class DebugCommandServiceProvider(IDebugPauseContext pauseContext, DebugCommandResult result, IDebugReplIo io) : IServiceProvider
 {
-    private readonly FrozenDictionary<Type, object?> _injectedServices = ((DIKvp[])
+    private readonly Dictionary<Type, object?> _injectedServices = ((DIKvp[])
     [
         SingletonOf(pauseContext),
         SingletonOf(result),
@@ -17,7 +16,7 @@ internal sealed class DebugCommandServiceProvider(IDebugPauseContext pauseContex
         SingletonOf(pauseContext.ValidationResult),
         SingletonOf(pauseContext.ValidationResult.Module),
         SingletonOf(pauseContext.ValidationResult.Errors),
-    ]).ToFrozenDictionary(static kvp => kvp.Key, static kvp => kvp.Value);
+    ]).ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value);
 
     private static DIKvp SingletonOf<T>(T instance) where T : class => (typeof(T), instance ?? throw new ArgumentNullException(nameof(instance)));
 

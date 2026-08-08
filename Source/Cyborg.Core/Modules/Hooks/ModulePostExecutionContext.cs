@@ -2,4 +2,4 @@
 
 namespace Cyborg.Core.Modules.Hooks;
 
-internal sealed record ModulePostExecutionContext(IModuleExecutionResult Result, IModuleRuntime Runtime, IModuleResultBuilder ResultBuilder) : IModulePostExecutionContext;
+internal sealed record ModulePostExecutionContext(IModuleExecutionResult Result, IModuleRuntime Runtime) : IModulePostExecutionContext;

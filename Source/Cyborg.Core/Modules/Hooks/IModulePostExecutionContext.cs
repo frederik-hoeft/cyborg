@@ -7,6 +7,4 @@ public interface IModulePostExecutionContext
     IModuleExecutionResult Result { get; }
 
     IModuleRuntime Runtime { get; }
-
-    IModuleResultBuilder ResultBuilder { get; }
 }

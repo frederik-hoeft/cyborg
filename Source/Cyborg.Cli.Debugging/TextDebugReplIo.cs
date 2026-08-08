@@ -11,7 +11,9 @@ internal sealed class TextDebugReplIo(TextReader input, TextWriter output) : IDe
         return await input.ReadLineAsync(cancellationToken);
     }
 
-    public async ValueTask WriteAsync(string message, OutputKind kind, CancellationToken cancellationToken = default) => await output.WriteAsync(message);
+    public ValueTask WriteAsync(string message, OutputKind kind, CancellationToken cancellationToken = default) =>
+        new(output.WriteAsync(message.AsMemory(), cancellationToken));
 
-    public async ValueTask WriteLineAsync(string message, OutputKind kind, CancellationToken cancellationToken = default) => await output.WriteLineAsync(message);
+    public ValueTask WriteLineAsync(string message, OutputKind kind, CancellationToken cancellationToken = default) =>
+        new(output.WriteLineAsync(message.AsMemory(), cancellationToken));
 }
