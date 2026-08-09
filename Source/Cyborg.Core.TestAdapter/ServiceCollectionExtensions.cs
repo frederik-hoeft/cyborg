@@ -9,7 +9,7 @@ namespace Cyborg.Core.TestAdapter;
 
 public static class ServiceCollectionExtensions
 {
-    extension (IServiceCollection self)
+    extension(IServiceCollection self)
     {
         public IServiceCollection AddDefaultTestServices()
         {

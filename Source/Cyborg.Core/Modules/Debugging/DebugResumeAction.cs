@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Modules.Debugging;
+﻿namespace Cyborg.Core.Modules.Debugging;
 
 /// <summary>
 /// Disposition returned when a debug pause ends and workflow execution may proceed.

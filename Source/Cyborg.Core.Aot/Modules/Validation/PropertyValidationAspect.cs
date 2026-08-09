@@ -1,3 +1,3 @@
-namespace Cyborg.Core.Aot.Modules.Validation;
+﻿namespace Cyborg.Core.Aot.Modules.Validation;
 
 internal abstract class PropertyValidationAspect : PropertyAspect;

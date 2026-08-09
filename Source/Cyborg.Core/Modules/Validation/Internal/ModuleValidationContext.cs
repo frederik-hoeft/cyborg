@@ -33,7 +33,7 @@ public sealed class ModuleValidationContext
     public string? SelectRawStringOverride<TModule>(TModule module, string? value, string moduleExpression, string valueExpression) where TModule : ModuleBase, IModuleDefinition =>
         Runtime.Environment.SelectRawStringOverride(module, value, moduleExpression, valueExpression);
 
-    [return: NotNullIfNotNull(nameof(value))]   
+    [return: NotNullIfNotNull(nameof(value))]
     public T? ResolveOverride<TModule, T>(TModule module, T? value, string moduleExpression, string valueExpression) where TModule : ModuleBase, IModuleDefinition =>
         Runtime.Environment.Resolve(module, value, moduleExpression, valueExpression);
 

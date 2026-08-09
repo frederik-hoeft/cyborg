@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Modules.Descriptors.Model;
+﻿namespace Cyborg.Core.Modules.Descriptors.Model;
 
 public interface IDescriptionValueComponent : IDescriptionComponent
 {
