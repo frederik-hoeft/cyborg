@@ -1,5 +1,5 @@
-﻿using Cyborg.Core.Modules.Validation;
-using Cyborg.Core.TestAdapter;
+﻿using Cyborg.Core.Modules.Runtime;
+using Cyborg.Core.Modules.Validation;
 using Cyborg.TestModules.Validation;
 using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Immutable;
@@ -10,8 +10,10 @@ namespace Cyborg.Modules.Tests.Core.Validation;
 public sealed class ValidationPipelineRegressionTests : ModuleTestBase
 {
     [TestMethod]
-    public async Task TestValidationAsync_DefaultRequiredImmutableArray_ProducesRequiredErrorWithoutEnumeratingAsync()
+    public Task TestValidationAsync_DefaultRequiredImmutableArray_ProducesRequiredErrorWithoutEnumeratingAsync() => TestWithDIAsync(async services =>
     {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+
         ValidationPipelineTestModule module = new(
             RequiredItems: default,
             OptionalItems: [],
@@ -20,22 +22,21 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
             DeferredValue: "literal",
             Tags: null);
 
-        await using TestModuleRuntimeScope scope = CreateValidationScope();
-        ValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(
-            scope.Runtime,
-            scope.ServiceProvider,
-            TestContext.CancellationToken);
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
 
         MSAssert.IsFalse(result.IsValid);
+        MSAssert.IsTrue(result.Module.RequiredItems.IsDefault);
         MSAssert.Contains(
             error => error.Rule == "required"
                 && error.PropertyName.EndsWith(nameof(ValidationPipelineTestModule.RequiredItems), StringComparison.Ordinal),
             result.Errors);
-    }
+    });
 
     [TestMethod]
-    public async Task TestValidationAsync_DefaultOptionalImmutableArray_RemainsDefaultAsync()
+    public Task TestValidationAsync_DefaultOptionalImmutableArray_RemainsDefaultAsync() => TestWithDIAsync(async services =>
     {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+
         ValidationPipelineTestModule module = new(
             RequiredItems: [],
             OptionalItems: default,
@@ -44,20 +45,18 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
             DeferredValue: "literal",
             Tags: null);
 
-        await using TestModuleRuntimeScope scope = CreateValidationScope();
-        ValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(
-            scope.Runtime,
-            scope.ServiceProvider,
-            TestContext.CancellationToken);
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
 
         MSAssert.IsTrue(result.IsValid);
-        ValidationPipelineTestModule validatedModule = result.Module!;
+        ValidationPipelineTestModule validatedModule = result.Module;
         MSAssert.IsTrue(validatedModule.OptionalItems.IsDefault);
-    }
+    });
 
     [TestMethod]
-    public async Task TestValidationAsync_NullableImmutableArrayContainingDefault_RemainsDefaultAsync()
+    public Task TestValidationAsync_NullableImmutableArrayContainingDefault_RemainsDefaultAsync() => TestWithDIAsync(async services =>
     {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+
         ValidationPipelineTestModule module = new(
             RequiredItems: [],
             OptionalItems: [],
@@ -66,21 +65,19 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
             DeferredValue: "literal",
             Tags: null);
 
-        await using TestModuleRuntimeScope scope = CreateValidationScope();
-        ValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(
-            scope.Runtime,
-            scope.ServiceProvider,
-            TestContext.CancellationToken);
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
 
         MSAssert.IsTrue(result.IsValid);
-        ValidationPipelineTestModule validatedModule = result.Module!;
+        ValidationPipelineTestModule validatedModule = result.Module;
         MSAssert.IsTrue(validatedModule.NullableItems.HasValue);
         MSAssert.IsTrue(validatedModule.NullableItems.Value.IsDefault);
-    }
+    });
 
     [TestMethod]
-    public async Task TestValidationAsync_CollectionElementDefaultsAreAppliedBeforeInterpolationAsync()
+    public Task TestValidationAsync_CollectionElementDefaultsAreAppliedBeforeInterpolationAsync() => TestWithDIAsync(async services =>
     {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+
         ValidationPipelineTestModule module = new(
             RequiredItems: [new(Value: null!)],
             OptionalItems: [],
@@ -89,21 +86,19 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
             DeferredValue: "literal",
             Tags: null);
 
-        await using TestModuleRuntimeScope scope = CreateValidationScope();
-        scope.GlobalEnvironment.SetVariable("fallback", "resolved-default");
-        ValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(
-            scope.Runtime,
-            scope.ServiceProvider,
-            TestContext.CancellationToken);
+        runtime.Environment.SetVariable("fallback", "resolved-default");
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
 
         MSAssert.IsTrue(result.IsValid);
-        ValidationPipelineTestModule validatedModule = result.Module!;
+        ValidationPipelineTestModule validatedModule = result.Module;
         MSAssert.AreEqual("resolved-default", validatedModule.RequiredItems[0].Value);
-    }
+    });
 
     [TestMethod]
-    public async Task TestValidationAsync_DeferredStringsAreNotInterpolatedAsync()
+    public Task TestValidationAsync_DeferredStringsAreNotInterpolatedAsync() => TestWithDIAsync(async services =>
     {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+
         ValidationPipelineTestModule module = new(
             RequiredItems: [],
             OptionalItems: [],
@@ -112,23 +107,21 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
             DeferredValue: "${deferred}",
             Tags: null);
 
-        await using TestModuleRuntimeScope scope = CreateValidationScope();
-        scope.GlobalEnvironment.SetVariable("resolved", "resolved-value");
-        scope.GlobalEnvironment.SetVariable("deferred", "deferred-value");
-        ValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(
-            scope.Runtime,
-            scope.ServiceProvider,
-            TestContext.CancellationToken);
+        runtime.Environment.SetVariable("resolved", "resolved-value");
+        runtime.Environment.SetVariable("deferred", "deferred-value");
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
 
         MSAssert.IsTrue(result.IsValid);
-        ValidationPipelineTestModule validatedModule = result.Module!;
+        ValidationPipelineTestModule validatedModule = result.Module;
         MSAssert.AreEqual("resolved-value", validatedModule.InterpolatedValue);
         MSAssert.AreEqual("${deferred}", validatedModule.DeferredValue);
-    }
+    });
 
     [TestMethod]
-    public async Task TestValidationAsync_IgnoreInterpolationPreservesDefaultExpressionAsync()
+    public Task TestValidationAsync_IgnoreInterpolationPreservesDefaultExpressionAsync() => TestWithDIAsync(async services =>
     {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+
         ValidationPipelineTestModule module = new(
             RequiredItems: [],
             OptionalItems: [],
@@ -137,20 +130,18 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
             DeferredValue: "literal",
             Tags: null);
 
-        await using TestModuleRuntimeScope scope = CreateValidationScope();
-        scope.GlobalEnvironment.SetVariable("deferred_default", "resolved-value");
-        ValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(
-            scope.Runtime,
-            scope.ServiceProvider,
-            TestContext.CancellationToken);
+        runtime.Environment.SetVariable("deferred_default", "resolved-value");
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
 
         MSAssert.IsTrue(result.IsValid);
-        MSAssert.AreEqual("${deferred_default}", result.Module!.DeferredDefault);
-    }
+        MSAssert.AreEqual("${deferred_default}", result.Module.DeferredDefault);
+    });
 
     [TestMethod]
-    public async Task TestValidationAsync_NormalStringOverrideIsInterpolatedDuringFinalPhaseAsync()
+    public Task TestValidationAsync_NormalStringOverrideIsInterpolatedDuringFinalPhaseAsync() => TestWithDIAsync(async services =>
     {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+
         ValidationPipelineTestModule module = new(
             RequiredItems: [],
             OptionalItems: [],
@@ -162,21 +153,19 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
             Name = "validation",
         };
 
-        await using TestModuleRuntimeScope scope = CreateValidationScope();
-        scope.GlobalEnvironment.SetVariable("@validation.interpolated_value", "${resolved}");
-        scope.GlobalEnvironment.SetVariable("resolved", "resolved-value");
-        ValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(
-            scope.Runtime,
-            scope.ServiceProvider,
-            TestContext.CancellationToken);
+        runtime.Environment.SetVariable("@validation.interpolated_value", "${resolved}");
+        runtime.Environment.SetVariable("resolved", "resolved-value");
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
 
         MSAssert.IsTrue(result.IsValid);
-        MSAssert.AreEqual("resolved-value", result.Module!.InterpolatedValue);
-    }
+        MSAssert.AreEqual("resolved-value", result.Module.InterpolatedValue);
+    });
 
     [TestMethod]
-    public async Task TestValidationAsync_IgnoreInterpolationPreservesOverrideExpressionAsync()
+    public Task TestValidationAsync_IgnoreInterpolationPreservesOverrideExpressionAsync() => TestWithDIAsync(async services =>
     {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+
         ValidationPipelineTestModule module = new(
             RequiredItems: [],
             OptionalItems: [],
@@ -188,21 +177,19 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
             Name = "validation",
         };
 
-        await using TestModuleRuntimeScope scope = CreateValidationScope();
-        scope.GlobalEnvironment.SetVariable("@validation.deferred_value", "${deferred}");
-        scope.GlobalEnvironment.SetVariable("deferred", "resolved-value");
-        ValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(
-            scope.Runtime,
-            scope.ServiceProvider,
-            TestContext.CancellationToken);
+        runtime.Environment.SetVariable("@validation.deferred_value", "${deferred}");
+        runtime.Environment.SetVariable("deferred", "resolved-value");
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
 
         MSAssert.IsTrue(result.IsValid);
-        MSAssert.AreEqual("${deferred}", result.Module!.DeferredValue);
-    }
+        MSAssert.AreEqual("${deferred}", result.Module.DeferredValue);
+    });
 
     [TestMethod]
-    public async Task TestValidationAsync_InterpolatedIdentifiersAreRejectedAsync()
+    public Task TestValidationAsync_InterpolatedIdentifiersAreRejectedAsync() => TestWithDIAsync(async services =>
     {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+
         ValidationPipelineTestModule module = new(
             RequiredItems: [],
             OptionalItems: [],
@@ -215,15 +202,11 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
             Group = "${group}",
         };
 
-        await using TestModuleRuntimeScope scope = CreateValidationScope();
-        scope.GlobalEnvironment.SetVariable("resolved", "resolved-value");
-        scope.GlobalEnvironment.SetVariable("deferred", "deferred-value");
-        scope.GlobalEnvironment.SetVariable("name", "resolved-name");
-        scope.GlobalEnvironment.SetVariable("group", "resolved-group");
-        ValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(
-            scope.Runtime,
-            scope.ServiceProvider,
-            TestContext.CancellationToken);
+        runtime.Environment.SetVariable("resolved", "resolved-value");
+        runtime.Environment.SetVariable("deferred", "deferred-value");
+        runtime.Environment.SetVariable("name", "resolved-name");
+        runtime.Environment.SetVariable("group", "resolved-group");
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
 
         MSAssert.HasCount(2, result.Errors);
         MSAssert.Contains(
@@ -234,11 +217,13 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
             error => error.Rule == "valid_identifier"
                 && error.PropertyName.EndsWith(nameof(ValidationPipelineTestModule.Group), StringComparison.Ordinal),
             result.Errors);
-    }
+    });
 
     [TestMethod]
-    public async Task TestValidationAsync_CollectionElementConstraintsAcceptValidTagsAsync()
+    public Task TestValidationAsync_CollectionElementConstraintsAcceptValidTagsAsync() => TestWithDIAsync(async services =>
     {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+
         ValidationPipelineTestModule module = new(
             RequiredItems: [],
             OptionalItems: [],
@@ -247,18 +232,16 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
             DeferredValue: "literal",
             Tags: ["primary-tag", "group.0"]);
 
-        await using TestModuleRuntimeScope scope = CreateValidationScope();
-        ValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(
-            scope.Runtime,
-            scope.ServiceProvider,
-            TestContext.CancellationToken);
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
 
         MSAssert.IsTrue(result.IsValid);
-    }
+    });
 
     [TestMethod]
-    public async Task TestValidationAsync_CollectionElementConstraintsAcceptParentViolationsAsync()
+    public Task TestValidationAsync_CollectionElementConstraintsAcceptParentViolationsAsync() => TestWithDIAsync(async services =>
     {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+
         ValidationPipelineTestModule module = new(
             RequiredItems: [],
             OptionalItems: [],
@@ -267,18 +250,16 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
             DeferredValue: "literal",
             Tags: null);
 
-        await using TestModuleRuntimeScope scope = CreateValidationScope();
-        ValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(
-            scope.Runtime,
-            scope.ServiceProvider,
-            TestContext.CancellationToken);
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
 
         MSAssert.IsTrue(result.IsValid);
-    }
+    });
 
     [TestMethod]
-    public async Task TestValidationAsync_CollectionElementConstraintsReportElementErrorsAsync()
+    public Task TestValidationAsync_CollectionElementConstraintsReportElementErrorsAsync() => TestWithDIAsync(async services =>
     {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+
         ValidationPipelineTestModule module = new(
             RequiredItems: [],
             OptionalItems: [],
@@ -287,11 +268,7 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
             DeferredValue: "literal",
             Tags: [null, string.Empty, "invalid tag"]);
 
-        await using TestModuleRuntimeScope scope = CreateValidationScope();
-        ValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(
-            scope.Runtime,
-            scope.ServiceProvider,
-            TestContext.CancellationToken);
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
 
         MSAssert.IsFalse(result.IsValid);
         MSAssert.HasCount(4, result.Errors);
@@ -311,11 +288,13 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
             error => error.Rule == "valid_identifier"
                 && error.Message.Equals("Collection element 2 of property 'Tags' must be a valid variable identifier, but was 'invalid tag'.", StringComparison.Ordinal),
             result.Errors);
-    }
+    });
 
     [TestMethod]
-    public async Task TestValidationAsync_CollectionElementConstraintsRunAfterInterpolationAsync()
+    public Task TestValidationAsync_CollectionElementConstraintsRunAfterInterpolationAsync() => TestWithDIAsync(async services =>
     {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+
         ValidationPipelineTestModule module = new(
             RequiredItems: [],
             OptionalItems: [],
@@ -324,21 +303,10 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
             DeferredValue: "literal",
             Tags: ["${tag}"]);
 
-        await using TestModuleRuntimeScope scope = CreateValidationScope();
-        scope.GlobalEnvironment.SetVariable("tag", "resolved-tag");
-        ValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(
-            scope.Runtime,
-            scope.ServiceProvider,
-            TestContext.CancellationToken);
+        runtime.GlobalEnvironment.SetVariable("tag", "resolved-tag");
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
 
         MSAssert.IsTrue(result.IsValid);
         MSAssert.AreEqual("resolved-tag", result.Module!.Tags!.Single());
-    }
-
-    private TestModuleRuntimeScope CreateValidationScope()
-    {
-        IServiceCollection services = TestServiceConfiguration.CreateDefaultServices();
-        ConfigureServices(services, new JabServiceDiscovery());
-        return TestModuleRuntimeScope.Create(services);
-    }
+    });
 }

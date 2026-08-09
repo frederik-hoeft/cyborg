@@ -12,11 +12,14 @@ internal sealed class ValidationContractInfo(Dictionary<ModuleValidationGenerato
         ModuleValidationGeneratorContract.IModuleRuntime,
         ModuleValidationGeneratorContract.IModuleT,
         ModuleValidationGeneratorContract.ModuleValidationContext,
-        ModuleValidationGeneratorContract.ValidationResultT,
+        ModuleValidationGeneratorContract.ValidationResult,
+        ModuleValidationGeneratorContract.IValidationResultT,
         ModuleValidationGeneratorContract.ValidationError,
         ModuleValidationGeneratorContract.IDefaultValueT,
         ModuleValidationGeneratorContract.IParser,
-        ModuleValidationGeneratorContract.IInspectable,
+        ModuleValidationGeneratorContract.IModuleDescriptor,
+        ModuleValidationGeneratorContract.IObjectDescriptionBuilder,
+        ModuleValidationGeneratorContract.ModuleIdentity,
     ];
 
     public INamedTypeSymbol IModuleRuntime => ContractTypes[ModuleValidationGeneratorContract.IModuleRuntime];
@@ -25,7 +28,9 @@ internal sealed class ValidationContractInfo(Dictionary<ModuleValidationGenerato
 
     public INamedTypeSymbol ModuleValidationContext => ContractTypes[ModuleValidationGeneratorContract.ModuleValidationContext];
 
-    public INamedTypeSymbol ValidationResultT => ContractTypes[ModuleValidationGeneratorContract.ValidationResultT];
+    public INamedTypeSymbol ValidationResult => ContractTypes[ModuleValidationGeneratorContract.ValidationResult];
+
+    public INamedTypeSymbol IValidationResultT => ContractTypes[ModuleValidationGeneratorContract.IValidationResultT];
 
     public INamedTypeSymbol ValidationError => ContractTypes[ModuleValidationGeneratorContract.ValidationError];
 
@@ -33,7 +38,11 @@ internal sealed class ValidationContractInfo(Dictionary<ModuleValidationGenerato
 
     public INamedTypeSymbol IParser => ContractTypes[ModuleValidationGeneratorContract.IParser];
 
-    public INamedTypeSymbol IInspectable => ContractTypes[ModuleValidationGeneratorContract.IInspectable];
+    public INamedTypeSymbol IModuleDescriptor => ContractTypes[ModuleValidationGeneratorContract.IModuleDescriptor];
+
+    public INamedTypeSymbol IObjectDescriptionBuilder => ContractTypes[ModuleValidationGeneratorContract.IObjectDescriptionBuilder];
+
+    public INamedTypeSymbol ModuleIdentity => ContractTypes[ModuleValidationGeneratorContract.ModuleIdentity];
 
     public static ValidationContractInfo? Create(ContractExplorer contractExplorer, SourceProductionContext context)
     {
@@ -42,6 +51,7 @@ internal sealed class ValidationContractInfo(Dictionary<ModuleValidationGenerato
         {
             return null;
         }
+
         return new ValidationContractInfo(contracts, contractExplorer.Compilation);
     }
 }

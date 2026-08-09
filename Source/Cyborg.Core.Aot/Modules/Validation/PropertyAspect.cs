@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using Microsoft.CodeAnalysis;
 using System.Diagnostics.CodeAnalysis;
@@ -13,6 +13,13 @@ internal abstract class PropertyAspect(bool ensuresDefault = false)
 
     [return: NotNullIfNotNull(nameof(currentExpression))]
     public virtual string? RewriteDefaultAssignmentExpression(PropertyRewriteContext context, string? currentExpression) => currentExpression;
+
+    public virtual void RegisterDescriptorHints(
+        List<string> hints,
+        DiagnosticsReporter diagnosticsReporter,
+        PropertyModel property)
+    {
+    }
 
     protected virtual void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
     {

@@ -6,6 +6,7 @@
     <File Path="Dockerfile" />
   </Folder>
   <Project Path="Cyborg.Cli/Cyborg.Cli.csproj" />
+  <Project Path="Cyborg.Cli.Debugging/Cyborg.Cli.Debugging.csproj" />
   <Project Path="Cyborg.Cli.Tests/Cyborg.Cli.Tests.csproj" />
   <Project Path="Cyborg.Core.Aot/Cyborg.Core.Aot.csproj" />
   <Project Path="Cyborg.Core.TestAdapter/Cyborg.Core.TestAdapter.csproj" Id="1846e33a-ffe7-4222-a5fd-f71859716f80" />

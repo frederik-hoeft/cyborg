@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using System.Globalization;
 
@@ -9,6 +9,8 @@ internal static class KnownTypes
     public static string IServiceProvider => field ??= typeof(IServiceProvider).RenderGlobal();
 
     public static string CancellationToken => field ??= typeof(CancellationToken).RenderGlobal();
+
+    public static string ValueTask => field ??= typeof(ValueTask).RenderGlobal();
 
     public static string ValueTaskOfT(string typeArgument) => typeof(ValueTask<>).RenderGlobalWithGenerics(typeArgument);
 
@@ -37,6 +39,8 @@ internal static class KnownTypes
     public static string File => $"global::System.IO.File";
 
     public static string Path => field ??= typeof(Path).RenderGlobal();
+
+    public static string ArgumentNullException => field ??= typeof(ArgumentNullException).RenderGlobal();
 
     public static string Task => field ??= typeof(Task).RenderGlobal();
 

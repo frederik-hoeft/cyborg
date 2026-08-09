@@ -149,6 +149,7 @@ Trust enforcement is configurable in `cyborg.options.jconf` and supports three m
 ```
 Source/
   Cyborg.Cli/           Application entry point and CLI routing
+  Cyborg.Cli.Debugging/ Console debugger frontend and isolated REPL routing
   Cyborg.Core/           Core abstractions: modules, runtime, parsing, services
   Cyborg.Core.Aot/       Roslyn source generators for AOT compatibility
   Cyborg.Modules/        Built-in modules (sequence, subprocess, template, etc.)

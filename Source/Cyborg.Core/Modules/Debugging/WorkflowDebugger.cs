@@ -1,63 +1,53 @@
-﻿using Cyborg.Core.Modules.Runtime;
+﻿using Cyborg.Core.Modules.Debugging.Breakpoints;
+using Cyborg.Core.Modules.Runtime;
+using Cyborg.Core.Modules.Validation;
+using Cyborg.Core.Services.Default;
 using Microsoft.Extensions.Logging;
 
 namespace Cyborg.Core.Modules.Debugging;
 
-public sealed class WorkflowDebugger(IBreakpointRegistry breakpoints, ILoggerFactory loggerFactory) : IWorkflowDebugger
+internal sealed class WorkflowDebugger(IBreakpointRegistry breakpoints, ILoggerFactory loggerFactory, IDefault<IDebugFrontend> defaultFrontend) : IWorkflowDebugger
 {
-    /// <summary>
-    /// Expression used to implement <c>step</c> via the shared breakpoint matcher.
-    /// </summary>
+    /// <summary>Expression used to implement <c>step</c> via the shared breakpoint matcher.</summary>
     public const string STEP_EXPRESSION = ".*";
 
     private readonly ILogger _logger = loggerFactory.CreateLogger("cyborg.core.debugging");
 
-    public IBreakpointRegistry Breakpoints { get; } = breakpoints;
+    public bool IsEnabled => breakpoints.Count > 0;
 
-    public IDebugFrontend? Frontend { get; set; }
-
-    public bool IsEnabled => Breakpoints.Count > 0;
-
-    public async ValueTask<DebugResumeAction> EvaluatePreExecutionAsync(IModule module, string moduleId, IModuleRuntime runtime, CancellationToken cancellationToken)
+    public async ValueTask<DebugResumeAction> EvaluatePreExecutionAsync(string moduleId, IValidationResult<IModule> validationResult, IModuleRuntime runtime,
+        IServiceProvider services, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(module);
         ArgumentException.ThrowIfNullOrWhiteSpace(moduleId);
+        ArgumentNullException.ThrowIfNull(validationResult);
         ArgumentNullException.ThrowIfNull(runtime);
+        ArgumentNullException.ThrowIfNull(services);
 
-        if (!IsEnabled)
+        // skip evaluation if debugging is disabled or we're running headless (no frontend to handle the breakpoint)
+        if (!IsEnabled || defaultFrontend.GetDefault() is not { } frontend)
         {
             return DebugResumeAction.Continue;
         }
-        // CONSIDER: pass match context (id, name, group) as a composite object to avoid parameter creep as more match criteria are added in the future.
-        if (!Breakpoints.TryMatchAndConsume(moduleId, module.Name, module.Group, out BreakpointExpression? matched))
+
+        IModule module = validationResult.Module;
+        BreakpointContext context = new(moduleId, module.Name, module.Group);
+        if (!breakpoints.TryMatchAndConsume(in context, out BreakpointExpression? matched))
         {
             return DebugResumeAction.Continue;
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-
-        DebugPauseContext pauseContext = new
-        (
-            module,
+        DebugPauseContext pauseContext = new(
             moduleId,
+            validationResult,
             runtime,
-            Breakpoints,
-            requestStep: () => Breakpoints.Add(STEP_EXPRESSION, isOneShot: true),
-            detach: Breakpoints.Clear
-        );
+            services,
+            breakpoints,
+            RequestStepAction: () => breakpoints.Add(STEP_EXPRESSION, isOneShot: true),
+            DetachAction: breakpoints.Clear);
 
-        // TODO: use ZLogger
-        _logger.LogDebug(
-            "Breakpoint hit for module '{ModuleIdentity}' (expression {Expression})",
-            pauseContext.ModuleIdentity,
-            matched!.Expression);
+        _logger.LogBreakpointHit(pauseContext.GetModuleIdentity(), matched.Expression);
 
-        if (Frontend is null)
-        {
-            // No interactive adapter: treat as a soft break and continue.
-            return DebugResumeAction.Continue;
-        }
-
-        return await Frontend.PauseAsync(pauseContext, cancellationToken).ConfigureAwait(false);
+        return await frontend.PauseAsync(pauseContext, cancellationToken).ConfigureAwait(false);
     }
 }
