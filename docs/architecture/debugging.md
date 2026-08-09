@@ -1,66 +1,70 @@
 # Workflow Debugging and Module Descriptions
 
-This document describes the workflow debugging subsystem and the module-description pipeline used by debugger inspection. Both areas are still under active development; the contracts documented here describe the current implementation rather than a compatibility promise for the debugging/description APIs.
+This document describes the workflow debugging subsystem and the format-neutral module-description pipeline used by debugger inspection and other presentation clients.
 
-For the surrounding execution model, see [Architecture Overview](architecture-overview.md). For the generator that emits module descriptors, see [Source Generators](source-generators.md).
+For the surrounding execution model and lifecycle-hook pipeline, see [Architecture Overview](architecture-overview.md). For the source generation that produces rich module descriptors, see [Source Generators](source-generators.md).
 
 ## Overview
 
-Cyborg debugging operates at module execution boundaries. When a breakpoint matches, defaults, override resolution, interpolation, and constraint evaluation have completed, but validation has not yet been enforced for execution and the worker has not run. The debugger therefore receives the complete `ValidationResult<TModule>` state: the prepared module plus any validation errors. This allows stepping to stop on invalid configurations, inspect the exact failed prepared state, and only enforce validity after the frontend resumes execution.
+Cyborg debugging operates at module execution boundaries. A breakpoint is evaluated after defaults, override resolution, interpolation, and constraint evaluation have produced an `IValidationResult<TModule>`, but before that result is enforced and before the worker executes. The debugger therefore sees the prepared module together with any validation errors, including configurations that would fail normal execution.
 
-The subsystem is split into three layers:
+The subsystem is split into three architectural layers:
 
-- `Cyborg.Core` owns breakpoint matching, pause state, descriptor contracts, immutable description trees, serializer discovery, and serialization orchestration.
-- `Cyborg.Cli.Debugging` owns the console frontend and its ConsoleAppFramework (CAF) command surface.
-- `Cyborg.Cli` owns the main process command surface and composes the core/debugging services.
+- `Cyborg.Core` owns breakpoint state and matching, the runtime debugger contract, module descriptors, immutable description trees, serializer discovery, and serialization orchestration.
+- `Cyborg.Cli.Debugging` provides the console frontend and its isolated command surface.
+- `Cyborg.Cli` is the host composition root: it registers the CLI debugger services and selects runtime configuration sources.
 
-`IDebugFrontend` is the runtime adapter boundary, so another host can provide a non-console frontend without changing the execution engine. `IModuleDescriptionSerializer` is the serialization extension boundary, so applications can register additional description formats through DI without changing generated modules.
+`IDebugFrontend` is the host-facing presentation boundary. Hosts can provide a console, remote, graphical, or other frontend without changing module execution. Module descriptions are independent of debugging: `IModuleDescriptionSerializer` is the format extension boundary, so applications can register additional output formats through DI and reuse the same descriptor tree elsewhere.
 
 ## Execution Boundary
 
-The debugger hook is in `ModuleWorker<TModule>` after generated preparation/constraint evaluation and the optional `ModuleValidationCallbackAsync`, but before `EnsureValid()` and the worker's `ExecuteAsync` implementation:
+Debugging participates in execution through the general pre-execution hook pipeline rather than being hard-wired into `ModuleWorker<TModule>`:
 
 ```text
-Load -> ApplyDefaults -> ResolveOverrides -> Interpolate -> Evaluate Constraints -> ValidationResult<TModule> -> [DEBUG HOOK] -> EnsureValid -> ExecuteAsync -> Exit
+Load
+  -> Apply Defaults
+  -> Resolve Overrides
+  -> Reapply Defaults
+  -> Interpolate
+  -> Evaluate Constraints
+  -> OnValidationAsync
+  -> Validation Hooks
+  -> [PRE-EXECUTION HOOKS: DEBUGGER MAY PAUSE]
+  -> EnsureValid
+  -> ExecuteAsync
+  -> Post-Execution Hooks
 ```
 
-Generated invalid results retain the prepared module alongside their errors. `ModuleWorker<TModule>` also supplies a module fallback for legacy/custom invalid results created through the older `Invalid(errors)` API before passing the result to the debugger.
+The validation result carried into the debugger always contains the prepared module. If the result is invalid, the frontend can inspect both that module and its errors before `EnsureValid()` would reject execution. Returning `Continue` resumes the normal lifecycle; returning `Cancel` lets the debugging hook produce a canceled module result through the normal result-building path without invoking the worker.
 
-At the hook:
+The debugger itself is inactive when no breakpoints are registered. On an active pre-execution boundary it evaluates the breakpoint registry against the module and, when a breakpoint matches, resolves the selected `IDebugFrontend` and presents an `IDebugPauseContext`.
 
-1. Resolve the optional `IWorkflowDebugger`.
-2. Return immediately when the debugger is absent or disabled.
-3. Evaluate the breakpoint registry against the prepared module carried by the validation result.
-4. If a breakpoint matches, resolve the configured `IDebugFrontend` and call it with the prepared module, validity state, and validation errors.
-5. `DebugResumeAction.Cancel` exits through the cancellation path without executing or enforcing the invalid configuration.
-6. `DebugResumeAction.Continue` returns to `ModuleWorker<TModule>`, which calls `EnsureValid()` before initializing normal execution state and invoking `ExecuteAsync`.
-
-The frontend is selected through `IDefault<IDebugFrontend>` and the `cyborg.core.debug:frontend` selection key. When the key is absent, `DebugOptions.Default.Frontend` supplies the default (`console`). If a breakpoint is hit but the selected frontend is unavailable, debugging fails explicitly instead of silently consuming the breakpoint.
+Frontend selection uses the keyed-service selection setting `cyborg.core.debug:frontend`. Core deliberately has no implicit frontend (`DebugOptions.Default.Frontend` is `null`), because frontend policy belongs to the host. `Cyborg.Cli.Debugging` registers the built-in `console` frontend; CLI deployments must select `console` in host configuration before using `--break-at`. A host can instead register and select a different keyed frontend.
 
 ## Breakpoints
 
-`IBreakpointRegistry` stores numbered `BreakpointExpression` entries. Expressions are culture-invariant regular expressions with a match timeout and are evaluated against module id, module name when present, and module group when present.
+`IBreakpointRegistry` stores numbered regular-expression breakpoints. Expressions are culture-invariant and matched against the module ID plus `Name` and `Group` when present. Matching follows breakpoint ID order, giving the registry a stable session view even though registration/removal is thread-safe.
 
 | Expression | Meaning |
 |---|---|
-| `step-two` | Substring match against id/name/group |
+| `step-two` | Substring match against ID/name/group |
 | `^step-two$` | Exact name/group match |
-| `cyborg\.modules\.empty\.v1` | Match the empty module id |
-| `.*` | Match every module; used for stepping |
+| `cyborg\.modules\.empty\.v1` | Match the empty module ID |
+| `.*` | Match every module; used for one-shot stepping |
 
-The `step` command registers a one-shot `.*` breakpoint and resumes. One-shot consumption is atomic: only the caller that successfully removes the matching one-shot breakpoint reports the match. Persistent breakpoints are unaffected.
-
-Breakpoint state is session-wide:
+Breakpoint state belongs to the workflow debugging session rather than to an individual pause:
 
 | Action | Registry effect |
 |---|---|
-| `break at <expression>` | Add persistent expression |
+| `break at <expression>` | Add a persistent expression |
 | `break rm <id>` | Remove one expression |
 | `break ls` | List current expressions |
-| `step` | Add one-shot `.*` |
-| `continue` | No change |
-| `detach` | Clear all expressions |
+| `step` | Add a one-shot `.*` expression and resume |
+| `continue` | Resume without changing the registry |
+| `detach` | Clear all breakpoint state and resume |
 | REPL EOF | Detach and continue |
+
+One-shot removal is atomic: a matching one-shot breakpoint is consumed by the caller that successfully removes it. Persistent breakpoints remain registered until explicitly removed or detached.
 
 ## Frontend Boundary
 
@@ -73,57 +77,39 @@ public interface IDebugFrontend : IKeyedService
 }
 ```
 
-`IDebugPauseContext` exposes only the state and debugger operations valid during a pause:
+`IDebugPauseContext` exposes the state and debugger operations that are valid during a pause:
 
 | Member | Purpose |
 |---|---|
-| `Module` / `ModuleId` | Prepared module from the validation result and canonical id |
-| `ModuleIdentity` | Compact id/name/group string |
-| `IsValid` / `ValidationErrors` | Validation status and constraint errors for the prepared module |
-| `Runtime` | Ambient module runtime for future debugger features |
-| `Services` | Host service provider associated with the executing module; used as the fallback for dispatch-local command DI |
+| `ModuleId` | Canonical versioned ID of the paused module |
+| `ValidationResult` | Prepared module, validity state, and validation errors |
+| `Runtime` | Runtime associated with the paused execution boundary |
+| `Services` | Host service provider associated with the executing module |
 | `Breakpoints` | Session breakpoint registry |
-| `RequestStep()` | Register the one-shot step breakpoint |
-| `Detach()` | Clear breakpoint state |
+| `RequestStep()` | Add the one-shot step breakpoint |
+| `Detach()` | Clear session breakpoint state |
 
-`Services` is intentionally carried with the pause because debugger commands execute inside the same host/runtime composition as the worker being inspected. Frontends should not treat it as a general service locator. The console frontend uses it only as the fallback behind a dispatch-local DI proxy so CAF command classes can receive ordinary host services through constructor injection while pause-local command state is supplied separately.
+The pause context intentionally carries the module's service provider because frontend command dispatch may need ordinary host services alongside pause-local state. It is an integration boundary, not a general recommendation to use service-location within module code.
 
 ## Console REPL and CAF Isolation
 
-`ConsoleDebugFrontend` owns only the interactive lifecycle: print the breakpoint banner, including validation failure state and errors when present, request one prompt-aware line through `IDebugReplIo`, dispatch it, and repeat until a command returns a resume action. EOF is treated as detach + continue. The `inspect` command prints the prepared module description and repeats the associated validation errors alongside it so failed configuration can be correlated with the rendered state.
+`ConsoleDebugFrontend` owns the interactive pause lifecycle: display the breakpoint state, read a prompt-aware command line through `IDebugReplIo`, dispatch it, and continue until a command returns a resume action. EOF detaches and resumes. Inspection serializes the paused module descriptor and then reports any associated validation errors so failed configuration can be correlated with its prepared state.
 
-The command path is split further so console interaction, lexical dispatch, CAF integration, and command behavior remain independent:
+The console frontend uses ConsoleAppFramework (CAF) for command routing, aliases, argument binding, validation, generated help, and command dependency injection. Cyborg retains only a lexical tokenizer because an interactive REPL receives one input string while CAF consumes an argument vector. Quoting and escaping are therefore handled before CAF dispatch, while command grammar remains CAF-owned.
 
-```text
-ConsoleDebugFrontend
-  -> IDebugReplIo                    prompt/read/write abstraction
-  -> DebugCommandDispatcher          tokenize one REPL line; create dispatch-local result/provider
-      -> CafDebugCommandRouter        CAF invocation + generated help/error hooks
-          -> DebugCommandRegistration Add<T> registrations only
-              -> DebugExecutionCommands
-              -> DebugInspectionCommands
-              -> DebugBreakpointCommands
-```
-
-CAF owns command routing, aliases, typed argument binding, validation/error output, generated help, and constructor injection for the command classes. The only parser Cyborg retains is `CommandLineTokenizer`, because a REPL receives one command-line string while CAF consumes an argument vector. The tokenizer is lexical only: it handles whitespace, single/double quotes, empty quoted arguments, and escaping, but knows nothing about debugger command grammar.
-
-Each dispatch creates a private `DebugCommandResult` and a delegating `DebugCommandServiceProvider`. The provider resolves the current `IDebugPauseContext`, result sink, and active `IDebugReplIo` locally, then delegates all other service requests to `IDebugPauseContext.Services`, which is the original Jab/runtime provider. Command classes therefore receive both host services and pause-local state through constructor injection; the dispatcher itself has no mutable pause context, cancellation token, or resume-action fields. Cancellation tokens remain CAF special parameters on async command methods rather than command-session state.
-
-CAF v5 generates its command router from registration call sites in the consuming compilation. The main CLI and debug REPL therefore deliberately live in different compilations:
+The process CLI and debugger command surfaces live in separate compilations:
 
 ```text
 Cyborg.Cli
-  Program / Commands                 -> main CAF router (`run`, ...)
+  main CAF command surface (`run`, ...)
 
 Cyborg.Cli.Debugging
-  CafDebugCommandRouter / commands   -> debug CAF router (`continue`, `break`, ...)
+  debugger CAF command surface (`continue`, `break`, ...)
 ```
 
-This prevents debug `help` or command routing from exposing the global CLI command set, and prevents the REPL from recursively invoking the main process command surface. `Cyborg.Cli` references and imports `ICyborgCliDebugServices`, but the debug assembly owns its CAF registrations and generated router.
+This isolation prevents debugger help and routing from exposing or recursively invoking the process-level CLI commands. During one debugger command dispatch, pause-local objects are layered over the module's host service provider so command classes can receive both kinds of dependencies through constructor injection.
 
-CAF exposes `ConsoleApp.ServiceProvider`, `ConsoleApp.Log`, and `ConsoleApp.LogError` as assembly-local generated static hooks. The router temporarily installs the dispatch-local provider and REPL output delegates around `RunAsync`, then restores the previous values. Because those hooks are shared by every CAF builder in the debug assembly, a static async gate serializes CAF dispatch across router instances; this synchronization is framework integration state, not debugger command state.
-
-`IDebugReplIo` is the presentation extension boundary for the console frontend. `ReadLineAsync` receives the prompt so a richer implementation can render and edit prompts itself, while `Write`/`WriteLine` carry `DebugReplOutputKind` (`Text`, `Status`, `Success`, `Warning`, or `Error`) so implementations such as a future Spectre.Console frontend can style output by semantic purpose without commands depending on a particular terminal library. The current console and scripted implementations intentionally render all categories as plain text.
+`IDebugReplIo` is the console presentation extension boundary. It owns prompt-aware reads and semantic writes classified by `OutputKind` (`Text`, `Status`, `Success`, `Warning`, and `Error`). The command layer therefore does not depend on a specific terminal rendering library; a richer I/O implementation can style those categories without changing debugger command behavior.
 
 Breakpoint expressions may consume multiple positional tokens, so `break at backup group` is interpreted as the expression `backup group`. Quoting remains available when whitespace grouping must be explicit, for example `break at "backup  group"`.
 
@@ -131,23 +117,23 @@ Breakpoint expressions may consume multiple positional tokens, so `break at back
 
 | Command | Aliases | Behavior |
 |---|---|---|
-| `continue` | `c`, `resume` | Resume until the next breakpoint |
-| `step` | `s` | Add one-shot `.*` and resume |
-| `detach` | none | Clear breakpoints and resume |
-| `inspect` | `i` | Serialize and print the prepared module and any associated validation errors when it implements `IModuleDescriptor` |
+| `continue` | `c`, `resume` | Resume until another breakpoint matches |
+| `step` | `s` | Register a one-shot `.*` breakpoint and resume |
+| `detach` | none | Clear breakpoint state and resume |
+| `inspect` | `i` | Serialize the prepared module descriptor and print associated validation errors |
 | `break at <expression>` | `b at ...` | Add a persistent breakpoint |
 | `break ls` | `break list`, `b ls`, `b list` | List breakpoints |
 | `break rm <id>` | `break remove`, `b rm`, `b remove` | Remove one breakpoint |
-| `cancel` | `q`, `quit` | Return the workflow cancellation action |
-| `help [command]` | `h`, `?` | Translate to CAF's generated help |
+| `cancel` | `q`, `quit` | Cancel the paused module execution |
+| `help [command]` | `h`, `?` | Display CAF-generated debugger help |
 
-The old `IDebugReplCommand` abstraction no longer exists. New console-debugger commands belong in a focused command class and are enrolled through `DebugCommandRegistration` with CAF's `Add<T>` API. Command classes and the CAF router remain internal; `IDebugReplIo` is public because presentation is the intended external extension point.
+Debugger commands are organized into focused internal command classes. `IDebugReplIo` remains public because console presentation is an intended extension boundary; command routing itself remains an implementation detail of the CLI frontend.
 
 ## Module Identity and Descriptor Capability
 
-`IModule` remains the stable runtime module contract and does not depend on debugging or description infrastructure. Descriptor support is an optional capability expressed separately by `IModuleDescriptor`.
+`IModule` defines the runtime identity and inspection surface shared by all modules: `Name`, `Group`, and `GetDescriptor()`. `IModuleDefinition` adds the static versioned `ModuleId` used for loading and execution. Short identity strings combine these values for diagnostics and breakpoint banners without relying on the concrete module type.
 
-Generated validation targets implement `IModuleDescriptor` directly and override `ToString()` through `ModuleIdentity.Format(ModuleId, Name, Group)`. The console `inspect` command checks whether the current `IModule` also implements `IModuleDescriptor`; hand-written or otherwise non-generated modules remain valid `IModule` implementations and simply cannot be structurally inspected unless they opt into the descriptor contract.
+Descriptor support is therefore not an optional debugger-only capability. Generated module records return their rich generated descriptor from `GetDescriptor()`, while `ModuleBase` supplies a minimal fallback containing CLR type, name, and group for hand-written modules. Consumers such as `inspect` can always request a descriptor and do not need to special-case whether a module implements a separate capability interface.
 
 ## Module Description Pipeline
 
@@ -162,44 +148,29 @@ public interface IModuleDescriptor
 }
 ```
 
-`DescribeAsync` is asynchronous and cancellable because descriptor production may eventually require asynchronous work. Current generated implementations build the tree synchronously and return `ValueTask.CompletedTask`. Nested builder callbacks therefore remain synchronous.
+Descriptor production is asynchronous and cancellable at the contract boundary. Generated descriptors populate the supplied builder directly; nested builder callbacks remain synchronous because tree construction itself does not require an asynchronous callback model.
 
 ### Tree construction and service ownership
 
-`IModuleSerializationService` owns the mutable construction phase. `BuildAsync` creates the internal default builder/component factory, awaits `DescribeAsync`, and returns an immutable `IDescriptionObjectComponent`. `SerializeAsync` either accepts an explicit `IModuleDescriptionSerializer` or resolves one by format through `IModuleDescriptionSerializerRegistry`.
+`IModuleSerializationService` owns construction and serialization. It asks the descriptor to populate an object builder, materializes an immutable `IDescriptionObjectComponent` tree, and then delegates output to an `IModuleDescriptionSerializer`. Serializers can be supplied directly or resolved by format through `IModuleDescriptionSerializerRegistry`.
 
-The public contracts needed by serializer authors are:
+The public extension surface includes the descriptor/builder contracts, immutable description-component interfaces, the component writer abstraction, serializer and registry contracts, and `IModuleSerializationService`. Concrete mutable builders and built-in serializer implementations remain internal. This keeps tree construction controlled by the core service while allowing external serializer implementations to consume the stable immutable model.
 
-- `IModuleDescriptor`
-- `IObjectDescriptionBuilder` / `ICollectionDescriptionBuilder` for descriptor production
-- immutable `IDescription*Component` tree interfaces
-- `IDescriptionComponentWriter`
-- `IModuleDescriptionSerializer`
-- `IModuleDescriptionSerializerRegistry`
-- `IModuleSerializationService`
-- `IModuleDescriptionServices` for DI composition
-
-Concrete mutable builders, component records/factory, built-in serializers/writers, and the default serialization/registry implementations are internal. `IModuleDescriptionServices` exposes public Jab factory methods so consuming applications can import the service module without requiring those implementation constructors to be visible across assembly boundaries.
-
-Description services are registered independently from `IDebugServices`. This allows non-debugging clients to use module descriptions and custom formats without importing breakpoint/debugger infrastructure. Applications can add more `IModuleDescriptionSerializer` registrations; the registry consumes all registered serializers and requires format keys to be unique case-insensitively.
-
-`ModuleDescriptionFormats.Text` and `.Json` use MIME-style keys (`text/plain` and `application/json`). Convenience methods such as `ToTextAsync` and `ToJsonAsync` resolve those keys through the same registry rather than directly constructing built-in serializers.
+Description services are registered independently from debugger services. Applications can therefore render module descriptions without enabling breakpoint infrastructure. Multiple `IModuleDescriptionSerializer` implementations may be registered; format keys are unique case-insensitively. Built-in text and JSON formats use `text/plain` and `application/json` and are resolved through the same registry as custom formats.
 
 ### Hints
 
-Values and properties carry `ImmutableArray<string>` hints. Hints are arbitrary string keys with no mandatory semantics in the core tree. `PropertyAspect.RegisterDescriptorHints` is a no-op extension hook by default; future attributes such as `[Secret]` can contribute keys, and serializers can opt into the keys they understand. Unknown hints remain preserved.
+Description properties and values may carry `ImmutableArray<string>` hints. Hints are arbitrary metadata keys with no mandatory semantics in the description tree. Generator aspects can contribute hints, the tree preserves them, and serializers decide which keys they understand. Unknown hints remain available to downstream consumers rather than being interpreted by the core model.
 
 ### Source-generated traversal
 
-`InspectionSectionRenderer` emits `DescribeAsync` from the same `PropertyModel` graph used by validation, interpolation, and defaults. It recursively describes `[Validatable]` records and supported collection element records without runtime reflection.
+The module-validation generator emits rich descriptor traversal from the same property model used for validation, defaults, overrides, and interpolation. Nested `[Validatable]` records and supported collections are therefore described with the same structural classification used by the preparation pipeline, without runtime reflection.
 
-Collection classification and enumeration semantics are shared with the rest of the validation generator: `string` is scalar despite implementing `IEnumerable<char>`, nullable references/value collections are guarded before enumeration, and default `ImmutableArray<T>` values are never enumerated.
-
-Generator accessibility checks use a `VisibilityContext` anchored to the root generated module symbol. This models the lexical location of generated helper methods correctly even when recursive processing reaches properties declared on nested validatable types or inherited base types; the property's value type is not an accessibility context.
+The shared collection rules matter for descriptor correctness as well as validation: `string` remains a scalar despite implementing `IEnumerable<char>`; absent nullable collections are not enumerated; and a default `ImmutableArray<T>` remains distinct from an initialized empty array. Accessibility checks are evaluated relative to the lexical context of the generated partial module, including recursively reached nested or inherited properties.
 
 ## DI Composition
 
-Core registration is split by responsibility:
+Core registration is separated by responsibility:
 
 ```text
 ICyborgCoreServices
@@ -207,6 +178,7 @@ ICyborgCoreServices
   imports IDebugServices
 
 IModuleDescriptionServices
+  description tree construction
   built-in serializers
   serializer registry
   serialization service
@@ -215,17 +187,18 @@ IDebugServices
   debug options provider
   breakpoint registry
   workflow debugger
-  frontend selection/default service
+  frontend selection service
+  pre-execution debugging hook
 
 ICyborgCliDebugServices (Cyborg.Cli.Debugging)
-  default IDebugReplIo
-  console IDebugFrontend factory
+  console REPL I/O
+  keyed console debug frontend
 ```
 
-Jab generates consuming providers in the project that imports a service module. When a registered implementation type would otherwise need cross-assembly constructor visibility, the owning module exposes a public static factory method and keeps the concrete implementation internal.
+This split keeps debugger mechanics, description serialization, and host presentation independently replaceable. The core defines contracts and orchestration; the CLI debugger assembly owns console-specific behavior; the application composition root decides which services and configuration sources are active.
 
 ## Testing Expectations
 
-Description tests should consume `IModuleDescriptionServices` through a small Jab test provider so the same registration boundary used by applications is exercised. Generator-backed tests must cover scalar strings, nested objects/collections, nullable shapes, default/empty `ImmutableArray<T>`, hints, custom serializers, and cancellation propagation.
+Tests should preserve architectural boundaries rather than merely individual command implementations. Description coverage should exercise generated scalar/nested/collection traversal, nullable and default collection shapes, hint preservation, custom serializer registration, and cancellation. Debugger coverage should exercise breakpoint lifecycle, invalid prepared-module inspection, frontend selection, repeated pauses, command aliases/tokenization, EOF/detach behavior, and cancellation.
 
-Console debugger tests should execute the real `Cyborg.Cli.Debugging` dispatcher/router and verify aliases, nested commands, quoted/unquoted expressions, repeated pauses, EOF, inspection, and generated help. A regression assertion must ensure debug help does not contain the main CLI `run` command; this protects the separate-CAF-compilation invariant. Tests should also preserve the prompt-aware `IDebugReplIo` contract and semantic output categories so future rich I/O implementations can replace plain text without changing command behavior.
+The console debugger tests should dispatch through the real debugger CAF command surface. In particular, generated debugger help must remain isolated from the main CLI `run` command, and alternate `IDebugReplIo` implementations must be able to observe prompt and semantic output categories without command classes depending on console-specific rendering.

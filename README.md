@@ -73,12 +73,25 @@ Cyborg expects its configuration in `/etc/cyborg/` by default. The `samples/` di
 | File | Purpose |
 |------|---------|
 | `cyborg.jconf` | Main workflow entry point — defines the top-level module to execute |
-| `cyborg.options.jconf` | Runtime options: logging, metrics, trust policies |
+| `cyborg.options.jconf` | Runtime options: logging, metrics, trust policies, debugger frontend |
 | `cyborg.hosts.jsecrets` | Host definitions and secrets (borg passphrases, SSH settings, WoL MACs) |
 | `jobs/` | Per-frequency job definitions (daily, weekly) |
 | `templates/` | Reusable workflow templates (Docker backup, systemd backup) |
 
 Copy the sample files to `/etc/cyborg/`, adjust host definitions and secrets for your environment, and ensure configuration files are owned by root with restrictive permissions (see [Security](#security) below).
+
+Interactive debugging uses a keyed frontend selected through runtime configuration. The CLI registers the built-in `console` frontend, but no frontend is selected implicitly. To use `--break-at`, add a debugger options entry to `cyborg.options.jconf`:
+
+```json
+{
+  "key": "cyborg.core.debug",
+  "cyborg.types.core.debug.options.v1": {
+    "frontend": "console"
+  }
+}
+```
+
+Add this object alongside the other entries in the file's `options` array.
 
 ### Running
 
@@ -92,11 +105,11 @@ cyborg run --main /path/to/cyborg.jconf -e target=daily
 # Override the console log level
 cyborg run -e target=daily --log-level information
 
-# Break before a named module and open the interactive debug REPL
+# Break before a named module and open the configured debug frontend
 cyborg run -e target=daily --break-at 'my-step-name'
 ```
 
-When `--break-at` is set, execution pauses after the matching module is loaded, initialized, and validated, and before it runs. The debug REPL supports `continue`, `step`, `inspect`, breakpoint management, and `cancel`. See [Workflow Debugging](docs/architecture/debugging.md).
+When `--break-at` is set, execution pauses after the matching module has been prepared and its constraints evaluated, but before validation is enforced and before the worker runs. With the `console` frontend selected, the debug REPL supports `continue`, `step`, `inspect`, breakpoint management, and `cancel`. See [Workflow Debugging](docs/architecture/debugging.md).
 
 The `target` environment variable selects which job to run (e.g., `daily`, `weekly`). Additional environment variables can be injected via `-e` with optional type annotations (e.g., `-e port:int=2222`).
 

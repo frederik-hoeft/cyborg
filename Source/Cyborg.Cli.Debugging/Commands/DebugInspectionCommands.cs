@@ -7,7 +7,7 @@ namespace Cyborg.Cli.Debugging.Commands;
 
 internal sealed class DebugInspectionCommands(IValidationResult<IModule> validationResult, IDebugReplIo io, IModuleSerializationService moduleSerializationService)
 {
-    /// <summary>Print the full validated state of the current module.</summary>
+    /// <summary>Print the prepared state of the current module and any validation errors.</summary>
     [Command("inspect|i")]
     public async Task InspectAsync(CancellationToken cancellationToken)
     {

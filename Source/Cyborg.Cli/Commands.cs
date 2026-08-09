@@ -45,8 +45,10 @@ internal sealed class Commands
     /// </param>
     /// <param name="metrics">The file path where metrics output will be written. If null, the default metrics file path from configuration is used.</param>
     /// <param name="logLevel">The minimum log level to use for console output. If null, the default log level from configuration is used.</param>
-    /// <param name="breakAt">Optional module id, name, or group regular expressions. Execution breaks after the matching module is loaded, initialized, and validated, and before it runs.
-    /// Repeat the flag to register multiple breakpoints.</param>
+    /// <param name="breakAt">
+    /// Optional module id, name, or group regular expressions. Execution breaks after the matching module has been prepared and its constraints evaluated,
+    /// but before validation is enforced and before its worker runs. Repeat the flag to register multiple breakpoints.
+    /// </param>
     /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation.</param>
     /// <returns>A task that represents the asynchronous operation and yields the process exit code.</returns>
     [Command("run")]

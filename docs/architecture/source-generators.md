@@ -41,18 +41,18 @@ For the runtime architecture these generators integrate with, see [Architecture 
 
 `Cyborg.Core.Aot` is a Roslyn incremental generator assembly consumed by the module projects as an analyzer reference. It targets netstandard2.0 as required by the Roslyn analyzer hosting model. The generators produce the repetitive, reflection-equivalent code that would otherwise need to be written by hand for every module type.
 
-The generator layer covers four concerns:
+The generator layer produces four primary kinds of compile-time behavior:
 
-- **Module validation** — Generating the four-renderer validation pipeline (`ApplyDefaultsAsync`, `ResolveOverridesAsync`, `ApplyInterpolationAsync`, `ValidateAsync`) from annotated module records, transforming declarative attributes into executable validation, defaulting, override resolution, interpolation, and validation logic.
-- **Module descriptions** — Generating `ToString` (short identity) and asynchronous `IModuleDescriptor.DescribeAsync` traversal on the same `[GeneratedModuleValidation]` partial records used for validation. The format-neutral description tree is then serialized by the debugger or other clients without per-module source changes. See [Workflow Debugging](debugging.md).
+- **Module preparation and validation** — Generating defaults, override resolution, interpolation, constraint validation, and the `IValidationResult<TModule>` contract from annotated module records.
+- **Module descriptions** — Generating short module identity and asynchronous `IModuleDescriptor` traversal from the same property model used for validation. The format-neutral description tree can then be serialized by the debugger or other clients without per-module reflection. See [Workflow Debugging](debugging.md).
 - **Module loader factories** — Generating worker construction methods that resolve constructor dependencies from the DI container, eliminating boilerplate in module loaders.
 - **Model decomposition** — Generating `IDecomposable` implementations that project record properties into `DynamicKeyValuePair` collections for environment publishing and artifact flattening.
 
-A fourth generator, the contract registration bootstrap, supports the other three by establishing the type discovery mechanism that decouples generators from the runtime type system.
+A contract-registration bootstrap supports these feature generators by establishing the compile-time type-discovery mechanism that decouples generator code from runtime assemblies.
 
 ## Contract Discovery
 
-The generators need to emit code referencing runtime types defined in other assemblies — `IModuleRuntime`, `ValidationResult<T>`, `DynamicKeyValuePair`, and others. Because the generator assembly cannot directly reference those types (it targets netstandard2.0 and runs in the Roslyn analyzer host), Cyborg uses a contract registration pattern to discover them at generation time.
+The generators need to emit code referencing runtime types defined in other assemblies — `IModuleRuntime`, `IValidationResult<T>`, `ValidationResult`, `DynamicKeyValuePair`, and others. Because the generator assembly cannot directly reference those types (it targets netstandard2.0 and runs in the Roslyn analyzer host), Cyborg uses a contract registration pattern to discover them at generation time.
 
 ### Contract Types
 
@@ -60,11 +60,11 @@ Each generator declares a contract enum whose members correspond to the runtime 
 
 | Contract | Members | Used By |
 |----------|---------|---------|
-| `ModuleValidationGeneratorContract` | `IModuleRuntime`, `IModuleT`, `ModuleValidationContext`, `ValidationResultT`, `ValidationError`, `IDefaultValueT`, `IParser` | Validation generator |
+| `ModuleValidationGeneratorContract` | `IModuleRuntime`, `IModuleT`, `ModuleValidationContext`, `ValidationResult`, `IValidationResultT`, `ValidationError`, `IDefaultValueT`, `IParser`, `IModuleDescriptor`, `IObjectDescriptionBuilder`, `ModuleIdentity` | Validation and descriptor generation |
 | `ModuleLoaderFactoryGeneratorContract` | `IModuleWorker`, `ModuleLoaderT`, `IModuleWorkerContextT`, `ModuleWorkerContextImplementationT` | Loader factory generator |
 | `ModelDecompositionGeneratorContract` | `IDecomposable`, `DynamicKeyValuePair` | Decomposition generator |
 
-Runtime types register themselves against these contracts using `[GeneratorContractRegistration<TContract>(ContractMember)]`. For example, the `ValidationResult<T>` type in `Cyborg.Core` carries an attribute registering it as `ModuleValidationGeneratorContract.ValidationResultT`.
+Runtime types register themselves against these contracts using `[GeneratorContractRegistration<TContract>(ContractMember)]`. A single contract may include both runtime execution types and description types when one generator emits code that participates in both subsystems.
 
 ### Discovery Mechanism
 
@@ -92,7 +92,7 @@ For each annotated record, the generator emits a partial record implementing `IM
 
 3. **`ApplyInterpolationAsync`** — Private instance helper that recursively rewrites eligible string properties through `ModuleValidationContext.Interpolate(...)`, including strings in nested `[Validatable]` records and supported collections. `[IgnoreInterpolation]` leaves a string untouched for later context-specific interpolation.
 
-4. **`ValidateAsync`** — Creates one `ModuleValidationContext` from the runtime and service provider, orchestrates defaults → overrides → defaults → interpolation → constraints, collects `ValidationError` instances, and returns `ValidationResult<TModule>.Valid(module)` or `ValidationResult<TModule>.Invalid(module, errors)`. Invalid generated results retain the fully prepared module so debugger/diagnostic consumers can inspect the failed post-preparation state. Validation recurses into nested validatable records and supported collection elements.
+4. **`ValidateAsync`** — Creates one `ModuleValidationContext` from the runtime and service provider, orchestrates defaults → overrides → defaults → interpolation → constraints, collects `ValidationError` instances, and returns `IValidationResult<TModule>` through the shared `ValidationResult.Valid(...)` / `Invalid(...)` factories. Invalid generated results retain the fully prepared module so lifecycle hooks, debugger inspection, and diagnostics can observe the same state that would otherwise reach validation enforcement. Validation recurses into nested validatable records and supported collection elements.
 
 The generated code uses `with`-expressions throughout, ensuring that each stage produces a new record instance and that the original deserialized module is never mutated.
 
@@ -135,16 +135,17 @@ All attributes are defined in `Cyborg.Core.Aot` and emitted into the consuming c
 
 ### Rendering Pipeline
 
-The generator assembles its output through four section renderers, each implementing `ISectionRenderer`:
+The validation generator renders one partial module declaration from a shared property model. Its generated behavior is organized into four preparation/validation stages plus module description output:
 
-| Renderer | Method Generated | Responsibility |
-|----------|-----------------|----------------|
-| `DefaultsSectionRenderer` | `ApplyDefaultsAsync` | Emits default value assignments from aspect rewrite expressions |
-| `OverrideSectionRenderer` | `ResolveOverridesAsync` | Emits override resolution calls with aspect rewrite expressions |
-| `InterpolationSectionRenderer` | `ApplyInterpolationAsync` | Recursively rewrites eligible strings after defaults and overrides |
-| `ValidationSectionRenderer` | `ValidateAsync` | Orchestrates the full pipeline and emits constraint checks from aspect validation logic |
+| Generated member | Responsibility |
+|------------------|----------------|
+| `ApplyDefaultsAsync` | Apply declared defaults recursively |
+| `ResolveOverridesAsync` | Resolve eligible runtime overrides recursively |
+| `ApplyInterpolationAsync` | Interpolate eligible strings recursively |
+| `ValidateAsync` | Orchestrate preparation and emit constraint checks |
+| `GetDescriptor` / `DescribeAsync` | Expose format-neutral identity and structural description |
 
-The `ModuleValidationRenderer` orchestrates these renderers sequentially into a single partial record declaration, and additionally runs `InspectionSectionRenderer` once to emit `ToString` and `DescribeAsync` while implementing `IModuleDescriptor`. `DescribeAsync` walks the same recursive `PropertyModel` graph as validation and reuses the shared collection-enumeration guards. Descriptor hints are collected from `PropertyAspect.RegisterDescriptorHints`; the default implementation contributes no hints, allowing future attributes such as redaction markers to add arbitrary string keys without coupling the generator to a serializer. It also emits file-scoped helper methods for default instance resolution and nullable relaxation.
+The description traversal uses the same recursive property graph and collection guards as the preparation pipeline, so validation and inspection agree on which values are scalar, nested, absent, or enumerable. Property aspects may also contribute arbitrary descriptor-hint keys. Hints are emitted as metadata and remain serializer-neutral; interpretation belongs to description consumers rather than the generator.
 
 ### Nested and Collection Handling
 
@@ -201,9 +202,9 @@ All generators implement `IIncrementalGenerator` and follow the Roslyn increment
 
 ### Rendering Infrastructure
 
-All generators render source code using `IndentedStringBuilder`, a custom builder that manages indentation levels via `IncreaseIndent()` and `DecreaseIndent()`. This produces consistently formatted generated code regardless of nesting depth.
+All generators render source through shared indentation and type-rendering utilities so emitted code follows consistent formatting and fully qualified type-reference rules. The validation generator keeps preparation, validation, and description stages separate while deriving them from one analyzed property graph.
 
-The validation generator further decomposes rendering into `ISectionRenderer` implementations, allowing each pipeline stage to be rendered independently. A shared `VisibilityContext` is anchored to the root generated module symbol so setter/member accessibility checks model the lexical context of the emitted partial type even while recursive rendering processes nested property models. The loader factory and decomposition generators use dedicated renderer classes (`LoaderFactoryRenderer`, `ModelDecompositionRenderer`) with static `Render` methods.
+Accessibility decisions are evaluated relative to the lexical context of the generated partial module rather than the value type of a recursively processed property. This is important for nested and inherited validatable properties: generated member access must reflect what code emitted inside the root partial type can actually read or assign. Loader-factory and decomposition output follow the same general rendering conventions without sharing the validation property model.
 
 ### Type Reference Safety
 

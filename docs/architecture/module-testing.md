@@ -64,7 +64,7 @@ The adapter is structured as a layered set of components, each with a single res
          ┌───────────────────────────────┼──────────────────────────────┐
          │                               │                              │
 ┌────────▼──────────────┐    ┌───────────▼────────────────┐  ┌─────────▼────────────────┐
-│ ModuleTestBase         │    │ BorgModuleTestBase          │  │ (future domain base)     │
+│ ModuleTestBase         │    │ BorgModuleTestBase          │  │ (other domain base)     │
 │ (Cyborg.Modules.Tests) │    │ (Cyborg.Modules.Borg.Tests) │  │                          │
 │                        │    │                             │  │                          │
 │ + ICyborgModuleServices│    │ + ICyborgModuleServices     │  │ + domain-specific        │
@@ -149,14 +149,13 @@ The public base class for all module unit tests. It is a façade that exposes a 
 
 1. Resolves the module JSON source (explicit parameter or `GetDefaultModuleJsonAsync()` fallback).
 2. Creates an empty `IServiceCollection` via `TestServiceConfiguration.CreateDefaultServices()`.
-3. Calls `ConfigureServices(services, jabServiceDiscovery)`, which — via the override chain — registers the full production Jab DI graph for the domain under test.
-4. Applies per-test-case service overrides (optional lambda).
-5. Creates a `TestModuleRuntimeScope`.
+3. Calls `ConfigureServices(services, jabServiceDiscovery)`, which — via the override chain — registers the production Jab DI graph for the domain under test.
+4. Applies optional per-test-case service overrides and creates a `TestModuleRuntimeScope`.
+5. Resolves an `IConfigurationBuilder`, applies the class-level `BuildConfiguration` hook followed by any per-test configuration callback, and finalizes the scope's singleton `IConfiguration`.
 6. Executes the test-specific pipeline (deserialization, validation, execution, etc.).
-7. Invokes the caller-provided assertion lambda with the results.
-8. Disposes the scope.
+7. Invokes the caller-provided assertion lambda with the results and disposes the scope.
 
-`CyborgTestBase.ConfigureServices` registers `ICyborgCoreServices` and a default silent `ILoggerFactory`. Domain-specific subclasses extend this by calling `base.ConfigureServices` and then registering their own Jab modules.
+`CyborgTestBase.ConfigureServices` registers `ICyborgCoreServices` and a default silent `ILoggerFactory`. Domain-specific subclasses extend this by calling `base.ConfigureServices` and then registering their own Jab modules. Runtime option configuration is deliberately separate from DI registration: `BuildConfiguration` composes configuration sources through the same `IConfigurationBuilder` abstraction used by hosts.
 
 ### Per-Domain Test Base Classes
 
@@ -184,7 +183,7 @@ The fixture assembly is used for generator-specific shapes that are difficult to
 
 ## Higher-Order Function API
 
-All HOF methods follow a consistent pattern: they accept an optional `moduleJson` string, a required assertion callback (lambda), and optional configuration overrides. The assertion lambda receives only the data relevant to the specific test scenario, keeping test code focused and free of boilerplate.
+All HOF methods follow a consistent pattern: they accept an optional `moduleJson` string, a required assertion callback (lambda), and optional per-test service and runtime-configuration callbacks. The assertion lambda receives only the data relevant to the specific test scenario, keeping test code focused and free of boilerplate.
 
 Each HOF method provides two overloads:
 - **Async overload** — accepts a `Func<..., Task>` assertion; this is the primary implementation.
@@ -196,12 +195,14 @@ Each HOF method provides two overloads:
 protected Task TestDeserializationAsync<TModule>(
     string? moduleJson,
     Func<TModule, Task> assertion,          // async overload
-    Action<IServiceCollection>? configureServices = null)
+    Action<IServiceCollection>? configureServices = null,
+    Action<IConfigurationBuilder>? buildConfiguration = null)
 
 protected Task TestDeserializationAsync<TModule>(
     string? moduleJson,
     Action<TModule> assertion,              // sync overload
-    Action<IServiceCollection>? configureServices = null)
+    Action<IServiceCollection>? configureServices = null,
+    Action<IConfigurationBuilder>? buildConfiguration = null)
 ```
 
 Deserializes the module JSON and passes the typed module record to the assertion. Use this to verify polymorphic dispatch, property mapping, and JSON structure.
@@ -210,12 +211,14 @@ Deserializes the module JSON and passes the typed module record to the assertion
 protected Task TestContextDeserializationAsync(
     string? moduleContextJson,
     Func<ModuleContext, Task> assertion,    // async overload
-    Action<IServiceCollection>? configureServices = null)
+    Action<IServiceCollection>? configureServices = null,
+    Action<IConfigurationBuilder>? buildConfiguration = null)
 
 protected Task TestContextDeserializationAsync(
     string? moduleContextJson,
     Action<ModuleContext> assertion,        // sync overload
-    Action<IServiceCollection>? configureServices = null)
+    Action<IServiceCollection>? configureServices = null,
+    Action<IConfigurationBuilder>? buildConfiguration = null)
 ```
 
 Deserializes a full module context JSON and passes the `ModuleContext` to the assertion. Use this to verify environment, configuration, and requirements deserialization.
@@ -225,22 +228,25 @@ Deserializes a full module context JSON and passes the `ModuleContext` to the as
 ```csharp
 protected Task TestValidationAsync<TModule>(
     string? moduleJson,
-    Func<ValidationResult<TModule>, Task> assertion,  // async overload
-    Action<IServiceCollection>? configureServices = null)
+    Func<IValidationResult<TModule>, Task> assertion,  // async overload
+    Action<IServiceCollection>? configureServices = null,
+    Action<IConfigurationBuilder>? buildConfiguration = null)
 
 protected Task TestValidationAsync<TModule>(
     string? moduleJson,
-    Action<ValidationResult<TModule>> assertion,      // sync overload
-    Action<IServiceCollection>? configureServices = null)
+    Action<IValidationResult<TModule>> assertion,      // sync overload
+    Action<IServiceCollection>? configureServices = null,
+    Action<IConfigurationBuilder>? buildConfiguration = null)
 ```
 
-Runs the complete generated pipeline (defaults → overrides → defaults → interpolation → constraints) and passes the `ValidationResult<TModule>` to the assertion. Use this to verify transformed values, recursive collection behavior, interpolation ordering, and validation errors.
+Runs the complete generated pipeline (defaults → overrides → defaults → interpolation → constraints) and passes the `IValidationResult<TModule>` to the assertion. Use this to verify transformed values, recursive collection behavior, interpolation ordering, and validation errors.
 
 ```csharp
 protected Task TestValidatedModuleAsync<TModule>(
     string? moduleJson,
     Func<TModule, TestModuleRuntimeScope, Task> assertion,
-    Action<IServiceCollection>? configureServices = null)
+    Action<IServiceCollection>? configureServices = null,
+    Action<IConfigurationBuilder>? buildConfiguration = null)
 ```
 
 Validates the module and asserts validity, then passes the validated module and runtime scope to the assertion for further inspection.
@@ -252,13 +258,15 @@ protected Task TestOverridesAsync<TModule>(
     string? moduleJson,
     Action<IRuntimeEnvironment> environmentSetup,
     Func<TModule, Task> assertion,          // async overload
-    Action<IServiceCollection>? configureServices = null)
+    Action<IServiceCollection>? configureServices = null,
+    Action<IConfigurationBuilder>? buildConfiguration = null)
 
 protected Task TestOverridesAsync<TModule>(
     string? moduleJson,
     Action<IRuntimeEnvironment> environmentSetup,
     Action<TModule> assertion,              // sync overload
-    Action<IServiceCollection>? configureServices = null)
+    Action<IServiceCollection>? configureServices = null,
+    Action<IConfigurationBuilder>? buildConfiguration = null)
 ```
 
 Configures environment variables via the `environmentSetup` callback, then runs validation and passes the transformed module to the assertion. Use this to verify typed `@module.property` overrides, the second defaulting pass, and the separate recursive interpolation phase.
@@ -270,13 +278,15 @@ protected Task TestModuleAsync<TModule, TWorker>(
     string? moduleJson,
     Func<TModule, TWorker, IModuleExecutionResult, Task> assertion,  // async overload
     Action<IRuntimeEnvironment>? environmentSetup = null,
-    Action<IServiceCollection>? configureServices = null)
+    Action<IServiceCollection>? configureServices = null,
+    Action<IConfigurationBuilder>? buildConfiguration = null)
 
 protected Task TestModuleAsync<TModule, TWorker>(
     string? moduleJson,
     Action<TModule, TWorker, IModuleExecutionResult> assertion,      // sync overload
     Action<IRuntimeEnvironment>? environmentSetup = null,
-    Action<IServiceCollection>? configureServices = null)
+    Action<IServiceCollection>? configureServices = null,
+    Action<IConfigurationBuilder>? buildConfiguration = null)
 ```
 
 Deserializes, executes, and passes the module record, typed worker, and execution result to the assertion. This is the primary HOF for testing worker correctness, result publishing, and artifact exposure.
@@ -286,13 +296,15 @@ protected Task TestExecutionAsync(
     string? moduleJson,
     Func<IModuleExecutionResult, Task> assertion,  // async overload
     Action<IRuntimeEnvironment>? environmentSetup = null,
-    Action<IServiceCollection>? configureServices = null)
+    Action<IServiceCollection>? configureServices = null,
+    Action<IConfigurationBuilder>? buildConfiguration = null)
 
 protected Task TestExecutionAsync(
     string? moduleJson,
     Action<IModuleExecutionResult> assertion,      // sync overload
     Action<IRuntimeEnvironment>? environmentSetup = null,
-    Action<IServiceCollection>? configureServices = null)
+    Action<IServiceCollection>? configureServices = null,
+    Action<IConfigurationBuilder>? buildConfiguration = null)
 ```
 
 Simplified variant that passes only the execution result to the assertion.
@@ -304,13 +316,15 @@ protected Task TestExecutionThrowsAsync<TException>(
     string? moduleJson,
     Func<TException, Task>? assertion = null,  // async overload
     Action<IRuntimeEnvironment>? environmentSetup = null,
-    Action<IServiceCollection>? configureServices = null)
+    Action<IServiceCollection>? configureServices = null,
+    Action<IConfigurationBuilder>? buildConfiguration = null)
 
 protected Task TestExecutionThrowsAsync<TException>(
     string? moduleJson,
     Action<TException>? assertion,             // sync overload
     Action<IRuntimeEnvironment>? environmentSetup = null,
-    Action<IServiceCollection>? configureServices = null)
+    Action<IServiceCollection>? configureServices = null,
+    Action<IConfigurationBuilder>? buildConfiguration = null)
 ```
 
 Asserts that module execution throws an exception of the expected type. The optional assertion callback can inspect the thrown exception.
@@ -322,7 +336,8 @@ protected Task TestModuleContextAsync(
     string? moduleContextJson,
     Func<IModuleExecutionResult, TestModuleRuntimeScope, Task> assertion,
     Action<IRuntimeEnvironment>? environmentSetup = null,
-    Action<IServiceCollection>? configureServices = null)
+    Action<IServiceCollection>? configureServices = null,
+    Action<IConfigurationBuilder>? buildConfiguration = null)
 ```
 
 Deserializes and executes a full module context (with environment scoping, configuration modules, and requires). Passes the result and runtime scope to the assertion, enabling inspection of both the execution outcome and the environment state after execution.
@@ -331,7 +346,7 @@ Deserializes and executes a full module context (with environment scoping, confi
 
 ### Per-Test-Class Configuration
 
-Override `ConfigureServices(IServiceCollection, IJabServiceDiscovery)` in a derived test class to apply registrations that affect every test in the class. Always call `base.ConfigureServices` to preserve the registration chain:
+Tests have separate class-level extension points for DI and runtime configuration. Override `ConfigureServices(IServiceCollection, IJabServiceDiscovery)` to change the service graph, and always call `base.ConfigureServices` to preserve the domain registration chain. Override `BuildConfiguration(IConfigurationBuilder)` to add configuration sources that should apply to every test in the class:
 
 ```csharp
 public sealed class MyModuleTests : ModuleTestBase
@@ -339,15 +354,24 @@ public sealed class MyModuleTests : ModuleTestBase
     protected override void ConfigureServices(IServiceCollection services, IJabServiceDiscovery jabServiceDiscovery)
     {
         base.ConfigureServices(services, jabServiceDiscovery);
-        // Replace the process dispatcher with a mock for all tests in this class
         services.AddSingleton<IChildProcessDispatcher, MockChildProcessDispatcher>();
+    }
+
+    protected override void BuildConfiguration(IConfigurationBuilder configuration)
+    {
+        configuration.AddDictionary(new Dictionary<string, string>
+        {
+            ["cyborg.core.debug:frontend"] = "test"
+        });
     }
 }
 ```
 
+The configuration builder is resolved from the completed test service provider, so loaders and other configuration services use the same DI graph as the runtime under test.
+
 ### Per-Test-Case Configuration
 
-Pass a `configureServices` lambda to any HOF method to apply registrations scoped to a single test invocation:
+Every HOF also accepts optional `configureServices` and `buildConfiguration` callbacks. Service callbacks run after the class-level service registrations and before the provider is built. Configuration callbacks run after the class-level `BuildConfiguration` hook and before the singleton `IConfiguration` is finalized:
 
 ```csharp
 [TestMethod]
@@ -359,11 +383,18 @@ public async Task MyTest()
         configureServices: services =>
         {
             services.AddSingleton<IChildProcessDispatcher>(new FakeDispatcher(exitCode: 42));
+        },
+        buildConfiguration: configuration =>
+        {
+            configuration.AddDictionary(new Dictionary<string, string>
+            {
+                ["cyborg.core.debug:frontend"] = "test"
+            });
         });
 }
 ```
 
-Per-test-case registrations are applied after per-test-class registrations, so they can override class-level defaults.
+This ordering lets an individual test replace class-level service registrations and layer additional configuration sources without bypassing production configuration composition.
 
 ## Module JSON Source Resolution
 
@@ -407,8 +438,9 @@ Each HOF method invocation creates a fully independent test scope:
 
 - A fresh `IServiceCollection` is built from defaults.
 - Per-test-class and per-test-case overrides are applied.
-- A new `ServiceProvider` is constructed (not shared across tests).
-- A new `RootModuleRuntime` and `GlobalRuntimeEnvironment` are created.
+- A fresh `ServiceProvider` is constructed and is not shared across tests.
+- A fresh `RootModuleRuntime` and `GlobalRuntimeEnvironment` are created.
+- Class-level and per-test configuration sources are applied to a fresh singleton `IConfiguration` before the test pipeline runs.
 - The scope is disposed at the end of the test, releasing all resources.
 
 This ensures complete isolation between tests, even when running in parallel (as enabled by `[Parallelize(Scope = ExecutionScope.MethodLevel)]` in `MSTestSettings.cs`).
@@ -423,7 +455,7 @@ The `JabServiceDiscovery` class works around this by:
 1. **Referencing Jab directly** in `Cyborg.Core.TestAdapter` to obtain stable, compiler-checked attribute names via `typeof(SingletonAttribute<>).Name` etc.
 2. **Matching by name and namespace** using `CustomAttributeData`, not by type identity, so scanned attributes from any assembly are correctly identified regardless of which assembly's internal copy they originate from.
 
-This approach was chosen over the alternative of manually duplicating registrations, which would be brittle and error-prone — adding a new service to a Jab module would silently break tests.
+Discovering the Jab registration graph keeps the test service provider aligned with production composition. Manually duplicated registrations would drift whenever a Jab module gains or changes a service registration.
 
 ### Facade Pattern Over Monolith
 
@@ -437,7 +469,7 @@ This approach was chosen over the alternative of manually duplicating registrati
 | `CyborgTestBase` | HOF API, JSON resolution, core service registration |
 | `ModuleTestBase` / `BorgModuleTestBase` | Domain-specific Jab module registration |
 
-This separation ensures maintainability: changes to the DI translation logic do not affect the test API surface, and new HOF methods can be added to `ModuleTestBase` without touching the infrastructure components.
+This separation keeps DI translation independent from the test API surface and allows the HOF façade to evolve without coupling test workflows to the infrastructure components.
 
 ### Dedicated Generator Fixture Assembly
 
