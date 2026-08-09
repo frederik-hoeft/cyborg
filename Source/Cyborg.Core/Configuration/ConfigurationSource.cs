@@ -3,4 +3,7 @@ using System.Collections.Immutable;
 
 namespace Cyborg.Core.Configuration;
 
-public sealed record ConfigurationSource(ImmutableArray<DynamicKeyValuePair> Options);
+public sealed record ConfigurationSource(ImmutableArray<DynamicKeyValuePair> Options) : IConfigurationSource
+{
+    IReadOnlyCollection<DynamicKeyValuePair> IConfigurationSource.Options => Options;
+}

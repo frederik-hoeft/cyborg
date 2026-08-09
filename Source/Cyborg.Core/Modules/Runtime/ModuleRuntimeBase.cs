@@ -188,7 +188,7 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory, ILo
 
     public abstract bool TryRemoveEnvironment(IRuntimeEnvironment environment);
 
-    public virtual IModuleExecutionResult Exit<TModule>(IModuleExecutionResult<TModule> result) where TModule : ModuleBase, IModule
+    public virtual IModuleExecutionResult Exit<TModule>(IModuleExecutionResult<TModule> result) where TModule : ModuleBase, IModuleDefinition
     {
         ArgumentNullException.ThrowIfNull(result);
         // When specifying scopes during configuration, the caller expects those scopes to be relative to the actual parent module,

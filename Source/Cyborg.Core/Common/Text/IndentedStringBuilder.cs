@@ -1,11 +1,8 @@
-using System.Text;
+﻿using System.Text;
 
 namespace Cyborg.Core.Common.Text;
 
-public sealed class IndentedStringBuilder(
-    StringBuilder builder,
-    int indentLevel = 0,
-    int indentSize = 2)
+internal sealed class IndentedStringBuilder(StringBuilder builder, int indentLevel = 0, int indentSize = 4)
 {
     public StringBuilder GetInnerBuilder() => builder;
 
@@ -15,28 +12,35 @@ public sealed class IndentedStringBuilder(
 
     public string IndentString { get; } = new(' ', indentSize * indentLevel);
 
-    public IndentedStringBuilder IncreaseIndent(int levels = 1)
-        => new(builder, indentLevel + levels, indentSize);
+    public IndentedStringBuilder IncreaseIndent(int levels = 1) => new(builder, indentLevel + levels, indentSize);
 
-    public IndentedStringBuilder DecreaseIndent(int levels = 1)
-        => new(builder, Math.Max(0, indentLevel - levels), indentSize);
+    public IndentedStringBuilder DecreaseIndent(int levels = 1) => new(builder, Math.Max(0, indentLevel - levels), indentSize);
+
+    public IndentedStringBuilder Append(char c)
+    {
+        TryIndent();
+        builder.Append(c);
+        return this;
+    }
 
     public IndentedStringBuilder Append(string text)
+    {
+        TryIndent();
+        builder.Append(text);
+        return this;
+    }
+
+    private void TryIndent()
     {
         if (builder.Length == 0 || builder[^1] == '\n')
         {
             builder.Append(IndentString);
         }
-
-        builder.Append(text);
-        return this;
     }
 
-    public IndentedStringBuilder AppendLine(string line)
-    {
-        Append(line).GetInnerBuilder().AppendLine();
-        return this;
-    }
+    public IndentedStringBuilder AppendLine(char c) => Append(c).AppendLine();
+
+    public IndentedStringBuilder AppendLine(string line) => Append(line).AppendLine();
 
     public IndentedStringBuilder AppendLine()
     {

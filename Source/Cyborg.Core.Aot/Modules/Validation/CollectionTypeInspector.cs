@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -12,6 +12,11 @@ internal static class CollectionTypeInspector
     public static bool TryDescribe(Compilation compilation, ITypeSymbol type, [NotNullWhen(true)] out CollectionTypeDescriptor? descriptor)
     {
         descriptor = null;
+
+        if (type.SpecialType == SpecialType.System_String)
+        {
+            return false;
+        }
 
         if (type is IArrayTypeSymbol arrayType)
         {

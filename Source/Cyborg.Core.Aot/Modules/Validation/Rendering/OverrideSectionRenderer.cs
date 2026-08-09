@@ -6,33 +6,30 @@ using System.Collections.Immutable;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
 
-internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInfo, string rootModuleVariable, DiagnosticsReporter diagnosticsReporter) : ISectionRenderer
+internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInfo, VisibilityContext visibilityContext, DiagnosticsReporter diagnosticsReporter)
+    : SectionRenderer(contractInfo, visibilityContext, diagnosticsReporter)
 {
-    private const string CONTEXT_VARIABLE = "context";
-
-    private readonly DefaultApplicationRenderer _defaultApplicationRenderer = new(contractInfo, diagnosticsReporter, rootModuleVariable, CONTEXT_VARIABLE);
-
-    public void RenderSection(IndentedStringBuilder builder, ModuleModel model)
+    public override void RenderSection(IndentedStringBuilder builder, ModuleModel model)
     {
         string qualifiedType = model.FullyQualifiedTypeName;
         builder.AppendBlock(
             $$"""
             private async {{KnownTypes.ValueTaskOfT(qualifiedType)}} {{ModuleValidationRenderer.ResolveOverridesAsync}}(
-                {{contractInfo.ModuleValidationContext.RenderGlobal()}} {{CONTEXT_VARIABLE}},
+                {{ContractInfo.ModuleValidationContext.RenderGlobal()}} {{ContextVariable}},
                 {{KnownTypes.CancellationToken}} cancellationToken)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                {{qualifiedType}} {{rootModuleVariable}} = this;
+                {{qualifiedType}} {{RootModuleVariable}} = this;
 
             """);
 
         builder = builder.IncreaseIndent();
-        AppendOverrideResolutionForObject(builder, model.Properties, rootModuleVariable, rootModuleVariable);
+        AppendOverrideResolutionForObject(builder, model.Properties, RootModuleVariable, RootModuleVariable);
         builder = builder.DecreaseIndent();
         builder.AppendBlock(
             $$"""
                 await {{KnownTypes.Task}}.CompletedTask;
-                return {{rootModuleVariable}};
+                return {{RootModuleVariable}};
             }
             """);
     }
@@ -45,20 +42,20 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
         {
             string propertyAccessExpression = $"{targetVariable}.{property.Name}";
             string rootPathExpression = $"{rootPathPrefix}.{property.Name}";
-            PropertyRewriteContext rewriteContext = new(property, contractInfo, diagnosticsReporter, rootModuleVariable, CONTEXT_VARIABLE, propertyAccessExpression);
+            PropertyRewriteContext rewriteContext = new(property, ContractInfo, DiagnosticsReporter, RootModuleVariable, ContextVariable, propertyAccessExpression);
             bool hasChildAssignments = property.IsValidatableType && property.Children.Any(child => HasOverrideWork(child, rewriteContext));
             bool hasCollectionElementAssignments = property.Collection is { SupportsElementRewrite: true } collection
                 && property.HasCollectionElementChildren
-                && _defaultApplicationRenderer.HasCollectionDefaultWork(collection, rewriteContext);
+                && DefaultApplicationRenderer.HasCollectionDefaultWork(collection, rewriteContext);
             bool ignoreOverride = property.TryGetAspect(out IgnoreOverrideAspect? ignoreOverrideAspect);
             if (ignoreOverride && (ignoreOverrideAspect is { Recurse: true } || !hasChildAssignments && !hasCollectionElementAssignments))
             {
                 continue;
             }
 
-            if (property.Symbol.SetMethod is not { } setter || !contractInfo.Compilation.IsSymbolAccessibleWithin(setter, property.Symbol.Type))
+            if (property.Symbol.SetMethod is not { } setter || !VisibilityContext.IsVisible(setter))
             {
-                diagnosticsReporter.Report(ValidationGeneratorDiagnostics.PropertyMustBeSettable,
+                DiagnosticsReporter.Report(ValidationGeneratorDiagnostics.PropertyMustBeSettable,
                     property.Symbol.Locations.FirstOrDefault() ?? Location.None,
                     property.Symbol.Name,
                     property.Symbol.ContainingType,
@@ -73,7 +70,7 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
             {
                 PropertyAccessExpression = localName
             };
-            _defaultApplicationRenderer.AppendDirectDefaultApplicationForProperty(builder, nestedRewriteContext);
+            DefaultApplicationRenderer.AppendDirectDefaultApplicationForProperty(builder, nestedRewriteContext);
 
             if (hasChildAssignments)
             {
@@ -82,7 +79,7 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
 
             if (hasCollectionElementAssignments)
             {
-                _defaultApplicationRenderer.AppendCollectionDefaultApplicationForProperty(builder, property, localName, diagnosticsPhase: "overrides");
+                DefaultApplicationRenderer.AppendCollectionDefaultApplicationForProperty(builder, property, localName, diagnosticsPhase: "overrides");
             }
 
             assignments.Add((property.Name, localName));
@@ -131,7 +128,8 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
 
     private static bool HasOverrideWork(PropertyModel property, PropertyRewriteContext rewriteContext)
     {
-        MutablePropertyRewriteContext mutableContext = new(property, rewriteContext.ContractInfo, rewriteContext.DiagnosticsReporter, rewriteContext.ModuleVariable, rewriteContext.ContextVariable, rewriteContext.PropertyAccessExpression);
+        MutablePropertyRewriteContext mutableContext = new(property, rewriteContext.ContractInfo, rewriteContext.DiagnosticsReporter, rewriteContext.ModuleVariable,
+            rewriteContext.ContextVariable, rewriteContext.PropertyAccessExpression);
         return HasOverrideWork(mutableContext);
     }
 
@@ -162,11 +160,12 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
         return false;
     }
 
-    private static string CreateOverrideResolutionExpression(PropertyRewriteContext context, string rootPathExpression)
+    private string CreateOverrideResolutionExpression(PropertyRewriteContext context, string rootPathExpression)
     {
+        string arguments = $"{context.ModuleVariable}, {context.PropertyAccessExpression}, moduleExpression: \"{context.ModuleVariable}\", valueExpression: \"{rootPathExpression}\"";
         string expression = context.Property.Symbol.Type.SpecialType is SpecialType.System_String
-            ? $"{CONTEXT_VARIABLE}.SelectRawStringOverride({context.ModuleVariable}, {context.PropertyAccessExpression}, moduleExpression: \"{context.ModuleVariable}\", valueExpression: \"{rootPathExpression}\")"
-            : $"{CONTEXT_VARIABLE}.ResolveOverride({context.ModuleVariable}, {context.PropertyAccessExpression}, moduleExpression: \"{context.ModuleVariable}\", valueExpression: \"{rootPathExpression}\")";
+            ? $"{ContextVariable}.SelectRawStringOverride({arguments})"
+            : $"{ContextVariable}.ResolveOverride({arguments})";
         foreach (PropertyAspect aspect in context.Property.Aspects)
         {
             expression = aspect.RewriteOverrideResolutionExpression(context, expression, rootPathExpression);

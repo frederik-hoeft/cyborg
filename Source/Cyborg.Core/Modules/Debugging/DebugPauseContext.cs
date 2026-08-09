@@ -1,38 +1,21 @@
-﻿using Cyborg.Core.Modules.Runtime;
+﻿using Cyborg.Core.Modules.Debugging.Breakpoints;
+using Cyborg.Core.Modules.Runtime;
+using Cyborg.Core.Modules.Validation;
 
 namespace Cyborg.Core.Modules.Debugging;
 
-// TODO: can probably be a record
-internal sealed class DebugPauseContext(
-    IModule module,
-    string moduleId,
-    IModuleRuntime runtime,
-    IBreakpointRegistry breakpoints,
-    Action requestStep,
-    Action detach) : IDebugPauseContext
+internal sealed record DebugPauseContext
+(
+    string ModuleId,
+    IValidationResult<IModule> ValidationResult,
+    IModuleRuntime Runtime,
+    IServiceProvider Services,
+    IBreakpointRegistry Breakpoints,
+    Action RequestStepAction,
+    Action DetachAction
+) : IDebugPauseContext
 {
-    public IModule Module { get; } = module;
+    public void RequestStep() => RequestStepAction();
 
-    public string ModuleId { get; } = moduleId;
-
-    public string ModuleIdentity { get; } = Debugging.ModuleIdentity.Format(module, moduleId);
-
-    public IModuleRuntime Runtime { get; } = runtime;
-
-    public IBreakpointRegistry Breakpoints { get; } = breakpoints;
-
-    public string Inspect()
-    {
-        if (Module is IInspectable inspectable)
-        {
-            return inspectable.Inspect();
-        }
-
-        // Fallback for modules without generated inspection support.
-        return ModuleIdentity;
-    }
-
-    public void RequestStep() => requestStep();
-
-    public void Detach() => detach();
+    public void Detach() => DetachAction();
 }

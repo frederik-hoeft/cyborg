@@ -1,5 +1,6 @@
 ﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
@@ -7,273 +8,192 @@ namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
 /// <summary>
 /// Emits module identity plus a format-neutral recursive description.
 /// </summary>
-internal sealed class InspectionSectionRenderer(
-    ValidationContractInfo contractInfo,
-    DiagnosticsReporter diagnosticsReporter) : ISectionRenderer
+internal sealed class InspectionSectionRenderer(ValidationContractInfo contractInfo, VisibilityContext visibilityContext, DiagnosticsReporter diagnosticsReporter)
+    : SectionRenderer(contractInfo, visibilityContext, diagnosticsReporter)
 {
-    private const string MODULE_IDENTITY_TYPE =
-        "global::Cyborg.Core.Modules.Debugging.ModuleIdentity";
-
-    private const string MODULE_DESCRIPTION_TYPE =
-        "global::Cyborg.Core.Modules.Descriptors.ModuleDescription";
-
-    public void RenderSection(IndentedStringBuilder builder, ModuleModel model)
+    public override void RenderSection(IndentedStringBuilder builder, ModuleModel model)
     {
         builder.AppendBlock(
             $$"""
-            public override string ToString() => {{MODULE_IDENTITY_TYPE}}.Format(ModuleId, Name, Group);
+            public override string ToString() => {{ContractInfo.ModuleIdentity.RenderGlobal()}}.Format(ModuleId, Name, Group);
 
-            public void Describe({{contractInfo.IObjectDescriptionBuilder.RenderGlobal()}} builder)
+            public override {{ContractInfo.IModuleDescriptor.RenderGlobal()}} GetDescriptor() => this;
+
+            public {{KnownTypes.ValueTask}} DescribeAsync(
+                {{ContractInfo.IObjectDescriptionBuilder.RenderGlobal()}} builder,
+                {{KnownTypes.CancellationToken}} cancellationToken)
             {
                 {{KnownTypes.ArgumentNullException}}.ThrowIfNull(builder);
-                builder.AddProperty("ModuleId", [], ModuleId);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                builder.AddProperty("ModuleId", ModuleId);
             """);
 
         IndentedStringBuilder body = builder.IncreaseIndent();
         foreach (PropertyModel property in model.Properties)
         {
-            AppendNode(
-                body,
-                property,
-                builderVariableName: "builder",
-                nodeAccessExpression: property.Name,
-                displayName: property.Name,
-                symbolPath: property.Name,
-                isProperty: true);
+            AppendNode(body, property, builderVariableName: "builder", nodeAccessExpression: property.Name, displayName: property.Name, symbolPath: property.Name, isProperty: true);
         }
-
         builder.AppendBlock(
             $$"""
+                return {{KnownTypes.ValueTask}}.CompletedTask;
             }
-
-            public string Inspect() => {{MODULE_DESCRIPTION_TYPE}}.ToText(this);
             """);
     }
 
-    private void AppendNode(
-        IndentedStringBuilder builder,
-        PropertyModel property,
-        string builderVariableName,
-        string nodeAccessExpression,
-        string displayName,
-        string symbolPath,
-        bool isProperty)
+    private void AppendNode(IndentedStringBuilder builder, PropertyModel property, string builderVariableName, string nodeAccessExpression, string displayName, string symbolPath, bool isProperty)
     {
-        string hintsExpression = CreateHintsExpression(property);
+        string? hintsExpression = CreateHintsExpression(property);
 
         if (property.Collection is not null)
         {
-            AppendCollection(
-                builder,
-                property,
-                builderVariableName,
-                nodeAccessExpression,
-                displayName,
-                symbolPath,
-                hintsExpression,
-                isProperty);
+            AppendCollection(builder, property, builderVariableName, nodeAccessExpression, displayName, symbolPath, hintsExpression, isProperty);
         }
         else if (property.HasValidatableChildren)
         {
-            AppendObject(
-                builder,
-                property,
-                builderVariableName,
-                nodeAccessExpression,
-                displayName,
-                symbolPath,
-                hintsExpression,
-                isProperty);
+            AppendObject(builder, property, builderVariableName, nodeAccessExpression, displayName, symbolPath, hintsExpression, isProperty);
         }
         else
         {
-            AppendAtom(
-                builder,
-                builderVariableName,
-                nodeAccessExpression,
-                displayName,
-                hintsExpression,
-                isProperty);
+            AppendAtom(builder, builderVariableName, nodeAccessExpression, displayName, hintsExpression, isProperty);
         }
     }
 
-    private static void AppendAtom(
-        IndentedStringBuilder builder,
-        string builderVariableName,
-        string nodeAccessExpression,
-        string displayName,
-        string hintsExpression,
-        bool isProperty)
+    private static void AppendAtom(IndentedStringBuilder builder, string builderVariableName, string nodeAccessExpression, string displayName, string? hintsExpression, bool isProperty)
     {
-        builder.AppendLine(
-            isProperty
-                ? $"{builderVariableName}.AddProperty(\"{displayName}\", {hintsExpression}, {nodeAccessExpression});"
-                : $"{builderVariableName}.AddItem({hintsExpression}, {nodeAccessExpression});");
-    }
-
-    private void AppendObject(
-        IndentedStringBuilder builder,
-        PropertyModel property,
-        string builderVariableName,
-        string nodeAccessExpression,
-        string displayName,
-        string symbolPath,
-        string hintsExpression,
-        bool isProperty)
-    {
-        string childBuilderName = CreateSymbolName(
-            $"{symbolPath}_object_description_builder");
-
-        builder.AppendBlock(
-            isProperty
-                ? $$"""
-                  if ({{nodeAccessExpression}} is null)
-                  {
-                      {{builderVariableName}}.AddProperty("{{displayName}}", {{hintsExpression}}, {{nodeAccessExpression}});
-                  }
-                  else
-                  {
-                      {{builderVariableName}}.AddObject("{{displayName}}", {{hintsExpression}}, {{childBuilderName}} =>
-                      {
-                  """
-                : $$"""
-                  if ({{nodeAccessExpression}} is null)
-                  {
-                      {{builderVariableName}}.AddItem({{hintsExpression}}, {{nodeAccessExpression}});
-                  }
-                  else
-                  {
-                      {{builderVariableName}}.AddObjectItem({{hintsExpression}}, {{childBuilderName}} =>
-                      {
-                  """);
-
-        IndentedStringBuilder childBody = builder.IncreaseIndent(2);
-        foreach (PropertyModel child in property.Children)
+        builder.AppendLine((isProperty, hintsExpression) switch
         {
-            AppendNode(
-                childBody,
-                child,
-                childBuilderName,
-                $"{nodeAccessExpression}.{child.Name}",
-                child.Name,
-                $"{symbolPath}_{child.Name}",
-                isProperty: true);
+            (true, null) => $"{builderVariableName}.AddProperty(\"{displayName}\", {nodeAccessExpression});",
+            (true, not null) => $"{builderVariableName}.AddProperty(\"{displayName}\", {hintsExpression}, {nodeAccessExpression});",
+            (false, null) => $"{builderVariableName}.AddItem({nodeAccessExpression});",
+            (false, not null) => $"{builderVariableName}.AddItem({hintsExpression}, {nodeAccessExpression});",
+        });
+    }
+
+    private void AppendObject(IndentedStringBuilder builder, PropertyModel property, string builderVariableName, string nodeAccessExpression, string displayName,
+        string symbolPath, string? hintsExpression, bool isProperty)
+    {
+        string childBuilderName = SymbolNameGenerator.MakeCamelCase($"{symbolPath}Builder");
+        bool requiresNullCheck = property.IsNullable || !property.Symbol.Type.IsValueType;
+        string objectAccessExpression = property.IsNullable && property.Symbol.Type.IsValueType
+            ? $"{nodeAccessExpression}.Value"
+            : nodeAccessExpression;
+
+        if (!requiresNullCheck)
+        {
+            AppendObjectBody(builder, property, builderVariableName, objectAccessExpression, displayName, symbolPath, hintsExpression, isProperty, childBuilderName);
+            return;
         }
 
-        builder.AppendBlock(
-            """
-                    });
-                }
+        builder.AppendBlock($$"""
+            if ({{nodeAccessExpression}} is null)
+            {
             """);
+        AppendAtom(builder.IncreaseIndent(), builderVariableName, nodeAccessExpression, displayName, hintsExpression, isProperty);
+        builder.AppendBlock($$"""
+            }
+            else
+            {
+            """);
+        AppendObjectBody(builder.IncreaseIndent(), property, builderVariableName, objectAccessExpression, displayName, symbolPath, hintsExpression, isProperty, childBuilderName);
+        builder.AppendLine("}");
     }
 
-    private void AppendCollection(
-        IndentedStringBuilder builder,
-        PropertyModel property,
-        string builderVariableName,
-        string nodeAccessExpression,
-        string displayName,
-        string symbolPath,
-        string hintsExpression,
-        bool isProperty)
+    private void AppendObjectBody(IndentedStringBuilder builder, PropertyModel property, string builderVariableName, string objectAccessExpression, string displayName,
+        string symbolPath, string? hintsExpression, bool isProperty, string childBuilderName)
     {
-        CollectionModel collection = property.Collection!;
-        string collectionBuilderName = CreateSymbolName(
-            $"{symbolPath}_collection_description_builder");
-        string elementName = CreateSymbolName(
-            $"{symbolPath}_description_element");
-
-        bool requiresNullCheck =
-            property.IsNullable || !property.Symbol.Type.IsValueType;
-
-        if (requiresNullCheck)
-        {
-            builder.AppendBlock(
-                isProperty
-                    ? $$"""
-                      if ({{nodeAccessExpression}} is null)
-                      {
-                          {{builderVariableName}}.AddProperty("{{displayName}}", {{hintsExpression}}, {{nodeAccessExpression}});
-                      }
-                      else
-                      {
-                          {{builderVariableName}}.AddCollection("{{displayName}}", {{hintsExpression}}, {{collectionBuilderName}} =>
-                          {
-                      """
-                    : $$"""
-                      if ({{nodeAccessExpression}} is null)
-                      {
-                          {{builderVariableName}}.AddItem({{hintsExpression}}, {{nodeAccessExpression}});
-                      }
-                      else
-                      {
-                          {{builderVariableName}}.AddCollectionItem({{hintsExpression}}, {{collectionBuilderName}} =>
-                          {
-                      """);
-        }
-        else
-        {
-            builder.AppendBlock(
-                isProperty
-                    ? $$"""
-                      {{builderVariableName}}.AddCollection("{{displayName}}", {{hintsExpression}}, {{collectionBuilderName}} =>
-                      {
-                      """
-                    : $$"""
-                      {{builderVariableName}}.AddCollectionItem({{hintsExpression}}, {{collectionBuilderName}} =>
-                      {
-                      """);
-        }
-
-        IndentedStringBuilder loopBuilder =
-            builder.IncreaseIndent(requiresNullCheck ? 2 : 1);
-
-        loopBuilder.AppendBlock(
+        string invocation = isProperty
+            ? $"{builderVariableName}.AddObject(\"{displayName}\", {childBuilderName} =>"
+            : $"{builderVariableName}.AddObjectItem({childBuilderName} =>";
+        builder.AppendBlock(
             $$"""
-            foreach ({{collection.ElementNullableTypeName}} {{elementName}} in {{nodeAccessExpression}})
+            {{invocation}}
             {
             """);
 
-        IndentedStringBuilder elementBody = loopBuilder.IncreaseIndent();
-
-        if (collection.IsElementValidatableType
-            && !collection.ElementChildren.IsDefaultOrEmpty)
+        IndentedStringBuilder childBody = builder.IncreaseIndent();
+        foreach (PropertyModel child in property.Children)
         {
-            AppendCollectionObjectElement(
-                elementBody,
-                collection,
-                collectionBuilderName,
-                elementName,
-                symbolPath);
+            AppendNode(childBody, child, childBuilderName, nodeAccessExpression: $"{objectAccessExpression}.{child.Name}", child.Name, symbolPath: $"{symbolPath}_{child.Name}", isProperty: true);
+        }
+        if (hintsExpression is not null)
+        {
+            builder.AppendLine($"}}, {hintsExpression});");
         }
         else
         {
-            elementBody.AppendLine(
-                $"{collectionBuilderName}.AddItem([], {elementName});");
+            builder.AppendLine("});");
         }
-
-        loopBuilder.AppendLine("}");
-
-        builder.AppendBlock(
-            requiresNullCheck
-                ? """
-                      });
-                  }
-                  """
-                : """
-                  });
-                  """);
     }
 
-    private void AppendCollectionObjectElement(
-        IndentedStringBuilder builder,
-        CollectionModel collection,
-        string collectionBuilderName,
-        string elementName,
-        string symbolPath)
+    private void AppendCollection(IndentedStringBuilder builder, PropertyModel property, string builderVariableName, string nodeAccessExpression, string displayName,
+        string symbolPath, string? hintsExpression, bool isProperty)
     {
-        string elementBuilderName = CreateSymbolName(
-            $"{symbolPath}_element_description_builder");
+        if (!CollectionHelpers.TryConstructEnumerationGuardExpression(property, nodeAccessExpression, out string? guardExpression, out string valueExpression))
+        {
+            AppendCollectionBody(builder, property, builderVariableName, valueExpression, displayName, symbolPath, hintsExpression, isProperty);
+            return;
+        }
+
+        builder.AppendBlock(
+            $$"""
+            if ({{guardExpression}})
+            {
+            """);
+        AppendCollectionBody(builder.IncreaseIndent(), property, builderVariableName, valueExpression, displayName, symbolPath, hintsExpression, isProperty);
+        builder.AppendBlock($$"""
+            }
+            else
+            {
+            """);
+        AppendAtom(builder.IncreaseIndent(), builderVariableName, nodeAccessExpression, displayName, hintsExpression, isProperty);
+        builder.AppendLine("}");
+    }
+
+    private void AppendCollectionBody(IndentedStringBuilder builder, PropertyModel property, string builderVariableName, string collectionAccessExpression,
+        string displayName, string symbolPath, string? hintsExpression, bool isProperty)
+    {
+        CollectionModel collection = property.Collection!;
+        string collectionBuilderName = SymbolNameGenerator.MakeCamelCase($"{symbolPath}Builder");
+        string elementName = SymbolNameGenerator.MakeCamelCase($"{symbolPath}Element");
+
+        string invocation = isProperty
+            ? $"{builderVariableName}.AddCollection(\"{displayName}\", {collectionBuilderName} =>"
+            : $"{builderVariableName}.AddCollectionItem({collectionBuilderName} =>";
+        builder.AppendBlock(
+            $$"""
+            {{invocation}}
+            {
+                foreach ({{collection.ElementNullableTypeName}} {{elementName}} in {{collectionAccessExpression}})
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+            """);
+        IndentedStringBuilder elementBody = builder.IncreaseIndent(levels: 2);
+        if (collection.IsElementValidatableType && !collection.ElementChildren.IsDefaultOrEmpty)
+        {
+            AppendCollectionObjectElement(elementBody, collection, collectionBuilderName, elementName, symbolPath);
+        }
+        else
+        {
+            elementBody.AppendLine($"{collectionBuilderName}.AddItem({elementName});");
+        }
+        builder.IncreaseIndent().AppendLine("}");
+        if (hintsExpression is not null)
+        {
+            builder.AppendLine($"}}, {hintsExpression});");
+        }
+        else
+        {
+            builder.AppendLine("});");
+        }
+    }
+
+    private void AppendCollectionObjectElement(IndentedStringBuilder builder, CollectionModel collection, string collectionBuilderName, string elementName, string symbolPath)
+    {
+        string elementBuilderName = SymbolNameGenerator.MakeCamelCase($"{symbolPath}ElementBuilder");
+        string elementAccessExpression = collection.IsElementNullable && collection.ElementType.IsValueType
+            ? $"{elementName}.Value"
+            : elementName;
 
         if (collection.ElementRequiresNullCheck)
         {
@@ -281,81 +201,55 @@ internal sealed class InspectionSectionRenderer(
                 $$"""
                 if ({{elementName}} is null)
                 {
-                    {{collectionBuilderName}}.AddItem([], {{elementName}});
+                    {{collectionBuilderName}}.AddItem({{elementName}});
                 }
                 else
                 {
-                    {{collectionBuilderName}}.AddObjectItem([], {{elementBuilderName}} =>
+                    {{collectionBuilderName}}.AddObjectItem({{elementBuilderName}} =>
                     {
                 """);
 
-            AppendCollectionElementProperties(
-                builder.IncreaseIndent(2),
-                collection,
-                elementBuilderName,
-                elementName,
-                symbolPath);
-
-            builder.AppendBlock(
-                """
-                        });
-                    }
-                """);
-        }
-        else
-        {
+            AppendCollectionElementProperties(builder.IncreaseIndent(levels: 2), collection, elementBuilderName, elementAccessExpression, symbolPath);
             builder.AppendBlock(
                 $$"""
-                {{collectionBuilderName}}.AddObjectItem([], {{elementBuilderName}} =>
-                {
+                    });
+                }
                 """);
-
-            AppendCollectionElementProperties(
-                builder.IncreaseIndent(),
-                collection,
-                elementBuilderName,
-                elementName,
-                symbolPath);
-
-            builder.AppendLine("});");
+            return;
         }
+
+        builder.AppendBlock(
+            $$"""
+            {{collectionBuilderName}}.AddObjectItem({{elementBuilderName}} =>
+            {
+            """);
+        AppendCollectionElementProperties(builder.IncreaseIndent(), collection, elementBuilderName, elementAccessExpression, symbolPath);
+        builder.AppendLine("});");
     }
 
-    private void AppendCollectionElementProperties(
-        IndentedStringBuilder builder,
-        CollectionModel collection,
-        string elementBuilderName,
-        string elementName,
-        string symbolPath)
+    private void AppendCollectionElementProperties(IndentedStringBuilder builder, CollectionModel collection, string elementBuilderName, string elementAccessExpression, string symbolPath)
     {
         foreach (PropertyModel child in collection.ElementChildren)
         {
             AppendNode(
                 builder,
-                child,
-                elementBuilderName,
-                $"{elementName}.{child.Name}",
-                child.Name,
-                $"{symbolPath}_element_{child.Name}",
+                property: child,
+                builderVariableName: elementBuilderName,
+                nodeAccessExpression: $"{elementAccessExpression}.{child.Name}",
+                displayName: child.Name,
+                symbolPath: $"{symbolPath}_Element_{child.Name}",
                 isProperty: true);
         }
     }
 
-    private string CreateHintsExpression(PropertyModel property)
+    private string? CreateHintsExpression(PropertyModel property)
     {
         List<string> hints = [];
-        foreach (PropertyValidationAspect aspect in property.Aspects)
+        foreach (PropertyAspect aspect in property.Aspects)
         {
-            aspect.RegisterDescriptorHints(
-                hints,
-                diagnosticsReporter,
-                property);
+            aspect.RegisterDescriptorHints(hints, DiagnosticsReporter, property);
         }
 
-        return hints.Count == 0
-            ? "[]"
-            : $"[{string.Join(", ", hints.Select(static hint => SymbolDisplay.FormatLiteral(hint, quote: false)))}]";
+        return hints.Count == 0 ? null : $"[{string.Join(", ", hints.Select(static hint => SymbolDisplay.FormatLiteral(hint, quote: true)))}]";
     }
-
-    private static string CreateSymbolName(string path) => SymbolNameGenerator.MakeCamelCase(path);
 }

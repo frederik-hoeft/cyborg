@@ -2,6 +2,8 @@
 
 public interface IConfiguration
 {
+    bool IsFinalized { get; }
+
     bool TryGetValue<T>(string key, [NotNullWhen(true)] out T? value);
 
     T Get<T>(string key, Func<T> defaultProvider);
@@ -11,5 +13,5 @@ public interface IConfiguration
 
     object? this[string key] { get; }
 
-    internal void AddSource(ConfigurationSource source);
+    internal void FinalizeWith(IEnumerable<IConfigurationSource> sources, IReadOnlySet<string> ignoredKeys);
 }

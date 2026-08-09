@@ -1,17 +1,13 @@
-using Cyborg.Core.Modules.Descriptors.Model;
+﻿using Cyborg.Core.Modules.Descriptors.Model;
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text.Json;
 
 namespace Cyborg.Core.Modules.Descriptors.Writers;
 
-public sealed class JsonModuleDescriptionComponentWriter(
-    Utf8JsonWriter jsonWriter) : IDescriptionComponentWriter
+internal sealed class JsonModuleDescriptionComponentWriter(Utf8JsonWriter jsonWriter) : IDescriptionComponentWriter
 {
-    public ValueTask WriteAtomAsync<T>(
-        T value,
-        ImmutableArray<string> hints,
-        CancellationToken cancellationToken)
+    public ValueTask WriteAtomAsync<T>(T value, ImmutableArray<string> hints, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -72,26 +68,20 @@ public sealed class JsonModuleDescriptionComponentWriter(
                 jsonWriter.WriteStringValue(guid);
                 break;
             case TimeSpan timeSpan:
-                jsonWriter.WriteStringValue(
-                    timeSpan.ToString("c", CultureInfo.InvariantCulture));
+                jsonWriter.WriteStringValue(timeSpan.ToString("c", CultureInfo.InvariantCulture));
                 break;
             case Enum enumValue:
-                jsonWriter.WriteStringValue(
-                    $"{enumValue.GetType().Name}.{enumValue}");
+                jsonWriter.WriteStringValue($"{enumValue.GetType().Name}.{enumValue}");
                 break;
             default:
-                jsonWriter.WriteStringValue(
-                    Convert.ToString(value, CultureInfo.InvariantCulture)
-                    ?? value.GetType().Name);
+                jsonWriter.WriteStringValue(Convert.ToString(value, CultureInfo.InvariantCulture) ?? value.GetType().Name);
                 break;
         }
 
         return ValueTask.CompletedTask;
     }
 
-    public async ValueTask WriteAsync(
-        IDescriptionObjectComponent objectComponent,
-        CancellationToken cancellationToken)
+    public async ValueTask WriteAsync(IDescriptionObjectComponent objectComponent, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(objectComponent);
         cancellationToken.ThrowIfCancellationRequested();
@@ -99,14 +89,12 @@ public sealed class JsonModuleDescriptionComponentWriter(
         jsonWriter.WriteStartObject();
         foreach (IDescriptionPropertyComponent property in objectComponent.Properties)
         {
-            await property.AcceptAsync(this, cancellationToken);
+            await property.AcceptAsync(this, cancellationToken).ConfigureAwait(false);
         }
         jsonWriter.WriteEndObject();
     }
 
-    public async ValueTask WriteAsync(
-        IDescriptionCollectionComponent collectionComponent,
-        CancellationToken cancellationToken)
+    public async ValueTask WriteAsync(IDescriptionCollectionComponent collectionComponent, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(collectionComponent);
         cancellationToken.ThrowIfCancellationRequested();
@@ -114,28 +102,17 @@ public sealed class JsonModuleDescriptionComponentWriter(
         jsonWriter.WriteStartArray();
         foreach (IDescriptionValueComponent item in collectionComponent.Items)
         {
-            await item.AcceptAsync(this, cancellationToken);
+            await item.AcceptAsync(this, cancellationToken).ConfigureAwait(false);
         }
         jsonWriter.WriteEndArray();
     }
 
-    public ValueTask WriteAsync(
-        IDescriptionValueComponent valueComponent,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(valueComponent);
-        cancellationToken.ThrowIfCancellationRequested();
-        return valueComponent.AcceptAsync(this, cancellationToken);
-    }
-
-    public async ValueTask WriteAsync(
-        IDescriptionPropertyComponent propertyComponent,
-        CancellationToken cancellationToken)
+    public async ValueTask WriteAsync(IDescriptionPropertyComponent propertyComponent, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(propertyComponent);
         cancellationToken.ThrowIfCancellationRequested();
 
         jsonWriter.WritePropertyName(propertyComponent.Name);
-        await propertyComponent.Value.AcceptAsync(this, cancellationToken);
+        await propertyComponent.Value.AcceptAsync(this, cancellationToken).ConfigureAwait(false);
     }
 }

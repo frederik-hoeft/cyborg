@@ -15,6 +15,7 @@ WORKDIR /src
 # Copy solution and project files first to enable NuGet restore layer caching
 COPY Cyborg.slnx Directory.Build.props Source/
 COPY Cyborg.Cli/Cyborg.Cli.csproj Source/Cyborg.Cli/
+COPY Cyborg.Cli.Debugging/Cyborg.Cli.Debugging.csproj Source/Cyborg.Cli.Debugging/
 COPY Cyborg.Core/Cyborg.Core.csproj Source/Cyborg.Core/
 COPY Cyborg.Core.Aot/Cyborg.Core.Aot.csproj Source/Cyborg.Core.Aot/
 COPY Cyborg.Modules/Cyborg.Modules.csproj Source/Cyborg.Modules/

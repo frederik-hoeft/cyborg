@@ -1,10 +1,11 @@
-﻿using Cyborg.Core.Modules;
+﻿using Cyborg.Core.Configuration;
+using Cyborg.Core.Configuration.Builders;
+using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Validation;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace Cyborg.Core.TestAdapter;
 
@@ -53,10 +54,12 @@ public abstract class CyborgTestBase
 
         // Register all production Jab modules via reflection
         jabServiceDiscovery.RegisterFromModule<ICyborgCoreServices>(services);
+        services.AddSingleton(TestContext);
+        services.AddDefaultTestServices();
+    }
 
-        // Provide a default (silent) logger factory — tests that need logging can override this.
-        // The logger factory is registered as a singleton and will be disposed by the service provider.
-        services.AddSingleton(_ => LoggerFactory.Create(static _ => { }));
+    protected virtual void BuildConfiguration(IConfigurationBuilder configuration)
+    {
     }
 
     /// <summary>
@@ -71,6 +74,43 @@ public abstract class CyborgTestBase
 
     #endregion
 
+    protected static IWorkerContext<TModule> CreateWorkerContext<TModule>(TModule module, IServiceProvider serviceProvider) where TModule : ModuleBase, IModule<TModule>
+    {
+        ArgumentNullException.ThrowIfNull(module);
+        ArgumentNullException.ThrowIfNull(serviceProvider);
+        return new DefaultWorkerContext<TModule>(module, serviceProvider);
+    }
+
+    protected Task<IModuleExecutionResult> ExecuteWorkerAsync(IModuleWorker worker, IModuleRuntime runtime)
+    {
+        ArgumentNullException.ThrowIfNull(worker);
+        ArgumentNullException.ThrowIfNull(runtime);
+        return worker.ExecuteAsync(runtime, TestContext.CancellationToken);
+    }
+
+    #region DI-based Testing
+
+    protected async Task TestWithDIAsync(Func<IServiceProvider, Task> assertion, Action<IServiceCollection>? configureServices = null, Action<IConfigurationBuilder>? buildConfiguration = null)
+    {
+        ArgumentNullException.ThrowIfNull(assertion);
+        await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
+        await assertion(scope.ServiceProvider);
+    }
+
+    protected Task TestWithDIAsync(Action<IServiceProvider> assertion, Action<IServiceCollection>? configureServices = null, Action<IConfigurationBuilder>? buildConfiguration = null)
+    {
+        ArgumentNullException.ThrowIfNull(assertion);
+        return TestWithDIAsync(serviceProvider =>
+            {
+                assertion(serviceProvider);
+                return Task.CompletedTask;
+            },
+            configureServices,
+            buildConfiguration);
+    }
+
+    #endregion
+
     #region HOF: Module Deserialization Testing
 
     /// <summary>
@@ -81,28 +121,23 @@ public abstract class CyborgTestBase
     /// <param name="moduleJson">Optional module JSON. Falls back to <see cref="GetDefaultModuleJsonAsync"/> when <see langword="null"/>.</param>
     /// <param name="assertion">The async test body receiving the deserialized module record.</param>
     /// <param name="configureServices">Optional per-test-case service configuration.</param>
-    protected async Task TestDeserializationAsync<TModule>(
-        string? moduleJson,
-        Func<TModule, Task> assertion,
-        Action<IServiceCollection>? configureServices = null)
+    /// <param name="buildConfiguration">Optional per-test-case configuration builder.</param>
+    protected async Task TestDeserializationAsync<TModule>(string? moduleJson, Func<TModule, Task> assertion, Action<IServiceCollection>? configureServices = null, Action<IConfigurationBuilder>? buildConfiguration = null)
         where TModule : ModuleBase, IModule
     {
         ArgumentNullException.ThrowIfNull(assertion);
         string resolvedJson = await ResolveModuleJsonAsync(moduleJson);
-        await using TestModuleRuntimeScope scope = CreateScope(configureServices);
+        await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
         IModuleWorker worker = scope.DeserializeModule(resolvedJson);
         TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(worker);
         await assertion(module);
     }
 
     /// <summary>
-    /// Overload of <see cref="TestDeserializationAsync{TModule}(string?,Func{TModule,Task},Action{IServiceCollection}?)"/>
+    /// Overload of <see cref="TestDeserializationAsync{TModule}(string?,Func{TModule,Task},Action{IServiceCollection}?,Action{IConfigurationBuilder}?)"/>
     /// with a synchronous assertion body for simpler test cases that don't need async assertions.
     /// </summary>
-    protected Task TestDeserializationAsync<TModule>(
-        string? moduleJson,
-        Action<TModule> assertion,
-        Action<IServiceCollection>? configureServices = null)
+    protected Task TestDeserializationAsync<TModule>(string? moduleJson, Action<TModule> assertion, Action<IServiceCollection>? configureServices = null, Action<IConfigurationBuilder>? buildConfiguration = null)
         where TModule : ModuleBase, IModule
     {
         ArgumentNullException.ThrowIfNull(assertion);
@@ -113,7 +148,8 @@ public abstract class CyborgTestBase
                 assertion(module);
                 return Task.CompletedTask;
             },
-            configureServices);
+            configureServices,
+            buildConfiguration);
     }
 
     /// <summary>
@@ -123,26 +159,29 @@ public abstract class CyborgTestBase
     /// <param name="moduleContextJson">Optional module context JSON. Falls back to <see cref="GetDefaultModuleJsonAsync"/> when <see langword="null"/>.</param>
     /// <param name="assertion">The async test body receiving the deserialized module context.</param>
     /// <param name="configureServices">Optional per-test-case service configuration.</param>
+    /// <param name="buildConfiguration">Optional per-test-case configuration builder.</param>
     protected async Task TestContextDeserializationAsync(
         string? moduleContextJson,
         Func<ModuleContext, Task> assertion,
-        Action<IServiceCollection>? configureServices = null)
+        Action<IServiceCollection>? configureServices = null,
+        Action<IConfigurationBuilder>? buildConfiguration = null)
     {
         ArgumentNullException.ThrowIfNull(assertion);
         string resolvedJson = await ResolveModuleJsonAsync(moduleContextJson);
-        await using TestModuleRuntimeScope scope = CreateScope(configureServices);
+        await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
         ModuleContext moduleContext = scope.DeserializeModuleContext(resolvedJson);
         await assertion(moduleContext);
     }
 
     /// <summary>
-    /// Overload of <see cref="TestContextDeserializationAsync(string?,Func{ModuleContext,Task},Action{IServiceCollection}?)"/>
+    /// Overload of <see cref="TestContextDeserializationAsync(string?,Func{ModuleContext,Task},Action{IServiceCollection}?,Action{IConfigurationBuilder}?)"/>
     /// with a synchronous assertion body for simpler test cases that don't need async assertions.
     /// </summary>
     protected Task TestContextDeserializationAsync(
         string? moduleContextJson,
         Action<ModuleContext> assertion,
-        Action<IServiceCollection>? configureServices = null)
+        Action<IServiceCollection>? configureServices = null,
+        Action<IConfigurationBuilder>? buildConfiguration = null)
     {
         ArgumentNullException.ThrowIfNull(assertion);
         return TestContextDeserializationAsync(
@@ -152,7 +191,8 @@ public abstract class CyborgTestBase
                 assertion(context);
                 return Task.CompletedTask;
             },
-            configureServices);
+            configureServices,
+            buildConfiguration);
     }
 
     #endregion
@@ -170,27 +210,29 @@ public abstract class CyborgTestBase
     /// <param name="configureServices">Optional per-test-case service configuration.</param>
     protected async Task TestValidationAsync<TModule>(
         string? moduleJson,
-        Func<ValidationResult<TModule>, Task> assertion,
-        Action<IServiceCollection>? configureServices = null)
+        Func<IValidationResult<TModule>, Task> assertion,
+        Action<IServiceCollection>? configureServices = null,
+        Action<IConfigurationBuilder>? buildConfiguration = null)
         where TModule : ModuleBase, IModule<TModule>
     {
         ArgumentNullException.ThrowIfNull(assertion);
         string resolvedJson = await ResolveModuleJsonAsync(moduleJson);
-        await using TestModuleRuntimeScope scope = CreateScope(configureServices);
+        await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
         IModuleWorker worker = scope.DeserializeModule(resolvedJson);
         TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(worker);
-        ValidationResult<TModule> validationResult = await module.ValidateAsync(scope.Runtime, scope.ServiceProvider, TestContext.CancellationToken);
+        IValidationResult<TModule> validationResult = await module.ValidateAsync(scope.Runtime, scope.ServiceProvider, TestContext.CancellationToken);
         await assertion(validationResult);
     }
 
     /// <summary>
-    /// Overload of <see cref="TestValidationAsync{TModule}(string?,Func{ValidationResult{TModule},Task},Action{IServiceCollection}?)"/>
+    /// Overload of <see cref="TestValidationAsync{TModule}(string?,Func{IValidationResult{TModule},Task},Action{IServiceCollection}?,Action{IConfigurationBuilder}?)"/>
     /// with a synchronous assertion body for simpler test cases that don't need async assertions.
     /// </summary>
     protected Task TestValidationAsync<TModule>(
         string? moduleJson,
-        Action<ValidationResult<TModule>> assertion,
-        Action<IServiceCollection>? configureServices = null)
+        Action<IValidationResult<TModule>> assertion,
+        Action<IServiceCollection>? configureServices = null,
+        Action<IConfigurationBuilder>? buildConfiguration = null)
         where TModule : ModuleBase, IModule<TModule>
     {
         ArgumentNullException.ThrowIfNull(assertion);
@@ -201,7 +243,8 @@ public abstract class CyborgTestBase
                 assertion(result);
                 return Task.CompletedTask;
             },
-            configureServices);
+            configureServices,
+            buildConfiguration);
     }
 
     /// <summary>
@@ -213,18 +256,20 @@ public abstract class CyborgTestBase
     /// <param name="moduleJson">Optional module JSON. Falls back to <see cref="GetDefaultModuleJsonAsync"/> when <see langword="null"/>.</param>
     /// <param name="assertion">The async test body receiving the validated module and runtime scope.</param>
     /// <param name="configureServices">Optional per-test-case service configuration.</param>
+    /// <param name="buildConfiguration">Optional per-test-case configuration builder setup.</param>
     protected async Task TestValidatedModuleAsync<TModule>(
         string? moduleJson,
         Func<TModule, TestModuleRuntimeScope, Task> assertion,
-        Action<IServiceCollection>? configureServices = null)
+        Action<IServiceCollection>? configureServices = null,
+        Action<IConfigurationBuilder>? buildConfiguration = null)
         where TModule : ModuleBase, IModule<TModule>
     {
         ArgumentNullException.ThrowIfNull(assertion);
         string resolvedJson = await ResolveModuleJsonAsync(moduleJson);
-        await using TestModuleRuntimeScope scope = CreateScope(configureServices);
+        await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
         IModuleWorker worker = scope.DeserializeModule(resolvedJson);
         TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(worker);
-        ValidationResult<TModule> validationResult = await module.ValidateAsync(scope.Runtime, scope.ServiceProvider, TestContext.CancellationToken);
+        IValidationResult<TModule> validationResult = await module.ValidateAsync(scope.Runtime, scope.ServiceProvider, TestContext.CancellationToken);
         validationResult.EnsureValid();
         await assertion(validationResult.Module, scope);
     }
@@ -244,34 +289,37 @@ public abstract class CyborgTestBase
     /// <param name="environmentSetup">Callback to configure environment variables before validation.</param>
     /// <param name="assertion">The async test body receiving the fully resolved module.</param>
     /// <param name="configureServices">Optional per-test-case service configuration.</param>
+    /// <param name="buildConfiguration">Optional per-test-case configuration builder setup.</param>
     protected async Task TestOverridesAsync<TModule>(
         string? moduleJson,
         Action<IRuntimeEnvironment> environmentSetup,
         Func<TModule, Task> assertion,
-        Action<IServiceCollection>? configureServices = null)
+        Action<IServiceCollection>? configureServices = null,
+        Action<IConfigurationBuilder>? buildConfiguration = null)
         where TModule : ModuleBase, IModule<TModule>
     {
         ArgumentNullException.ThrowIfNull(environmentSetup);
         ArgumentNullException.ThrowIfNull(assertion);
         string resolvedJson = await ResolveModuleJsonAsync(moduleJson);
-        await using TestModuleRuntimeScope scope = CreateScope(configureServices);
+        await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
         environmentSetup(scope.GlobalEnvironment);
         IModuleWorker worker = scope.DeserializeModule(resolvedJson);
         TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(worker);
-        ValidationResult<TModule> validationResult = await module.ValidateAsync(scope.Runtime, scope.ServiceProvider, TestContext.CancellationToken);
+        IValidationResult<TModule> validationResult = await module.ValidateAsync(scope.Runtime, scope.ServiceProvider, TestContext.CancellationToken);
         validationResult.EnsureValid();
         await assertion(validationResult.Module);
     }
 
     /// <summary>
-    /// Overload of <see cref="TestOverridesAsync{TModule}(string?,Action{IRuntimeEnvironment},Func{TModule,Task},Action{IServiceCollection}?)"/>
+    /// Overload of <see cref="TestOverridesAsync{TModule}(string?,Action{IRuntimeEnvironment},Func{TModule,Task},Action{IServiceCollection}?),Action{IConfigurationBuilder}?)"/>
     /// with a synchronous assertion body for simpler test cases that don't need async assertions.
     /// </summary>
     protected Task TestOverridesAsync<TModule>(
         string? moduleJson,
         Action<IRuntimeEnvironment> environmentSetup,
         Action<TModule> assertion,
-        Action<IServiceCollection>? configureServices = null)
+        Action<IServiceCollection>? configureServices = null,
+        Action<IConfigurationBuilder>? buildConfiguration = null)
         where TModule : ModuleBase, IModule<TModule>
     {
         ArgumentNullException.ThrowIfNull(assertion);
@@ -283,7 +331,8 @@ public abstract class CyborgTestBase
                 assertion(module);
                 return Task.CompletedTask;
             },
-            configureServices);
+            configureServices,
+            buildConfiguration);
     }
 
     #endregion
@@ -301,17 +350,19 @@ public abstract class CyborgTestBase
     /// <param name="assertion">The async test body receiving the module, worker, and execution result.</param>
     /// <param name="environmentSetup">Optional callback to configure environment variables before execution.</param>
     /// <param name="configureServices">Optional per-test-case service configuration.</param>
+    /// <param name="buildConfiguration">Optional per-test-case configuration builder setup.</param>
     protected async Task TestModuleAsync<TModule, TWorker>(
         string? moduleJson,
         Func<TModule, TWorker, IModuleExecutionResult, Task> assertion,
         Action<IRuntimeEnvironment>? environmentSetup = null,
-        Action<IServiceCollection>? configureServices = null)
+        Action<IServiceCollection>? configureServices = null,
+        Action<IConfigurationBuilder>? buildConfiguration = null)
         where TModule : ModuleBase, IModule
         where TWorker : class, IModuleWorker
     {
         ArgumentNullException.ThrowIfNull(assertion);
         string resolvedJson = await ResolveModuleJsonAsync(moduleJson);
-        await using TestModuleRuntimeScope scope = CreateScope(configureServices);
+        await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
         environmentSetup?.Invoke(scope.GlobalEnvironment);
         IModuleWorker worker = scope.DeserializeModule(resolvedJson);
         TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(worker);
@@ -325,14 +376,15 @@ public abstract class CyborgTestBase
     }
 
     /// <summary>
-    /// Overload of <see cref="TestModuleAsync{TModule,TWorker}(string?,Func{TModule,TWorker,IModuleExecutionResult,Task},Action{IRuntimeEnvironment}?,Action{IServiceCollection}?)"/>
+    /// Overload of <see cref="TestModuleAsync{TModule,TWorker}(string?,Func{TModule,TWorker,IModuleExecutionResult,Task},Action{IRuntimeEnvironment}?,Action{IServiceCollection}?,Action{IConfigurationBuilder}?)"/>
     /// with a synchronous assertion body for simpler test cases that don't need async assertions.
     /// </summary>
     protected Task TestModuleAsync<TModule, TWorker>(
         string? moduleJson,
         Action<TModule, TWorker, IModuleExecutionResult> assertion,
         Action<IRuntimeEnvironment>? environmentSetup = null,
-        Action<IServiceCollection>? configureServices = null)
+        Action<IServiceCollection>? configureServices = null,
+        Action<IConfigurationBuilder>? buildConfiguration = null)
         where TModule : ModuleBase, IModule
         where TWorker : class, IModuleWorker
     {
@@ -344,7 +396,8 @@ public abstract class CyborgTestBase
                 return Task.CompletedTask;
             },
             environmentSetup,
-            configureServices);
+            configureServices,
+            buildConfiguration);
     }
 
     #endregion
@@ -360,15 +413,17 @@ public abstract class CyborgTestBase
     /// <param name="assertion">The async test body receiving the execution result.</param>
     /// <param name="environmentSetup">Optional callback to configure environment variables before execution.</param>
     /// <param name="configureServices">Optional per-test-case service configuration.</param>
+    /// <param name="buildConfiguration">Optional per-test-case configuration builder setup.</param>
     protected async Task TestExecutionAsync(
         string? moduleJson,
         Func<IModuleExecutionResult, Task> assertion,
         Action<IRuntimeEnvironment>? environmentSetup = null,
-        Action<IServiceCollection>? configureServices = null)
+        Action<IServiceCollection>? configureServices = null,
+        Action<IConfigurationBuilder>? buildConfiguration = null)
     {
         ArgumentNullException.ThrowIfNull(assertion);
         string resolvedJson = await ResolveModuleJsonAsync(moduleJson);
-        await using TestModuleRuntimeScope scope = CreateScope(configureServices);
+        await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
         environmentSetup?.Invoke(scope.GlobalEnvironment);
         IModuleWorker worker = scope.DeserializeModule(resolvedJson);
         IModuleExecutionResult result = await scope.ExecuteAsync(worker, TestContext.CancellationToken);
@@ -376,21 +431,22 @@ public abstract class CyborgTestBase
     }
 
     /// <summary>
-    /// Overload of <see cref="TestExecutionAsync(string?,Func{IModuleExecutionResult,Task},Action{IRuntimeEnvironment}?,Action{IServiceCollection}?)"/>
+    /// Overload of <see cref="TestExecutionAsync(string?,Func{IModuleExecutionResult,Task},Action{IRuntimeEnvironment}?,Action{IServiceCollection}?,Action{IConfigurationBuilder}?)"/>
     /// with a synchronous assertion body for simpler test cases that don't need async assertions.
     /// </summary>
     protected Task TestExecutionAsync(
         string? moduleJson,
         Action<IModuleExecutionResult> assertion,
         Action<IRuntimeEnvironment>? environmentSetup = null,
-        Action<IServiceCollection>? configureServices = null)
+        Action<IServiceCollection>? configureServices = null,
+        Action<IConfigurationBuilder>? buildConfiguration = null)
     {
         ArgumentNullException.ThrowIfNull(assertion);
         return TestExecutionAsync(moduleJson, result =>
         {
             assertion(result);
             return Task.CompletedTask;
-        }, environmentSetup, configureServices);
+        }, environmentSetup, configureServices, buildConfiguration);
     }
 
     /// <summary>
@@ -403,15 +459,17 @@ public abstract class CyborgTestBase
     /// <param name="assertion">Optional async callback to inspect the thrown exception.</param>
     /// <param name="environmentSetup">Optional callback to configure environment variables before execution.</param>
     /// <param name="configureServices">Optional per-test-case service configuration.</param>
+    /// <param name="buildConfiguration">Optional per-test-case configuration builder setup.</param>
     protected async Task TestExecutionThrowsAsync<TException>(
         string? moduleJson,
         Func<TException, Task>? assertion = null,
         Action<IRuntimeEnvironment>? environmentSetup = null,
-        Action<IServiceCollection>? configureServices = null)
+        Action<IServiceCollection>? configureServices = null,
+        Action<IConfigurationBuilder>? buildConfiguration = null)
         where TException : Exception
     {
         string resolvedJson = await ResolveModuleJsonAsync(moduleJson);
-        await using TestModuleRuntimeScope scope = CreateScope(configureServices);
+        await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
         environmentSetup?.Invoke(scope.GlobalEnvironment);
         IModuleWorker worker = scope.DeserializeModule(resolvedJson);
         TException exception = await Assert.ThrowsExactlyAsync<TException>(
@@ -423,14 +481,15 @@ public abstract class CyborgTestBase
     }
 
     /// <summary>
-    /// Overload of <see cref="TestExecutionThrowsAsync{TException}(string?,Func{TException,Task}?,Action{IRuntimeEnvironment}?,Action{IServiceCollection}?)"/>
+    /// Overload of <see cref="TestExecutionThrowsAsync{TException}(string?,Func{TException,Task}?,Action{IRuntimeEnvironment}?,Action{IServiceCollection}?,Action{IConfigurationBuilder}?)"/>
     /// with a synchronous assertion body for simpler test cases that don't need async assertions.
     /// </summary>
     protected Task TestExecutionThrowsAsync<TException>(
         string? moduleJson,
         Action<TException>? assertion,
         Action<IRuntimeEnvironment>? environmentSetup = null,
-        Action<IServiceCollection>? configureServices = null)
+        Action<IServiceCollection>? configureServices = null,
+        Action<IConfigurationBuilder>? buildConfiguration = null)
         where TException : Exception
     {
         return TestExecutionThrowsAsync<TException>(
@@ -441,7 +500,8 @@ public abstract class CyborgTestBase
                 return Task.CompletedTask;
             },
             environmentSetup,
-            configureServices);
+            configureServices,
+            buildConfiguration);
     }
 
     #endregion
@@ -457,15 +517,17 @@ public abstract class CyborgTestBase
     /// <param name="assertion">The async test body receiving the execution result and the runtime scope.</param>
     /// <param name="environmentSetup">Optional callback to configure environment variables before execution.</param>
     /// <param name="configureServices">Optional per-test-case service configuration.</param>
+    /// <param name="buildConfiguration">Optional per-test-case configuration builder setup.</param>
     protected async Task TestModuleContextAsync(
         string? moduleContextJson,
         Func<IModuleExecutionResult, TestModuleRuntimeScope, Task> assertion,
         Action<IRuntimeEnvironment>? environmentSetup = null,
-        Action<IServiceCollection>? configureServices = null)
+        Action<IServiceCollection>? configureServices = null,
+        Action<IConfigurationBuilder>? buildConfiguration = null)
     {
         ArgumentNullException.ThrowIfNull(assertion);
         string resolvedJson = await ResolveModuleJsonAsync(moduleContextJson);
-        await using TestModuleRuntimeScope scope = CreateScope(configureServices);
+        await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
         environmentSetup?.Invoke(scope.GlobalEnvironment);
         ModuleContext moduleContext = scope.DeserializeModuleContext(resolvedJson);
         IModuleExecutionResult result = await scope.ExecuteAsync(moduleContext, TestContext.CancellationToken);
@@ -476,12 +538,18 @@ public abstract class CyborgTestBase
 
     #region Private Helpers
 
-    private TestModuleRuntimeScope CreateScope(Action<IServiceCollection>? perTestConfigureServices)
+    private async ValueTask<TestModuleRuntimeScope> CreateScopeAsync(Action<IServiceCollection>? perTestConfigureServices, Action<IConfigurationBuilder>? perTestConfigureConfiguration)
     {
         IServiceCollection services = TestServiceConfiguration.CreateDefaultServices();
         ConfigureServices(services, new JabServiceDiscovery());
         perTestConfigureServices?.Invoke(services);
-        return TestModuleRuntimeScope.Create(services);
+        TestModuleRuntimeScope testScope = TestModuleRuntimeScope.Create(services);
+        IConfigurationBuilder configurationBuilder = testScope.ServiceProvider.GetRequiredService<IConfigurationBuilder>();
+        BuildConfiguration(configurationBuilder);
+        perTestConfigureConfiguration?.Invoke(configurationBuilder);
+        IConfiguration configuration = testScope.ServiceProvider.GetRequiredService<IConfiguration>();
+        await configurationBuilder.ApplyToAsync(configuration, TestContext.CancellationToken);
+        return testScope;
     }
 
     private async Task<string> ResolveModuleJsonAsync(string? explicitJson)

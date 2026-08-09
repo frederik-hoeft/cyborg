@@ -1,52 +1,56 @@
 ﻿using Cyborg.Core.Modules;
+using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
-using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Cyborg.Core.Tests.Runtime;
 
 [TestClass]
-public sealed class EnvironmentInterpolationTests
+public sealed class EnvironmentInterpolationTests : CyborgCoreTestBase
 {
     [TestMethod]
     [DataRow("${#HOME}", "${HOME}")]
     [DataRow("${##HOME}", "${#HOME}")]
     [DataRow("before ${#HOME} after", "before ${HOME} after")]
     [DataRow("${#}", "${}")]
-    public void Test_Interpolate_HashLiteral_StripsExactlyOneHash(string value, string expected)
+    public Task Test_Interpolate_HashLiteral_StripsExactlyOneHashAsync(string value, string expected) => TestWithDIAsync(services =>
     {
-        GlobalRuntimeEnvironment environment = CreateEnvironment();
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
 
-        string actual = environment.Interpolate(value);
+        string actual = runtime.Environment.Interpolate(value);
 
         Assert.AreEqual(expected, actual);
-    }
+    });
 
     [TestMethod]
-    public void Test_Interpolate_OrdinaryAndEscapedExpressions_ResolvesThenFinalizes()
+    public Task Test_Interpolate_OrdinaryAndEscapedExpressions_ResolvesThenFinalizesAsync() => TestWithDIAsync(services =>
     {
-        GlobalRuntimeEnvironment environment = CreateEnvironment();
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        IRuntimeEnvironment environment = runtime.Environment;
         environment.SetVariable("prefix", "resolved");
 
         string actual = environment.Interpolate("${prefix}/${#HOME}");
 
         Assert.AreEqual("resolved/${HOME}", actual);
-    }
+    });
 
     [TestMethod]
-    public void Test_Interpolate_RevealedExpression_IsNotRescanned()
+    public Task Test_Interpolate_RevealedExpression_IsNotRescannedAsync() => TestWithDIAsync(services =>
     {
-        GlobalRuntimeEnvironment environment = CreateEnvironment();
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        IRuntimeEnvironment environment = runtime.Environment;
         environment.SetVariable("HOME", "resolved-home");
 
         string actual = environment.Interpolate("${#HOME}");
 
         Assert.AreEqual("${HOME}", actual);
-    }
+    });
 
     [TestMethod]
-    public void Test_Interpolate_DoubleEscapeAcrossExplicitCalls_StripsOneHashPerCall()
+    public Task Test_Interpolate_DoubleEscapeAcrossExplicitCalls_StripsOneHashPerCallAsync() => TestWithDIAsync(services =>
     {
-        GlobalRuntimeEnvironment environment = CreateEnvironment();
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        IRuntimeEnvironment environment = runtime.Environment;
         environment.SetVariable("HOME", "resolved-home");
 
         string firstPass = environment.Interpolate("${##HOME}");
@@ -56,12 +60,13 @@ public sealed class EnvironmentInterpolationTests
         Assert.AreEqual("${#HOME}", firstPass);
         Assert.AreEqual("${HOME}", secondPass);
         Assert.AreEqual("resolved-home", thirdPass);
-    }
+    });
 
     [TestMethod]
-    public void Test_TryResolveVariable_EscapedExpressionIntroducedByVariable_FinalizesAtExplicitBoundary()
+    public Task Test_TryResolveVariable_EscapedExpressionIntroducedByVariable_FinalizesAtExplicitBoundaryAsync() => TestWithDIAsync(services =>
     {
-        GlobalRuntimeEnvironment environment = CreateEnvironment();
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        IRuntimeEnvironment environment = runtime.Environment;
         environment.SetVariable("shell_expression", "${#HOME}");
         environment.SetVariable("template", "${shell_expression}");
 
@@ -69,12 +74,13 @@ public sealed class EnvironmentInterpolationTests
 
         Assert.IsTrue(resolved);
         Assert.AreEqual("${HOME}", actual);
-    }
+    });
 
     [TestMethod]
-    public void Test_TryResolveVariable_ForwardReference_UsesValueAtReadTime()
+    public Task Test_TryResolveVariable_ForwardReference_UsesValueAtReadTimeAsync() => TestWithDIAsync(services =>
     {
-        GlobalRuntimeEnvironment environment = CreateEnvironment();
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        IRuntimeEnvironment environment = runtime.Environment;
         environment.SetVariable("template", "${value}");
         environment.SetVariable("value", "first");
         environment.SetVariable("value", "second");
@@ -83,19 +89,20 @@ public sealed class EnvironmentInterpolationTests
 
         Assert.IsTrue(resolved);
         Assert.AreEqual("second", actual);
-    }
+    });
 
     [TestMethod]
-    public void Test_TryResolveVariable_LateReference_UsesOriginalEntryPoint()
+    public Task Test_TryResolveVariable_LateReference_UsesOriginalEntryPointAsync() => TestWithDIAsync(services =>
     {
-        GlobalRuntimeEnvironment parent = CreateEnvironment();
-        parent.SetVariable("template", "${@value}");
-        parent.SetVariable("value", "parent");
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        IRuntimeEnvironment environment = runtime.Environment;
+        environment.SetVariable("template", "${@value}");
+        environment.SetVariable("value", "parent");
         InheritedRuntimeEnvironment child = new(
             Name: "child",
-            Parent: parent,
+            Parent: environment,
             IsTransient: false,
-            SyntaxFactory: parent.SyntaxFactory,
+            SyntaxFactory: environment.SyntaxFactory,
             Namespace: string.Empty);
         child.SetVariable("value", "child");
 
@@ -103,77 +110,82 @@ public sealed class EnvironmentInterpolationTests
 
         Assert.IsTrue(resolved);
         Assert.AreEqual("child", actual);
-    }
+    });
 
     [TestMethod]
-    public void Test_TryResolveVariable_CurrentAndEntryPointSelfReferences_UseDistinctScopes()
+    public Task Test_TryResolveVariable_CurrentAndEntryPointSelfReferences_UseDistinctScopesAsync() => TestWithDIAsync(services =>
     {
-        GlobalRuntimeEnvironment parent = CreateEnvironment() with
+        GlobalRuntimeEnvironment environment = services.GetRequiredService<GlobalRuntimeEnvironment>() with
         {
-            Namespace = "parent",
+            Namespace = "parent"
         };
-        parent.SetVariable("template", "${@}/${@@}");
+        environment.SetVariable("template", "${@}/${@@}");
         InheritedRuntimeEnvironment child = new(
             Name: "child",
-            Parent: parent,
+            Parent: environment,
             IsTransient: false,
-            SyntaxFactory: parent.SyntaxFactory,
+            SyntaxFactory: environment.SyntaxFactory,
             Namespace: "child");
 
         bool resolved = child.TryResolveVariable("template", out string? actual);
 
         Assert.IsTrue(resolved);
         Assert.AreEqual("parent/child", actual);
-    }
+    });
 
     [TestMethod]
-    public void Test_Interpolate_UnresolvedExpression_RemainsUnchanged()
+    public Task Test_Interpolate_UnresolvedExpression_RemainsUnchangedAsync() => TestWithDIAsync(services =>
     {
-        GlobalRuntimeEnvironment environment = CreateEnvironment();
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        IRuntimeEnvironment environment = runtime.Environment;
 
         string actual = environment.Interpolate("before ${missing} after");
 
         Assert.AreEqual("before ${missing} after", actual);
-    }
+    });
 
     [TestMethod]
-    public void Test_TryResolveVariable_CyclicReference_ThrowsInvalidOperationException()
+    public Task Test_TryResolveVariable_CyclicReference_ThrowsInvalidOperationExceptionAsync() => TestWithDIAsync(services =>
     {
-        GlobalRuntimeEnvironment environment = CreateEnvironment();
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        IRuntimeEnvironment environment = runtime.Environment;
         environment.SetVariable("first", "${second}");
         environment.SetVariable("second", "${first}");
 
         Assert.ThrowsExactly<InvalidOperationException>(() => environment.TryResolveVariable("first", out string? _));
-    }
+    });
 
     [TestMethod]
-    public void Test_Resolve_StringFallback_PerformsCompleteEvaluation()
+    public Task Test_Resolve_StringFallback_PerformsCompleteEvaluationAsync() => TestWithDIAsync(services =>
     {
-        GlobalRuntimeEnvironment environment = CreateEnvironment();
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        IRuntimeEnvironment environment = runtime.Environment;
         ProbeModule module = new(Value: "${value}/${#HOME}", Port: 0);
         environment.SetVariable("value", "resolved");
 
         string? actual = environment.Resolve(module, module.Value);
 
         Assert.AreEqual("resolved/${HOME}", actual);
-    }
+    });
 
     [TestMethod]
-    public void Test_Resolve_StringOverride_PerformsCompleteEvaluation()
+    public Task Test_Resolve_StringOverride_PerformsCompleteEvaluationAsync() => TestWithDIAsync(services =>
     {
-        GlobalRuntimeEnvironment environment = CreateEnvironment();
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        IRuntimeEnvironment environment = runtime.Environment;
         ProbeModule module = new(Value: "fallback", Port: 0) { Name = "probe" };
         environment.SetVariable("@probe.value", "${#HOME}");
 
         string? actual = environment.Resolve(module, module.Value);
 
         Assert.AreEqual("${HOME}", actual);
-    }
+    });
 
     [TestMethod]
-    public void Test_Resolve_NonStringOverride_PreservesTypedIndirection()
+    public Task Test_Resolve_NonStringOverride_PreservesTypedIndirectionAsync() => TestWithDIAsync(services =>
     {
-        GlobalRuntimeEnvironment environment = CreateEnvironment();
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        IRuntimeEnvironment environment = runtime.Environment;
         ProbeModule module = new(Value: null, Port: 0) { Name = "probe" };
         environment.SetVariable("port", 22);
         environment.SetVariable("@probe.port", "${port}");
@@ -181,7 +193,7 @@ public sealed class EnvironmentInterpolationTests
         int actual = environment.Resolve(module, module.Port);
 
         Assert.AreEqual(22, actual);
-    }
+    });
 
     [TestMethod]
     public void Test_PublicEnvironmentSurface_DoesNotExposeGeneratedPreparationOperations()
@@ -194,9 +206,7 @@ public sealed class EnvironmentInterpolationTests
         Assert.DoesNotContain("ResolveCollection", methodNames);
     }
 
-    private static GlobalRuntimeEnvironment CreateEnvironment() => new(JsonNamingPolicy.SnakeCaseLower);
-
-    private sealed record ProbeModule(string? Value, int Port) : ModuleBase, IModule
+    private sealed record ProbeModule(string? Value, int Port) : ModuleBase, IModuleDefinition
     {
         public static string ModuleId => "cyborg.tests.interpolation-probe.v1";
     }

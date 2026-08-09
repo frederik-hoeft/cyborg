@@ -1,28 +1,23 @@
-using Cyborg.Core.Common.Text;
+﻿using Cyborg.Core.Common.Text;
+using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Descriptors.Model;
+using System.Collections;
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
 
 namespace Cyborg.Core.Modules.Descriptors.Writers;
 
-public sealed class TextModuleDescriptionComponentWriter(
-    IndentedStringBuilder builder) : IDescriptionComponentWriter
+internal sealed class TextModuleDescriptionComponentWriter(IndentedStringBuilder builder) : IDescriptionComponentWriter
 {
-    public ValueTask WriteAtomAsync<T>(
-        T value,
-        ImmutableArray<string> hints,
-        CancellationToken cancellationToken)
+    public ValueTask WriteAtomAsync<T>(T value, ImmutableArray<string> hints, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        WriteAtom(builder.GetInnerBuilder(), value);
-        builder.GetInnerBuilder().AppendLine();
+        WriteAtom(builder, value);
         return ValueTask.CompletedTask;
     }
 
-    public async ValueTask WriteAsync(
-        IDescriptionObjectComponent objectComponent,
-        CancellationToken cancellationToken)
+    public async ValueTask WriteAsync(IDescriptionObjectComponent objectComponent, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(objectComponent);
         cancellationToken.ThrowIfCancellationRequested();
@@ -35,13 +30,11 @@ public sealed class TextModuleDescriptionComponentWriter(
 
         foreach (IDescriptionPropertyComponent property in objectComponent.Properties)
         {
-            await property.AcceptAsync(this, cancellationToken);
+            await property.AcceptAsync(this, cancellationToken).ConfigureAwait(false);
         }
     }
 
-    public async ValueTask WriteAsync(
-        IDescriptionCollectionComponent collectionComponent,
-        CancellationToken cancellationToken)
+    public async ValueTask WriteAsync(IDescriptionCollectionComponent collectionComponent, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(collectionComponent);
         cancellationToken.ThrowIfCancellationRequested();
@@ -60,82 +53,75 @@ public sealed class TextModuleDescriptionComponentWriter(
             if (item is IDescriptionObjectComponent or IDescriptionCollectionComponent)
             {
                 builder.GetInnerBuilder().AppendLine();
-                TextModuleDescriptionComponentWriter nestedWriter =
-                    new(builder.IncreaseIndent());
-                await item.AcceptAsync(nestedWriter, cancellationToken);
+                TextModuleDescriptionComponentWriter nestedWriter = new(builder.IncreaseIndent());
+                await item.AcceptAsync(nestedWriter, cancellationToken).ConfigureAwait(false);
             }
             else
             {
                 builder.GetInnerBuilder().Append(' ');
-                await item.AcceptAsync(this, cancellationToken);
+                await item.AcceptAsync(this, cancellationToken).ConfigureAwait(false);
             }
         }
     }
 
-    public ValueTask WriteAsync(
-        IDescriptionValueComponent valueComponent,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(valueComponent);
-        cancellationToken.ThrowIfCancellationRequested();
-        return valueComponent.AcceptAsync(this, cancellationToken);
-    }
-
-    public async ValueTask WriteAsync(
-        IDescriptionPropertyComponent propertyComponent,
-        CancellationToken cancellationToken)
+    public async ValueTask WriteAsync(IDescriptionPropertyComponent propertyComponent, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(propertyComponent);
         cancellationToken.ThrowIfCancellationRequested();
 
         builder.Append($"{propertyComponent.Name}:");
 
-        if (propertyComponent.Value is
-            IDescriptionObjectComponent or IDescriptionCollectionComponent)
+        if (propertyComponent.Value is IDescriptionObjectComponent or IDescriptionCollectionComponent)
         {
             builder.GetInnerBuilder().AppendLine();
-            TextModuleDescriptionComponentWriter nestedWriter =
-                new(builder.IncreaseIndent());
-            await propertyComponent.Value.AcceptAsync(
-                nestedWriter,
-                cancellationToken);
+            TextModuleDescriptionComponentWriter nestedWriter = new(builder.IncreaseIndent());
+            await propertyComponent.Value.AcceptAsync(nestedWriter, cancellationToken).ConfigureAwait(false);
         }
         else
         {
             builder.GetInnerBuilder().Append(' ');
-            await propertyComponent.Value.AcceptAsync(this, cancellationToken);
+            await propertyComponent.Value.AcceptAsync(this, cancellationToken).ConfigureAwait(false);
         }
     }
 
-    private static void WriteAtom<T>(StringBuilder builder, T value)
+    private static IndentedStringBuilder WriteAtom<T>(IndentedStringBuilder builder, T value) => value switch
     {
-        switch (value)
+        null => builder.AppendLine("null"),
+        string text => AppendQuotedString(builder, text, '"'),
+        char character => AppendQuotedString(builder, character.ToString(), '\''),
+        bool flag => builder.AppendLine(flag ? "true" : "false"),
+        DateTime dateTime => builder.AppendLine(dateTime.ToString("O", CultureInfo.InvariantCulture)),
+        DateTimeOffset dateTimeOffset => builder.AppendLine(dateTimeOffset.ToString("O", CultureInfo.InvariantCulture)),
+        TimeSpan timeSpan => builder.AppendLine(timeSpan.ToString("c", CultureInfo.InvariantCulture)),
+        Guid guid => builder.AppendLine(guid.ToString("D")),
+        Enum e => builder.AppendLine(e.ToString()),
+        // cyborg types
+        ModuleReference moduleReference => builder.AppendLine($"-> {moduleReference.Module.ModuleId}"),
+        _ => builder.AppendLine(Convert.ToString(value, CultureInfo.InvariantCulture) ?? value.GetType().Name)
+    };
+
+    private static IndentedStringBuilder AppendQuotedString(IndentedStringBuilder builder, string value, char quote)
+    {
+        builder.Append(quote);
+        foreach (char character in value)
         {
-            case null:
-                builder.Append("null");
-                break;
-            case string text:
-                builder.Append('"')
-                    .Append(text.Replace("\\", "\\\\", StringComparison.Ordinal)
-                        .Replace("\"", "\\\"", StringComparison.Ordinal))
-                    .Append('"');
-                break;
-            case char character:
-                builder.Append('\'').Append(character).Append('\'');
-                break;
-            case bool flag:
-                builder.Append(flag ? "true" : "false");
-                break;
-            case Enum:
-                builder.Append(value.GetType().Name)
-                    .Append('.')
-                    .Append(value);
-                break;
-            default:
-                builder.Append(
-                    Convert.ToString(value, CultureInfo.InvariantCulture)
-                    ?? value.GetType().Name);
-                break;
+            _ = character switch
+            {
+                '\\' => builder.Append("\\\\"),
+                '"' when quote == '"' => builder.Append("\\\""),
+                '\'' when quote == '\'' => builder.Append("\\'"),
+                '\0' => builder.Append("\\0"),
+                '\a' => builder.Append("\\a"),
+                '\b' => builder.Append("\\b"),
+                '\f' => builder.Append("\\f"),
+                '\n' => builder.Append("\\n"),
+                '\r' => builder.Append("\\r"),
+                '\t' => builder.Append("\\t"),
+                '\v' => builder.Append("\\v"),
+                _ when char.IsControl(character) => builder.Append("\\u").Append(((int)character).ToString("X4", CultureInfo.InvariantCulture)),
+                _ => builder.Append(character)
+            };
         }
+        return builder.AppendLine(quote);
     }
 }
