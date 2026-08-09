@@ -11,6 +11,7 @@ using Cyborg.Core.Modules.Debugging.Breakpoints;
 using Cyborg.Core.Modules.Extensions;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
+using Cyborg.Core.Services.Default;
 using Cyborg.Core.Services.Metrics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -82,7 +83,10 @@ internal sealed class Commands
             ILogger logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("cyborg.cli.main");
             logger.LogStartup(string.Join(' ', Array.ConvertAll(Environment.GetCommandLineArgs()[1..], QuoteArg)));
 
-            ConfigureDebugger(services, breakAt);
+            if (!TryConfigureDebugger(services, logger, breakAt))
+            {
+                return 1;
+            }
 
             IEnvironmentVariableArgumentHandler environmentVariableService = services.GetRequiredService<IEnvironmentVariableArgumentHandler>();
             if (!environmentVariableService.TryProcessArgument(environmentVariables, globalEnvironment))
@@ -127,11 +131,18 @@ internal sealed class Commands
         }
     }
 
-    private static void ConfigureDebugger(DefaultServiceProvider services, string[]? breakAt)
+    private static bool TryConfigureDebugger(DefaultServiceProvider services, ILogger logger, string[]? breakAt)
     {
         if (breakAt is not { Length: > 0 })
         {
-            return;
+            return true;
+        }
+        // check if there is a frontend for the debugger
+        IDefault<IDebugFrontend> defaultFrontend = services.GetRequiredService<IDefault<IDebugFrontend>>();
+        if (defaultFrontend.GetDefault() is null)
+        {
+            logger.LogBreakAtWithoutDebugFrontend(defaultFrontend.ConfigurationKey);
+            return false;
         }
 
         IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
@@ -149,9 +160,11 @@ internal sealed class Commands
             catch (ArgumentException ex)
             {
                 // RegexParseException derives from ArgumentException.
-                throw new ArgumentException($"Invalid --break-at expression '{expression}': {ex.Message}", ex);
+                logger.LogInvalidBreakAtExpression(expression, ex.Message);
+                return false;
             }
         }
+        return true;
     }
 
     private static void CollectRunMetrics(GlobalRuntimeEnvironment environment, IMetricsCollector metricsCollector, bool runSucceeded)

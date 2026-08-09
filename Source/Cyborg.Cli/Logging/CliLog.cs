@@ -22,4 +22,10 @@ internal static partial class CliLog
 
     [ZLoggerMessage(LogLevel.Error, "Environment variable definition '{env}' has an invalid type specification '{typeName}'. Expected format: 'key:type=value', where type must be a valid registered dynamic value provider type name.")]
     public static partial void LogUnknownEnvironmentVariableType(this ILogger logger, string env, string typeName);
+
+    [ZLoggerMessage(LogLevel.Error, "Cannot use --break-at with no debug frontend configured. Please configure a debug frontend in the configuration file at '{configKey}' or remove the --break-at option.")]
+    public static partial void LogBreakAtWithoutDebugFrontend(this ILogger logger, string configKey);
+
+    [ZLoggerMessage(LogLevel.Error, "Invalid --break-at expression '{expression}': {message}")]
+    public static partial void LogInvalidBreakAtExpression(this ILogger logger, string expression, string message);
 }

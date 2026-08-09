@@ -7,6 +7,8 @@ public sealed class Default<TService>(IServiceSelectionKey<TService> serviceKey,
 {
     private readonly Dictionary<string, TService> _services = services.ToDictionary(s => s.Key, StringComparer.OrdinalIgnoreCase);
 
+    public string ConfigurationKey => serviceKey.Key;
+
     public TService? GetDefault()
     {
         bool configured = true;

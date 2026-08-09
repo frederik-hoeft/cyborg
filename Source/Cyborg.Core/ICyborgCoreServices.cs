@@ -9,6 +9,7 @@ using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Debugging;
 using Cyborg.Core.Modules.Descriptors;
+using Cyborg.Core.Modules.Hooks;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Runtime.Environments.Artifacts;
@@ -16,6 +17,7 @@ using Cyborg.Core.Services;
 using Cyborg.Core.Services.Dispatch;
 using Cyborg.Core.Services.Metrics;
 using Cyborg.Core.Services.Network.Probe;
+using Cyborg.Core.Services.Pipelines;
 using Cyborg.Core.Services.Security.Trust;
 using Jab;
 using System.Text.Json;
@@ -50,6 +52,9 @@ namespace Cyborg.Core;
 [Singleton<IModuleRuntime, RootModuleRuntime>]
 [Singleton<IModuleRegistry, DefaultModuleRegistry>]
 [Singleton<IModuleArtifactsFactory, DefaultModuleArtifactsFactory>]
+[Transient<IServicePipeline<IModuleValidationHook>, ServicePipeline<IModuleValidationHook>>]
+[Transient<IServicePipeline<IModulePreExecutionHook>, ServicePipeline<IModulePreExecutionHook>>]
+[Transient<IServicePipeline<IModulePostExecutionHook>, ServicePipeline<IModulePostExecutionHook>>]
 [Singleton<IChildProcessDispatcher, DefaultChildProcessDispatcher>]
 [Singleton<IPingService, DefaultPingService>]
 [Singleton<IPortProbeService, TcpPortProbeService>]

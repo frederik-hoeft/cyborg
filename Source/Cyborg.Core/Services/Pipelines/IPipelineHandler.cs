@@ -1,4 +1,4 @@
-﻿namespace Cyborg.Core.Common.Pipelines;
+﻿namespace Cyborg.Core.Services.Pipelines;
 
 public interface IPipelineHandler
 {

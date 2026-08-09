@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Common.Pipelines;
+﻿using Cyborg.Core.Services.Pipelines;
 
 namespace Cyborg.Core.Modules.Hooks;
 

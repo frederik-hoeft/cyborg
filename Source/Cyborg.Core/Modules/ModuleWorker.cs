@@ -1,20 +1,19 @@
-﻿using Cyborg.Core.Common.Pipelines;
-using Cyborg.Core.Configuration.Model;
+﻿using Cyborg.Core.Configuration.Model;
 using Cyborg.Core.Modules.Hooks;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments.Artifacts;
 using Cyborg.Core.Modules.Validation;
+using Cyborg.Core.Services.Pipelines;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using System.Collections.Immutable;
 
 namespace Cyborg.Core.Modules;
 
 public abstract class ModuleWorker<TModule>(IWorkerContext<TModule> context) : IModuleWorker where TModule : ModuleBase, IModule<TModule>
 {
-    private readonly ImmutableArray<IModuleValidationHook> _validationHooks = context.ServiceProvider.GetServices<IModuleValidationHook>().CreatePipeline();
-    private readonly ImmutableArray<IModulePreExecutionHook> _preExecutionHooks = context.ServiceProvider.GetServices<IModulePreExecutionHook>().CreatePipeline();
-    private readonly ImmutableArray<IModulePostExecutionHook> _postExecutionHooks = context.ServiceProvider.GetServices<IModulePostExecutionHook>().CreatePipeline();
+    private readonly IServicePipeline<IModuleValidationHook> _validationHooks = context.ServiceProvider.GetRequiredService<IServicePipeline<IModuleValidationHook>>();
+    private readonly IServicePipeline<IModulePreExecutionHook> _preExecutionHooks = context.ServiceProvider.GetRequiredService<IServicePipeline<IModulePreExecutionHook>>();
+    private readonly IServicePipeline<IModulePostExecutionHook> _postExecutionHooks = context.ServiceProvider.GetRequiredService<IServicePipeline<IModulePostExecutionHook>>();
 
     private IModuleResultBuilder ResultBuilder { get; set; } = null!;
 
