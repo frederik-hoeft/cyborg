@@ -50,7 +50,7 @@ public sealed class TestModuleRuntimeScope : IAsyncDisposable
     /// </summary>
     /// <param name="services">The fully configured service collection.</param>
     /// <returns>A ready-to-use test scope.</returns>
-    public static TestModuleRuntimeScope Create(IServiceCollection services)
+    internal static TestModuleRuntimeScope Create(IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
         ServiceProvider serviceProvider = services.BuildServiceProvider();

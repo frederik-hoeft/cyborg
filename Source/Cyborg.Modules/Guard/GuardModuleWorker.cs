@@ -7,7 +7,7 @@ namespace Cyborg.Modules.Guard;
 
 public sealed partial class GuardModuleWorker(IWorkerContext<GuardModule> context) : ModuleWorker<GuardModule>(context)
 {
-    protected override ValueTask<IValidationResult<GuardModule>> ModuleValidationCallbackAsync(IValidationResult<GuardModule> validationResult, GuardModule originalModule, CancellationToken cancellationToken)
+    protected override ValueTask<IValidationResult<GuardModule>> OnValidationAsync(IValidationResult<GuardModule> validationResult, GuardModule originalModule, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(validationResult);
         if (validationResult.Module is { Catch: null, Finally: null })
@@ -22,7 +22,7 @@ public sealed partial class GuardModuleWorker(IWorkerContext<GuardModule> contex
             ));
         }
 
-        return base.ModuleValidationCallbackAsync(validationResult, originalModule, cancellationToken);
+        return base.OnValidationAsync(validationResult, originalModule, cancellationToken);
     }
 
     protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)

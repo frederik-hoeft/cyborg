@@ -1,4 +1,5 @@
-﻿using Cyborg.Core.Modules.Validation;
+﻿using Cyborg.Core.Modules.Runtime;
+using Cyborg.Core.Modules.Validation;
 using Cyborg.Core.TestAdapter;
 using Cyborg.TestModules.Validation;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,40 +10,42 @@ namespace Cyborg.Modules.Tests.Core.Validation;
 public sealed class RepeatedCollectionValidationTests : ModuleTestBase
 {
     [TestMethod]
-    public async Task TestValidationAsync_RepeatedRequiredAttributesReportParentErrorAsync()
+    public Task TestValidationAsync_RepeatedRequiredAttributesReportParentErrorAsync() => TestWithDIAsync(async services =>
     {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+
         ValidationPipelineTestModule module = CreateModule() with
         {
             RequiredTags = null,
         };
 
-        await using TestModuleRuntimeScope scope = CreateValidationScope();
-        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(scope.Runtime, scope.ServiceProvider, TestContext.CancellationToken);
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
 
         MSAssert.HasCount(1, result.Errors);
         MSAssert.Contains(
             error => error.Rule == "required"
                 && error.PropertyName.EndsWith(nameof(ValidationPipelineTestModule.RequiredTags), StringComparison.Ordinal),
             result.Errors);
-    }
+    });
 
     [TestMethod]
-    public async Task TestValidationAsync_RepeatedRequiredAttributesReportElementErrorAsync()
+    public Task TestValidationAsync_RepeatedRequiredAttributesReportElementErrorAsync() => TestWithDIAsync(async services =>
     {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+
         ValidationPipelineTestModule module = CreateModule() with
         {
             RequiredTags = [null],
         };
 
-        await using TestModuleRuntimeScope scope = CreateValidationScope();
-        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(scope.Runtime, scope.ServiceProvider, TestContext.CancellationToken);
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
 
         MSAssert.HasCount(1, result.Errors);
         MSAssert.Contains(
             error => error.Rule == "required"
                 && error.PropertyName.EndsWith(nameof(ValidationPipelineTestModule.RequiredTags), StringComparison.Ordinal),
             result.Errors);
-    }
+    });
 
     private static ValidationPipelineTestModule CreateModule() => new
     (
@@ -53,11 +56,4 @@ public sealed class RepeatedCollectionValidationTests : ModuleTestBase
         DeferredValue: "literal",
         Tags: null
     );
-
-    private TestModuleRuntimeScope CreateValidationScope()
-    {
-        IServiceCollection services = TestServiceConfiguration.CreateDefaultServices();
-        ConfigureServices(services, new JabServiceDiscovery());
-        return TestModuleRuntimeScope.Create(services);
-    }
 }

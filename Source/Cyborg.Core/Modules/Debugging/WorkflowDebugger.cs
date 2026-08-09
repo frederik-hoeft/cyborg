@@ -23,7 +23,8 @@ internal sealed class WorkflowDebugger(IBreakpointRegistry breakpoints, ILoggerF
         ArgumentNullException.ThrowIfNull(runtime);
         ArgumentNullException.ThrowIfNull(services);
 
-        if (!IsEnabled)
+        // skip evaluation if debugging is disabled or we're running headless (no frontend to handle the breakpoint)
+        if (!IsEnabled || defaultFrontend.GetDefault() is not { } frontend)
         {
             return DebugResumeAction.Continue;
         }
@@ -47,7 +48,6 @@ internal sealed class WorkflowDebugger(IBreakpointRegistry breakpoints, ILoggerF
 
         _logger.LogBreakpointHit(pauseContext.GetModuleIdentity(), matched.Expression);
 
-        IDebugFrontend frontend = defaultFrontend.GetRequiredDefault();
         return await frontend.PauseAsync(pauseContext, cancellationToken).ConfigureAwait(false);
     }
 }

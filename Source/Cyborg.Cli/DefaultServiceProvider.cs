@@ -18,5 +18,5 @@ namespace Cyborg.Cli;
 [Singleton<JsonSerializerContext>(Factory = nameof(GetCliJsonSerializerContext))]
 internal sealed partial class DefaultServiceProvider
 {
-    private static CliJsonSerializerContext GetCliJsonSerializerContext() => CliJsonSerializerContext.Default;
+    internal static CliJsonSerializerContext GetCliJsonSerializerContext() => CliJsonSerializerContext.Default;
 }

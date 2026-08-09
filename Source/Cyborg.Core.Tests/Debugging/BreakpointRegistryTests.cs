@@ -3,10 +3,10 @@
 namespace Cyborg.Core.Tests.Debugging;
 
 [TestClass]
-public sealed class BreakpointRegistryTests
+public sealed class BreakpointRegistryTests : CyborgCoreTestBase
 {
     [TestMethod]
-    public void Add_And_List_ReturnsRegisteredBreakpoints()
+    public void Test_Add_And_List_ReturnsRegisteredBreakpoints()
     {
         BreakpointRegistry registry = new();
         int id1 = registry.Add("foo");
@@ -20,7 +20,7 @@ public sealed class BreakpointRegistryTests
     }
 
     [TestMethod]
-    public void TryMatchAndConsume_MatchesModuleId()
+    public void Test_TryMatchAndConsume_MatchesModuleId()
     {
         BreakpointRegistry registry = new();
         registry.Add("cyborg\\.modules\\.empty\\.v1");
@@ -33,7 +33,7 @@ public sealed class BreakpointRegistryTests
     }
 
     [TestMethod]
-    public void TryMatchAndConsume_MatchesNameAndGroup()
+    public void Test_TryMatchAndConsume_MatchesNameAndGroup()
     {
         BreakpointRegistry registry = new();
         registry.Add("^my-step$");
@@ -47,7 +47,7 @@ public sealed class BreakpointRegistryTests
     }
 
     [TestMethod]
-    public void TryMatchAndConsume_RemovesOneShotBreakpoint()
+    public void Test_TryMatchAndConsume_RemovesOneShotBreakpoint()
     {
         BreakpointRegistry registry = new();
         registry.Add(".*", isOneShot: true);
@@ -60,7 +60,7 @@ public sealed class BreakpointRegistryTests
     }
 
     [TestMethod]
-    public void Remove_ById_Works()
+    public void Test_Remove_ById_Works()
     {
         BreakpointRegistry registry = new();
         int id = registry.Add("x");
@@ -70,7 +70,7 @@ public sealed class BreakpointRegistryTests
     }
 
     [TestMethod]
-    public void Clear_RemovesAll()
+    public void Test_Clear_RemovesAll()
     {
         BreakpointRegistry registry = new();
         registry.Add("a");

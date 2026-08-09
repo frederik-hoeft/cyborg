@@ -3,7 +3,7 @@
 namespace Cyborg.Core.Modules.Debugging.Configuration;
 
 [GeneratedDecomposition]
-public sealed partial record DebugOptions(string Frontend)
+public sealed partial record DebugOptions(string? Frontend)
 {
-    public static DebugOptions Default { get; } = new(Frontend: "console");
+    public static DebugOptions Default { get; } = new(Frontend: null);
 }

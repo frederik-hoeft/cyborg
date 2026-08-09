@@ -1,131 +1,169 @@
-﻿using Cyborg.Core.Modules;
+﻿using Cyborg.Core.Configuration.Builders;
+using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Debugging;
 using Cyborg.Core.Modules.Debugging.Breakpoints;
 using Cyborg.Core.Modules.Runtime;
-using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Validation;
 using Cyborg.Core.Services.Default;
-using Microsoft.Extensions.Logging;
-using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Cyborg.Core.Tests.Debugging;
 
 [TestClass]
-public sealed class WorkflowDebuggerTests
+public sealed class WorkflowDebuggerTests : CyborgCoreTestBase
 {
-    private static readonly IServiceProvider s_services = new EmptyServiceProvider();
-
-    public TestContext TestContext { get; set; }
+    protected override void BuildConfiguration(IConfigurationBuilder configuration)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        IServiceSelectionKey<IDebugFrontend> frontendKey = configuration.ServiceProvider.GetRequiredService<IServiceSelectionKey<IDebugFrontend>>();
+        // use ScriptedFrontend as the default frontend for testing
+        configuration.AddDictionary(dict => dict.AddEntry(frontendKey.Key, "test"));
+    }
 
     [TestMethod]
-    public async Task EvaluatePreExecutionAsync_WhenDisabled_ReturnsContinueWithoutFrontendAsync()
+    public Task Test_EvaluatePreExecutionAsync_WhenDisabled_ReturnsContinueWithoutFrontendAsync() => TestWithDIAsync(async services =>
     {
-        BreakpointRegistry registry = new();
-        using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
-        WorkflowDebugger debugger = CreateDebugger(registry, loggerFactory, frontend: null);
-        RootModuleRuntime runtime = new(new GlobalRuntimeEnvironment(JsonNamingPolicy.SnakeCaseLower), loggerFactory);
+        IWorkflowDebugger debugger = services.GetRequiredService<IWorkflowDebugger>();
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
 
-        DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(ProbeModule.ModuleId, ValidationResult.Valid(new ProbeModule()), runtime, s_services, TestContext.CancellationToken);
+        DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(ProbeModule.ModuleId, ValidationResult.Valid(new ProbeModule()), runtime, services, TestContext.CancellationToken);
 
         Assert.AreEqual(DebugResumeAction.Continue, action);
         Assert.IsFalse(debugger.IsEnabled);
-    }
+    });
 
     [TestMethod]
-    public async Task EvaluatePreExecutionAsync_WhenBreakpointMatches_InvokesFrontendAsync()
+    public Task Test_EvaluatePreExecutionAsync_WhenBreakpointMatches_InvokesFrontendAsync() => TestWithDIAsync(async services =>
     {
-        BreakpointRegistry registry = new();
-        registry.Add("probe");
-        using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
-        ScriptedFrontend frontend = new(DebugResumeAction.Continue);
-        WorkflowDebugger debugger = CreateDebugger(registry, loggerFactory, frontend);
-        RootModuleRuntime runtime = new(new GlobalRuntimeEnvironment(JsonNamingPolicy.SnakeCaseLower), loggerFactory);
+        IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        IWorkflowDebugger debugger = services.GetRequiredService<IWorkflowDebugger>();
+
+        breakpoints.Add("probe");
         ProbeModule module = new() { Name = "probe-step" };
+        DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(ProbeModule.ModuleId, ValidationResult.Valid(module), runtime, services, TestContext.CancellationToken);
 
-        DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(ProbeModule.ModuleId, ValidationResult.Valid(module), runtime, s_services, TestContext.CancellationToken);
-
+        IDebugFrontend debugFrontend = services.GetRequiredService<IDebugFrontend>();
+        Assert.IsInstanceOfType<ScriptedFrontend>(debugFrontend);
+        ScriptedFrontend frontend = (ScriptedFrontend)debugFrontend;
         Assert.AreEqual(DebugResumeAction.Continue, action);
         Assert.AreEqual(1, frontend.PauseCount);
         Assert.AreEqual("cyborg.tests.probe.v1 name=probe-step", frontend.LastIdentity);
-    }
+    }, static services => services.AddSingleton<IDebugFrontend>(new ScriptedFrontend(DebugResumeAction.Continue)));
 
     [TestMethod]
-    public async Task EvaluatePreExecutionAsync_CancelFromFrontend_PropagatesAsync()
+    public Task Test_EvaluatePreExecutionAsync_CancelFromFrontend_PropagatesAsync() => TestWithDIAsync(async services =>
     {
-        BreakpointRegistry registry = new();
-        registry.Add(".*");
-        using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
-        WorkflowDebugger debugger = CreateDebugger(registry, loggerFactory, new ScriptedFrontend(DebugResumeAction.Cancel));
-        RootModuleRuntime runtime = new(new GlobalRuntimeEnvironment(JsonNamingPolicy.SnakeCaseLower), loggerFactory);
+        IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        IWorkflowDebugger debugger = services.GetRequiredService<IWorkflowDebugger>();
 
-        DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(ProbeModule.ModuleId, ValidationResult.Valid(new ProbeModule()), runtime, s_services, TestContext.CancellationToken);
+        breakpoints.Add(".*");
+
+        DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(
+            ProbeModule.ModuleId,
+            ValidationResult.Valid(new ProbeModule()),
+            runtime,
+            services,
+            TestContext.CancellationToken);
 
         Assert.AreEqual(DebugResumeAction.Cancel, action);
-    }
+    }, static services => services.AddSingleton<IDebugFrontend>(new ScriptedFrontend(DebugResumeAction.Cancel)));
 
     [TestMethod]
-    public async Task RequestStep_RegistersOneShotWildcardAsync()
-    {
-        BreakpointRegistry registry = new();
-        registry.Add("first");
-        using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
-        WorkflowDebugger debugger = CreateDebugger(registry, loggerFactory, new StepThenContinueFrontend());
-        RootModuleRuntime runtime = new(new GlobalRuntimeEnvironment(JsonNamingPolicy.SnakeCaseLower), loggerFactory);
-        ProbeModule module = new() { Name = "first" };
+    public Task Test_RequestStep_RegistersOneShotWildcardAsync() => TestWithDIAsync(
+        assertion: async services =>
+        {
+            IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
+            IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+            IWorkflowDebugger debugger = services.GetRequiredService<IWorkflowDebugger>();
 
-        await debugger.EvaluatePreExecutionAsync(ProbeModule.ModuleId, ValidationResult.Valid(module), runtime, s_services, TestContext.CancellationToken);
+            breakpoints.Add("first");
+            ProbeModule module = new() { Name = "first" };
 
-        IReadOnlyList<BreakpointExpression> breakpoints = registry.ToList();
-        Assert.Contains(static breakpoint => breakpoint.Expression == WorkflowDebugger.STEP_EXPRESSION && breakpoint.IsOneShot, breakpoints);
-    }
+            await debugger.EvaluatePreExecutionAsync(ProbeModule.ModuleId, ValidationResult.Valid(module), runtime, services, TestContext.CancellationToken);
 
-    [TestMethod]
-    public async Task EvaluatePreExecutionAsync_InvalidResult_PassesPreparedModuleAndErrorsToFrontendAsync()
-    {
-        BreakpointRegistry registry = new();
-        registry.Add("probe");
-        using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
-        ScriptedFrontend frontend = new(DebugResumeAction.Continue);
-        WorkflowDebugger debugger = CreateDebugger(registry, loggerFactory, frontend);
-        RootModuleRuntime runtime = new(new GlobalRuntimeEnvironment(JsonNamingPolicy.SnakeCaseLower), loggerFactory);
-        ProbeModule module = new() { Name = "probe-invalid" };
-        ValidationError error = new(nameof(ProbeModule.Name), "test-rule", "The probe is invalid.");
-        IValidationResult<ProbeModule> validationResult = ValidationResult.Invalid(module, [error]);
+            IReadOnlyList<BreakpointExpression> registeredBreakpoints = breakpoints.ToList();
+            Assert.Contains(static breakpoint => breakpoint.Expression == WorkflowDebugger.STEP_EXPRESSION && breakpoint.IsOneShot, registeredBreakpoints);
+        },
+        configureServices: static services => services.AddSingleton<IDebugFrontend, StepThenContinueFrontend>(),
+        buildConfiguration: static config =>
+        {
+            IServiceSelectionKey<IDebugFrontend> frontendKey = config.ServiceProvider.GetRequiredService<IServiceSelectionKey<IDebugFrontend>>();
 
-        DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(ProbeModule.ModuleId, validationResult, runtime, s_services, TestContext.CancellationToken);
-
-        Assert.AreEqual(DebugResumeAction.Continue, action);
-        Assert.IsFalse(frontend.LastIsValid);
-        Assert.AreEqual(module, frontend.LastModule);
-        Assert.AreSequenceEqual([error], frontend.LastValidationErrors);
-    }
+            config.AddDictionary(dict => dict.AddEntry(frontendKey.Key, "test-step"));
+        });
 
     [TestMethod]
-    public async Task EvaluatePreExecutionAsync_WhenFrontendConfigurationIsInvalid_ThrowsAsync()
-    {
-        BreakpointRegistry registry = new();
-        registry.Add("probe");
-        using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
-        WorkflowDebugger debugger = CreateDebugger(registry, loggerFactory, frontend: null);
-        RootModuleRuntime runtime = new(new GlobalRuntimeEnvironment(JsonNamingPolicy.SnakeCaseLower), loggerFactory);
+    public Task Test_EvaluatePreExecutionAsync_InvalidResult_PassesPreparedModuleAndErrorsToFrontendAsync() => TestWithDIAsync(
+        assertion: async services =>
+        {
+            IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
+            IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+            IWorkflowDebugger debugger = services.GetRequiredService<IWorkflowDebugger>();
 
-        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            await debugger.EvaluatePreExecutionAsync(ProbeModule.ModuleId, ValidationResult.Valid(new ProbeModule()), runtime, s_services, TestContext.CancellationToken));
-    }
+            breakpoints.Add("probe");
 
-    private static WorkflowDebugger CreateDebugger(BreakpointRegistry registry, ILoggerFactory loggerFactory, IDebugFrontend? frontend) =>
-        new(registry, loggerFactory, new TestDefaultFrontend(frontend));
+            ProbeModule module = new() { Name = "probe-invalid" };
+            ValidationError error = new(nameof(ProbeModule.Name), "test-rule", "The probe is invalid.");
+            IValidationResult<ProbeModule> validationResult = ValidationResult.Invalid(module, [error]);
+
+            DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(ProbeModule.ModuleId, validationResult, runtime, services, TestContext.CancellationToken);
+
+            IDebugFrontend debugFrontend = services.GetRequiredService<IDebugFrontend>();
+            Assert.IsInstanceOfType<ScriptedFrontend>(debugFrontend);
+            ScriptedFrontend frontend = (ScriptedFrontend)debugFrontend;
+
+            Assert.AreEqual(DebugResumeAction.Continue, action);
+            Assert.IsFalse(frontend.LastIsValid);
+            Assert.AreEqual(module, frontend.LastModule);
+            Assert.AreSequenceEqual([error], frontend.LastValidationErrors);
+        },
+        configureServices: static services => services.AddSingleton<IDebugFrontend>(new ScriptedFrontend(DebugResumeAction.Continue)));
+
+    [TestMethod]
+    public Task Test_EvaluatePreExecutionAsync_WhenNoFrontendIsAvailable_ReturnsContinueAsync() => TestWithDIAsync(
+        assertion: async services =>
+        {
+            IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
+            IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+            IWorkflowDebugger debugger = services.GetRequiredService<IWorkflowDebugger>();
+
+            breakpoints.Add("probe");
+
+            DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(ProbeModule.ModuleId, ValidationResult.Valid(new ProbeModule()), runtime, services, TestContext.CancellationToken);
+
+            Assert.AreEqual(DebugResumeAction.Continue, action);
+        },
+        buildConfiguration: static config =>
+        {
+            IServiceSelectionKey<IDebugFrontend> frontendKey = config.ServiceProvider.GetRequiredService<IServiceSelectionKey<IDebugFrontend>>();
+            config.Ignore(frontendKey.Key);
+        });
+
+    [TestMethod]
+    public Task Test_EvaluatePreExecutionAsync_WhenSpecifiedFrontendIsNotFound_ThrowsAsync() => TestWithDIAsync(
+        assertion: async services =>
+        {
+            IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
+            IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+            IWorkflowDebugger debugger = services.GetRequiredService<IWorkflowDebugger>();
+
+            breakpoints.Add("probe");
+
+            await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                await debugger.EvaluatePreExecutionAsync(ProbeModule.ModuleId, ValidationResult.Valid(new ProbeModule()), runtime, services, TestContext.CancellationToken));
+        },
+        buildConfiguration: static config =>
+        {
+            IServiceSelectionKey<IDebugFrontend> frontendKey = config.ServiceProvider.GetRequiredService<IServiceSelectionKey<IDebugFrontend>>();
+
+            config.AddDictionary(dict => dict.AddEntry(frontendKey.Key, "does-not-exist"));
+        });
 
     private sealed record ProbeModule : ModuleBase, IModule
     {
         public static string ModuleId => "cyborg.tests.probe.v1";
-    }
-
-    private sealed class TestDefaultFrontend(IDebugFrontend? frontend) : IDefault<IDebugFrontend>
-    {
-        public IDebugFrontend? GetDefault() => frontend;
-
-        public IDebugFrontend GetRequiredDefault() => frontend ?? throw new InvalidOperationException("No frontend configured.");
     }
 
     private sealed class ScriptedFrontend(DebugResumeAction action) : IDebugFrontend
@@ -164,10 +202,5 @@ public sealed class WorkflowDebuggerTests
             context.RequestStep();
             return ValueTask.FromResult(DebugResumeAction.Continue);
         }
-    }
-
-    private sealed class EmptyServiceProvider : IServiceProvider
-    {
-        public object? GetService(Type serviceType) => serviceType == typeof(IServiceProvider) ? this : null;
     }
 }

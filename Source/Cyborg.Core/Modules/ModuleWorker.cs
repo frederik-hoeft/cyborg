@@ -57,7 +57,7 @@ public abstract class ModuleWorker<TModule>(IWorkerContext<TModule> context) : I
         ArgumentNullException.ThrowIfNull(runtime);
         Logger.LogModuleValidationStarted(ModuleId);
         IValidationResult<TModule> moduleValidationResult = await context.Module.ValidateAsync(runtime, ServiceProvider, cancellationToken);
-        IValidationResult<TModule> workerValidationResult = await ModuleValidationCallbackAsync(moduleValidationResult, context.Module, cancellationToken);
+        IValidationResult<TModule> workerValidationResult = await OnValidationAsync(moduleValidationResult, context.Module, cancellationToken);
         // run validation hooks
         ModuleValidationContext<TModule> validationContext = new(workerValidationResult, runtime.Environment);
         foreach (IModuleValidationHook validationHook in _validationHooks)
@@ -109,6 +109,6 @@ public abstract class ModuleWorker<TModule>(IWorkerContext<TModule> context) : I
         return result;
     }
 
-    protected virtual ValueTask<IValidationResult<TModule>> ModuleValidationCallbackAsync(IValidationResult<TModule> validationResult, TModule originalModule, CancellationToken cancellationToken) =>
+    protected virtual ValueTask<IValidationResult<TModule>> OnValidationAsync(IValidationResult<TModule> validationResult, TModule originalModule, CancellationToken cancellationToken) =>
         ValueTask.FromResult(validationResult);
 }

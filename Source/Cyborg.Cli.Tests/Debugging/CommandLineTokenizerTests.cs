@@ -3,7 +3,7 @@
 namespace Cyborg.Cli.Tests.Debugging;
 
 [TestClass]
-public sealed class CommandLineTokenizerTests
+public sealed class CommandLineTokenizerTests : CyborgCliTestBase
 {
     [TestMethod]
     public void TryTokenize_QuotedArgument_PreservesWhitespace()

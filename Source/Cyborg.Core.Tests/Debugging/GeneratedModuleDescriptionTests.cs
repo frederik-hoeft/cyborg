@@ -10,7 +10,7 @@ namespace Cyborg.Core.Tests.Debugging;
 public sealed class GeneratedModuleDescriptionTests : CyborgCoreTestBase
 {
     [TestMethod]
-    public Task ToJsonAsync_StringProperty_IsScalarAsync() => TestWithDIAsync(async services =>
+    public Task Test_ToJsonAsync_StringProperty_IsScalarAsync() => TestWithDIAsync(async services =>
     {
         IModuleSerializationService serializationService = services.GetRequiredService<IModuleSerializationService>();
 
@@ -40,7 +40,7 @@ public sealed class GeneratedModuleDescriptionTests : CyborgCoreTestBase
     });
 
     [TestMethod]
-    public Task ToJsonAsync_NestedObjectAndCollection_AreRecursiveAsync() => TestWithDIAsync(async services =>
+    public Task Test_ToJsonAsync_NestedObjectAndCollection_AreRecursiveAsync() => TestWithDIAsync(async services =>
     {
         IModuleSerializationService serializationService = services.GetRequiredService<IModuleSerializationService>();
         GeneratedDescriptionTestModule module = new()
@@ -68,7 +68,7 @@ public sealed class GeneratedModuleDescriptionTests : CyborgCoreTestBase
     });
 
     [TestMethod]
-    public Task ToJsonAsync_NullAndNullableCollections_PreserveShapeAsync() => TestWithDIAsync(async services =>
+    public Task Test_ToJsonAsync_NullAndNullableCollections_PreserveShapeAsync() => TestWithDIAsync(async services =>
     {
         IModuleSerializationService serializationService = services.GetRequiredService<IModuleSerializationService>();
         GeneratedDescriptionTestModule module = new()
@@ -100,7 +100,7 @@ public sealed class GeneratedModuleDescriptionTests : CyborgCoreTestBase
     });
 
     [TestMethod]
-    public Task ToTextAsync_EmptyImmutableArray_RendersEmptyCollectionAsync() => TestWithDIAsync(async services =>
+    public Task Test_ToTextAsync_EmptyImmutableArray_RendersEmptyCollectionAsync() => TestWithDIAsync(async services =>
     {
         IModuleSerializationService serializationService = services.GetRequiredService<IModuleSerializationService>();
         GeneratedDescriptionTestModule module = new()
@@ -115,7 +115,7 @@ public sealed class GeneratedModuleDescriptionTests : CyborgCoreTestBase
     });
 
     [TestMethod]
-    public Task ToTextAsync_DefaultImmutableArray_DoesNotEnumerateAsync() => TestWithDIAsync(async services =>
+    public Task Test_ToTextAsync_DefaultImmutableArray_DoesNotEnumerateAsync() => TestWithDIAsync(async services =>
     {
         IModuleSerializationService serializationService = services.GetRequiredService<IModuleSerializationService>();
         GeneratedDescriptionTestModule module = new()

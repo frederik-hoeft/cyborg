@@ -1,4 +1,6 @@
 ﻿using Cyborg.Core.Configuration;
+using Cyborg.Core.Configuration.Builders;
+using Cyborg.Core.Configuration.Loaders;
 using Cyborg.Core.Configuration.Model;
 using Cyborg.Core.Configuration.Serialization;
 using Cyborg.Core.Configuration.Serialization.Dynamics;
@@ -27,7 +29,9 @@ namespace Cyborg.Core;
 [Import<IModuleDescriptionServices>]
 [Import<IDebugServices>]
 [Singleton<IConfiguration, DefaultConfiguration>]
-[Singleton<IConfigurationLoader, DefaultConfigurationLoader>]
+[Transient<IConfigurationBuilder, DefaultConfigurationBuilder>]
+[Transient<IConfigurationFileLoader, ConfigurationFileLoader>]
+[Transient<IConfigurationDictionaryLoader, ConfigurationDictionaryLoader>]
 [Singleton<INamedServiceProvider, NamedServiceProvider>]
 [Singleton<IJsonLoaderContext, DefaultJsonLoaderContext>]
 [Singleton<IJsonLoaderContextProvider, DefaultJsonLoaderContextProvider>]

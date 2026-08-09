@@ -3,6 +3,7 @@ using Cyborg.Cli.Arguments;
 using Cyborg.Cli.Logging;
 using Cyborg.Cli.Metrics;
 using Cyborg.Core.Configuration;
+using Cyborg.Core.Configuration.Builders;
 using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Debugging;
@@ -59,8 +60,9 @@ internal sealed class Commands
     {
         using DefaultServiceProvider services = new();
         IConfiguration configuration = services.GetRequiredService<IConfiguration>();
-        IConfigurationLoader configurationLoader = services.GetRequiredService<IConfigurationLoader>();
-        await configurationLoader.AddSourceAsync(configuration, options, cancellationToken);
+        IConfigurationBuilder configurationBuilder = services.GetRequiredService<IConfigurationBuilder>();
+        configurationBuilder.AddFiles(files => files.Add(options));
+        await configurationBuilder.ApplyToAsync(configuration, cancellationToken);
 
         MetricsOptions metricsOptions = configuration.Get("cyborg.services.metrics", () => new MetricsOptions());
         services.GetRequiredService<MetricsCollectorOptions>().Namespace = metricsOptions.Namespace;

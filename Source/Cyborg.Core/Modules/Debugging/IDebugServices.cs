@@ -31,9 +31,9 @@ public interface IDebugServices
         return new WorkflowDebugger(breakpoints, loggerFactory, defaultFrontend);
     }
 
-    static IModulePreExecutionHook CreateDebuggingHook(IWorkflowDebugger? debugger, IServiceProvider serviceProvider)
+    static IModulePreExecutionHook CreateDebuggingHook(IServiceProvider serviceProvider, IWorkflowDebugger? debugger = null)
     {
         ArgumentNullException.ThrowIfNull(serviceProvider);
-        return new DebuggingHook(debugger, serviceProvider);
+        return new DebuggingHook(serviceProvider, debugger);
     }
 }
