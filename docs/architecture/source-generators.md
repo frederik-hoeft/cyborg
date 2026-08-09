@@ -92,7 +92,7 @@ For each annotated record, the generator emits a partial record implementing `IM
 
 3. **`ApplyInterpolationAsync`** — Private instance helper that recursively rewrites eligible string properties through `ModuleValidationContext.Interpolate(...)`, including strings in nested `[Validatable]` records and supported collections. `[IgnoreInterpolation]` leaves a string untouched for later context-specific interpolation.
 
-4. **`ValidateAsync`** — Creates one `ModuleValidationContext` from the runtime and service provider, orchestrates defaults → overrides → defaults → interpolation → constraints, collects `ValidationError` instances, and returns `ValidationResult<TModule>.Valid(module)` or `ValidationResult<TModule>.Invalid(errors)`. Validation recurses into nested validatable records and supported collection elements.
+4. **`ValidateAsync`** — Creates one `ModuleValidationContext` from the runtime and service provider, orchestrates defaults → overrides → defaults → interpolation → constraints, collects `ValidationError` instances, and returns `ValidationResult<TModule>.Valid(module)` or `ValidationResult<TModule>.Invalid(module, errors)`. Invalid generated results retain the fully prepared module so debugger/diagnostic consumers can inspect the failed post-preparation state. Validation recurses into nested validatable records and supported collection elements.
 
 The generated code uses `with`-expressions throughout, ensuring that each stage produces a new record instance and that the original deserialized module is never mutated.
 
@@ -182,7 +182,7 @@ The generator is triggered by `[GeneratedDecomposition]` on a `partial record` o
 
 ### Generated Output
 
-The generated `Decompose()` method returns a collection of `DynamicKeyValuePair` entries, one per public property. Properties marked with `[DecomposeIgnore]` are excluded. Each entry pairs a transformed property name (as the key) with the property value.
+The generated `Decompose()` method returns a collection of `DynamicKeyValuePair` entries, one per public instance property. Static properties and properties marked with `[DecomposeIgnore]` are excluded. Each entry pairs a transformed property name (as the key) with the property value.
 
 ### Naming Policy
 
@@ -203,7 +203,7 @@ All generators implement `IIncrementalGenerator` and follow the Roslyn increment
 
 All generators render source code using `IndentedStringBuilder`, a custom builder that manages indentation levels via `IncreaseIndent()` and `DecreaseIndent()`. This produces consistently formatted generated code regardless of nesting depth.
 
-The validation generator further decomposes rendering into `ISectionRenderer` implementations, allowing each pipeline stage to be rendered independently. The loader factory and decomposition generators use dedicated renderer classes (`LoaderFactoryRenderer`, `ModelDecompositionRenderer`) with static `Render` methods.
+The validation generator further decomposes rendering into `ISectionRenderer` implementations, allowing each pipeline stage to be rendered independently. A shared `VisibilityContext` is anchored to the root generated module symbol so setter/member accessibility checks model the lexical context of the emitted partial type even while recursive rendering processes nested property models. The loader factory and decomposition generators use dedicated renderer classes (`LoaderFactoryRenderer`, `ModelDecompositionRenderer`) with static `Render` methods.
 
 ### Type Reference Safety
 

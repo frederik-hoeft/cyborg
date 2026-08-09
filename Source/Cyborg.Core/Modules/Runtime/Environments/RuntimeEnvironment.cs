@@ -16,7 +16,7 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
 
     [return: NotNullIfNotNull(nameof(value))]
     internal protected virtual IReadOnlyCollection<T>? ResolveCollectionCore<TModule, T>(EnvironmentLike entryPoint, TModule module, IReadOnlyCollection<T>? value, string? moduleExpression, string? valueExpression)
-        where TModule : ModuleBase, IModule
+        where TModule : ModuleBase, IModuleDefinition
     {
         ArgumentNullException.ThrowIfNull(entryPoint);
         ArgumentNullException.ThrowIfNull(module);
@@ -42,12 +42,8 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
     }
 
     [return: NotNullIfNotNull(nameof(value))]
-    T? IRuntimeEnvironment.Resolve<TModule, T>(TModule module, T? value, string? moduleExpression, string? valueExpression) where T : default =>
-        Resolve(module, value, moduleExpression, valueExpression);
-
-    [return: NotNullIfNotNull(nameof(value))]
-    internal protected virtual T? Resolve<TModule, T>(TModule module, T? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
-        where TModule : ModuleBase, IModule
+    public virtual T? Resolve<TModule, T>(TModule module, T? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
+        where TModule : ModuleBase, IModuleDefinition
     {
         T? resolvedValue = ResolveCore(this, module, value, moduleExpression, valueExpression);
         if (resolvedValue is string stringValue)
@@ -58,7 +54,7 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
     }
 
     [return: NotNullIfNotNull(nameof(value))]
-    internal protected virtual T? ResolveCore<TModule, T>(EnvironmentLike entryPoint, TModule module, T? value, string? moduleExpression, string? valueExpression) where TModule : ModuleBase, IModule
+    internal protected virtual T? ResolveCore<TModule, T>(EnvironmentLike entryPoint, TModule module, T? value, string? moduleExpression, string? valueExpression) where TModule : ModuleBase, IModuleDefinition
     {
         ArgumentNullException.ThrowIfNull(entryPoint);
         ArgumentNullException.ThrowIfNull(module);
@@ -81,7 +77,8 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
     string? IRuntimeEnvironment.SelectRawStringOverride<TModule>(TModule module, string? value, string moduleExpression, string valueExpression) =>
         TrySelectRawStringOverrideCore(this, module, moduleExpression, valueExpression, out string? selectedValue) ? selectedValue : value;
 
-    internal protected virtual bool TrySelectRawStringOverrideCore<TModule>(EnvironmentLike entryPoint, TModule module, string? moduleExpression, string? valueExpression, [NotNullWhen(true)] out string? value) where TModule : ModuleBase, IModule
+    internal protected virtual bool TrySelectRawStringOverrideCore<TModule>(EnvironmentLike entryPoint, TModule module, string? moduleExpression, string? valueExpression, [NotNullWhen(true)] out string? value)
+        where TModule : ModuleBase, IModuleDefinition
     {
         ArgumentNullException.ThrowIfNull(entryPoint);
         ArgumentNullException.ThrowIfNull(module);
@@ -129,7 +126,7 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         return valuePath;
     }
 
-    public virtual string NamespaceOf<TModule>(TModule module) where TModule : ModuleBase, IModule
+    public virtual string NamespaceOf<TModule>(TModule module) where TModule : IModuleDefinition
     {
         ArgumentNullException.ThrowIfNull(module);
         return GetEffectiveNamespace(module.Name, module.Group, TModule.ModuleId);

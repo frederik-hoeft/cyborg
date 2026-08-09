@@ -4,7 +4,7 @@ using Cyborg.Core.Modules.Runtime;
 namespace Cyborg.Core.Modules.Validation;
 
 [GeneratorContractRegistration<ModuleValidationGeneratorContract>(ModuleValidationGeneratorContract.IModuleT)]
-public interface IModule<TSelf> : IModule where TSelf : class, IModule<TSelf>
+public interface IModule<TSelf> : IModuleDefinition where TSelf : class, IModule<TSelf>
 {
     /// <summary>
     /// Validates the current instance asynchronously using the specified runtime environment and service provider.
@@ -17,7 +17,6 @@ public interface IModule<TSelf> : IModule where TSelf : class, IModule<TSelf>
     /// <param name="runtime">The runtime environment that provides context and resources required for the validation process. Cannot be null.</param>
     /// <param name="serviceProvider">The service provider used to resolve dependencies needed during validation. Cannot be null.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the validation operation.</param>
-    /// <returns>A task that represents the asynchronous validation operation. The result contains a validation outcome
-    /// indicating whether the instance is valid or specifying any validation errors.</returns>
-    ValueTask<ValidationResult<TSelf>> ValidateAsync(IModuleRuntime runtime, IServiceProvider serviceProvider, CancellationToken cancellationToken);
+    /// <returns>A task that represents the asynchronous validation operation. Generated results retain the prepared module instance and report any validation errors alongside it.</returns>
+    ValueTask<IValidationResult<TSelf>> ValidateAsync(IModuleRuntime runtime, IServiceProvider serviceProvider, CancellationToken cancellationToken);
 }

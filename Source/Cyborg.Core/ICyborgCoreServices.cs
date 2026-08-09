@@ -1,12 +1,15 @@
-using Cyborg.Core.Configuration;
+﻿using Cyborg.Core.Configuration;
+using Cyborg.Core.Configuration.Builders;
+using Cyborg.Core.Configuration.Loaders;
 using Cyborg.Core.Configuration.Model;
 using Cyborg.Core.Configuration.Serialization;
 using Cyborg.Core.Configuration.Serialization.Dynamics;
+using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Debugging;
 using Cyborg.Core.Modules.Descriptors;
-using Cyborg.Core.Modules.Descriptors.Writers;
+using Cyborg.Core.Modules.Hooks;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Runtime.Environments.Artifacts;
@@ -14,6 +17,7 @@ using Cyborg.Core.Services;
 using Cyborg.Core.Services.Dispatch;
 using Cyborg.Core.Services.Metrics;
 using Cyborg.Core.Services.Network.Probe;
+using Cyborg.Core.Services.Pipelines;
 using Cyborg.Core.Services.Security.Trust;
 using Jab;
 using System.Text.Json;
@@ -24,8 +28,12 @@ namespace Cyborg.Core;
 [ServiceProviderModule]
 [Import<IDynamicValueProviderServices>]
 [Import<IConfigurationTrustServices>]
+[Import<IModuleDescriptionServices>]
+[Import<IDebugServices>]
 [Singleton<IConfiguration, DefaultConfiguration>]
-[Singleton<IConfigurationLoader, DefaultConfigurationLoader>]
+[Transient<IConfigurationBuilder, DefaultConfigurationBuilder>]
+[Transient<IConfigurationFileLoader, ConfigurationFileLoader>]
+[Transient<IConfigurationDictionaryLoader, ConfigurationDictionaryLoader>]
 [Singleton<INamedServiceProvider, NamedServiceProvider>]
 [Singleton<IJsonLoaderContext, DefaultJsonLoaderContext>]
 [Singleton<IJsonLoaderContextProvider, DefaultJsonLoaderContextProvider>]
@@ -44,34 +52,23 @@ namespace Cyborg.Core;
 [Singleton<IModuleRuntime, RootModuleRuntime>]
 [Singleton<IModuleRegistry, DefaultModuleRegistry>]
 [Singleton<IModuleArtifactsFactory, DefaultModuleArtifactsFactory>]
+[Transient<IServicePipeline<IModuleValidationHook>, ServicePipeline<IModuleValidationHook>>]
+[Transient<IServicePipeline<IModulePreExecutionHook>, ServicePipeline<IModulePreExecutionHook>>]
+[Transient<IServicePipeline<IModulePostExecutionHook>, ServicePipeline<IModulePostExecutionHook>>]
 [Singleton<IChildProcessDispatcher, DefaultChildProcessDispatcher>]
 [Singleton<IPingService, DefaultPingService>]
 [Singleton<IPortProbeService, TcpPortProbeService>]
 [Singleton<IPosixShellCommandBuilder, PosixShellCommandBuilder>]
+[Singleton<IModuleResultBuilderFactory, ModuleResultBuilderFactory>]
 [Singleton<MetricsCollectorOptions>]
 [Singleton<IMetricsCollector, MetricsCollector>]
-[Singleton<IModuleDescriptionSerializer>(Factory = nameof(CreateTextModuleDescriptionSerializer))]
-[Singleton<IModuleDescriptionSerializer>(Factory = nameof(CreateJsonModuleDescriptionSerializer))]
-[Singleton<IModuleDescriptionSerializerRegistry>(Factory = nameof(CreateModuleDescriptionSerializerRegistry))]
-[Singleton<IBreakpointRegistry, BreakpointRegistry>]
-[Singleton<IWorkflowDebugger, WorkflowDebugger>]
 [Singleton<GlobalRuntimeEnvironment>]
 [Singleton<JsonSerializerContext>(Factory = nameof(GetCoreJsonSerializerContext))]
 public interface ICyborgCoreServices
 {
-    public static CoreJsonSerializerContext GetCoreJsonSerializerContext() => CoreJsonSerializerContext.Default;
+    static CoreJsonSerializerContext GetCoreJsonSerializerContext() => CoreJsonSerializerContext.Default;
 
-    public static IModuleDescriptionSerializer CreateTextModuleDescriptionSerializer() =>
-        TextModuleDescriptionSerializer.Instance;
+    static JsonConverter CreateEnvironmentScopeConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<EnvironmentScope>(namingPolicy);
 
-    public static IModuleDescriptionSerializer CreateJsonModuleDescriptionSerializer() =>
-        new JsonModuleDescriptionSerializer();
-
-    public static IModuleDescriptionSerializerRegistry CreateModuleDescriptionSerializerRegistry(
-        IEnumerable<IModuleDescriptionSerializer> serializers) =>
-        new DefaultModuleDescriptionSerializerRegistry(serializers);
-
-    public static JsonConverter CreateEnvironmentScopeConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<EnvironmentScope>(namingPolicy);
-
-    public static JsonConverter CreateDecompositionStrategyConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<DecompositionStrategy>(namingPolicy);
+    static JsonConverter CreateDecompositionStrategyConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<DecompositionStrategy>(namingPolicy);
 }

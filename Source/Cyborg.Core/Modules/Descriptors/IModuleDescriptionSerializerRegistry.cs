@@ -1,12 +1,8 @@
-using System.Diagnostics.CodeAnalysis;
-
-namespace Cyborg.Core.Modules.Descriptors;
+﻿namespace Cyborg.Core.Modules.Descriptors;
 
 public interface IModuleDescriptionSerializerRegistry
 {
-    IModuleDescriptionSerializer GetRequired(string format);
+    IModuleDescriptionSerializer GetRequiredSerializer(string format);
 
-    bool TryGet(
-        string format,
-        [NotNullWhen(true)] out IModuleDescriptionSerializer? serializer);
+    bool TryGetSerializer(string format, [NotNullWhen(true)] out IModuleDescriptionSerializer? serializer);
 }

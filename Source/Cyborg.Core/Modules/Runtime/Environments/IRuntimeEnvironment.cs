@@ -26,20 +26,20 @@ public interface IRuntimeEnvironment : IEnvironmentLike
     /// <returns>The resolved value of the variable, or null if the variable could not be resolved. The return value is determined based on the module and value expressions, allowing for overrides based on the context of the module and variable being accessed.</returns>
     /// <remarks>String results are fully interpolated and finalize one layer of escaped interpolation literals.</remarks>
     [return: NotNullIfNotNull(nameof(value))]
-    internal T? Resolve<TModule, T>(TModule module, T? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
-        where TModule : ModuleBase, IModule;
+    T? Resolve<TModule, T>(TModule module, T? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
+        where TModule : ModuleBase, IModuleDefinition;
 
     [return: NotNullIfNotNull(nameof(value))]
-    internal string? SelectRawStringOverride<TModule>(TModule module, string? value, string moduleExpression, string valueExpression) where TModule : ModuleBase, IModule;
+    internal string? SelectRawStringOverride<TModule>(TModule module, string? value, string moduleExpression, string valueExpression) where TModule : ModuleBase, IModuleDefinition;
 
     [return: NotNullIfNotNull(nameof(value))]
-    internal IReadOnlyCollection<T>? ResolveCollection<TModule, T>(TModule module, IReadOnlyCollection<T>? value, string moduleExpression, string valueExpression) where TModule : ModuleBase, IModule;
+    internal IReadOnlyCollection<T>? ResolveCollection<TModule, T>(TModule module, IReadOnlyCollection<T>? value, string moduleExpression, string valueExpression) where TModule : ModuleBase, IModuleDefinition;
 
     void Publish<TModule, T>(TModule module, string root, T decomposable)
-        where TModule : ModuleBase, IModule
+        where TModule : ModuleBase, IModuleDefinition
         where T : class, IDecomposable;
 
-    string NamespaceOf<TModule>(TModule module) where TModule : ModuleBase, IModule;
+    string NamespaceOf<TModule>(TModule module) where TModule : IModuleDefinition;
 
     string NamespaceOf(IModuleWorker module);
 

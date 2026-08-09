@@ -34,13 +34,8 @@ internal sealed class GenerationCandidateFactory
             .Replace('>', '_')
             .Replace('.', '_');
 
-        ModuleModel model = new(
-            Namespace: ns,
-            TypeName: TypeSymbol.Name,
-            FullyQualifiedTypeName: fullyQualifiedTypeName,
-            HintName: hintName + ".ModuleValidation",
-            ContainingTypes: containingTypes,
-            Properties: properties);
+        ModuleModel model = new(ModuleSymbol: TypeSymbol, Namespace: ns, TypeName: TypeSymbol.Name, FullyQualifiedTypeName: fullyQualifiedTypeName,
+            HintName: hintName + ".ModuleValidation", ContainingTypes: containingTypes, Properties: properties);
 
         return new GenerationCandidate(model.HintName, model, [.. diagnostics]);
     }

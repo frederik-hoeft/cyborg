@@ -1,62 +1,44 @@
-using Cyborg.Cli.Debugging;
+﻿using Cyborg.Cli.Debugging;
 
 namespace Cyborg.Cli.Tests.Debugging;
 
 [TestClass]
-public sealed class CommandLineTokenizerTests
+public sealed class CommandLineTokenizerTests : CyborgCliTestBase
 {
     [TestMethod]
     public void TryTokenize_QuotedArgument_PreservesWhitespace()
     {
-        bool result = CommandLineTokenizer.TryTokenize(
-            "break at \"module group\"",
-            out string[] arguments,
-            out string? error);
+        bool result = CommandLineTokenizer.TryTokenize("break at \"module group\"", out string[] arguments, out string? error);
 
         Assert.IsTrue(result);
         Assert.IsNull(error);
-        CollectionAssert.AreEqual(
-            new[] { "break", "at", "module group" },
-            arguments);
+        Assert.AreSequenceEqual(["break", "at", "module group"], arguments);
     }
 
     [TestMethod]
     public void TryTokenize_RepeatedWhitespaceAndTabs_AreSeparators()
     {
-        bool result = CommandLineTokenizer.TryTokenize(
-            "  break\t  at   value  ",
-            out string[] arguments,
-            out string? error);
+        bool result = CommandLineTokenizer.TryTokenize("  break\t  at   value  ", out string[] arguments, out string? error);
 
         Assert.IsTrue(result);
         Assert.IsNull(error);
-        CollectionAssert.AreEqual(
-            new[] { "break", "at", "value" },
-            arguments);
+        Assert.AreSequenceEqual(["break", "at", "value"], arguments);
     }
 
     [TestMethod]
     public void TryTokenize_EmptyQuotedArgument_IsPreserved()
     {
-        bool result = CommandLineTokenizer.TryTokenize(
-            "break at \"\"",
-            out string[] arguments,
-            out string? error);
+        bool result = CommandLineTokenizer.TryTokenize("break at \"\"", out string[] arguments, out string? error);
 
         Assert.IsTrue(result);
         Assert.IsNull(error);
-        CollectionAssert.AreEqual(
-            new[] { "break", "at", string.Empty },
-            arguments);
+        Assert.AreSequenceEqual(["break", "at", string.Empty], arguments);
     }
 
     [TestMethod]
     public void TryTokenize_RegexBackslashes_ArePreserved()
     {
-        bool result = CommandLineTokenizer.TryTokenize(
-            @"break at ^cyborg\.modules\.empty\.v1$",
-            out string[] arguments,
-            out string? error);
+        bool result = CommandLineTokenizer.TryTokenize(@"break at ^cyborg\.modules\.empty\.v1$", out string[] arguments, out string? error);
 
         Assert.IsTrue(result);
         Assert.IsNull(error);
@@ -66,10 +48,7 @@ public sealed class CommandLineTokenizerTests
     [TestMethod]
     public void TryTokenize_BackslashBeforeInactiveQuote_IsPreserved()
     {
-        bool result = CommandLineTokenizer.TryTokenize(
-            "break at \"regex\\'value\"",
-            out string[] arguments,
-            out string? error);
+        bool result = CommandLineTokenizer.TryTokenize("break at \"regex\\'value\"", out string[] arguments, out string? error);
 
         Assert.IsTrue(result);
         Assert.IsNull(error);
@@ -79,10 +58,7 @@ public sealed class CommandLineTokenizerTests
     [TestMethod]
     public void TryTokenize_EscapedQuote_IsUnescaped()
     {
-        bool result = CommandLineTokenizer.TryTokenize(
-            "break at \"module \\\"quoted\\\"\"",
-            out string[] arguments,
-            out string? error);
+        bool result = CommandLineTokenizer.TryTokenize("break at \"module \\\"quoted\\\"\"", out string[] arguments, out string? error);
 
         Assert.IsTrue(result);
         Assert.IsNull(error);
@@ -92,13 +68,10 @@ public sealed class CommandLineTokenizerTests
     [TestMethod]
     public void TryTokenize_UnterminatedQuote_ReturnsError()
     {
-        bool result = CommandLineTokenizer.TryTokenize(
-            "break at \"module",
-            out string[] arguments,
-            out string? error);
+        bool result = CommandLineTokenizer.TryTokenize("break at \"module", out string[] arguments, out string? error);
 
         Assert.IsFalse(result);
-        Assert.AreEqual(0, arguments.Length);
+        Assert.IsEmpty(arguments);
         Assert.IsNotNull(error);
     }
 }

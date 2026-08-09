@@ -1,11 +1,9 @@
-using Cyborg.Cli.Debugging;
-using Cyborg.Cli.Logging;
+﻿using Cyborg.Cli.Logging;
 using Cyborg.Cli.Logging.Options;
 using Cyborg.Cli.Metrics;
 using Cyborg.Core.Configuration;
 using Cyborg.Core.Configuration.Serialization.Dynamics;
 using Cyborg.Core.Logging;
-using Cyborg.Core.Modules.Debugging;
 using Jab;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
@@ -28,25 +26,21 @@ namespace Cyborg.Cli;
 [Singleton<JsonConverter>(Factory = nameof(CreateRollingIntervalConverter))]
 [Singleton<JsonConverter>(Factory = nameof(CreateLogFormatConverter))]
 [Singleton<JsonConverter>(Factory = nameof(CreateLogLevelConverter))]
-[Singleton<IDebugReplIo, ConsoleDebugReplIo>]
-[Singleton<DebugCommandDispatcher>]
-[Singleton<IDebugFrontend, ConsoleDebugFrontend>]
 internal interface ICyborgCliServiceOptions
 {
-    public static ILoggerFactory CreateLoggerFactory(IConfiguration configuration, IEnumerable<ILoggingConfigurator> configurators) =>
-        LoggerFactory.Create(builder =>
+    static ILoggerFactory CreateLoggerFactory(IConfiguration configuration, IEnumerable<ILoggingConfigurator> configurators) => LoggerFactory.Create(builder =>
+    {
+        GlobalLoggingOptions globalOptions = configuration.Get("cyborg.services.logging", () => new GlobalLoggingOptions(LogLevel.Trace));
+        builder.SetMinimumLevel(globalOptions.MinimumLevel);
+        foreach (ILoggingConfigurator configurator in configurators)
         {
-            GlobalLoggingOptions globalOptions = configuration.Get("cyborg.services.logging", () => new GlobalLoggingOptions(LogLevel.Trace));
-            builder.SetMinimumLevel(globalOptions.MinimumLevel);
-            foreach (ILoggingConfigurator configurator in configurators)
-            {
-                configurator.Configure(builder);
-            }
-        });
+            configurator.Configure(builder);
+        }
+    });
 
-    public static JsonConverter CreateRollingIntervalConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<RollingInterval>(namingPolicy);
+    static JsonConverter CreateRollingIntervalConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<RollingInterval>(namingPolicy);
 
-    public static JsonConverter CreateLogFormatConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<LogFormat>(namingPolicy);
+    static JsonConverter CreateLogFormatConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<LogFormat>(namingPolicy);
 
-    public static JsonConverter CreateLogLevelConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<LogLevel>(namingPolicy);
+    static JsonConverter CreateLogLevelConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<LogLevel>(namingPolicy);
 }

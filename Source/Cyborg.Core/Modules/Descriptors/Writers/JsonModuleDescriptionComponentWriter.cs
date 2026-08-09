@@ -1,17 +1,13 @@
-using Cyborg.Core.Modules.Descriptors.Model;
+﻿using Cyborg.Core.Modules.Descriptors.Model;
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text.Json;
 
 namespace Cyborg.Core.Modules.Descriptors.Writers;
 
-internal sealed class JsonModuleDescriptionComponentWriter(
-    Utf8JsonWriter jsonWriter) : IDescriptionComponentWriter
+internal sealed class JsonModuleDescriptionComponentWriter(Utf8JsonWriter jsonWriter) : IDescriptionComponentWriter
 {
-    public ValueTask WriteAtomAsync<T>(
-        T value,
-        ImmutableArray<string> hints,
-        CancellationToken cancellationToken)
+    public ValueTask WriteAtomAsync<T>(T value, ImmutableArray<string> hints, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -72,26 +68,20 @@ internal sealed class JsonModuleDescriptionComponentWriter(
                 jsonWriter.WriteStringValue(guid);
                 break;
             case TimeSpan timeSpan:
-                jsonWriter.WriteStringValue(
-                    timeSpan.ToString("c", CultureInfo.InvariantCulture));
+                jsonWriter.WriteStringValue(timeSpan.ToString("c", CultureInfo.InvariantCulture));
                 break;
             case Enum enumValue:
-                jsonWriter.WriteStringValue(
-                    $"{enumValue.GetType().Name}.{enumValue}");
+                jsonWriter.WriteStringValue($"{enumValue.GetType().Name}.{enumValue}");
                 break;
             default:
-                jsonWriter.WriteStringValue(
-                    Convert.ToString(value, CultureInfo.InvariantCulture)
-                    ?? value.GetType().Name);
+                jsonWriter.WriteStringValue(Convert.ToString(value, CultureInfo.InvariantCulture) ?? value.GetType().Name);
                 break;
         }
 
         return ValueTask.CompletedTask;
     }
 
-    public async ValueTask WriteAsync(
-        IDescriptionObjectComponent objectComponent,
-        CancellationToken cancellationToken)
+    public async ValueTask WriteAsync(IDescriptionObjectComponent objectComponent, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(objectComponent);
         cancellationToken.ThrowIfCancellationRequested();
@@ -104,9 +94,7 @@ internal sealed class JsonModuleDescriptionComponentWriter(
         jsonWriter.WriteEndObject();
     }
 
-    public async ValueTask WriteAsync(
-        IDescriptionCollectionComponent collectionComponent,
-        CancellationToken cancellationToken)
+    public async ValueTask WriteAsync(IDescriptionCollectionComponent collectionComponent, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(collectionComponent);
         cancellationToken.ThrowIfCancellationRequested();
@@ -119,15 +107,12 @@ internal sealed class JsonModuleDescriptionComponentWriter(
         jsonWriter.WriteEndArray();
     }
 
-    public async ValueTask WriteAsync(
-        IDescriptionPropertyComponent propertyComponent,
-        CancellationToken cancellationToken)
+    public async ValueTask WriteAsync(IDescriptionPropertyComponent propertyComponent, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(propertyComponent);
         cancellationToken.ThrowIfCancellationRequested();
 
         jsonWriter.WritePropertyName(propertyComponent.Name);
-        await propertyComponent.Value.AcceptAsync(this, cancellationToken)
-            .ConfigureAwait(false);
+        await propertyComponent.Value.AcceptAsync(this, cancellationToken).ConfigureAwait(false);
     }
 }

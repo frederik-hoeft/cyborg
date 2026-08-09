@@ -18,7 +18,7 @@ internal sealed class ConsoleLoggingConfigurator(IConfiguration configuration, L
         }
 
         LogLevel minimumLevel = loggingOptions.MinimumLevel ?? options.MinimumLevel;
-        builder.AddFilter<ZLoggerConsoleLoggerProvider>(null, minimumLevel);
+        builder.AddFilter<ZLoggerConsoleLoggerProvider>(category: null, minimumLevel);
 
         builder.AddZLoggerConsole(consoleOptions =>
         {

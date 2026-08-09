@@ -1,4 +1,4 @@
-using Cyborg.Core.Aot.Contracts;
+﻿using Cyborg.Core.Aot.Contracts;
 using System.Text;
 
 namespace Cyborg.Core.Modules.Debugging;
@@ -7,8 +7,7 @@ namespace Cyborg.Core.Modules.Debugging;
 /// Formats short identity strings for modules (module id, name, group).
 /// Used by generated <see cref="object.ToString"/> overrides and breakpoint hit banners.
 /// </summary>
-[GeneratorContractRegistration<ModuleValidationGeneratorContract>(
-    ModuleValidationGeneratorContract.ModuleIdentity)]
+[GeneratorContractRegistration<ModuleValidationGeneratorContract>(ModuleValidationGeneratorContract.ModuleIdentity)]
 public static class ModuleIdentity
 {
     public static string Format(string moduleId, string? name, string? group)
@@ -28,7 +27,7 @@ public static class ModuleIdentity
         return builder.ToString();
     }
 
-    public static string Format(IModule module, string moduleId)
+    public static string Format(string moduleId, IModule module)
     {
         ArgumentNullException.ThrowIfNull(module);
         return Format(moduleId, module.Name, module.Group);

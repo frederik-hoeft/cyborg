@@ -30,14 +30,14 @@ public sealed class ModuleValidationContext
     public string Interpolate(string value) => Runtime.Environment.Interpolate(value);
 
     [return: NotNullIfNotNull(nameof(value))]
-    public string? SelectRawStringOverride<TModule>(TModule module, string? value, string moduleExpression, string valueExpression) where TModule : ModuleBase, IModule =>
+    public string? SelectRawStringOverride<TModule>(TModule module, string? value, string moduleExpression, string valueExpression) where TModule : ModuleBase, IModuleDefinition =>
         Runtime.Environment.SelectRawStringOverride(module, value, moduleExpression, valueExpression);
 
-    [return: NotNullIfNotNull(nameof(value))]
-    public T? ResolveOverride<TModule, T>(TModule module, T? value, string moduleExpression, string valueExpression) where TModule : ModuleBase, IModule =>
+    [return: NotNullIfNotNull(nameof(value))]   
+    public T? ResolveOverride<TModule, T>(TModule module, T? value, string moduleExpression, string valueExpression) where TModule : ModuleBase, IModuleDefinition =>
         Runtime.Environment.Resolve(module, value, moduleExpression, valueExpression);
 
     [return: NotNullIfNotNull(nameof(value))]
-    public IReadOnlyCollection<T>? ResolveCollectionOverride<TModule, T>(TModule module, IReadOnlyCollection<T>? value, string moduleExpression, string valueExpression) where TModule : ModuleBase, IModule =>
+    public IReadOnlyCollection<T>? ResolveCollectionOverride<TModule, T>(TModule module, IReadOnlyCollection<T>? value, string moduleExpression, string valueExpression) where TModule : ModuleBase, IModuleDefinition =>
         Runtime.Environment.ResolveCollection(module, value, moduleExpression, valueExpression);
 }
