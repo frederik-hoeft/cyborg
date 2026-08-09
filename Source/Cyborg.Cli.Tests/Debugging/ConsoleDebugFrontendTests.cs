@@ -20,7 +20,7 @@ public sealed class ConsoleDebugFrontendTests : CyborgCliTestBase
     protected override void ConfigureServices(IServiceCollection services, IJabServiceDiscovery jabServiceDiscovery)
     {
         base.ConfigureServices(services, jabServiceDiscovery);
-                
+
         services.AddSingleton<TestDebugReplIoInputWriter>();
         services.AddSingleton<IDebugReplIo>(static sp => new TestDebugReplIo(sp.GetRequiredService<TestDebugReplIoInputWriter>().Input));
     }
