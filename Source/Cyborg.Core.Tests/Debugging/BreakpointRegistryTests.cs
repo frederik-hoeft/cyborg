@@ -1,4 +1,5 @@
-﻿using Cyborg.Core.Modules.Debugging.Breakpoints;
+﻿using Cyborg.Core.Modules.Debugging;
+using Cyborg.Core.Modules.Debugging.Breakpoints;
 
 namespace Cyborg.Core.Tests.Debugging;
 
@@ -20,20 +21,21 @@ public sealed class BreakpointRegistryTests : CyborgCoreTestBase
     }
 
     [TestMethod]
-    public void Test_TryMatchAndConsume_MatchesModuleId()
+    public void Test_EvaluateAndConsume_MatchesModuleId()
     {
         BreakpointRegistry registry = new();
         registry.Add("cyborg\\.modules\\.empty\\.v1");
 
         BreakpointContext context = new("cyborg.modules.empty.v1", Name: null, Group: null);
-        bool matched = registry.TryMatchAndConsume(in context, out BreakpointExpression? bp);
-        Assert.IsTrue(matched);
-        Assert.IsNotNull(bp);
+        BreakpointEvaluationResult result = registry.EvaluateAndConsume(in context);
+
+        Assert.AreEqual(BreakpointEvaluationStatus.Match, result.Status);
+        Assert.IsNotNull(result.Breakpoint);
         Assert.AreEqual(1, registry.Count); // persistent breakpoint remains
     }
 
     [TestMethod]
-    public void Test_TryMatchAndConsume_MatchesNameAndGroup()
+    public void Test_EvaluateAndConsume_MatchesNameAndGroup()
     {
         BreakpointRegistry registry = new();
         registry.Add("^my-step$");
@@ -41,22 +43,78 @@ public sealed class BreakpointRegistryTests : CyborgCoreTestBase
         BreakpointContext nameContext = new("cyborg.modules.empty.v1", Name: "my-step", Group: null);
         BreakpointContext groupContext = new("cyborg.modules.empty.v1", Name: null, Group: "my-step");
         BreakpointContext otherContext = new("cyborg.modules.empty.v1", Name: "other", Group: "other");
-        Assert.IsTrue(registry.TryMatchAndConsume(in nameContext, out _));
-        Assert.IsTrue(registry.TryMatchAndConsume(in groupContext, out _));
-        Assert.IsFalse(registry.TryMatchAndConsume(in otherContext, out _));
+        Assert.AreEqual(BreakpointEvaluationStatus.Match, registry.EvaluateAndConsume(in nameContext).Status);
+        Assert.AreEqual(BreakpointEvaluationStatus.Match, registry.EvaluateAndConsume(in groupContext).Status);
+        Assert.AreEqual(BreakpointEvaluationStatus.NoMatch, registry.EvaluateAndConsume(in otherContext).Status);
     }
 
     [TestMethod]
-    public void Test_TryMatchAndConsume_RemovesOneShotBreakpoint()
+    public void Test_EvaluateAndConsume_RemovesOneShotBreakpoint()
     {
         BreakpointRegistry registry = new();
         registry.Add(".*", isOneShot: true);
 
         BreakpointContext context = new("anything", Name: null, Group: null);
-        Assert.IsTrue(registry.TryMatchAndConsume(in context, out BreakpointExpression? bp));
-        Assert.IsTrue(bp!.IsOneShot);
+        BreakpointEvaluationResult result = registry.EvaluateAndConsume(in context);
+
+        Assert.AreEqual(BreakpointEvaluationStatus.Match, result.Status);
+        Assert.IsNotNull(result.Breakpoint);
+        Assert.IsTrue(result.Breakpoint.IsOneShot);
         Assert.AreEqual(0, registry.Count);
-        Assert.IsFalse(registry.TryMatchAndConsume(in context, out _));
+        Assert.AreEqual(BreakpointEvaluationStatus.NoMatch, registry.EvaluateAndConsume(in context).Status);
+    }
+
+    [TestMethod]
+    public void Test_EvaluateAndConsume_OneShotBreakpointTakesPriorityOverOlderPersistentMatch()
+    {
+        BreakpointRegistry registry = new();
+        int persistentId = registry.Add(".*");
+        int oneShotId = registry.Add(".*", isOneShot: true);
+
+        BreakpointContext context = new("anything", Name: null, Group: null);
+        BreakpointEvaluationResult result = registry.EvaluateAndConsume(in context);
+
+        Assert.AreEqual(BreakpointEvaluationStatus.Match, result.Status);
+        Assert.IsNotNull(result.Breakpoint);
+        Assert.AreEqual(oneShotId, result.Breakpoint.Id);
+        Assert.IsTrue(result.Breakpoint.IsOneShot);
+        IReadOnlyList<BreakpointExpression> remaining = registry.ToList();
+        Assert.HasCount(1, remaining);
+        Assert.AreEqual(persistentId, remaining[0].Id);
+    }
+
+    [TestMethod]
+    public void Test_EvaluateAndConsume_NewerOneShotBreakpointIsEvaluatedFirst()
+    {
+        BreakpointRegistry registry = new();
+        int olderOneShotId = registry.Add(".*", isOneShot: true);
+        int newerOneShotId = registry.Add(".*", isOneShot: true);
+
+        BreakpointEvaluationResult result = registry.EvaluateAndConsume(["anything"]);
+
+        Assert.AreEqual(BreakpointEvaluationStatus.Match, result.Status);
+        Assert.IsNotNull(result.Breakpoint);
+        Assert.AreEqual(newerOneShotId, result.Breakpoint.Id);
+        Assert.Contains(breakpoint => breakpoint.Id == olderOneShotId, registry.ToList());
+    }
+
+    [TestMethod]
+    public void Test_EvaluateAndConsume_RegexTimeoutPausesWithDiagnostic()
+    {
+        BreakpointRegistry registry = new(TimeSpan.FromMilliseconds(1));
+        int id = registry.Add("^(a+)+$");
+        string target = $"{new string('a', 100_000)}!";
+
+        BreakpointEvaluationResult result = registry.EvaluateAndConsume([target]);
+
+        Assert.AreEqual(BreakpointEvaluationStatus.Faulted, result.Status);
+        Assert.IsTrue(result.ShouldPause);
+        Assert.IsNotNull(result.Breakpoint);
+        Assert.AreEqual(id, result.Breakpoint.Id);
+        Assert.HasCount(1, result.Diagnostics);
+        Assert.AreEqual(DebugDiagnosticSeverity.Error, result.Diagnostics[0].Severity);
+        Assert.IsTrue(result.Diagnostics[0].Message.Contains("regex match timeout", StringComparison.OrdinalIgnoreCase));
+        Assert.AreEqual(1, registry.Count);
     }
 
     [TestMethod]

@@ -8,7 +8,15 @@ namespace Cyborg.Core.Modules.Debugging.Breakpoints;
 /// </summary>
 public sealed record BreakpointExpression(int Id, string Expression, bool IsOneShot = false)
 {
-    internal Regex Regex { get; } = new Regex(Expression, RegexOptions.CultureInvariant | RegexOptions.Compiled, matchTimeout: TimeSpan.FromSeconds(1));
+    private static readonly TimeSpan s_defaultMatchTimeout = TimeSpan.FromSeconds(1);
+
+    internal Regex Regex { get; private init; } = CreateRegex(Expression, s_defaultMatchTimeout);
+
+    internal BreakpointExpression(int id, string expression, bool isOneShot, TimeSpan matchTimeout)
+        : this(id, expression, isOneShot)
+    {
+        Regex = CreateRegex(expression, matchTimeout);
+    }
 
     public bool MatchesAny(IEnumerable<string> targets)
     {
@@ -24,4 +32,7 @@ public sealed record BreakpointExpression(int Id, string Expression, bool IsOneS
     }
 
     public override string ToString() => IsOneShot ? $"{Id}: {Expression} (one-shot)" : $"{Id}: {Expression}";
+
+    private static Regex CreateRegex(string expression, TimeSpan matchTimeout) =>
+        new(expression, RegexOptions.CultureInvariant | RegexOptions.Compiled, matchTimeout);
 }

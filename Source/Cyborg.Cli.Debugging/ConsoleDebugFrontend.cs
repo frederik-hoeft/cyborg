@@ -16,10 +16,23 @@ internal sealed class ConsoleDebugFrontend(IDebugReplIo io, DebugCommandDispatch
         ArgumentNullException.ThrowIfNull(context);
 
         await io.WriteLineAsync(string.Empty, OutputKind.Text, cancellationToken);
-        OutputKind titleKind = context.ValidationResult.IsValid ? OutputKind.Status : OutputKind.Error;
+        bool hasDebugErrors = context.Diagnostics.Any(static diagnostic => diagnostic.Severity is DebugDiagnosticSeverity.Error);
+        OutputKind titleKind = context.ValidationResult.IsValid && !hasDebugErrors ? OutputKind.Status : OutputKind.Error;
         string errorLabel = context.ValidationResult.Errors.Count == 1 ? "error" : "errors";
         string validationSuffix = context.ValidationResult.IsValid ? string.Empty : $" [validation failed: {context.ValidationResult.Errors.Count} {errorLabel}]";
-        await io.WriteLineAsync($"Breakpoint hit: {context.GetModuleIdentity()}{validationSuffix}", titleKind, cancellationToken);
+        string pauseLabel = context.Diagnostics.Count == 0 ? "Breakpoint hit" : "Debugger paused";
+        await io.WriteLineAsync($"{pauseLabel}: {context.GetModuleIdentity()}{validationSuffix}", titleKind, cancellationToken);
+        foreach (DebugDiagnostic diagnostic in context.Diagnostics)
+        {
+            OutputKind diagnosticKind = diagnostic.Severity switch
+            {
+                DebugDiagnosticSeverity.Information => OutputKind.Status,
+                DebugDiagnosticSeverity.Warning => OutputKind.Warning,
+                DebugDiagnosticSeverity.Error => OutputKind.Error,
+                _ => throw new ArgumentOutOfRangeException(nameof(diagnostic.Severity), diagnostic.Severity, "Unknown debug diagnostic severity.")
+            };
+            await io.WriteLineAsync(diagnostic.Message, diagnosticKind, cancellationToken);
+        }
         await DebugValidationOutput.WriteErrorsAsync(io, context.ValidationResult.Errors, cancellationToken);
         await io.WriteLineAsync("Type 'help' for available commands.", OutputKind.Status, cancellationToken);
         await io.WriteLineAsync(string.Empty, OutputKind.Text, cancellationToken);

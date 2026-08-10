@@ -11,6 +11,7 @@ internal sealed record DebugPauseContext
     IModuleRuntime Runtime,
     IServiceProvider Services,
     IBreakpointRegistry Breakpoints,
+    IReadOnlyList<DebugDiagnostic> Diagnostics,
     Action RequestStepAction,
     Action DetachAction
 ) : IDebugPauseContext

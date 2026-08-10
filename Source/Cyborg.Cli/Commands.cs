@@ -1,17 +1,15 @@
 ﻿using ConsoleAppFramework;
 using Cyborg.Cli.Arguments;
+using Cyborg.Cli.Debugging;
 using Cyborg.Cli.Logging;
 using Cyborg.Cli.Metrics;
 using Cyborg.Core.Configuration;
 using Cyborg.Core.Configuration.Builders;
 using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
-using Cyborg.Core.Modules.Debugging;
-using Cyborg.Core.Modules.Debugging.Breakpoints;
 using Cyborg.Core.Modules.Extensions;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
-using Cyborg.Core.Services.Default;
 using Cyborg.Core.Services.Metrics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -64,6 +62,8 @@ internal sealed class Commands
         using DefaultServiceProvider services = new();
         IConfiguration configuration = services.GetRequiredService<IConfiguration>();
         IConfigurationBuilder configurationBuilder = services.GetRequiredService<IConfigurationBuilder>();
+        ICliDebugArgumentHandler debugArgumentHandler = services.GetRequiredService<ICliDebugArgumentHandler>();
+        bool debuggerArgumentsValid = debugArgumentHandler.TryConfigure(configurationBuilder, breakAt, out string? invalidBreakpointExpression, out string? debuggerArgumentError);
         configurationBuilder.AddFiles(files => files.Add(options));
         await configurationBuilder.ApplyToAsync(configuration, cancellationToken);
 
@@ -85,8 +85,14 @@ internal sealed class Commands
             ILogger logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("cyborg.cli.main");
             logger.LogStartup(string.Join(' ', Array.ConvertAll(Environment.GetCommandLineArgs()[1..], QuoteArg)));
 
-            if (!TryConfigureDebugger(services, logger, breakAt))
+            if (!debuggerArgumentsValid)
             {
+                logger.LogInvalidBreakAtExpression(invalidBreakpointExpression!, debuggerArgumentError!);
+                return 1;
+            }
+            if (!debugArgumentHandler.HasUsableFrontend())
+            {
+                logger.LogBreakAtWithoutDebugFrontend(debugArgumentHandler.FrontendConfigurationKey);
                 return 1;
             }
 
@@ -131,42 +137,6 @@ internal sealed class Commands
             CollectRunMetrics(globalEnvironment, metricsCollector, runSucceeded);
             await WriteMetricsAsync(metricsCollector, metricsDestinationPath, CancellationToken.None);
         }
-    }
-
-    private static bool TryConfigureDebugger(DefaultServiceProvider services, ILogger logger, string[]? breakAt)
-    {
-        if (breakAt is not { Length: > 0 })
-        {
-            return true;
-        }
-        // check if there is a frontend for the debugger
-        IDefault<IDebugFrontend> defaultFrontend = services.GetRequiredService<IDefault<IDebugFrontend>>();
-        if (defaultFrontend.GetDefault() is null)
-        {
-            logger.LogBreakAtWithoutDebugFrontend(defaultFrontend.ConfigurationKey);
-            return false;
-        }
-
-        IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
-        foreach (string expression in breakAt)
-        {
-            if (string.IsNullOrWhiteSpace(expression))
-            {
-                continue;
-            }
-
-            try
-            {
-                breakpoints.Add(expression);
-            }
-            catch (ArgumentException ex)
-            {
-                // RegexParseException derives from ArgumentException.
-                logger.LogInvalidBreakAtExpression(expression, ex.Message);
-                return false;
-            }
-        }
-        return true;
     }
 
     private static void CollectRunMetrics(GlobalRuntimeEnvironment environment, IMetricsCollector metricsCollector, bool runSucceeded)

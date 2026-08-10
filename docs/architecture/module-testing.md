@@ -131,7 +131,7 @@ Provides a single static factory method `CreateDefaultServices()` that returns a
 
 **File:** `Cyborg.Core.TestAdapter/TestModuleRuntimeScope.cs`
 
-Encapsulates the per-test lifecycle: builds a `ServiceProvider` from the configured `IServiceCollection`, constructs a `RootModuleRuntime` with a fresh `GlobalRuntimeEnvironment`, and provides methods for module deserialization and execution. Implements `IAsyncDisposable` for deterministic cleanup.
+Encapsulates the per-test lifecycle: builds a `ServiceProvider` from the configured `IServiceCollection`, constructs a `RootModuleRuntime` with a fresh `GlobalRuntimeEnvironment` and the configured runtime lifecycle services, and provides methods for module deserialization and execution. This preserves runtime-owned behavior such as the post-execution hook pipeline when tests execute through the scope rather than resolving `IModuleRuntime` directly. Implements `IAsyncDisposable` for deterministic cleanup.
 
 Key methods:
 - `Create(IServiceCollection)` — Static factory that builds the scope from a configured service collection.

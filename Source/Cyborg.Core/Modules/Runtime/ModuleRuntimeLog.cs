@@ -25,6 +25,12 @@ internal static partial class ModuleRuntimeLog
     [ZLoggerMessage(LogLevel.Error, "Module '{moduleId}' in environment '{environment}' threw an unhandled exception")]
     public static partial void LogModuleUnhandledException(this ILogger logger, string moduleId, string environment, Exception exception);
 
+    [ZLoggerMessage(LogLevel.Error, "Post-execution hook '{hookType}' failed while observing module '{moduleId}'. The module result is unchanged.")]
+    public static partial void LogPostExecutionHookFailed(this ILogger logger, string moduleId, string hookType, Exception exception);
+
+    [ZLoggerMessage(LogLevel.Error, "Post-execution hook pipeline could not be resolved while observing module '{moduleId}'. The module result is unchanged.")]
+    public static partial void LogPostExecutionHookPipelineFailed(this ILogger logger, string moduleId, Exception exception);
+
     // ── Module context execution ──────────────────────────────────────────────
 
     [ZLoggerMessage(LogLevel.Debug, "Running configuration module '{configModuleId}' before main module '{mainModuleId}'")]

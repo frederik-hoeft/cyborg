@@ -80,18 +80,7 @@ Cyborg expects its configuration in `/etc/cyborg/` by default. The `samples/` di
 
 Copy the sample files to `/etc/cyborg/`, adjust host definitions and secrets for your environment, and ensure configuration files are owned by root with restrictive permissions (see [Security](#security) below).
 
-Interactive debugging uses a keyed frontend selected through runtime configuration. The CLI registers the built-in `console` frontend, but no frontend is selected implicitly. To use `--break-at`, add a debugger options entry to `cyborg.options.jconf`:
-
-```json
-{
-  "key": "cyborg.core.debug",
-  "cyborg.types.core.debug.options.v1": {
-    "frontend": "console"
-  }
-}
-```
-
-Add this object alongside the other entries in the file's `options` array.
+Interactive debugging uses a keyed frontend selected through runtime configuration. When `--break-at` registers at least one breakpoint, the CLI contributes its built-in `console` frontend as a low-precedence configuration default. An explicit `cyborg.core.debug:frontend` setting from the options file can override that host default, allowing another registered frontend to be selected without changing the core debugger.
 
 ### Running
 
@@ -105,7 +94,7 @@ cyborg run --main /path/to/cyborg.jconf -e target=daily
 # Override the console log level
 cyborg run -e target=daily --log-level information
 
-# Break before a named module and open the configured debug frontend
+# Break before a named module and open the selected debug frontend
 cyborg run -e target=daily --break-at 'my-step-name'
 ```
 

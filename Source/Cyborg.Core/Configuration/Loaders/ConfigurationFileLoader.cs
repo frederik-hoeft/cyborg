@@ -7,12 +7,12 @@ namespace Cyborg.Core.Configuration.Loaders;
 
 public sealed class ConfigurationFileLoader(IJsonLoaderContext configurationContext) : IConfigurationFileLoader
 {
-    private readonly HashSet<string> _configFiles = [];
+    private readonly OrderedDictionary<string, byte> _configFiles = [];
 
     public IConfigurationFileLoader Add(string filePath)
     {
         ArgumentException.ThrowIfNullOrEmpty(filePath);
-        _configFiles.Add(filePath);
+        _configFiles.TryAdd(filePath, 0);
         return this;
     }
 
@@ -20,7 +20,7 @@ public sealed class ConfigurationFileLoader(IJsonLoaderContext configurationCont
     {
         cancellationToken.ThrowIfCancellationRequested();
         // snap a defensive copy of the config files to avoid issues with modifications during enumeration
-        ImmutableArray<string> configFiles = [.. _configFiles];
+        ImmutableArray<string> configFiles = [.. _configFiles.Keys];
         foreach (string configFile in configFiles)
         {
             await using FileStream stream = File.OpenRead(configFile);

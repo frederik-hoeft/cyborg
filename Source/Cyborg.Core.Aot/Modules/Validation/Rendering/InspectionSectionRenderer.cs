@@ -64,9 +64,9 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
         builder.AppendLine((isProperty, hintsExpression) switch
         {
             (true, null) => $"{builderVariableName}.AddProperty(\"{displayName}\", {nodeAccessExpression});",
-            (true, not null) => $"{builderVariableName}.AddProperty(\"{displayName}\", {hintsExpression}, {nodeAccessExpression});",
+            (true, not null) => $"{builderVariableName}.AddProperty(\"{displayName}\", {nodeAccessExpression}, {hintsExpression});",
             (false, null) => $"{builderVariableName}.AddItem({nodeAccessExpression});",
-            (false, not null) => $"{builderVariableName}.AddItem({hintsExpression}, {nodeAccessExpression});",
+            (false, not null) => $"{builderVariableName}.AddItem({nodeAccessExpression}, {hintsExpression});",
         });
     }
 

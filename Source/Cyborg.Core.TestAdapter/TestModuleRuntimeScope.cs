@@ -56,7 +56,7 @@ public sealed class TestModuleRuntimeScope : IAsyncDisposable
         ServiceProvider serviceProvider = services.BuildServiceProvider();
         GlobalRuntimeEnvironment globalEnvironment = serviceProvider.GetRequiredService<GlobalRuntimeEnvironment>();
         ILoggerFactory loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
-        RootModuleRuntime runtime = new(globalEnvironment, loggerFactory);
+        RootModuleRuntime runtime = new(globalEnvironment, loggerFactory, serviceProvider);
         return new TestModuleRuntimeScope(serviceProvider, runtime, globalEnvironment);
     }
 

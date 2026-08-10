@@ -3,7 +3,8 @@ using Microsoft.Extensions.Logging;
 
 namespace Cyborg.Core.Modules.Runtime;
 
-public sealed class RootModuleRuntime(GlobalRuntimeEnvironment defaultEnvironment, ILoggerFactory loggerFactory) : ModuleRuntimeBase(defaultEnvironment.SyntaxFactory, loggerFactory)
+public sealed class RootModuleRuntime(GlobalRuntimeEnvironment defaultEnvironment, ILoggerFactory loggerFactory, IServiceProvider? serviceProvider = null)
+    : ModuleRuntimeBase(defaultEnvironment.SyntaxFactory, loggerFactory, serviceProvider)
 {
     private readonly Dictionary<string, IRuntimeEnvironment> _environments = [];
 

@@ -15,7 +15,7 @@ public interface IBreakpointRegistry
 
     IReadOnlyList<BreakpointExpression> ToList();
 
-    bool TryMatchAndConsume(ref readonly BreakpointContext context, [NotNullWhen(true)] out BreakpointExpression? matched);
+    BreakpointEvaluationResult EvaluateAndConsume(ref readonly BreakpointContext context);
 
-    bool TryMatchAndConsume(IEnumerable<string> targets, out BreakpointExpression? matched);
+    BreakpointEvaluationResult EvaluateAndConsume(IEnumerable<string> targets);
 }

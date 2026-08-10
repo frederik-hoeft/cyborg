@@ -1,17 +1,21 @@
 ﻿using Cyborg.Core.Modules.Configuration.Model;
+using Cyborg.Core.Modules.Hooks;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Runtime.Environments.Syntax;
+using Cyborg.Core.Services.Pipelines;
 using Microsoft.Extensions.Logging;
 
 namespace Cyborg.Core.Modules.Runtime;
 
-public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory, ILoggerFactory loggerFactory) : IModuleRuntime
+public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory, ILoggerFactory loggerFactory, IServiceProvider? serviceProvider = null) : IModuleRuntime
 {
     private const string UNBOUND_ENVIRONMENT = "__UNBOUND";
 
     protected ILoggerFactory LoggerFactory { get; } = loggerFactory;
 
     protected ILogger Logger { get; } = loggerFactory.CreateLogger("cyborg.core.runtime");
+
+    protected IServiceProvider? ServiceProvider => serviceProvider;
 
     public abstract IRuntimeEnvironment GlobalEnvironment { get; }
 
@@ -155,11 +159,12 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory, ILo
         ArgumentNullException.ThrowIfNull(environment);
 
         IRuntimeEnvironment boundEnvironment = environment.Bind(module);
-        IModuleRuntime runtime = new ScopedRuntime(root, parent: this, boundEnvironment, SyntaxFactory, LoggerFactory);
+        IModuleRuntime runtime = new ScopedRuntime(root, parent: this, boundEnvironment, SyntaxFactory, LoggerFactory, ServiceProvider);
         Logger.LogModuleDispatched(module.ModuleId, boundEnvironment.Name);
+        IModuleExecutionResult result;
         try
         {
-            IModuleExecutionResult result = await module.ExecuteAsync(runtime, cancellationToken);
+            result = await module.ExecuteAsync(runtime, cancellationToken);
             if (result.Status is ModuleExitStatus.Failed or ModuleExitStatus.Canceled)
             {
                 Logger.LogModuleExecutionFailed(module.ModuleId, result.Status.ToString(), boundEnvironment.Name);
@@ -168,17 +173,50 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory, ILo
             {
                 Logger.LogModuleCompleted(module.ModuleId, result.Status.ToString(), boundEnvironment.Name);
             }
-            return result;
         }
         catch (OperationCanceledException)
         {
             Logger.LogModuleCanceled(module.ModuleId, boundEnvironment.Name);
-            return new ModuleExecutionResult(module.Module, ModuleExitStatus.Canceled, boundEnvironment.CreateArtifactCollection());
+            result = new ModuleExecutionResult(module.Module, ModuleExitStatus.Canceled, boundEnvironment.CreateArtifactCollection());
         }
         catch (Exception e)
         {
             Logger.LogModuleUnhandledException(module.ModuleId, boundEnvironment.Name, e);
-            return new ModuleExecutionResult(module.Module, ModuleExitStatus.Failed, boundEnvironment.CreateArtifactCollection());
+            result = new ModuleExecutionResult(module.Module, ModuleExitStatus.Failed, boundEnvironment.CreateArtifactCollection());
+        }
+
+        await RunPostExecutionHooksAsync(module.ModuleId, result, runtime);
+        return result;
+    }
+
+    private async ValueTask RunPostExecutionHooksAsync(string moduleId, IModuleExecutionResult result, IModuleRuntime runtime)
+    {
+        IServicePipeline<IModulePostExecutionHook>? postExecutionHooks;
+        try
+        {
+            postExecutionHooks = serviceProvider?.GetService(typeof(IServicePipeline<IModulePostExecutionHook>)) as IServicePipeline<IModulePostExecutionHook>;
+        }
+        catch (Exception exception)
+        {
+            Logger.LogPostExecutionHookPipelineFailed(moduleId, exception);
+            return;
+        }
+        if (postExecutionHooks is null)
+        {
+            return;
+        }
+
+        ModulePostExecutionContext context = new(result, runtime);
+        foreach (IModulePostExecutionHook postExecutionHook in postExecutionHooks)
+        {
+            try
+            {
+                await postExecutionHook.ExecuteAsync(context, CancellationToken.None);
+            }
+            catch (Exception exception)
+            {
+                Logger.LogPostExecutionHookFailed(moduleId, postExecutionHook.GetType().FullName ?? postExecutionHook.GetType().Name, exception);
+            }
         }
     }
 
