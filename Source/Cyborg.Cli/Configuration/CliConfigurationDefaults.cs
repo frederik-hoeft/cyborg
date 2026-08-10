@@ -9,12 +9,31 @@ namespace Cyborg.Cli.Configuration;
 internal static class CliConfigurationDefaults
 {
     internal const string DEBUG_OPTIONS_KEY = "cyborg.core.debug";
+    internal const string DEBUG_FRONTEND_KEY = DEBUG_OPTIONS_KEY + ".frontend";
     internal const string GLOBAL_LOGGING_OPTIONS_KEY = "cyborg.services.logging";
+    internal const string GLOBAL_LOGGING_MINIMUM_LEVEL_KEY = GLOBAL_LOGGING_OPTIONS_KEY + ".minimum_level";
     internal const string ROLLING_LOGGING_OPTIONS_KEY = "cyborg.services.logging.rolling";
+    internal const string ROLLING_LOGGING_ENABLED_KEY = ROLLING_LOGGING_OPTIONS_KEY + ".enabled";
+    internal const string ROLLING_LOGGING_MINIMUM_LEVEL_KEY = ROLLING_LOGGING_OPTIONS_KEY + ".minimum_level";
+    internal const string ROLLING_LOGGING_PATH_KEY = ROLLING_LOGGING_OPTIONS_KEY + ".path";
+    internal const string ROLLING_LOGGING_INTERVAL_KEY = ROLLING_LOGGING_OPTIONS_KEY + ".rolling_interval";
+    internal const string ROLLING_LOGGING_SIZE_BYTES_KEY = ROLLING_LOGGING_OPTIONS_KEY + ".rolling_size_bytes";
+    internal const string ROLLING_LOGGING_FORMAT_KEY = ROLLING_LOGGING_OPTIONS_KEY + ".format";
     internal const string CONSOLE_LOGGING_OPTIONS_KEY = "cyborg.services.logging.console";
+    internal const string CONSOLE_LOGGING_ENABLED_KEY = CONSOLE_LOGGING_OPTIONS_KEY + ".enabled";
+    internal const string CONSOLE_LOGGING_MINIMUM_LEVEL_KEY = CONSOLE_LOGGING_OPTIONS_KEY + ".minimum_level";
+    internal const string CONSOLE_LOGGING_FORMAT_KEY = CONSOLE_LOGGING_OPTIONS_KEY + ".format";
     internal const string FILE_LOGGING_OPTIONS_KEY = "cyborg.services.logging.file";
+    internal const string FILE_LOGGING_ENABLED_KEY = FILE_LOGGING_OPTIONS_KEY + ".enabled";
+    internal const string FILE_LOGGING_MINIMUM_LEVEL_KEY = FILE_LOGGING_OPTIONS_KEY + ".minimum_level";
+    internal const string FILE_LOGGING_PATH_KEY = FILE_LOGGING_OPTIONS_KEY + ".path";
+    internal const string FILE_LOGGING_FORMAT_KEY = FILE_LOGGING_OPTIONS_KEY + ".format";
     internal const string METRICS_OPTIONS_KEY = "cyborg.services.metrics";
+    internal const string METRICS_NAMESPACE_KEY = METRICS_OPTIONS_KEY + ".namespace";
+    internal const string METRICS_FILE_PATH_KEY = METRICS_OPTIONS_KEY + ".file_path";
     internal const string TRUST_OPTIONS_KEY = "cyborg.services.trust";
+    internal const string TRUST_POLICIES_KEY = TRUST_OPTIONS_KEY + ".policies";
+    internal const string TRUST_ENFORCEMENT_MODE_KEY = TRUST_OPTIONS_KEY + ".enforcement_mode";
 
     private const string CONSOLE_DEBUG_FRONTEND = "console";
 

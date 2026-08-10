@@ -23,6 +23,9 @@ namespace Cyborg.Cli;
 [Singleton<IDynamicValueProvider, DynamicFileLoggingConfiguratorOptionsProvider>]
 [Singleton<IDynamicValueProvider, DynamicConsoleLoggingConfiguratorOptionsProvider>]
 [Singleton<IDynamicValueProvider, DynamicMetricsOptionsProvider>]
+[Singleton<IDynamicValueProvider, DynamicLogLevelProvider>]
+[Singleton<IDynamicValueProvider, DynamicLogFormatProvider>]
+[Singleton<IDynamicValueProvider, DynamicRollingIntervalProvider>]
 [Singleton<ILoggerFactory>(Factory = nameof(CreateLoggerFactory))]
 [Singleton<JsonConverter>(Factory = nameof(CreateRollingIntervalConverter))]
 [Singleton<JsonConverter>(Factory = nameof(CreateLogFormatConverter))]
@@ -31,8 +34,8 @@ internal interface ICyborgCliServiceOptions
 {
     static ILoggerFactory CreateLoggerFactory(IConfiguration configuration, IEnumerable<ILoggingConfigurator> configurators) => LoggerFactory.Create(builder =>
     {
-        GlobalLoggingOptions globalOptions = configuration.Get(CliConfigurationDefaults.GLOBAL_LOGGING_OPTIONS_KEY, CliConfigurationDefaults.GlobalLogging);
-        builder.SetMinimumLevel(globalOptions.MinimumLevel);
+        LogLevel minimumLevel = configuration.Get(CliConfigurationDefaults.GLOBAL_LOGGING_MINIMUM_LEVEL_KEY, CliConfigurationDefaults.GlobalLogging.MinimumLevel);
+        builder.SetMinimumLevel(minimumLevel);
         foreach (ILoggingConfigurator configurator in configurators)
         {
             configurator.Configure(builder);

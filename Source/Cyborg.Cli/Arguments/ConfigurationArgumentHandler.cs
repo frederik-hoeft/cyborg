@@ -11,7 +11,7 @@ internal sealed class ConfigurationArgumentHandler
     IJsonLoaderContext jsonLoaderContext
 ) : IConfigurationArgumentHandler
 {
-    private const string TYPE_DELIMITER = "::";
+    private const char TYPE_DELIMITER = ':';
 
     public bool TryProcessArgument(
         string[]? configurationEntries,
@@ -85,13 +85,13 @@ internal sealed class ConfigurationArgumentHandler
             key = null;
             typeName = null;
             value = null;
-            errorMessage = "Expected format 'key[::type]=value'.";
+            errorMessage = "Expected format 'key[:type]=value'.";
             return false;
         }
 
         string keyAndType = definition[..assignmentDelimiter];
         value = definition[(assignmentDelimiter + 1)..];
-        int typeDelimiter = keyAndType.LastIndexOf(TYPE_DELIMITER, StringComparison.Ordinal);
+        int typeDelimiter = keyAndType.IndexOf(TYPE_DELIMITER);
         if (typeDelimiter < 0)
         {
             key = keyAndType;
@@ -99,8 +99,15 @@ internal sealed class ConfigurationArgumentHandler
         }
         else
         {
+            if (typeDelimiter != keyAndType.LastIndexOf(TYPE_DELIMITER))
+            {
+                key = null;
+                typeName = null;
+                errorMessage = "Configuration definitions may contain at most one type delimiter ':' before the assignment.";
+                return false;
+            }
             key = keyAndType[..typeDelimiter];
-            typeName = keyAndType[(typeDelimiter + TYPE_DELIMITER.Length)..];
+            typeName = keyAndType[(typeDelimiter + 1)..];
             if (string.IsNullOrWhiteSpace(typeName))
             {
                 errorMessage = "Dynamic value type must not be empty.";

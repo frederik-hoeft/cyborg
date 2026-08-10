@@ -1,7 +1,6 @@
 using Cyborg.Cli.Configuration;
-using Cyborg.Cli.Logging;
-using Cyborg.Cli.Metrics;
 using Cyborg.Core.Configuration;
+using Cyborg.Core.Configuration.Model;
 using Cyborg.Core.Modules.Debugging;
 using Cyborg.Core.Services.Default;
 using Cyborg.Core.Services.Security.Trust.Configuration;
@@ -14,7 +13,7 @@ namespace Cyborg.Cli.Tests.Configuration;
 public sealed class CliConfigurationServiceTests : CyborgCliTestBase
 {
     [TestMethod]
-    public async Task Test_TryConfigure_DefaultsAreAppliedWithoutFileOverrideAsync()
+    public async Task Test_TryConfigure_DefaultsAreAppliedAsLeavesWithoutFileOverrideAsync()
     {
         string optionsPath = await CreateOptionsFileAsync(frontend: null);
         try
@@ -23,20 +22,21 @@ public sealed class CliConfigurationServiceTests : CyborgCliTestBase
                 assertion: services =>
                 {
                     IConfiguration configuration = services.GetRequiredService<IConfiguration>();
-                    GlobalLoggingOptions globalLogging = configuration.Get<GlobalLoggingOptions>(CliConfigurationDefaults.GLOBAL_LOGGING_OPTIONS_KEY)!;
-                    ConsoleLoggingConfiguratorOptions consoleLogging = configuration.Get<ConsoleLoggingConfiguratorOptions>(CliConfigurationDefaults.CONSOLE_LOGGING_OPTIONS_KEY)!;
-                    FileLoggingConfiguratorOptions fileLogging = configuration.Get<FileLoggingConfiguratorOptions>(CliConfigurationDefaults.FILE_LOGGING_OPTIONS_KEY)!;
-                    RollingFileLoggingConfiguratorOptions rollingLogging = configuration.Get<RollingFileLoggingConfiguratorOptions>(CliConfigurationDefaults.ROLLING_LOGGING_OPTIONS_KEY)!;
-                    ConfigurationTrustOptions trust = configuration.Get<ConfigurationTrustOptions>(CliConfigurationDefaults.TRUST_OPTIONS_KEY)!;
 
-                    Assert.AreEqual("console", configuration.Get<string>("cyborg.core.debug:frontend"));
-                    Assert.AreEqual(LogLevel.Trace, globalLogging.MinimumLevel);
-                    Assert.IsFalse(consoleLogging.Enabled);
-                    Assert.IsFalse(fileLogging.Enabled);
-                    Assert.IsFalse(rollingLogging.Enabled);
-                    Assert.AreEqual("cyborg", configuration.Get<string>("cyborg.services.metrics:namespace"));
-                    Assert.AreEqual(TrustEnforcementMode.Enforce, trust.EnforcementMode);
-                    Assert.AreEqual(0, trust.Policies.Count);
+                    Assert.IsNull(configuration[CliConfigurationDefaults.DEBUG_OPTIONS_KEY]);
+                    Assert.IsNull(configuration[CliConfigurationDefaults.GLOBAL_LOGGING_OPTIONS_KEY]);
+                    Assert.IsNull(configuration[CliConfigurationDefaults.CONSOLE_LOGGING_OPTIONS_KEY]);
+                    Assert.IsNull(configuration[CliConfigurationDefaults.TRUST_OPTIONS_KEY]);
+                    Assert.AreEqual("console", configuration.Get<string>(CliConfigurationDefaults.DEBUG_FRONTEND_KEY));
+                    Assert.AreEqual(LogLevel.Trace, configuration.Get(CliConfigurationDefaults.GLOBAL_LOGGING_MINIMUM_LEVEL_KEY, LogLevel.None));
+                    Assert.IsFalse(configuration.Get(CliConfigurationDefaults.CONSOLE_LOGGING_ENABLED_KEY, true));
+                    Assert.AreEqual(LogLevel.Information, configuration.Get(CliConfigurationDefaults.CONSOLE_LOGGING_MINIMUM_LEVEL_KEY, LogLevel.None));
+                    Assert.IsFalse(configuration.Get(CliConfigurationDefaults.FILE_LOGGING_ENABLED_KEY, true));
+                    Assert.IsFalse(configuration.Get(CliConfigurationDefaults.ROLLING_LOGGING_ENABLED_KEY, true));
+                    Assert.AreEqual("cyborg", configuration.Get<string>(CliConfigurationDefaults.METRICS_NAMESPACE_KEY));
+                    Assert.AreEqual(TrustEnforcementMode.Enforce, configuration.Get(CliConfigurationDefaults.TRUST_ENFORCEMENT_MODE_KEY, TrustEnforcementMode.Disabled));
+                    IReadOnlyList<DynamicValue> policies = configuration.Get<IReadOnlyList<DynamicValue>>(CliConfigurationDefaults.TRUST_POLICIES_KEY)!;
+                    Assert.AreEqual(0, policies.Count);
                 },
                 buildConfiguration: configuration =>
                 {
@@ -62,7 +62,7 @@ public sealed class CliConfigurationServiceTests : CyborgCliTestBase
                     IConfiguration configuration = services.GetRequiredService<IConfiguration>();
                     IDefault<IDebugFrontend> defaultFrontend = services.GetRequiredService<IDefault<IDebugFrontend>>();
 
-                    Assert.AreEqual("custom", configuration.Get<string>("cyborg.core.debug:frontend"));
+                    Assert.AreEqual("custom", configuration.Get<string>(CliConfigurationDefaults.DEBUG_FRONTEND_KEY));
                     Assert.AreEqual("custom", defaultFrontend.GetRequiredDefault().Key);
                 },
                 configureServices: static services => services.AddSingleton<IDebugFrontend>(new CustomDebugFrontend()),
@@ -79,7 +79,7 @@ public sealed class CliConfigurationServiceTests : CyborgCliTestBase
     }
 
     [TestMethod]
-    public async Task Test_TryConfigure_TypedCliArgumentOverridesStructuredFileOptionAsync()
+    public async Task Test_TryConfigure_LeafCliArgumentOverridesStructuredFileOptionAsync()
     {
         string optionsPath = await CreateMetricsOptionsFileAsync("file");
         try
@@ -88,10 +88,10 @@ public sealed class CliConfigurationServiceTests : CyborgCliTestBase
                 assertion: services =>
                 {
                     IConfiguration configuration = services.GetRequiredService<IConfiguration>();
-                    MetricsOptions options = configuration.Get<MetricsOptions>(CliConfigurationDefaults.METRICS_OPTIONS_KEY)!;
 
-                    Assert.AreEqual("cli", options.Namespace);
-                    Assert.AreEqual("/tmp/cli.prom", options.FilePath);
+                    Assert.IsNull(configuration[CliConfigurationDefaults.METRICS_OPTIONS_KEY]);
+                    Assert.AreEqual("file", configuration.Get<string>(CliConfigurationDefaults.METRICS_NAMESPACE_KEY));
+                    Assert.AreEqual("/tmp/cli.prom", configuration.Get<string>(CliConfigurationDefaults.METRICS_FILE_PATH_KEY));
                 },
                 buildConfiguration: configuration =>
                 {
@@ -99,7 +99,39 @@ public sealed class CliConfigurationServiceTests : CyborgCliTestBase
                     Assert.IsTrue(service.TryConfigure(
                         configuration,
                         optionsPath,
-                        ["cyborg.services.metrics::cyborg.types.services.metrics.v1={\"namespace\":\"cli\",\"file_path\":\"/tmp/cli.prom\"}"],
+                        ["cyborg.services.metrics.file_path=/tmp/cli.prom"],
+                        out _,
+                        out _));
+                });
+        }
+        finally
+        {
+            File.Delete(optionsPath);
+        }
+    }
+
+    [TestMethod]
+    public async Task Test_TryConfigure_TypedStructuredCliArgumentContributesLeavesOnlyAsync()
+    {
+        string optionsPath = await CreateMetricsOptionsFileAsync("file");
+        try
+        {
+            await TestWithDIAsync(
+                assertion: services =>
+                {
+                    IConfiguration configuration = services.GetRequiredService<IConfiguration>();
+
+                    Assert.IsNull(configuration[CliConfigurationDefaults.METRICS_OPTIONS_KEY]);
+                    Assert.AreEqual("cli", configuration.Get<string>(CliConfigurationDefaults.METRICS_NAMESPACE_KEY));
+                    Assert.AreEqual("/tmp/cli.prom", configuration.Get<string>(CliConfigurationDefaults.METRICS_FILE_PATH_KEY));
+                },
+                buildConfiguration: configuration =>
+                {
+                    ICliConfigurationService service = configuration.ServiceProvider.GetRequiredService<ICliConfigurationService>();
+                    Assert.IsTrue(service.TryConfigure(
+                        configuration,
+                        optionsPath,
+                        ["cyborg.services.metrics:cyborg.types.services.metrics.v1={\"namespace\":\"cli\",\"file_path\":\"/tmp/cli.prom\"}"],
                         out _,
                         out _));
                 });
@@ -120,12 +152,12 @@ public sealed class CliConfigurationServiceTests : CyborgCliTestBase
                 assertion: services =>
                 {
                     IConfiguration configuration = services.GetRequiredService<IConfiguration>();
-                    Assert.AreEqual("cli", configuration.Get<string>("cyborg.core.debug:frontend"));
+                    Assert.AreEqual("cli", configuration.Get<string>(CliConfigurationDefaults.DEBUG_FRONTEND_KEY));
                 },
                 buildConfiguration: configuration =>
                 {
                     ICliConfigurationService service = configuration.ServiceProvider.GetRequiredService<ICliConfigurationService>();
-                    Assert.IsTrue(service.TryConfigure(configuration, optionsPath, ["cyborg.core.debug:frontend=cli"], out _, out _));
+                    Assert.IsTrue(service.TryConfigure(configuration, optionsPath, ["cyborg.core.debug.frontend=cli"], out _, out _));
                 });
         }
         finally
@@ -155,14 +187,6 @@ public sealed class CliConfigurationServiceTests : CyborgCliTestBase
         return path;
     }
 
-    private sealed class CustomDebugFrontend : IDebugFrontend
-    {
-        public string Key => "custom";
-
-        public ValueTask<DebugResumeAction> PauseAsync(IDebugPauseContext context, CancellationToken cancellationToken) =>
-            ValueTask.FromResult(DebugResumeAction.Continue);
-    }
-
     private static async Task<string> CreateMetricsOptionsFileAsync(string @namespace)
     {
         string path = Path.GetTempFileName();
@@ -181,5 +205,13 @@ public sealed class CliConfigurationServiceTests : CyborgCliTestBase
           """;
         await File.WriteAllTextAsync(path, options);
         return path;
+    }
+
+    private sealed class CustomDebugFrontend : IDebugFrontend
+    {
+        public string Key => "custom";
+
+        public ValueTask<DebugResumeAction> PauseAsync(IDebugPauseContext context, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(DebugResumeAction.Continue);
     }
 }

@@ -361,7 +361,7 @@ public sealed class MyModuleTests : ModuleTestBase
     {
         configuration.AddDictionary(new Dictionary<string, string>
         {
-            ["cyborg.core.debug:frontend"] = "test"
+            ["cyborg.core.debug.frontend"] = "test"
         });
     }
 }
@@ -388,7 +388,7 @@ public async Task MyTest()
         {
             configuration.AddDictionary(new Dictionary<string, string>
             {
-                ["cyborg.core.debug:frontend"] = "test"
+                ["cyborg.core.debug.frontend"] = "test"
             });
         });
 }

@@ -13,20 +13,26 @@ internal sealed class RollingFileLoggingConfigurator(IConfiguration configuratio
 {
     public void Configure(ILoggingBuilder builder)
     {
-        RollingFileLoggingConfiguratorOptions options = configuration.Get(CliConfigurationDefaults.ROLLING_LOGGING_OPTIONS_KEY, CliConfigurationDefaults.RollingLogging);
-        if (!options.Enabled)
+        RollingFileLoggingConfiguratorOptions defaults = CliConfigurationDefaults.RollingLogging;
+        bool enabled = configuration.Get(CliConfigurationDefaults.ROLLING_LOGGING_ENABLED_KEY, defaults.Enabled);
+        if (!enabled)
         {
             return;
         }
 
-        builder.AddFilter<ZLoggerRollingFileLoggerProvider>(null, options.MinimumLevel);
+        LogLevel minimumLevel = configuration.Get(CliConfigurationDefaults.ROLLING_LOGGING_MINIMUM_LEVEL_KEY, defaults.MinimumLevel);
+        string path = configuration.Get(CliConfigurationDefaults.ROLLING_LOGGING_PATH_KEY, defaults.Path);
+        RollingInterval rollingInterval = configuration.Get(CliConfigurationDefaults.ROLLING_LOGGING_INTERVAL_KEY, defaults.RollingInterval);
+        int rollingSizeBytes = configuration.Get(CliConfigurationDefaults.ROLLING_LOGGING_SIZE_BYTES_KEY, defaults.RollingSizeBytes);
+        LogFormat format = configuration.Get(CliConfigurationDefaults.ROLLING_LOGGING_FORMAT_KEY, defaults.Format);
+        builder.AddFilter<ZLoggerRollingFileLoggerProvider>(null, minimumLevel);
 
         builder.AddZLoggerRollingFile(rollingOptions =>
         {
-            rollingOptions.FilePathSelector = (timestamp, sequenceNumber) => Path.Join(options.Path, $"{timestamp.ToLocalTime():yyyy-MM-dd}_{sequenceNumber:000}.log");
-            rollingOptions.RollingInterval = options.RollingInterval;
-            rollingOptions.RollingSizeKB = options.RollingSizeBytes >> 10; // divide by 1024 to convert bytes to KB
-            if (options.Format is LogFormat.Json)
+            rollingOptions.FilePathSelector = (timestamp, sequenceNumber) => Path.Join(path, $"{timestamp.ToLocalTime():yyyy-MM-dd}_{sequenceNumber:000}.log");
+            rollingOptions.RollingInterval = rollingInterval;
+            rollingOptions.RollingSizeKB = rollingSizeBytes >> 10; // divide by 1024 to convert bytes to KB
+            if (format is LogFormat.Json)
             {
                 rollingOptions.UseJsonFormatter(f => f.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower);
             }

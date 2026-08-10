@@ -43,9 +43,9 @@ internal sealed class Commands
     /// If no type is specified, the value is treated as a literal string. When a type is specified, the value must be a valid JSON literal for the selected provider.
     /// </param>
     /// <param name="config">
-    /// -c, Optional host configuration overrides. Each element must use `key[::type]=value`. Untyped values are strings;
-    /// typed values are parsed as JSON through the dynamic value provider registry.
-    /// The double-colon type delimiter keeps the optional type annotation distinct from colon-delimited configuration key paths.
+    /// -c, Optional host configuration overrides. Each element must use `key[:type]=value`. Untyped values are strings;
+    /// typed values are parsed as JSON through the dynamic value provider registry. Configuration hierarchy uses dot-delimited keys,
+    /// leaving the optional single-colon suffix exclusively for the dynamic value type annotation.
     /// Multiple definitions use array input; JSON-array syntax preserves definitions whose values contain commas.
     /// </param>
     /// <param name="metrics">The file path where metrics output will be written. If null, the default metrics file path from configuration is used.</param>
@@ -81,10 +81,12 @@ internal sealed class Commands
         bool debuggerArgumentsValid = debugArgumentHandler.TryConfigure(breakAt, out string? invalidBreakpointExpression, out string? debuggerArgumentError);
         await configurationBuilder.ApplyToAsync(configuration, cancellationToken);
 
-        MetricsOptions metricsOptions = configuration.Get(CliConfigurationDefaults.METRICS_OPTIONS_KEY, CliConfigurationDefaults.Metrics);
-        services.GetRequiredService<MetricsCollectorOptions>().Namespace = metricsOptions.Namespace;
+        MetricsOptions metricsDefaults = CliConfigurationDefaults.Metrics;
+        string metricsNamespace = configuration.Get(CliConfigurationDefaults.METRICS_NAMESPACE_KEY, metricsDefaults.Namespace);
+        string configuredMetricsPath = configuration.Get(CliConfigurationDefaults.METRICS_FILE_PATH_KEY, metricsDefaults.FilePath);
+        services.GetRequiredService<MetricsCollectorOptions>().Namespace = metricsNamespace;
         IMetricsCollector metricsCollector = services.GetRequiredService<IMetricsCollector>();
-        string metricsDestinationPath = metrics ?? metricsOptions.FilePath;
+        string metricsDestinationPath = metrics ?? configuredMetricsPath;
         GlobalRuntimeEnvironment globalEnvironment = services.GetRequiredService<GlobalRuntimeEnvironment>();
         bool runSucceeded = false;
 
@@ -138,10 +140,10 @@ internal sealed class Commands
             else
             {
                 logger.LogRunCompletedWithStatus(target, result.Status.ToString());
-                if (!(configuration.TryGetValue($"{CliConfigurationDefaults.CONSOLE_LOGGING_OPTIONS_KEY}:enabled", out bool enabled) && enabled)
-                    && configuration.TryGetValue($"{CliConfigurationDefaults.FILE_LOGGING_OPTIONS_KEY}:enabled", out enabled) && enabled)
+                if (!(configuration.TryGetValue(CliConfigurationDefaults.CONSOLE_LOGGING_ENABLED_KEY, out bool enabled) && enabled)
+                    && configuration.TryGetValue(CliConfigurationDefaults.FILE_LOGGING_ENABLED_KEY, out enabled) && enabled)
                 {
-                    string logFile = configuration.Get($"{CliConfigurationDefaults.FILE_LOGGING_OPTIONS_KEY}:path", CliConfigurationDefaults.FileLogging.Path);
+                    string logFile = configuration.Get(CliConfigurationDefaults.FILE_LOGGING_PATH_KEY, CliConfigurationDefaults.FileLogging.Path);
                     await using Stream logStream = File.OpenRead(logFile);
                     using Stream stdout = Console.OpenStandardOutput();
                     await logStream.CopyToAsync(stdout, cancellationToken);

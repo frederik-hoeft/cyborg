@@ -183,7 +183,7 @@ The generator is triggered by `[GeneratedDecomposition]` on a `partial record` o
 
 ### Generated Output
 
-The generated `Decompose()` method returns a collection of `DynamicKeyValuePair` entries, one per public instance property. Static properties and properties marked with `[DecomposeIgnore]` are excluded. Each entry pairs a transformed property name (as the key) with the property value.
+The generated `Decompose()` method returns a collection of `DynamicKeyValuePair` entries, one per public instance property visible on the annotated type, including inherited properties. Static properties and properties marked with `[DecomposeIgnore]` are excluded. If a derived type hides or overrides a property name, the most-derived property is emitted once. Each entry pairs a transformed property name (as the key) with the property value.
 
 ### Naming Policy
 

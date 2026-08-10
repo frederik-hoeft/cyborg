@@ -12,19 +12,22 @@ internal sealed class ConsoleLoggingConfigurator(IConfiguration configuration, L
 {
     public void Configure(ILoggingBuilder builder)
     {
-        ConsoleLoggingConfiguratorOptions options = configuration.Get(CliConfigurationDefaults.CONSOLE_LOGGING_OPTIONS_KEY, CliConfigurationDefaults.ConsoleLogging);
-        if (!options.Enabled)
+        ConsoleLoggingConfiguratorOptions defaults = CliConfigurationDefaults.ConsoleLogging;
+        bool enabled = configuration.Get(CliConfigurationDefaults.CONSOLE_LOGGING_ENABLED_KEY, defaults.Enabled);
+        if (!enabled)
         {
             return;
         }
 
-        LogLevel minimumLevel = loggingOptions.MinimumLevel ?? options.MinimumLevel;
+        LogLevel configuredMinimumLevel = configuration.Get(CliConfigurationDefaults.CONSOLE_LOGGING_MINIMUM_LEVEL_KEY, defaults.MinimumLevel);
+        LogLevel minimumLevel = loggingOptions.MinimumLevel ?? configuredMinimumLevel;
+        LogFormat format = configuration.Get(CliConfigurationDefaults.CONSOLE_LOGGING_FORMAT_KEY, defaults.Format);
         builder.AddFilter<ZLoggerConsoleLoggerProvider>(category: null, minimumLevel);
 
         builder.AddZLoggerConsole(consoleOptions =>
         {
             consoleOptions.OutputEncodingToUtf8 = true;
-            if (options.Format is LogFormat.Json)
+            if (format is LogFormat.Json)
             {
                 consoleOptions.UseJsonFormatter();
             }
