@@ -1,5 +1,6 @@
 ﻿using ConsoleAppFramework;
 using Cyborg.Cli.Arguments;
+using Cyborg.Cli.Configuration;
 using Cyborg.Cli.Debugging;
 using Cyborg.Cli.Logging;
 using Cyborg.Cli.Metrics;
@@ -30,7 +31,7 @@ internal sealed class Commands
     /// </summary>
     /// <remarks>
     /// This method loads configuration, sets up the runtime environment, executes the configured main module, and writes metrics output.
-    /// Logging and metrics behavior can be customized via parameters or configuration files.
+    /// Logging and metrics behavior can be customized through command-line arguments and host configuration.
     /// If the run fails and file logging is enabled, the log file is written to standard output.
     /// When <paramref name="breakAt"/> is supplied, workflow execution pauses at matching modules and opens an interactive debug REPL.
     /// </remarks>
@@ -40,6 +41,12 @@ internal sealed class Commands
     /// -e, An optional array of environment variable assignments to inject into the global environment. Each element must use `key[:type]=value`.
     /// The optional type must identify a supported dynamic value provider.
     /// If no type is specified, the value is treated as a literal string. When a type is specified, the value must be a valid JSON literal for the selected provider.
+    /// </param>
+    /// <param name="config">
+    /// -c, Optional host configuration overrides. Each element must use `key[::type]=value`. Untyped values are strings;
+    /// typed values are parsed as JSON through the dynamic value provider registry.
+    /// The double-colon type delimiter keeps the optional type annotation distinct from colon-delimited configuration key paths.
+    /// Multiple definitions use array input; JSON-array syntax preserves definitions whose values contain commas.
     /// </param>
     /// <param name="metrics">The file path where metrics output will be written. If null, the default metrics file path from configuration is used.</param>
     /// <param name="logLevel">The minimum log level to use for console output. If null, the default log level from configuration is used.</param>
@@ -54,6 +61,7 @@ internal sealed class Commands
         string main = $"{CYBORG_ROOT}/cyborg.jconf",
         string options = $"{CYBORG_ROOT}/cyborg.options.jconf",
         string[]? environmentVariables = null,
+        string[]? config = null,
         string? metrics = null,
         LogLevel? logLevel = null,
         string[]? breakAt = null,
@@ -62,12 +70,18 @@ internal sealed class Commands
         using DefaultServiceProvider services = new();
         IConfiguration configuration = services.GetRequiredService<IConfiguration>();
         IConfigurationBuilder configurationBuilder = services.GetRequiredService<IConfigurationBuilder>();
+        ICliConfigurationService cliConfigurationService = services.GetRequiredService<ICliConfigurationService>();
+        bool configurationArgumentsValid = cliConfigurationService.TryConfigure(
+            configurationBuilder,
+            options,
+            config,
+            out string? invalidConfigurationDefinition,
+            out string? configurationArgumentError);
         ICliDebugArgumentHandler debugArgumentHandler = services.GetRequiredService<ICliDebugArgumentHandler>();
-        bool debuggerArgumentsValid = debugArgumentHandler.TryConfigure(configurationBuilder, breakAt, out string? invalidBreakpointExpression, out string? debuggerArgumentError);
-        configurationBuilder.AddFiles(files => files.Add(options));
+        bool debuggerArgumentsValid = debugArgumentHandler.TryConfigure(breakAt, out string? invalidBreakpointExpression, out string? debuggerArgumentError);
         await configurationBuilder.ApplyToAsync(configuration, cancellationToken);
 
-        MetricsOptions metricsOptions = configuration.Get("cyborg.services.metrics", () => new MetricsOptions());
+        MetricsOptions metricsOptions = configuration.Get(CliConfigurationDefaults.METRICS_OPTIONS_KEY, CliConfigurationDefaults.Metrics);
         services.GetRequiredService<MetricsCollectorOptions>().Namespace = metricsOptions.Namespace;
         IMetricsCollector metricsCollector = services.GetRequiredService<IMetricsCollector>();
         string metricsDestinationPath = metrics ?? metricsOptions.FilePath;
@@ -85,6 +99,11 @@ internal sealed class Commands
             ILogger logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("cyborg.cli.main");
             logger.LogStartup(string.Join(' ', Array.ConvertAll(Environment.GetCommandLineArgs()[1..], QuoteArg)));
 
+            if (!configurationArgumentsValid)
+            {
+                logger.LogInvalidConfigurationOverride(invalidConfigurationDefinition!, configurationArgumentError!);
+                return 1;
+            }
             if (!debuggerArgumentsValid)
             {
                 logger.LogInvalidBreakAtExpression(invalidBreakpointExpression!, debuggerArgumentError!);
@@ -119,10 +138,10 @@ internal sealed class Commands
             else
             {
                 logger.LogRunCompletedWithStatus(target, result.Status.ToString());
-                if (!(configuration.TryGetValue("cyborg.services.logging.console:enabled", out bool enabled) && enabled)
-                    && configuration.TryGetValue("cyborg.services.logging.file:enabled", out enabled) && enabled)
+                if (!(configuration.TryGetValue($"{CliConfigurationDefaults.CONSOLE_LOGGING_OPTIONS_KEY}:enabled", out bool enabled) && enabled)
+                    && configuration.TryGetValue($"{CliConfigurationDefaults.FILE_LOGGING_OPTIONS_KEY}:enabled", out enabled) && enabled)
                 {
-                    string logFile = configuration.Get("cyborg.services.logging.file:path", defaultValue: "/var/log/cyborg/latest.log");
+                    string logFile = configuration.Get($"{CliConfigurationDefaults.FILE_LOGGING_OPTIONS_KEY}:path", CliConfigurationDefaults.FileLogging.Path);
                     await using Stream logStream = File.OpenRead(logFile);
                     using Stream stdout = Console.OpenStandardOutput();
                     await logStream.CopyToAsync(stdout, cancellationToken);

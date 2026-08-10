@@ -40,7 +40,7 @@ The validation result carried into the debugger always contains the prepared mod
 
 The debugger itself is inactive when no breakpoints are registered. On an active pre-execution boundary it evaluates the breakpoint registry against the module and, when a breakpoint matches, resolves the selected `IDebugFrontend` and presents an `IDebugPauseContext`.
 
-Frontend selection uses the keyed-service selection setting `cyborg.core.debug:frontend`. Core deliberately has no implicit frontend (`DebugOptions.Default.Frontend` is `null`), because frontend policy belongs to the host. `Cyborg.Cli.Debugging` registers the built-in `console` frontend and a CLI argument-integration service. When `--break-at` contributes at least one breakpoint, that service adds `console` as a low-precedence dictionary-backed configuration source before the options file is loaded; an explicit later frontend setting therefore overrides the CLI default. Other hosts can choose their own frontend registration and configuration policy.
+Frontend selection uses the keyed-service selection setting `cyborg.core.debug:frontend`. Core deliberately has no implicit frontend (`DebugOptions.Default.Frontend` is `null`), because frontend policy belongs to the host. `Cyborg.Cli.Debugging` registers the built-in `console` frontend and owns breakpoint argument integration, while the `Cyborg.Cli` composition root includes `DebugOptions.Default with { Frontend = "console" }` in its general dictionary-backed defaults. The options file and explicit `--config` source are applied afterward and can therefore replace that selection. Other hosts can choose their own frontend registration and configuration policy.
 
 ## Breakpoints
 
@@ -197,7 +197,7 @@ IDebugServices
 ICyborgCliDebugServices (Cyborg.Cli.Debugging)
   console REPL I/O
   keyed console debug frontend
-  CLI debugger argument/configuration integration
+  CLI breakpoint argument integration
 ```
 
 This split keeps debugger mechanics, description serialization, and host presentation independently replaceable. The core defines contracts and orchestration; the CLI debugger assembly owns console-specific behavior; the application composition root decides which services and configuration sources are active.

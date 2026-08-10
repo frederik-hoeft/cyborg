@@ -7,4 +7,7 @@ namespace Cyborg.Cli.Logging;
 internal sealed partial record ConsoleLoggingConfiguratorOptions
 (
     LogFormat Format = LogFormat.Text
-) : LoggingConfiguratorOptions;
+) : LoggingConfiguratorOptions
+{
+    internal static ConsoleLoggingConfiguratorOptions Default { get; } = new();
+}

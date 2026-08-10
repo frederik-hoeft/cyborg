@@ -1,4 +1,5 @@
-﻿using Cyborg.Cli.Logging.Options;
+﻿using Cyborg.Cli.Configuration;
+using Cyborg.Cli.Logging.Options;
 using Cyborg.Core.Configuration;
 using Cyborg.Core.Logging;
 using Microsoft.Extensions.Logging;
@@ -11,7 +12,7 @@ internal sealed class ConsoleLoggingConfigurator(IConfiguration configuration, L
 {
     public void Configure(ILoggingBuilder builder)
     {
-        ConsoleLoggingConfiguratorOptions options = configuration.Get("cyborg.services.logging.console", () => new ConsoleLoggingConfiguratorOptions() { Enabled = false });
+        ConsoleLoggingConfiguratorOptions options = configuration.Get(CliConfigurationDefaults.CONSOLE_LOGGING_OPTIONS_KEY, CliConfigurationDefaults.ConsoleLogging);
         if (!options.Enabled)
         {
             return;

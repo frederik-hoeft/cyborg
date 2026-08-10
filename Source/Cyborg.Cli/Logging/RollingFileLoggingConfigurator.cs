@@ -1,4 +1,5 @@
-﻿using Cyborg.Cli.Logging.Options;
+﻿using Cyborg.Cli.Configuration;
+using Cyborg.Cli.Logging.Options;
 using Cyborg.Core.Configuration;
 using Cyborg.Core.Logging;
 using Microsoft.Extensions.Logging;
@@ -12,7 +13,7 @@ internal sealed class RollingFileLoggingConfigurator(IConfiguration configuratio
 {
     public void Configure(ILoggingBuilder builder)
     {
-        RollingFileLoggingConfiguratorOptions options = configuration.Get("cyborg.services.logging.rolling", () => new RollingFileLoggingConfiguratorOptions() { Enabled = false });
+        RollingFileLoggingConfiguratorOptions options = configuration.Get(CliConfigurationDefaults.ROLLING_LOGGING_OPTIONS_KEY, CliConfigurationDefaults.RollingLogging);
         if (!options.Enabled)
         {
             return;

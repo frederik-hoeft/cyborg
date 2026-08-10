@@ -8,4 +8,7 @@ internal sealed partial record FileLoggingConfiguratorOptions
 (
     string Path = "/var/log/cyborg/latest.log",
     LogFormat Format = LogFormat.Json
-) : LoggingConfiguratorOptions;
+) : LoggingConfiguratorOptions
+{
+    internal static FileLoggingConfiguratorOptions Default { get; } = new();
+}

@@ -1,11 +1,8 @@
 ﻿using Cyborg.Cli.Logging;
-using Cyborg.Core.Configuration.Model;
 using Cyborg.Core.Configuration.Serialization;
 using Cyborg.Core.Configuration.Serialization.Dynamics;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Microsoft.Extensions.Logging;
-using System.Text;
-using System.Text.Json;
 
 namespace Cyborg.Cli.Arguments;
 
@@ -39,14 +36,12 @@ internal sealed class EnvironmentVariableArgumentHandler
                     logger.LogUnknownEnvironmentVariableType(env, typeName);
                     return false;
                 }
-                Utf8JsonReader reader = new(Encoding.UTF8.GetBytes(value.ToString()));
-                reader.Read();
-                if (!provider.TryCreateValue(ref reader, jsonLoaderContext, out DynamicValue? dynamicValue))
+                if (!DynamicArgumentValueParser.TryParse(provider, jsonLoaderContext, value.ToString(), out object? dynamicValue, out _))
                 {
                     logger.LogInvalidEnvironmentVariable(env);
                     return false;
                 }
-                valueObj = dynamicValue.Value;
+                valueObj = dynamicValue;
             }
             else
             {

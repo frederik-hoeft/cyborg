@@ -53,7 +53,7 @@ public sealed class ModulePostExecutionHookTests : CyborgCoreTestBase
     {
         RecordingPostExecutionHook hook = new(priority: 0);
         using CancellationTokenSource cancellationSource = new();
-        cancellationSource.Cancel();
+        await cancellationSource.CancelAsync();
 
         await TestWithDIAsync(async services =>
         {

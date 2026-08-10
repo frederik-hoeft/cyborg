@@ -1,5 +1,4 @@
-﻿using Cyborg.Core.Configuration.Builders;
-using Cyborg.Core.Modules.Debugging;
+﻿using Cyborg.Core.Modules.Debugging;
 using Cyborg.Core.Modules.Debugging.Breakpoints;
 using Cyborg.Core.Services.Default;
 using System.Diagnostics.CodeAnalysis;
@@ -8,15 +7,10 @@ namespace Cyborg.Cli.Debugging;
 
 internal sealed class CliDebugArgumentHandler(IBreakpointRegistry breakpoints, IDefault<IDebugFrontend> defaultFrontend) : ICliDebugArgumentHandler
 {
-    private const string CONSOLE_FRONTEND_KEY = "console";
-
     public string FrontendConfigurationKey => defaultFrontend.ConfigurationKey;
 
-    public bool TryConfigure(IConfigurationBuilder configurationBuilder, string[]? breakAt, [NotNullWhen(false)] out string? invalidExpression,
-        [NotNullWhen(false)] out string? errorMessage)
+    public bool TryConfigure(string[]? breakAt, [NotNullWhen(false)] out string? invalidExpression, [NotNullWhen(false)] out string? errorMessage)
     {
-        ArgumentNullException.ThrowIfNull(configurationBuilder);
-
         invalidExpression = null;
         errorMessage = null;
         if (breakAt is not { Length: > 0 })
@@ -49,11 +43,6 @@ internal sealed class CliDebugArgumentHandler(IBreakpointRegistry breakpoints, I
             }
         }
 
-        if (addedBreakpoints.Count > 0)
-        {
-            // CLI debugging has a console frontend, so provide it as a low-precedence host default. Configuration files added after this source may override it.
-            configurationBuilder.AddDictionary(dictionary => dictionary.AddEntry(FrontendConfigurationKey, CONSOLE_FRONTEND_KEY));
-        }
         return true;
     }
 

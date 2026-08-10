@@ -1,4 +1,5 @@
-﻿using Cyborg.Cli.Logging;
+﻿using Cyborg.Cli.Configuration;
+using Cyborg.Cli.Logging;
 using Cyborg.Cli.Logging.Options;
 using Cyborg.Cli.Metrics;
 using Cyborg.Core.Configuration;
@@ -30,7 +31,7 @@ internal interface ICyborgCliServiceOptions
 {
     static ILoggerFactory CreateLoggerFactory(IConfiguration configuration, IEnumerable<ILoggingConfigurator> configurators) => LoggerFactory.Create(builder =>
     {
-        GlobalLoggingOptions globalOptions = configuration.Get("cyborg.services.logging", () => new GlobalLoggingOptions(LogLevel.Trace));
+        GlobalLoggingOptions globalOptions = configuration.Get(CliConfigurationDefaults.GLOBAL_LOGGING_OPTIONS_KEY, CliConfigurationDefaults.GlobalLogging);
         builder.SetMinimumLevel(globalOptions.MinimumLevel);
         foreach (ILoggingConfigurator configurator in configurators)
         {

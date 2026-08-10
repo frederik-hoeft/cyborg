@@ -1,4 +1,5 @@
-﻿using Cyborg.Cli.Logging.Options;
+﻿using Cyborg.Cli.Configuration;
+using Cyborg.Cli.Logging.Options;
 using Cyborg.Core.Configuration;
 using Cyborg.Core.Logging;
 using Microsoft.Extensions.Logging;
@@ -12,7 +13,7 @@ internal sealed class FileLoggingConfigurator(IConfiguration configuration) : IL
 {
     public void Configure(ILoggingBuilder builder)
     {
-        FileLoggingConfiguratorOptions options = configuration.Get("cyborg.services.logging.file", () => new FileLoggingConfiguratorOptions() { Enabled = false });
+        FileLoggingConfiguratorOptions options = configuration.Get(CliConfigurationDefaults.FILE_LOGGING_OPTIONS_KEY, CliConfigurationDefaults.FileLogging);
         if (!options.Enabled)
         {
             return;
