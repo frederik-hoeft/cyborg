@@ -1,10 +1,9 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <IsTestProject>true</IsTestProject>
-        <LangVersion>preview</LangVersion>
     </PropertyGroup>
 
     <ItemGroup>
@@ -14,6 +13,8 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\Cyborg.Core.TestAdapter\Cyborg.Core.TestAdapter.csproj" />
         <ProjectReference Include="..\Cyborg.Core\Cyborg.Core.csproj" />
+        <ProjectReference Include="..\Cyborg.TestModules\Cyborg.TestModules.csproj" />
     </ItemGroup>
 </Project>

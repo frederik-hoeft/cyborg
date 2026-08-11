@@ -42,7 +42,7 @@ internal sealed class DefinedEnumValueProcessor : AttributeProcessorBase<Defined
                 ConstructedFrom.SpecialType: SpecialType.System_Nullable_T,
                 TypeArguments:
                 [
-                    { TypeKind: TypeKind.Enum } nullableEnum
+                { TypeKind: TypeKind.Enum } nullableEnum
                 ]
             })
         {

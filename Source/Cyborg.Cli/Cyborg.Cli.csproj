@@ -28,6 +28,7 @@
     
     <ItemGroup>
         <ProjectReference Include="..\Cyborg.Core\Cyborg.Core.csproj" />
+        <ProjectReference Include="..\Cyborg.Cli.Debugging\Cyborg.Cli.Debugging.csproj" />
         <ProjectReference Include="..\Cyborg.Modules\Cyborg.Modules.csproj" />
         <ProjectReference Include="..\Cyborg.Modules.Borg\Cyborg.Modules.Borg.csproj" />
         <ProjectReference Include="..\Cyborg.Core.Aot\Cyborg.Core.Aot.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false">
@@ -37,13 +38,13 @@
     </ItemGroup>
     
     <ItemGroup>
-      <None Update="*.dev.jconf">
+      <None Update="**/*.dev.jconf">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
     </ItemGroup>
     
     <ItemGroup>
-      <None Update="*.dev.jsecrets">
+      <None Update="**/*.dev.jsecrets">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
     </ItemGroup>

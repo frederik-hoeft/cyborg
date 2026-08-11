@@ -10,6 +10,7 @@ For detailed reference material, see:
 - [Source Generators](source-generators.md) — Roslyn source generators for AOT-compatible code generation
 - [Validation Attributes Reference](validation-attributes-reference.md) — Validation, defaulting, override, and interpolation control attributes
 - [Module Testing](module-testing.md) — Production-backed test infrastructure and generator regression fixtures
+- [Workflow Debugging](debugging.md) — Breakpoints, interactive REPL, module inspection, and debug adapters
 
 **Table of Contents**
 
@@ -27,9 +28,11 @@ For detailed reference material, see:
   - [Loading and Deserialization](#loading-and-deserialization)
     - [Registry-Based Deserialization](#registry-based-deserialization)
     - [Dynamic Value System](#dynamic-value-system)
+  - [Module Identity and Descriptions](#module-identity-and-descriptions)
 - [Module Execution](#module-execution)
   - [Execution Lifecycle](#execution-lifecycle)
     - [Validation Pipeline](#validation-pipeline)
+    - [Lifecycle Hooks](#lifecycle-hooks)
     - [Execution and Result](#execution-and-result)
   - [Runtime Hierarchy](#runtime-hierarchy)
   - [Environment Binding](#environment-binding)
@@ -52,6 +55,7 @@ For detailed reference material, see:
     - [Artifact Configuration](#artifact-configuration)
     - [Artifact Exposure Patterns](#artifact-exposure-patterns)
 - [Supporting Infrastructure](#supporting-infrastructure)
+  - [Host Configuration Composition](#host-configuration-composition)
   - [Parsing Infrastructure](#parsing-infrastructure)
     - [Parser Combinators](#parser-combinators)
     - [Terminal Parsers](#terminal-parsers)
@@ -72,7 +76,7 @@ For detailed reference material, see:
 
 ## Overview
 
-Cyborg is a .NET 10 application providing modular, JSON-configured backup orchestration with native AOT compilation support. It replaces legacy shell-based backup scripts with a type-safe, extensible module system. The architecture is driven by four design goals:
+Cyborg is a .NET 10 application providing modular, JSON-configured backup orchestration with native AOT compilation support. Its architecture is driven by four design goals:
 
 1. **AOT Compilation** — Native AOT publishing for minimal startup time and memory footprint on Linux servers, and minimal external dependencies (no .NET runtime requirement, no external dynamic libraries).
 2. **Extensibility** — A plugin-like module system allowing backup operations to be composed from JSON configuration without code changes.
@@ -81,7 +85,7 @@ Cyborg is a .NET 10 application providing modular, JSON-configured backup orches
 
 ## Project Structure
 
-The production solution is organized into five primary projects, each with a specific role in the dependency hierarchy:
+The production solution is organized into six primary projects, each with a specific role in the dependency hierarchy:
 
 | Layer | Target | Purpose |
 |-------|--------|---------|
@@ -89,9 +93,10 @@ The production solution is organized into five primary projects, each with a spe
 | `Cyborg.Core.Aot` | netstandard2.0 | Roslyn incremental source generators distributed as analyzers. Targets netstandard2.0 as required by the Roslyn analyzer hosting model. |
 | `Cyborg.Modules` | net10.0 | Built-in, domain-agnostic module implementations supplemented by generated code from `Cyborg.Core.Aot`, e.g., for model validation and instance activation. |
 | `Cyborg.Modules.Borg` | net10.0 | Borg-specific modules (create, prune, compact) with JSON output parsing and borg-specific configuration types. |
-| `Cyborg.Cli` | net10.0 | Application entry point using ConsoleAppFramework for CLI routing, with Jab for compile-time dependency injection composition. |
+| `Cyborg.Cli.Debugging` | net10.0 | Console debugger frontend and its isolated ConsoleAppFramework-generated REPL command surface. |
+| `Cyborg.Cli` | net10.0 | Application entry point using its own ConsoleAppFramework command surface, with Jab for compile-time dependency injection composition. |
 
-`Cyborg.Core` defines the runtime interfaces and abstractions. `Cyborg.Core.Aot` generates code that implements those interfaces for specific module types. `Cyborg.Modules` and `Cyborg.Modules.Borg` provide the built-in module library. `Cyborg.Cli` composes everything into the final executable. Each module library exposes a Jab `[ServiceProviderModule]` interface (e.g., `ICyborgModuleServices`, `ICyborgBorgServices`) that the CLI project imports into its composition root.
+`Cyborg.Core` defines the runtime interfaces and abstractions. `Cyborg.Core.Aot` generates code that implements those interfaces for specific module types. `Cyborg.Modules` and `Cyborg.Modules.Borg` provide the built-in module library. `Cyborg.Cli.Debugging` provides the console debugger adapter in a separate CAF compilation, and `Cyborg.Cli` composes everything into the final executable. Each module library exposes a Jab `[ServiceProviderModule]` interface (e.g., `ICyborgModuleServices`, `ICyborgBorgServices`) that the CLI project imports into its composition root.
 
 ### Test Support Projects
 
@@ -158,6 +163,14 @@ Configuration modules populate the environment with typed values using the `IDyn
 
 Custom types implement `IDynamicValueProvider` and register a versioned type name. When annotated with `[GeneratedDecomposition]`, they gain `IDecomposable` support for hierarchical property access via the variable resolution subsystem. Dynamic key-value entries must contain a non-null `key` and exactly one non-null typed value; malformed entries fail immediately with `JsonException`, including when they are parsed outside a module-validation context. See the [Dynamic Values Reference](dynamic-values-reference.md) for a complete listing of available value providers.
 
+### Module Identity and Descriptions
+
+Every runtime module exposes structural identity through `IModule`: optional `Name` and `Group` values plus a format-neutral descriptor returned by `GetDescriptor()`. Executable module definitions additionally implement `IModuleDefinition`, which provides the static versioned `ModuleId`. Together these values identify a module in runtime binding, diagnostics, debugger breakpoints, and human-readable output without coupling those consumers to the concrete module record type.
+
+Generated module records use their generated descriptor traversal directly, so the descriptor reflects the same nested property graph and collection semantics used by validation. `ModuleBase` supplies a minimal descriptor fallback for hand-written modules, preserving the descriptor contract even when richer generated metadata is unavailable. The description subsystem builds an immutable object/collection tree from the descriptor and serializes that tree through DI-discovered `IModuleDescriptionSerializer` implementations. Built-in text and JSON serializers are consumers of the same tree; additional formats can be registered without changing module types or the debugger.
+
+Description components may carry arbitrary string hints. Hints are metadata only: the core tree preserves them, while individual serializers decide whether and how to interpret recognized keys. This keeps concerns such as presentation or redaction policy outside the module model. See [Workflow Debugging and Module Descriptions](debugging.md) for the debugger integration and serialization boundaries.
+
 ## Module Execution
 
 This section describes how modules are executed at runtime: the validation pipeline that prepares module records before execution, the runtime hierarchy that manages nested module dispatch, and the environment binding model that determines each module's execution context.
@@ -178,13 +191,23 @@ Before a worker's `ExecuteAsync` method is invoked, `ModuleWorker<TModule>` call
 
 4. **Interpolate Strings** — Recursively applies `runtime.Environment.Interpolate(...)` to eligible strings on the module, nested `[Validatable]` records, and supported collection elements. `[IgnoreInterpolation]` preserves strings that require later context-specific interpolation. `ModuleBase.Name` and `ModuleBase.Group` opt out because they establish structural identity before validation; `AssertModule.Message` is interpolated by its worker after the assertion child has executed so it can reference child artifacts.
 
-5. **Validate Constraints** — Checks constraints declared through `[Required]`, `[VariableIdentifier]`, `[Range<T>]`, length, filesystem, path-shape, regex, grammar, enum, and related validation attributes. Produces a `ValidationResult<TModule>` containing either the transformed module or validation errors.
+5. **Validate Constraints** — Checks constraints declared through `[Required]`, `[VariableIdentifier]`, `[Range<T>]`, length, filesystem, path-shape, regex, grammar, enum, and related validation attributes. Produces an `IValidationResult<TModule>` that retains the transformed module and carries any validation errors.
 
 Each transformation uses `with` expressions, so the original deserialized module is never mutated. The generator emits private async `ApplyDefaultsAsync`, `ResolveOverridesAsync`, and `ApplyInterpolationAsync` instance helpers plus the public `ValidateAsync` orchestrator required by `IModule<TModule>`. `ValidateAsync` creates one editor-hidden `ModuleValidationContext` containing the runtime and service provider and passes it through all generated preparation phases.
 
 Collection traversal is guarded according to the concrete collection shape. Null reference collections and absent nullable value-type collections are skipped. A default `ImmutableArray<T>` is not enumerated and remains distinct from an initialized empty array; property-level constraints such as `[Required]` still execute outside the enumeration guard, allowing invalid default arrays to produce validation errors instead of throwing while validating elements. Selected validation attributes can set `TargetsElements = true` to validate each immediate collection element through the same guarded traversal. Element-targeted errors retain the parent property name and include the zero-based element index in their message.
 
-After generated validation completes, workers may optionally adjust the result through `ModuleValidationCallbackAsync`. The pipeline then calls `EnsureValid()`, which throws a `ValidationException` if any errors remain. Only after successful validation does the worker's `ExecuteAsync` method execute.
+Generated validation returns `IValidationResult<TModule>`, which always carries the prepared module together with its errors and validity state. This means invalid results remain inspectable without reconstructing or mutating the module. Before the result is enforced, the worker can refine it through the protected `OnValidationAsync` extension point and the ordered validation-hook pipeline described below.
+
+#### Lifecycle Hooks
+
+Module execution exposes three ordered service pipelines for cross-cutting lifecycle behavior. Every hook has a numeric priority; lower values execute first, and the resolved handlers are snapshotted in pipeline order.
+
+1. **Validation hooks** run after generated validation and the worker-specific `OnValidationAsync` extension point. A hook receives the current validation result and runtime environment and may return a replacement result. After the final validation hook, the resulting module instance becomes the stable module used for the remainder of execution.
+2. **Pre-execution hooks** run after artifact/result builders have been created but before validity is enforced and before the worker runs. They receive the prepared validation result, runtime, module identity, and result builder, and may return an execution result to short-circuit normal execution. The workflow debugger is implemented as an early pre-execution hook, which is why it can inspect invalid prepared modules and cancel them without first triggering `EnsureValid()`.
+3. **Post-execution hooks** run at the runtime dispatch boundary after a concrete execution result has been established. They receive that result together with the scoped runtime and observe it without changing the result contract. The runtime enters this pipeline for ordinary worker returns as well as failures and cancellations produced by thrown exceptions. Each post hook is isolated: a failing hook is logged, later hooks still run, and the established module result is preserved. The module execution cancellation token does not short-circuit this cleanup/observation pipeline. For ordinary worker results, `runtime.Exit(...)` has already finalized artifact publication before the post hooks observe the result.
+
+If no pre-execution hook short-circuits the module, `ModuleWorker<TModule>` enforces the final validation result with `EnsureValid()`. Invalid results therefore fail before worker code executes, while valid results proceed to `ExecuteAsync`. The runtime owns the final dispatch/result boundary and the post-execution pipeline, while the worker owns validation, pre-execution participation, and module-specific execution. This separation provides reliable before/after extension points without making worker implementations responsible for runtime cleanup behavior.
 
 #### Execution and Result
 
@@ -282,7 +305,7 @@ A decimal digit cannot begin the first segment, but it may begin a segment follo
 Other valid identifiers include `host`, `_internal`, `host.port`, `backup-job.result`, and `a-.b`.  
 Invalid identifiers include `.host`, `host.`, `host..port`, `host port`, and `${host}`.
 
-**Namespaces** currently use the same syntax as identifiers. They are maintained as a distinct grammar contract because namespace and general identifier syntax may diverge in the future.
+**Namespaces** are validated through a distinct grammar contract whose accepted syntax is identical to identifiers. Keeping the contracts separate allows namespace semantics to evolve independently from general identifier syntax.
 
 **Variable expressions** are enclosed in `${` and `}` and use one of the following forms:
 
@@ -433,7 +456,17 @@ After publishing, parent modules can read artifacts via standard variable resolu
 
 ## Supporting Infrastructure
 
-Beyond the module and environment systems, Cyborg provides several supporting subsystems that modules rely on for interacting with external processes, extracting structured data, and reporting operational metrics.
+Beyond the module and environment systems, Cyborg provides several supporting subsystems that modules rely on for host configuration, interacting with external processes, extracting structured data, and reporting operational metrics.
+
+### Host Configuration Composition
+
+Host-level service options are composed separately from workflow environment variables. `IConfigurationBuilder` collects configuration loaders and ignored keys, materializes their sources asynchronously, and finalizes the singleton `IConfiguration` once the host composition is complete. File-backed and dictionary-backed loaders use the same source abstraction, allowing the CLI, tests, and other hosts to provide configuration through different inputs without changing option consumers. File sources preserve their configured insertion order and deduplicate repeated paths, so source precedence is explicit rather than dependent on set enumeration.
+
+The CLI composition root applies three source layers in a fixed order: a dictionary-backed set of built-in host defaults, the configured options file, then an optional dictionary-backed source produced from the `--config` array entries. The defaults are assembled centrally from the option models' default instances, with host-specific refinements where required; for example, core leaves the debugger frontend unspecified while the CLI refines that default to its registered `console` frontend. This gives the options file normal deployment-level precedence while preserving command-line overrides as the final per-invocation layer. CLI entries use `key[:type]=value`: configuration hierarchy is dot-delimited, untyped values remain strings, and the optional single-colon suffix selects a dynamic value provider that parses the JSON value.
+
+Configuration finalization recursively decomposes values implementing `IDecomposable` and stores only terminal values under dot-delimited hierarchical keys. A structured source value registered at `cyborg.core.debug`, for example, contributes `cyborg.core.debug.frontend` but is not retained as a value at `cyborg.core.debug`. Intermediate structured nodes therefore cannot become stale when a later source replaces one of their descendants: source precedence is evaluated only on the leaf keys that form the configuration state. Ignored keys are omitted while sources are incorporated. Once finalized, consumers read the stable leaf store through `IConfiguration`; the configuration layer does not implicitly reconstruct composite values.
+
+This configuration layer is also the selection mechanism for keyed host services. For example, the debugger frontend selection key reads `cyborg.core.debug.frontend`, while the CLI separately decides which concrete frontend implementations to register. Keeping source composition, leaf values, and keyed-service registration separate allows each host to define policy through ordinary configuration sources without moving frontend or deployment policy into `Cyborg.Core`.
 
 ### Parsing Infrastructure
 

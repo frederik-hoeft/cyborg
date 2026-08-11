@@ -16,14 +16,15 @@ internal static class TypeSymbolExtensions
         /// <returns>true if the type was successfully unwrapped; otherwise, false.</returns>
         public bool TryUnwrapNullableType(out ITypeSymbol unwrapped)
         {
-            if (self.NullableAnnotation == NullableAnnotation.Annotated)
-            {
-                unwrapped = self.WithNullableAnnotation(NullableAnnotation.NotAnnotated);
-                return true;
-            }
+            // need to actually unwrap nullable value types, rather than just removing the nullable annotation, so check that first
             if (self is INamedTypeSymbol namedType && namedType.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T)
             {
                 unwrapped = namedType.TypeArguments[0];
+                return true;
+            }
+            if (self.NullableAnnotation == NullableAnnotation.Annotated)
+            {
+                unwrapped = self.WithNullableAnnotation(NullableAnnotation.NotAnnotated);
                 return true;
             }
             unwrapped = self;

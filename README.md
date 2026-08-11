@@ -66,19 +66,21 @@ Build artifacts are output to `Source/artifacts/`.
 
 ### Configuration
 
-Cyborg is configured through jconf files, which are JSON with support for comments.
+Cyborg is configured through jconf files, which are JSON with support for comments. Host configuration is stored as dot-delimited hierarchical leaf keys and composed in three precedence layers: CLI-defined built-in defaults, the options file, then explicit `--config` command-line overrides. Structured source values are decomposed before storage, so later layers replace earlier values at the same leaf without retaining stale parent objects.
 
 Cyborg expects its configuration in `/etc/cyborg/` by default. The `samples/` directory provides a complete reference configuration:
 
 | File | Purpose |
 |------|---------|
 | `cyborg.jconf` | Main workflow entry point — defines the top-level module to execute |
-| `cyborg.options.jconf` | Runtime options: logging, metrics, trust policies |
+| `cyborg.options.jconf` | Runtime options: logging, metrics, trust policies, debugger frontend |
 | `cyborg.hosts.jsecrets` | Host definitions and secrets (borg passphrases, SSH settings, WoL MACs) |
 | `jobs/` | Per-frequency job definitions (daily, weekly) |
 | `templates/` | Reusable workflow templates (Docker backup, systemd backup) |
 
 Copy the sample files to `/etc/cyborg/`, adjust host definitions and secrets for your environment, and ensure configuration files are owned by root with restrictive permissions (see [Security](#security) below).
+
+Interactive debugging uses a keyed frontend selected through runtime configuration. The CLI's built-in defaults select the registered `console` frontend; the options file or a later `--config cyborg.core.debug.frontend=...` override can select another registered frontend without changing the core debugger.
 
 ### Running
 
@@ -91,9 +93,23 @@ cyborg run --main /path/to/cyborg.jconf -e target=daily
 
 # Override the console log level
 cyborg run -e target=daily --log-level information
+
+# Override a frontend selected by the options file for this invocation
+cyborg run -e target=daily --config cyborg.core.debug.frontend=console
+
+# Override a configuration leaf for this invocation
+cyborg run -e target=daily --config cyborg.services.metrics.file_path=/tmp/cyborg.prom
+
+# Override an enum-valued configuration leaf through its registered dynamic value type
+cyborg run -e target=daily --config 'cyborg.services.logging.minimum_level:cyborg.types.services.logging.level.v1="debug"'
+
+# Break before a named module and open the selected debug frontend
+cyborg run -e target=daily --break-at 'my-step-name'
 ```
 
-The `target` environment variable selects which job to run (e.g., `daily`, `weekly`). Additional environment variables can be injected via `-e` with optional type annotations (e.g., `-e port:int=2222`).
+When `--break-at` is set, execution pauses after the matching module has been prepared and its constraints evaluated, but before validation is enforced and before the worker runs. With the `console` frontend selected, the debug REPL supports `continue`, `step`, `inspect`, breakpoint management, and `cancel`. See [Workflow Debugging](docs/architecture/debugging.md).
+
+The `target` environment variable selects which job to run (e.g., `daily`, `weekly`). Additional environment variables can be injected via `-e` with optional type annotations (e.g., `-e port:int=2222`). Host configuration can be overridden with `-c` / `--config` using `key[:type]=value`. Configuration hierarchy uses dots, while the optional single-colon suffix identifies a registered dynamic value provider. Untyped values are literal strings; typed values are parsed as JSON. Multiple definitions use the option's array input: comma-separated definitions are convenient for simple values, while JSON-array syntax preserves definitions that themselves contain commas. Structured typed inputs are decomposed into their leaf keys before entering the configuration store.
 
 ## Configuration Model
 
@@ -137,12 +153,14 @@ Trust enforcement is configurable in `cyborg.options.jconf` and supports three m
 | [Templates Reference](docs/architecture/templates-reference.md) | Template module usage and patterns |
 | [Source Generators](docs/architecture/source-generators.md) | Roslyn source generators for AOT-compatible code generation |
 | [Validation Attributes Reference](docs/architecture/validation-attributes-reference.md) | Validation, defaulting, and override control attributes |
+| [Workflow Debugging](docs/architecture/debugging.md) | Breakpoints, interactive REPL, and module inspection |
 
 ## Project Structure
 
 ```
 Source/
   Cyborg.Cli/           Application entry point and CLI routing
+  Cyborg.Cli.Debugging/ Console debugger frontend and isolated REPL routing
   Cyborg.Core/           Core abstractions: modules, runtime, parsing, services
   Cyborg.Core.Aot/       Roslyn source generators for AOT compatibility
   Cyborg.Modules/        Built-in modules (sequence, subprocess, template, etc.)

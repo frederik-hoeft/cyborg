@@ -12,7 +12,10 @@ internal sealed partial record RollingFileLoggingConfiguratorOptions
     RollingInterval RollingInterval = RollingInterval.Day,
     int RollingSizeBytes = 10 * 1024 * 1024,
     LogFormat Format = LogFormat.Json
-) : LoggingConfiguratorOptions;
+) : LoggingConfiguratorOptions
+{
+    internal static RollingFileLoggingConfiguratorOptions Default { get; } = new();
+}
 
 internal abstract record LoggingConfiguratorOptions
 {

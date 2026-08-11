@@ -75,8 +75,10 @@ internal abstract class PropertyValidationProcessorBase<TAttribute> : AttributeP
     private bool TryCreateCollectionElementTarget(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyValidationTarget target)
     {
         _ = context.Property.Type.TryUnwrapNullableType(out ITypeSymbol nonNullableType);
-        if (nonNullableType.SpecialType is SpecialType.System_String
-            || !CollectionTypeInspector.TryDescribe(context.Compilation, nonNullableType, out CollectionTypeInspector.CollectionTypeDescriptor? descriptor))
+        if (!CollectionTypeInspector.TryDescribe(
+            context.Compilation,
+            nonNullableType,
+            out CollectionTypeInspector.CollectionTypeDescriptor? descriptor))
         {
             context.Report(
                 ValidationGeneratorDiagnostics.CollectionApplicationRequiresCollection,

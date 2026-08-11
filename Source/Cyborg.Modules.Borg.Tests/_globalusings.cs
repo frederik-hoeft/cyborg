@@ -1,1 +1,1 @@
-global using MSAssert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
+﻿global using MSAssert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;

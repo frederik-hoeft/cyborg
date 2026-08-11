@@ -4,4 +4,7 @@ using Microsoft.Extensions.Logging;
 namespace Cyborg.Cli.Logging;
 
 [GeneratedDecomposition]
-internal sealed partial record GlobalLoggingOptions(LogLevel MinimumLevel = LogLevel.Information);
+internal sealed partial record GlobalLoggingOptions(LogLevel MinimumLevel = LogLevel.Information)
+{
+    internal static GlobalLoggingOptions Default { get; } = new();
+}

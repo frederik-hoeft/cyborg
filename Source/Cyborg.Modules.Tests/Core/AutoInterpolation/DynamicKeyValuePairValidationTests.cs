@@ -72,9 +72,9 @@ public sealed class DynamicKeyValuePairValidationTests : ModuleTestBase
         },
         module =>
         {
-        List<DynamicKvp> entries = [.. module.Entries];
-        MSAssert.AreEqual("first_key", entries[0].Key);
-        MSAssert.AreEqual("second_key", entries[1].Key);
+            List<DynamicKvp> entries = [.. module.Entries];
+            MSAssert.AreEqual("first_key", entries[0].Key);
+            MSAssert.AreEqual("second_key", entries[1].Key);
         });
 
     [TestMethod]

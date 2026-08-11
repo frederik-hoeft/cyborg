@@ -50,13 +50,13 @@ public sealed class TestModuleRuntimeScope : IAsyncDisposable
     /// </summary>
     /// <param name="services">The fully configured service collection.</param>
     /// <returns>A ready-to-use test scope.</returns>
-    public static TestModuleRuntimeScope Create(IServiceCollection services)
+    internal static TestModuleRuntimeScope Create(IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
         ServiceProvider serviceProvider = services.BuildServiceProvider();
         GlobalRuntimeEnvironment globalEnvironment = serviceProvider.GetRequiredService<GlobalRuntimeEnvironment>();
         ILoggerFactory loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
-        RootModuleRuntime runtime = new(globalEnvironment, loggerFactory);
+        RootModuleRuntime runtime = new(globalEnvironment, loggerFactory, serviceProvider);
         return new TestModuleRuntimeScope(serviceProvider, runtime, globalEnvironment);
     }
 

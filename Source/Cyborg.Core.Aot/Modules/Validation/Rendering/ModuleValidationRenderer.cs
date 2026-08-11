@@ -6,8 +6,6 @@ namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
 
 internal static class ModuleValidationRenderer
 {
-    private const string MODULE_VARIABLE = "self";
-
     public static string Helpers => "__Helpers";
 
     public static class HelperMembers
@@ -27,12 +25,14 @@ internal static class ModuleValidationRenderer
 
     public static string Render(ModuleModel model, ValidationContractInfo contractInfo, DiagnosticsReporter diagnosticsReporter)
     {
+        VisibilityContext visibilityContext = new(contractInfo.Compilation, model.ModuleSymbol);
         ReadOnlySpan<ISectionRenderer> renderPipeline =
         [
-            new DefaultsSectionRenderer(contractInfo, MODULE_VARIABLE, diagnosticsReporter),
-            new OverrideSectionRenderer(contractInfo, MODULE_VARIABLE, diagnosticsReporter),
-            new InterpolationSectionRenderer(contractInfo, MODULE_VARIABLE),
-            new ValidationSectionRenderer(contractInfo, diagnosticsReporter),
+            new DefaultsSectionRenderer(contractInfo, visibilityContext, diagnosticsReporter),
+            new OverrideSectionRenderer(contractInfo, visibilityContext, diagnosticsReporter),
+            new InterpolationSectionRenderer(contractInfo, visibilityContext, diagnosticsReporter),
+            new ValidationSectionRenderer(contractInfo, visibilityContext, diagnosticsReporter),
+            new InspectionSectionRenderer(contractInfo, visibilityContext, diagnosticsReporter),
         ];
 
         StringBuilder builder = new();
@@ -51,23 +51,29 @@ internal static class ModuleValidationRenderer
             builder.AppendLine("{");
         }
 
-        builder.Append("partial record ").Append(model.TypeName).Append(" : ").Append(contractInfo.IModuleT.RenderGlobalWithGenerics(model.TypeName)).AppendLine();
+        builder.Append("partial record ").Append(model.TypeName).Append(" : ").Append(contractInfo.IModuleT.RenderGlobalWithGenerics(model.TypeName)).Append(", ")
+            .Append(contractInfo.IModuleDescriptor.RenderGlobal()).AppendLine();
         builder.AppendLine("{");
+
         IndentedStringBuilder indentedBuilder = new(builder, indentLevel: 1);
-        for (int i = 0; i < renderPipeline.Length; ++i)
+
+        for (int index = 0; index < renderPipeline.Length; index++)
         {
-            if (i > 0)
+            if (index > 0)
             {
                 builder.AppendLine();
             }
-            renderPipeline[i].RenderSection(indentedBuilder, model);
+
+            renderPipeline[index].RenderSection(indentedBuilder, model);
         }
+
         builder.AppendLine("}");
 
-        for (int index = model.ContainingTypes.Length - 1; index >= 0; --index)
+        for (int index = model.ContainingTypes.Length - 1; index >= 0; index--)
         {
             builder.AppendLine("}");
         }
+
         builder.AppendLine();
         builder.AppendLine(
             $$"""

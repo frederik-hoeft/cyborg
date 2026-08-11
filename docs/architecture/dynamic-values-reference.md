@@ -17,6 +17,7 @@ For runtime semantics such as scoping, interpolation, decomposition, and overrid
   - [Entry Shape](#entry-shape)
   - [Type Name Syntax](#type-name-syntax)
 - [Scalar Types](#scalar-types)
+  - [Configuration Enum Types](#configuration-enum-types)
 - [Runtime Composition Types](#runtime-composition-types)
   - [`cyborg.types.module.reference.v1`](#cyborgtypesmodulereferencev1)
   - [`cyborg.types.module.environment.v1`](#cyborgtypesmoduleenvironmentv1)
@@ -91,6 +92,19 @@ The following scalar types are registered by the core runtime:
 | `float` | number |
 | `double` | number |
 | `decimal` | number |
+
+### Configuration Enum Types
+
+Configuration-facing enum leaves have dedicated dynamic value providers so command-line and other dynamic sources can preserve the leaf's enum type instead of storing a string. Their values are JSON strings using the same snake_case enum naming convention as configuration files.
+
+| Type name | Enum |
+|-----------|------|
+| `cyborg.types.services.logging.level.v1` | `LogLevel` |
+| `cyborg.types.services.logging.format.v1` | `LogFormat` |
+| `cyborg.types.services.logging.rolling_interval.v1` | `RollingInterval` |
+| `cyborg.types.services.trust.enforcement_mode.v1` | `TrustEnforcementMode` |
+
+For example, `"log_only"` is a valid value for `cyborg.types.services.trust.enforcement_mode.v1`. These providers are registered by the service layer that owns the corresponding option type rather than by the core primitive-provider set.
 
 ## Runtime Composition Types
 
@@ -214,6 +228,8 @@ Represents files-cache sentinel options for a Borg create operation. See [Borg C
 | `sentinel_file_name` | string | No | `"borg_files_cache.sentinel"` | Valid file name |
 
 ## Service Option Types
+
+Service option providers deserialize convenient structured source values. When these values are added to host configuration, `IConfiguration` recursively decomposes them and retains only their dot-addressed leaf values; the structured provider types are not stored as retrievable parent nodes.
 
 ### `cyborg.types.services.trust.options.v1`
 

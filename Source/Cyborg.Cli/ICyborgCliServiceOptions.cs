@@ -1,4 +1,5 @@
-﻿using Cyborg.Cli.Logging;
+﻿using Cyborg.Cli.Configuration;
+using Cyborg.Cli.Logging;
 using Cyborg.Cli.Logging.Options;
 using Cyborg.Cli.Metrics;
 using Cyborg.Core.Configuration;
@@ -22,22 +23,24 @@ namespace Cyborg.Cli;
 [Singleton<IDynamicValueProvider, DynamicFileLoggingConfiguratorOptionsProvider>]
 [Singleton<IDynamicValueProvider, DynamicConsoleLoggingConfiguratorOptionsProvider>]
 [Singleton<IDynamicValueProvider, DynamicMetricsOptionsProvider>]
+[Singleton<IDynamicValueProvider, DynamicLogLevelProvider>]
+[Singleton<IDynamicValueProvider, DynamicLogFormatProvider>]
+[Singleton<IDynamicValueProvider, DynamicRollingIntervalProvider>]
 [Singleton<ILoggerFactory>(Factory = nameof(CreateLoggerFactory))]
 [Singleton<JsonConverter>(Factory = nameof(CreateRollingIntervalConverter))]
 [Singleton<JsonConverter>(Factory = nameof(CreateLogFormatConverter))]
 [Singleton<JsonConverter>(Factory = nameof(CreateLogLevelConverter))]
 internal interface ICyborgCliServiceOptions
 {
-    static ILoggerFactory CreateLoggerFactory(IConfiguration configuration, IEnumerable<ILoggingConfigurator> configurators) =>
-        LoggerFactory.Create(builder =>
+    static ILoggerFactory CreateLoggerFactory(IConfiguration configuration, IEnumerable<ILoggingConfigurator> configurators) => LoggerFactory.Create(builder =>
+    {
+        LogLevel minimumLevel = configuration.Get(CliConfigurationDefaults.GLOBAL_LOGGING_MINIMUM_LEVEL_KEY, CliConfigurationDefaults.GlobalLogging.MinimumLevel);
+        builder.SetMinimumLevel(minimumLevel);
+        foreach (ILoggingConfigurator configurator in configurators)
         {
-            GlobalLoggingOptions globalOptions = configuration.Get("cyborg.services.logging", () => new GlobalLoggingOptions(LogLevel.Trace));
-            builder.SetMinimumLevel(globalOptions.MinimumLevel);
-            foreach (ILoggingConfigurator configurator in configurators)
-            {
-                configurator.Configure(builder);
-            }
-        });
+            configurator.Configure(builder);
+        }
+    });
 
     static JsonConverter CreateRollingIntervalConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<RollingInterval>(namingPolicy);
 

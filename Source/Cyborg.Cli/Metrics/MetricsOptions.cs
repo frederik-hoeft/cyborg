@@ -7,4 +7,7 @@ internal sealed partial record MetricsOptions
 (
     string Namespace = "cyborg",
     string FilePath = "/var/log/cyborg/metrics.prom"
-);
+)
+{
+    internal static MetricsOptions Default { get; } = new();
+}

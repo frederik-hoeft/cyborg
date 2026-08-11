@@ -1,6 +1,6 @@
 ﻿using System.Collections.Immutable;
 
-namespace Cyborg.Core.Common.Pipelines;
+namespace Cyborg.Core.Services.Pipelines;
 
 [SuppressMessage("Design", CA1034, Justification = CA1034_JUSTIFY_EXTENSION_SYNTAX_CSHARP_14)]
 public static class PipelineHandlerExtensions

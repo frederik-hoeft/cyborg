@@ -13,6 +13,11 @@ internal static class CollectionTypeInspector
     {
         descriptor = null;
 
+        if (type.SpecialType == SpecialType.System_String)
+        {
+            return false;
+        }
+
         if (type is IArrayTypeSymbol arrayType)
         {
             descriptor = new CollectionTypeDescriptor(

@@ -24,16 +24,11 @@ internal static class DecompositionGenerationCandidateFactory
         }
 
         string namingPolicyPropertyName = GetNamedArgument(target.GeneratorAttribute, nameof(GeneratedDecompositionAttribute.NamingPolicy)) ?? "SnakeCaseLower";
-        string namingPolicyProviderTypeName = (target.GeneratorAttribute.NamedArguments.FirstOrDefault(kv => kv.Key == nameof(GeneratedDecompositionAttribute.NamingPolicyProvider)).Value.Value as Type)
-            ?.RenderGlobal()
+        string namingPolicyProviderTypeName = (target.GeneratorAttribute.NamedArguments
+            .FirstOrDefault(kv => kv.Key == nameof(GeneratedDecompositionAttribute.NamingPolicyProvider)).Value.Value as Type)?.RenderGlobal()
             ?? KnownTypes.JsonNamingPolicy;
 
-        ImmutableArray<IPropertySymbol> decomposableProperties =
-        [
-            .. typeSymbol.GetMembers().OfType<IPropertySymbol>()
-                .Where(static property => property.DeclaredAccessibility is Accessibility.Public)
-                .Where(static property => !property.GetAttributes().Any(static attr => attr.AttributeClass?.ToDisplayString() == typeof(DecomposeIgnoreAttribute).FullName))
-        ];
+        ImmutableArray<IPropertySymbol> decomposableProperties = [.. EnumerateDecomposableProperties(typeSymbol)];
 
         string namespaceName = typeSymbol.ContainingNamespace?.IsGlobalNamespace is false
             ? typeSymbol.ContainingNamespace.ToDisplayString()
@@ -49,6 +44,24 @@ internal static class DecompositionGenerationCandidateFactory
                 NamingPolicyPropertyName: namingPolicyPropertyName,
                 DecomposableProperties: decomposableProperties),
             diagnostics.ToImmutable());
+    }
+
+    private static IEnumerable<IPropertySymbol> EnumerateDecomposableProperties(INamedTypeSymbol typeSymbol)
+    {
+        HashSet<string> propertyNames = new(StringComparer.Ordinal);
+        for (INamedTypeSymbol? currentType = typeSymbol; currentType is not null; currentType = currentType.BaseType)
+        {
+            foreach (IPropertySymbol property in currentType.GetMembers().OfType<IPropertySymbol>())
+            {
+                if (!propertyNames.Add(property.Name)
+                    || property is not { DeclaredAccessibility: Accessibility.Public, IsStatic: false }
+                    || property.GetAttributes().Any(static attr => attr.AttributeClass?.ToDisplayString() == typeof(DecomposeIgnoreAttribute).FullName))
+                {
+                    continue;
+                }
+                yield return property;
+            }
+        }
     }
 
     private static bool IsPartial(INamedTypeSymbol typeSymbol) =>
