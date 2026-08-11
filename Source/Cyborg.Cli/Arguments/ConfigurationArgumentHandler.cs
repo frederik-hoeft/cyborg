@@ -1,4 +1,4 @@
-using Cyborg.Core.Configuration.Builders;
+﻿using Cyborg.Core.Configuration.Builders;
 using Cyborg.Core.Configuration.Serialization;
 using Cyborg.Core.Configuration.Serialization.Dynamics;
 using System.Diagnostics.CodeAnalysis;
@@ -37,7 +37,7 @@ internal sealed class ConfigurationArgumentHandler
                 return false;
             }
 
-            object value;
+            object? value;
             if (typeName is null)
             {
                 value = valueText;
