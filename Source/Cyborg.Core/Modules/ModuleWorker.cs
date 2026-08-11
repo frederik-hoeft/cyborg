@@ -13,7 +13,6 @@ public abstract class ModuleWorker<TModule>(IWorkerContext<TModule> context) : I
 {
     private readonly IServicePipeline<IModuleValidationHook> _validationHooks = context.ServiceProvider.GetRequiredService<IServicePipeline<IModuleValidationHook>>();
     private readonly IServicePipeline<IModulePreExecutionHook> _preExecutionHooks = context.ServiceProvider.GetRequiredService<IServicePipeline<IModulePreExecutionHook>>();
-    private readonly IServicePipeline<IModulePostExecutionHook> _postExecutionHooks = context.ServiceProvider.GetRequiredService<IServicePipeline<IModulePostExecutionHook>>();
 
     private IModuleResultBuilder ResultBuilder { get; set; } = null!;
 
@@ -97,15 +96,7 @@ public abstract class ModuleWorker<TModule>(IWorkerContext<TModule> context) : I
         }
         // validation passed, proceed to execution
         Logger.LogModuleValidationCompleted(ModuleId);
-        IModuleExecutionResult result = await ExecuteAsync(runtime, cancellationToken);
-
-        // run post-execution hooks
-        ModulePostExecutionContext postExecutionContext = new(result, runtime);
-        foreach (IModulePostExecutionHook postExecutionHook in _postExecutionHooks)
-        {
-            await postExecutionHook.ExecuteAsync(postExecutionContext, cancellationToken);
-        }
-        return result;
+        return await ExecuteAsync(runtime, cancellationToken);
     }
 
     protected virtual ValueTask<IValidationResult<TModule>> OnValidationAsync(IValidationResult<TModule> validationResult, TModule originalModule, CancellationToken cancellationToken) =>

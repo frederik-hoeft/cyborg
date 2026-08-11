@@ -1,17 +1,16 @@
 ﻿using ConsoleAppFramework;
 using Cyborg.Cli.Arguments;
+using Cyborg.Cli.Configuration;
+using Cyborg.Cli.Debugging;
 using Cyborg.Cli.Logging;
 using Cyborg.Cli.Metrics;
 using Cyborg.Core.Configuration;
 using Cyborg.Core.Configuration.Builders;
 using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
-using Cyborg.Core.Modules.Debugging;
-using Cyborg.Core.Modules.Debugging.Breakpoints;
 using Cyborg.Core.Modules.Extensions;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
-using Cyborg.Core.Services.Default;
 using Cyborg.Core.Services.Metrics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -32,7 +31,7 @@ internal sealed class Commands
     /// </summary>
     /// <remarks>
     /// This method loads configuration, sets up the runtime environment, executes the configured main module, and writes metrics output.
-    /// Logging and metrics behavior can be customized via parameters or configuration files.
+    /// Logging and metrics behavior can be customized through command-line arguments and host configuration.
     /// If the run fails and file logging is enabled, the log file is written to standard output.
     /// When <paramref name="breakAt"/> is supplied, workflow execution pauses at matching modules and opens an interactive debug REPL.
     /// </remarks>
@@ -42,6 +41,12 @@ internal sealed class Commands
     /// -e, An optional array of environment variable assignments to inject into the global environment. Each element must use `key[:type]=value`.
     /// The optional type must identify a supported dynamic value provider.
     /// If no type is specified, the value is treated as a literal string. When a type is specified, the value must be a valid JSON literal for the selected provider.
+    /// </param>
+    /// <param name="config">
+    /// -c, Optional host configuration overrides. Each element must use `key[:type]=value`. Untyped values are strings;
+    /// typed values are parsed as JSON through the dynamic value provider registry. Configuration hierarchy uses dot-delimited keys,
+    /// leaving the optional single-colon suffix exclusively for the dynamic value type annotation.
+    /// Multiple definitions use array input; JSON-array syntax preserves definitions whose values contain commas.
     /// </param>
     /// <param name="metrics">The file path where metrics output will be written. If null, the default metrics file path from configuration is used.</param>
     /// <param name="logLevel">The minimum log level to use for console output. If null, the default log level from configuration is used.</param>
@@ -56,6 +61,7 @@ internal sealed class Commands
         string main = $"{CYBORG_ROOT}/cyborg.jconf",
         string options = $"{CYBORG_ROOT}/cyborg.options.jconf",
         string[]? environmentVariables = null,
+        string[]? config = null,
         string? metrics = null,
         LogLevel? logLevel = null,
         string[]? breakAt = null,
@@ -64,13 +70,23 @@ internal sealed class Commands
         using DefaultServiceProvider services = new();
         IConfiguration configuration = services.GetRequiredService<IConfiguration>();
         IConfigurationBuilder configurationBuilder = services.GetRequiredService<IConfigurationBuilder>();
-        configurationBuilder.AddFiles(files => files.Add(options));
+        ICliConfigurationService cliConfigurationService = services.GetRequiredService<ICliConfigurationService>();
+        bool configurationArgumentsValid = cliConfigurationService.TryConfigure(
+            configurationBuilder,
+            options,
+            config,
+            out string? invalidConfigurationDefinition,
+            out string? configurationArgumentError);
+        ICliDebugArgumentHandler debugArgumentHandler = services.GetRequiredService<ICliDebugArgumentHandler>();
+        bool debuggerArgumentsValid = debugArgumentHandler.TryConfigure(breakAt, out string? invalidBreakpointExpression, out string? debuggerArgumentError);
         await configurationBuilder.ApplyToAsync(configuration, cancellationToken);
 
-        MetricsOptions metricsOptions = configuration.Get("cyborg.services.metrics", () => new MetricsOptions());
-        services.GetRequiredService<MetricsCollectorOptions>().Namespace = metricsOptions.Namespace;
+        MetricsOptions metricsDefaults = CliConfigurationDefaults.Metrics;
+        string metricsNamespace = configuration.Get(CliConfigurationDefaults.METRICS_NAMESPACE_KEY, metricsDefaults.Namespace);
+        string configuredMetricsPath = configuration.Get(CliConfigurationDefaults.METRICS_FILE_PATH_KEY, metricsDefaults.FilePath);
+        services.GetRequiredService<MetricsCollectorOptions>().Namespace = metricsNamespace;
         IMetricsCollector metricsCollector = services.GetRequiredService<IMetricsCollector>();
-        string metricsDestinationPath = metrics ?? metricsOptions.FilePath;
+        string metricsDestinationPath = metrics ?? configuredMetricsPath;
         GlobalRuntimeEnvironment globalEnvironment = services.GetRequiredService<GlobalRuntimeEnvironment>();
         bool runSucceeded = false;
 
@@ -85,8 +101,19 @@ internal sealed class Commands
             ILogger logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("cyborg.cli.main");
             logger.LogStartup(string.Join(' ', Array.ConvertAll(Environment.GetCommandLineArgs()[1..], QuoteArg)));
 
-            if (!TryConfigureDebugger(services, logger, breakAt))
+            if (!configurationArgumentsValid)
             {
+                logger.LogInvalidConfigurationOverride(invalidConfigurationDefinition!, configurationArgumentError!);
+                return 1;
+            }
+            if (!debuggerArgumentsValid)
+            {
+                logger.LogInvalidBreakAtExpression(invalidBreakpointExpression!, debuggerArgumentError!);
+                return 1;
+            }
+            if (!debugArgumentHandler.HasUsableFrontend())
+            {
+                logger.LogBreakAtWithoutDebugFrontend(debugArgumentHandler.FrontendConfigurationKey);
                 return 1;
             }
 
@@ -113,10 +140,10 @@ internal sealed class Commands
             else
             {
                 logger.LogRunCompletedWithStatus(target, result.Status.ToString());
-                if (!(configuration.TryGetValue("cyborg.services.logging.console:enabled", out bool enabled) && enabled)
-                    && configuration.TryGetValue("cyborg.services.logging.file:enabled", out enabled) && enabled)
+                if (!(configuration.TryGetValue(CliConfigurationDefaults.CONSOLE_LOGGING_ENABLED_KEY, out bool enabled) && enabled)
+                    && configuration.TryGetValue(CliConfigurationDefaults.FILE_LOGGING_ENABLED_KEY, out enabled) && enabled)
                 {
-                    string logFile = configuration.Get("cyborg.services.logging.file:path", defaultValue: "/var/log/cyborg/latest.log");
+                    string logFile = configuration.Get(CliConfigurationDefaults.FILE_LOGGING_PATH_KEY, CliConfigurationDefaults.FileLogging.Path);
                     await using Stream logStream = File.OpenRead(logFile);
                     using Stream stdout = Console.OpenStandardOutput();
                     await logStream.CopyToAsync(stdout, cancellationToken);
@@ -131,42 +158,6 @@ internal sealed class Commands
             CollectRunMetrics(globalEnvironment, metricsCollector, runSucceeded);
             await WriteMetricsAsync(metricsCollector, metricsDestinationPath, CancellationToken.None);
         }
-    }
-
-    private static bool TryConfigureDebugger(DefaultServiceProvider services, ILogger logger, string[]? breakAt)
-    {
-        if (breakAt is not { Length: > 0 })
-        {
-            return true;
-        }
-        // check if there is a frontend for the debugger
-        IDefault<IDebugFrontend> defaultFrontend = services.GetRequiredService<IDefault<IDebugFrontend>>();
-        if (defaultFrontend.GetDefault() is null)
-        {
-            logger.LogBreakAtWithoutDebugFrontend(defaultFrontend.ConfigurationKey);
-            return false;
-        }
-
-        IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
-        foreach (string expression in breakAt)
-        {
-            if (string.IsNullOrWhiteSpace(expression))
-            {
-                continue;
-            }
-
-            try
-            {
-                breakpoints.Add(expression);
-            }
-            catch (ArgumentException ex)
-            {
-                // RegexParseException derives from ArgumentException.
-                logger.LogInvalidBreakAtExpression(expression, ex.Message);
-                return false;
-            }
-        }
-        return true;
     }
 
     private static void CollectRunMetrics(GlobalRuntimeEnvironment environment, IMetricsCollector metricsCollector, bool runSucceeded)

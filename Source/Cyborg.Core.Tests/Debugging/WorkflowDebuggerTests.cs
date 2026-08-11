@@ -95,6 +95,32 @@ public sealed class WorkflowDebuggerTests : CyborgCoreTestBase
         });
 
     [TestMethod]
+    public Task Test_RequestStep_WhenNextModuleAlsoMatchesPersistentBreakpoint_ConsumesStepFirstAsync() => TestWithDIAsync(
+        assertion: async services =>
+        {
+            IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
+            IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+            IWorkflowDebugger debugger = services.GetRequiredService<IWorkflowDebugger>();
+
+            int persistentId = breakpoints.Add("probe");
+            ProbeModule module = new() { Name = "probe" };
+
+            await debugger.EvaluatePreExecutionAsync(ProbeModule.ModuleId, ValidationResult.Valid(module), runtime, services, TestContext.CancellationToken);
+            await debugger.EvaluatePreExecutionAsync(ProbeModule.ModuleId, ValidationResult.Valid(module), runtime, services, TestContext.CancellationToken);
+
+            IReadOnlyList<BreakpointExpression> registeredBreakpoints = breakpoints.ToList();
+            Assert.HasCount(1, registeredBreakpoints);
+            Assert.AreEqual(persistentId, registeredBreakpoints[0].Id);
+            Assert.IsFalse(registeredBreakpoints[0].IsOneShot);
+        },
+        configureServices: static services => services.AddSingleton<IDebugFrontend, StepOnceThenContinueFrontend>(),
+        buildConfiguration: static config =>
+        {
+            IServiceSelectionKey<IDebugFrontend> frontendKey = config.ServiceProvider.GetRequiredService<IServiceSelectionKey<IDebugFrontend>>();
+            config.AddDictionary(dict => dict.AddEntry(frontendKey.Key, "test-step-once"));
+        });
+
+    [TestMethod]
     public Task Test_EvaluatePreExecutionAsync_InvalidResult_PassesPreparedModuleAndErrorsToFrontendAsync() => TestWithDIAsync(
         assertion: async services =>
         {
@@ -189,6 +215,23 @@ public sealed class WorkflowDebuggerTests : CyborgCoreTestBase
             LastIsValid = context.ValidationResult.IsValid;
             LastValidationErrors = context.ValidationResult.Errors;
             return ValueTask.FromResult(action);
+        }
+    }
+
+    private sealed class StepOnceThenContinueFrontend : IDebugFrontend
+    {
+        public string Key => "test-step-once";
+
+        private int PauseCount { get; set; }
+
+        public ValueTask<DebugResumeAction> PauseAsync(IDebugPauseContext context, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (PauseCount++ == 0)
+            {
+                context.RequestStep();
+            }
+            return ValueTask.FromResult(DebugResumeAction.Continue);
         }
     }
 

@@ -1,4 +1,5 @@
-﻿using Cyborg.Cli.Logging.Options;
+﻿using Cyborg.Cli.Configuration;
+using Cyborg.Cli.Logging.Options;
 using Cyborg.Core.Configuration;
 using Cyborg.Core.Logging;
 using Microsoft.Extensions.Logging;
@@ -12,21 +13,25 @@ internal sealed class FileLoggingConfigurator(IConfiguration configuration) : IL
 {
     public void Configure(ILoggingBuilder builder)
     {
-        FileLoggingConfiguratorOptions options = configuration.Get("cyborg.services.logging.file", () => new FileLoggingConfiguratorOptions() { Enabled = false });
-        if (!options.Enabled)
+        FileLoggingConfiguratorOptions defaults = CliConfigurationDefaults.FileLogging;
+        bool enabled = configuration.Get(CliConfigurationDefaults.FILE_LOGGING_ENABLED_KEY, defaults.Enabled);
+        if (!enabled)
         {
             return;
         }
 
-        builder.AddFilter<ZLoggerFileLoggerProvider>(null, options.MinimumLevel);
+        LogLevel minimumLevel = configuration.Get(CliConfigurationDefaults.FILE_LOGGING_MINIMUM_LEVEL_KEY, defaults.MinimumLevel);
+        string path = configuration.Get(CliConfigurationDefaults.FILE_LOGGING_PATH_KEY, defaults.Path);
+        LogFormat format = configuration.Get(CliConfigurationDefaults.FILE_LOGGING_FORMAT_KEY, defaults.Format);
+        builder.AddFilter<ZLoggerFileLoggerProvider>(null, minimumLevel);
 
-        if (File.Exists(options.Path))
+        if (File.Exists(path))
         {
-            File.Delete(options.Path);
+            File.Delete(path);
         }
-        builder.AddZLoggerFile(options.Path, fileOptions =>
+        builder.AddZLoggerFile(path, fileOptions =>
         {
-            if (options.Format is LogFormat.Json)
+            if (format is LogFormat.Json)
             {
                 fileOptions.UseJsonFormatter(f => f.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower);
             }

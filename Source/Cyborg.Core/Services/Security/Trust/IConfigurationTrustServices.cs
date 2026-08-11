@@ -11,6 +11,7 @@ namespace Cyborg.Core.Services.Security.Trust;
 [ServiceProviderModule]
 [Singleton<IPathCanonicalizationService, DefaultPathCanonicalizationService>]
 [Singleton<IDynamicValueProvider, ConfigurationTrustOptionsDynamicProvider>]
+[Singleton<IDynamicValueProvider, DynamicTrustEnforcementModeProvider>]
 [Singleton<IDynamicValueProvider, UnixPermissionsTrustPolicyDynamicProvider>]
 [Singleton<IDynamicValueProvider, UnixOwnerTrustPolicyDynamicProvider>]
 [Singleton<IConfigurationTrustMonitor, UnionConfigurationTrustMonitor>]

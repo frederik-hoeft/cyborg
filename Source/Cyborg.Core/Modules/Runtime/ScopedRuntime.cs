@@ -4,7 +4,8 @@ using Microsoft.Extensions.Logging;
 
 namespace Cyborg.Core.Modules.Runtime;
 
-internal sealed class ScopedRuntime(IModuleRuntime root, IModuleRuntime parent, IRuntimeEnvironment environment, VariableSyntaxBuilder syntaxFactory, ILoggerFactory loggerFactory) : ModuleRuntimeBase(syntaxFactory, loggerFactory)
+internal sealed class ScopedRuntime(IModuleRuntime root, IModuleRuntime parent, IRuntimeEnvironment environment, VariableSyntaxBuilder syntaxFactory, ILoggerFactory loggerFactory,
+    IServiceProvider? serviceProvider) : ModuleRuntimeBase(syntaxFactory, loggerFactory, serviceProvider)
 {
     public override IRuntimeEnvironment GlobalEnvironment => root.GlobalEnvironment;
 

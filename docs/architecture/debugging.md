@@ -32,18 +32,19 @@ Load
   -> [PRE-EXECUTION HOOKS: DEBUGGER MAY PAUSE]
   -> EnsureValid
   -> ExecuteAsync
+  -> [RUNTIME RESULT BOUNDARY]
   -> Post-Execution Hooks
 ```
 
-The validation result carried into the debugger always contains the prepared module. If the result is invalid, the frontend can inspect both that module and its errors before `EnsureValid()` would reject execution. Returning `Continue` resumes the normal lifecycle; returning `Cancel` lets the debugging hook produce a canceled module result through the normal result-building path without invoking the worker.
+The validation result carried into the debugger always contains the prepared module. If the result is invalid, the frontend can inspect both that module and its errors before `EnsureValid()` would reject execution. Returning `Continue` resumes the normal lifecycle; returning `Cancel` lets the debugging hook produce a canceled module result through the normal result-building path without invoking the worker. The runtime establishes the final execution result before entering the post-execution pipeline, including when validation or worker execution throws or is canceled. Post-execution hook failures are isolated from that result and from later hooks, making the post pipeline a reliable observation/cleanup boundary rather than another result-producing stage.
 
 The debugger itself is inactive when no breakpoints are registered. On an active pre-execution boundary it evaluates the breakpoint registry against the module and, when a breakpoint matches, resolves the selected `IDebugFrontend` and presents an `IDebugPauseContext`.
 
-Frontend selection uses the keyed-service selection setting `cyborg.core.debug:frontend`. Core deliberately has no implicit frontend (`DebugOptions.Default.Frontend` is `null`), because frontend policy belongs to the host. `Cyborg.Cli.Debugging` registers the built-in `console` frontend; CLI deployments must select `console` in host configuration before using `--break-at`. A host can instead register and select a different keyed frontend.
+Frontend selection uses the keyed-service selection setting `cyborg.core.debug.frontend`. Core deliberately has no implicit frontend (`DebugOptions.Default.Frontend` is `null`), because frontend policy belongs to the host. `Cyborg.Cli.Debugging` registers the built-in `console` frontend and owns breakpoint argument integration, while the `Cyborg.Cli` composition root includes `DebugOptions.Default with { Frontend = "console" }` in its general dictionary-backed defaults. The options file and explicit `--config` source are applied afterward and can therefore replace that selection. Other hosts can choose their own frontend registration and configuration policy.
 
 ## Breakpoints
 
-`IBreakpointRegistry` stores numbered regular-expression breakpoints. Expressions are culture-invariant and matched against the module ID plus `Name` and `Group` when present. Matching follows breakpoint ID order, giving the registry a stable session view even though registration/removal is thread-safe.
+`IBreakpointRegistry` stores numbered regular-expression breakpoints. Expressions are culture-invariant and matched against the module ID plus `Name` and `Group` when present. Persistent breakpoints are evaluated in breakpoint-ID order. One-shot breakpoints are evaluated first, with the newest one-shot taking priority, so stepping applies to the immediately following execution boundary even when that module also matches an older persistent breakpoint. Registration and removal remain thread-safe.
 
 | Expression | Meaning |
 |---|---|
@@ -66,6 +67,8 @@ Breakpoint state belongs to the workflow debugging session rather than to an ind
 
 One-shot removal is atomic: a matching one-shot breakpoint is consumed by the caller that successfully removes it. Persistent breakpoints remain registered until explicitly removed or detached.
 
+Breakpoint evaluation failures use the same pause path as successful matches. Regular-expression matching has a bounded timeout; if an expression exceeds it, execution pauses at that module boundary instead of failing the workflow. The evaluation produces debugger diagnostics that are attached to the pause context and can be rendered by any frontend. A timed-out persistent breakpoint remains registered, while a one-shot breakpoint is consumed when its evaluation causes the pause. This diagnostic channel is intentionally not regex-specific and can carry future debugger-side evaluation problems through the same boundary.
+
 ## Frontend Boundary
 
 The runtime-facing frontend contract is deliberately small:
@@ -86,6 +89,7 @@ public interface IDebugFrontend : IKeyedService
 | `Runtime` | Runtime associated with the paused execution boundary |
 | `Services` | Host service provider associated with the executing module |
 | `Breakpoints` | Session breakpoint registry |
+| `Diagnostics` | Debugger-side diagnostics associated with entering this pause |
 | `RequestStep()` | Add the one-shot step breakpoint |
 | `Detach()` | Clear session breakpoint state |
 
@@ -93,7 +97,7 @@ The pause context intentionally carries the module's service provider because fr
 
 ## Console REPL and CAF Isolation
 
-`ConsoleDebugFrontend` owns the interactive pause lifecycle: display the breakpoint state, read a prompt-aware command line through `IDebugReplIo`, dispatch it, and continue until a command returns a resume action. EOF detaches and resumes. Inspection serializes the paused module descriptor and then reports any associated validation errors so failed configuration can be correlated with its prepared state.
+`ConsoleDebugFrontend` owns the interactive pause lifecycle: display the pause state and any debugger diagnostics, read a prompt-aware command line through `IDebugReplIo`, dispatch it, and continue until a command returns a resume action. EOF detaches and resumes. Inspection serializes the paused module descriptor and then reports any associated validation errors so failed configuration can be correlated with its prepared state.
 
 The console frontend uses ConsoleAppFramework (CAF) for command routing, aliases, argument binding, validation, generated help, and command dependency injection. Cyborg retains only a lexical tokenizer because an interactive REPL receives one input string while CAF consumes an argument vector. Quoting and escaping are therefore handled before CAF dispatch, while command grammar remains CAF-owned.
 
@@ -193,12 +197,13 @@ IDebugServices
 ICyborgCliDebugServices (Cyborg.Cli.Debugging)
   console REPL I/O
   keyed console debug frontend
+  CLI breakpoint argument integration
 ```
 
 This split keeps debugger mechanics, description serialization, and host presentation independently replaceable. The core defines contracts and orchestration; the CLI debugger assembly owns console-specific behavior; the application composition root decides which services and configuration sources are active.
 
 ## Testing Expectations
 
-Tests should preserve architectural boundaries rather than merely individual command implementations. Description coverage should exercise generated scalar/nested/collection traversal, nullable and default collection shapes, hint preservation, custom serializer registration, and cancellation. Debugger coverage should exercise breakpoint lifecycle, invalid prepared-module inspection, frontend selection, repeated pauses, command aliases/tokenization, EOF/detach behavior, and cancellation.
+Tests should preserve architectural boundaries rather than merely individual command implementations. Description coverage should exercise generated scalar/nested/collection traversal, nullable and default collection shapes, hint preservation, custom serializer registration, and cancellation. Debugger coverage should exercise breakpoint lifecycle, one-shot/persistent precedence, evaluation diagnostics, invalid prepared-module inspection, frontend selection and host defaults, repeated pauses, command aliases/tokenization, EOF/detach behavior, and cancellation.
 
 The console debugger tests should dispatch through the real debugger CAF command surface. In particular, generated debugger help must remain isolated from the main CLI `run` command, and alternate `IDebugReplIo` implementations must be able to observe prompt and semantic output categories without command classes depending on console-specific rendering.

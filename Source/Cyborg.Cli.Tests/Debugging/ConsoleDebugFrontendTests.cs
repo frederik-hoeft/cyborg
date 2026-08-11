@@ -224,6 +224,7 @@ public sealed class ConsoleDebugFrontendTests : CyborgCliTestBase
             runtime,
             services,
             breakpoints,
+            Diagnostics: [],
             RequestStepAction: () => breakpoints.Add(".*", isOneShot: true),
             DetachAction: breakpoints.Clear);
 
@@ -234,6 +235,35 @@ public sealed class ConsoleDebugFrontendTests : CyborgCliTestBase
         Assert.AreEqual(DebugResumeAction.Continue, action);
         Assert.Contains(static write => write.Message.Contains("validation failed", StringComparison.Ordinal) && write.Kind == OutputKind.Error, typedIo.Writes);
         Assert.Contains(static write => write.Message.Contains("Name [required]: Name is required.", StringComparison.Ordinal) && write.Kind == OutputKind.Error, typedIo.Writes);
+    }, configureServices: static services => services.AddSingleton<IDebugReplIo>(static _ => new RecordingDebugReplIo(["continue"])));
+
+    [TestMethod]
+    public Task Test_PauseAsync_DebugDiagnostic_IsRenderedAsDebuggerErrorAsync() => TestWithDIAsync(async services =>
+    {
+        IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        IDebugFrontend frontend = services.GetRequiredService<IDebugFrontend>();
+        IDebugReplIo io = services.GetRequiredService<IDebugReplIo>();
+
+        ProbeModule module = new() { Name = "probe" };
+        DebugDiagnostic diagnostic = new(DebugDiagnosticSeverity.Error, "Breakpoint expression evaluation timed out.");
+        DebugPauseContextStub context = new(
+            ProbeModule.ModuleId,
+            ValidationResult.Valid(module),
+            runtime,
+            services,
+            breakpoints,
+            [diagnostic],
+            RequestStepAction: () => breakpoints.Add(".*", isOneShot: true),
+            DetachAction: breakpoints.Clear);
+
+        DebugResumeAction action = await frontend.PauseAsync(context, TestContext.CancellationToken);
+        Assert.IsInstanceOfType<RecordingDebugReplIo>(io);
+        RecordingDebugReplIo typedIo = (RecordingDebugReplIo)io;
+
+        Assert.AreEqual(DebugResumeAction.Continue, action);
+        Assert.Contains(static write => write.Message.StartsWith("Debugger paused:", StringComparison.Ordinal) && write.Kind == OutputKind.Error, typedIo.Writes);
+        Assert.Contains(static write => write.Message == "Breakpoint expression evaluation timed out." && write.Kind == OutputKind.Error, typedIo.Writes);
     }, configureServices: static services => services.AddSingleton<IDebugReplIo>(static _ => new RecordingDebugReplIo(["continue"])));
 
     [TestMethod]
@@ -251,6 +281,7 @@ public sealed class ConsoleDebugFrontendTests : CyborgCliTestBase
             runtime,
             services,
             breakpoints,
+            Diagnostics: [],
             RequestStepAction: () => breakpoints.Add(".*", isOneShot: true),
             DetachAction: breakpoints.Clear);
 
@@ -264,7 +295,13 @@ public sealed class ConsoleDebugFrontendTests : CyborgCliTestBase
         Assert.Contains(static write => write.Message.StartsWith("Breakpoint hit:", StringComparison.Ordinal) && write.Kind == OutputKind.Status, typedIo.Writes);
     }, configureServices: static services => services.AddSingleton<IDebugReplIo>(static _ => new RecordingDebugReplIo(["break at other", "continue"])));
 
-    private async Task<DebugReplResult> RunReplAsync(IServiceProvider services, string script, string[]? seedBreakpoints = null, int pauseCount = 1, IReadOnlyList<ValidationError>? validationErrors = null)
+    private async Task<DebugReplResult> RunReplAsync(
+        IServiceProvider services,
+        string script,
+        string[]? seedBreakpoints = null,
+        int pauseCount = 1,
+        IReadOnlyList<ValidationError>? validationErrors = null,
+        IReadOnlyList<DebugDiagnostic>? diagnostics = null)
     {
         IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
         IBreakpointRegistry registry = services.GetRequiredService<IBreakpointRegistry>();
@@ -290,6 +327,7 @@ public sealed class ConsoleDebugFrontendTests : CyborgCliTestBase
             runtime,
             services,
             registry,
+            diagnostics ?? [],
             RequestStepAction: () => registry.Add(".*", isOneShot: true),
             DetachAction: registry.Clear);
 
@@ -312,6 +350,7 @@ public sealed class ConsoleDebugFrontendTests : CyborgCliTestBase
         IModuleRuntime Runtime,
         IServiceProvider Services,
         IBreakpointRegistry Breakpoints,
+        IReadOnlyList<DebugDiagnostic> Diagnostics,
         Action RequestStepAction,
         Action DetachAction
     ) : IDebugPauseContext

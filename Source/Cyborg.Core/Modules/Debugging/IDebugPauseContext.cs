@@ -20,6 +20,9 @@ public interface IDebugPauseContext
 
     IBreakpointRegistry Breakpoints { get; }
 
+    /// <summary>Diagnostics associated with entering the current pause, such as breakpoint evaluation failures.</summary>
+    IReadOnlyList<DebugDiagnostic> Diagnostics { get; }
+
     /// <summary>Requests a one-shot break at the next module executed through the runtime (step).</summary>
     void RequestStep();
 

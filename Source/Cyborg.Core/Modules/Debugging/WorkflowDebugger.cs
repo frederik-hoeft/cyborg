@@ -31,7 +31,8 @@ internal sealed class WorkflowDebugger(IBreakpointRegistry breakpoints, ILoggerF
 
         IModule module = validationResult.Module;
         BreakpointContext context = new(moduleId, module.Name, module.Group);
-        if (!breakpoints.TryMatchAndConsume(in context, out BreakpointExpression? matched))
+        BreakpointEvaluationResult evaluationResult = breakpoints.EvaluateAndConsume(in context);
+        if (!evaluationResult.ShouldPause || evaluationResult.Breakpoint is not { } breakpoint)
         {
             return DebugResumeAction.Continue;
         }
@@ -43,10 +44,21 @@ internal sealed class WorkflowDebugger(IBreakpointRegistry breakpoints, ILoggerF
             runtime,
             services,
             breakpoints,
+            evaluationResult.Diagnostics,
             RequestStepAction: () => breakpoints.Add(STEP_EXPRESSION, isOneShot: true),
             DetachAction: breakpoints.Clear);
 
-        _logger.LogBreakpointHit(pauseContext.GetModuleIdentity(), matched.Expression);
+        if (evaluationResult.Status is BreakpointEvaluationStatus.Match)
+        {
+            _logger.LogBreakpointHit(pauseContext.GetModuleIdentity(), breakpoint.Expression);
+        }
+        else
+        {
+            foreach (DebugDiagnostic diagnostic in evaluationResult.Diagnostics)
+            {
+                _logger.LogBreakpointEvaluationFailed(pauseContext.GetModuleIdentity(), breakpoint.Expression, diagnostic.Message);
+            }
+        }
 
         return await frontend.PauseAsync(pauseContext, cancellationToken).ConfigureAwait(false);
     }

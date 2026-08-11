@@ -17,7 +17,7 @@ namespace Cyborg.Core.Modules.Debugging;
 [Singleton<IModulePreExecutionHook>(Factory = nameof(CreateDebuggingHook))]
 public interface IDebugServices
 {
-    static ServiceSelectionKey<IDebugFrontend> DebugFrontendSelectionKey => new("cyborg.core.debug:frontend", DebugOptions.Default.Frontend);
+    static ServiceSelectionKey<IDebugFrontend> DebugFrontendSelectionKey => new("cyborg.core.debug.frontend", DebugOptions.Default.Frontend);
 
     static IDynamicValueProvider CreateDebugOptionsProvider() => new DebugOptionsProvider();
 

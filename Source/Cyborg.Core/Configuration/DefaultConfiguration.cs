@@ -68,19 +68,20 @@ public sealed class DefaultConfiguration : IConfiguration
 
         private void AddValue(string? parentKey, DynamicKeyValuePair property, IReadOnlySet<string> ignoredKeys)
         {
-            string key = parentKey is null ? property.Key : $"{parentKey}:{property.Key}";
+            string key = parentKey is null ? property.Key : $"{parentKey}.{property.Key}";
             if (ignoredKeys.Contains(key))
             {
                 return;
             }
-            Options[key] = property.Value;
             if (property.Value is IDecomposable decomposable)
             {
                 foreach (DynamicKeyValuePair nestedProperty in decomposable.Decompose())
                 {
                     AddValue(key, nestedProperty, ignoredKeys);
                 }
+                return;
             }
+            Options[key] = property.Value;
         }
     }
 }
