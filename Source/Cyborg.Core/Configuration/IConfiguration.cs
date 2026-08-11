@@ -1,17 +1,16 @@
 ﻿namespace Cyborg.Core.Configuration;
 
-public interface IConfiguration
+/// <summary>
+/// Host-level hierarchical configuration store. Stores leaf values only under dotted path keys.
+/// </summary>
+public interface IConfiguration : IHierarchicalKeyValueStore
 {
     bool IsFinalized { get; }
-
-    bool TryGetValue<T>(string key, [NotNullWhen(true)] out T? value);
 
     T Get<T>(string key, Func<T> defaultProvider);
 
     [return: NotNullIfNotNull(nameof(defaultValue))]
     T? Get<T>(string key, T? defaultValue = default);
-
-    object? this[string key] { get; }
 
     internal void FinalizeWith(IEnumerable<IConfigurationSource> sources, IReadOnlySet<string> ignoredKeys);
 }

@@ -1,4 +1,5 @@
-﻿using Cyborg.Core.Configuration.Model;
+﻿using Cyborg.Core.Configuration;
+using Cyborg.Core.Configuration.Model;
 using Cyborg.Core.Modules.Runtime.Environments.Artifacts;
 using Cyborg.Core.Modules.Runtime.Environments.Syntax;
 using System.Collections;
@@ -181,33 +182,42 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         return InterpolateCore(template, entryPoint: this);
     }
 
+    /// <inheritdoc cref="IHierarchicalKeyValueStore.this" />
+    public virtual object? this[string key] => Variables.TryGetValue(key, out object? value) ? value : null;
+
+    /// <inheritdoc cref="IHierarchicalKeyValueStore.TryGetValue{T}" />
+    public virtual bool TryGetValue<T>(string key, [NotNullWhen(true)] out T? value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        if (Variables.TryGetValue(key, out object? objValue) && objValue is T typedValue)
+        {
+            value = typedValue;
+            return true;
+        }
+        value = default;
+        return false;
+    }
+
+    /// <summary>
+    /// Publishes <paramref name="decomposable"/> as recursive leaf variables under <paramref name="root"/>.
+    /// Composed intermediate objects are never stored, regardless of <paramref name="strategy"/>.
+    /// </summary>
     public virtual void Publish(string root, IDecomposable decomposable, DecompositionStrategy strategy, bool publishNullValues)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(root);
         ArgumentNullException.ThrowIfNull(decomposable);
+        _ = strategy; // retained for API/config compatibility; storage is always leaves-only
 
-        if (strategy is DecompositionStrategy.FullHierarchy)
-        {
-            SetVariable(root, decomposable);
-        }
         foreach ((string key, object? value) in decomposable.Decompose())
         {
+            string path = SyntaxFactory.Path(root, key);
             if (value is IDecomposable nested)
             {
-                // inner node
-                if (strategy is not DecompositionStrategy.LeavesOnly)
-                {
-                    SetVariable(SyntaxFactory.Path(root, key), nested);
-                }
-                if (strategy is not DecompositionStrategy.Shallow)
-                {
-                    Publish(SyntaxFactory.Path(root, key), nested, strategy, publishNullValues);
-                }
+                Publish(path, nested, strategy, publishNullValues);
             }
             else if (value is not null || publishNullValues)
             {
-                // leaf node
-                SetVariable(SyntaxFactory.Path(root, key), value);
+                SetVariable(path, value);
             }
         }
     }

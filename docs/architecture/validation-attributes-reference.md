@@ -74,7 +74,7 @@ Triggers the loader factory generator on a module loader class. The target must 
 
 ### GeneratedDecomposition
 
-Triggers the decomposition generator on a record or class. The generator emits an `IDecomposable.Decompose()` method that projects public properties into `DynamicKeyValuePair` entries.
+Triggers the decomposition generator on a record or class. The generator emits an `IDecomposable<TSelf>` implementation with `Decompose()` (projects public properties into `DynamicKeyValuePair` entries for hierarchical leaf publication) and static `Compose(IHierarchicalKeyValueStore, string rootPath)` (reconstructs the instance from leaves under the root path).
 
 **Target:** `class` (record or class)  
 **Parameters:**
@@ -275,4 +275,4 @@ This is used by `AssertModule.Message`, whose placeholders may refer to artifact
 
 ### DecomposeIgnore
 
-Excludes a property from the generated `IDecomposable.Decompose()` output. The property is not projected into a `DynamicKeyValuePair` entry and is not addressable via hierarchical variable paths in the environment.
+Excludes a property from the generated `IDecomposable.Decompose()` / `Compose` surface. The property is not projected into a `DynamicKeyValuePair` entry, is not addressable via hierarchical variable paths in the environment, and is not restored by composition.

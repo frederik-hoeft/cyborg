@@ -29,7 +29,9 @@ public sealed class ForeachModuleWorker(IWorkerContext<ForeachModule> context) :
             IRuntimeEnvironment loopEnvironment = runtime.PrepareEnvironment(Module.Body);
             if (item is IDecomposable decomposable)
             {
-                loopEnvironment.Publish(Module.ItemVariable, decomposable, DecompositionStrategy.FullHierarchy, publishNullValues: true);
+                // Leaves only: intermediate composed objects are never stored. Consumers read leaf paths
+                // or reconstruct structured values via generated Compose / TryCompose helpers.
+                loopEnvironment.Publish(Module.ItemVariable, decomposable, DecompositionStrategy.LeavesOnly, publishNullValues: true);
             }
             else
             {

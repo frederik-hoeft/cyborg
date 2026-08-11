@@ -375,15 +375,19 @@ fragment IDENTIFIER_CHAR
 
 #### Decomposable Objects
 
-Types annotated with `[GeneratedDecomposition]` implement `IDecomposable`, which exposes their properties as `DynamicKeyValuePair` entries. When such an object is published to the environment, its properties become individually addressable variables. For example, publishing a remote host object makes `host.hostname`, `host.port`, and other properties available as individual variables.
+Types annotated with `[GeneratedDecomposition]` implement `IDecomposable<TSelf>`, which projects properties as `DynamicKeyValuePair` entries (`Decompose`) and reconstructs instances from hierarchical leaves (`Compose`). When such an object is published to a hierarchical store (runtime environment or host configuration), only **leaf** values are retained under dotted paths. Intermediate composed objects are never stored. For example, publishing a remote host object writes `host.hostname`, `host.port`, and other leaf paths, but does not store a value at `host` itself.
 
-The `DecompositionStrategy` controls how deeply nested objects are flattened:
+Structured instances are reconstructed on demand via the generated static `Compose` method (or the `IHierarchicalKeyValueStore` extension helpers `Compose` / `TryCompose`), which reads the current leaves under a root path. This ensures that a later write to a property leaf (for example overriding `host.port`) is observed when a consumer recomposes the structured type.
+
+Host configuration (`IConfiguration`) and runtime environments (`IEnvironmentLike`) both implement `IHierarchicalKeyValueStore`, the shared leaf-oriented API that composition targets.
+
+The `DecompositionStrategy` configuration field is retained for compatibility. All strategies publish recursive leaves only; historical `Shallow` and `FullHierarchy` modes that stored intermediate composed objects are obsolete and treated as `LeavesOnly`:
 
 | Strategy | Behavior |
 |----------|----------|
-| `LeavesOnly` | Only leaf (non-decomposable) values are published as variables |
-| `Shallow` | Top-level properties are published; nested decomposables become single entries |
-| `FullHierarchy` | The root and all nested decomposables are published at every level, allowing access to complex-typed intermediate nodes |
+| `LeavesOnly` | Recursive leaf publication (the only storage shape) |
+| `Shallow` | Obsolete; treated as `LeavesOnly` |
+| `FullHierarchy` | Obsolete; treated as `LeavesOnly` |
 
 ### Module Property Overrides
 
@@ -440,7 +444,7 @@ Each module carries a `ModuleArtifacts` record (inherited from `ModuleBase`) tha
 | `Namespace` | Module's effective namespace | Variable path prefix for published artifacts |
 | `ExitStatusName` | `$?` | Name of the variable holding the module's exit status |
 | `Environment` | `Parent` scope | Target environment for artifact publication |
-| `DecompositionStrategy` | `LeavesOnly` | How deeply decomposable results are flattened |
+| `DecompositionStrategy` | `LeavesOnly` | Historical control for flatten depth; all values publish recursive leaves only |
 | `PublishNullValues` | `false` | Whether to publish null-valued properties |
 
 These artifact properties can be overridden from the environment at runtime using the override subsystem, allowing dynamic control over artifact publishing behavior. Structural `ModuleBase.Name` and `ModuleBase.Group` are explicit exceptions and ignore both overrides and generated interpolation.
@@ -450,9 +454,9 @@ These artifact properties can be overridden from the environment at runtime usin
 Workers expose artifacts in two ways:
 
 - **Scalar values** — `Artifacts.Expose("path", value)` sets a single variable at the given path within the artifact namespace.
-- **Decomposable results** — Returning `Success(result)` or `Failed(result)` with an `IDecomposable` result automatically decomposes the object and publishes its properties according to the configured `DecompositionStrategy`.
+- **Decomposable results** — Returning `Success(result)` or `Failed(result)` with an `IDecomposable` result automatically decomposes the object and publishes its **leaf** properties into the artifact environment. Intermediate composed nodes are not stored.
 
-After publishing, parent modules can read artifacts via standard variable resolution. For example, a subprocess module publishing a result with `ExitCode`, `Stdout`, and `Stderr` properties makes those values available as variables in the parent environment under the module's artifact namespace.
+After publishing, parent modules can read artifact leaves via standard variable resolution, or reconstruct a structured result with generated `Compose` / `TryCompose` against the environment as an `IHierarchicalKeyValueStore`. For example, a subprocess module publishing a result with `ExitCode`, `Stdout`, and `Stderr` properties makes those values available as leaf variables in the parent environment under the module's artifact namespace.
 
 ## Supporting Infrastructure
 
@@ -464,7 +468,7 @@ Host-level service options are composed separately from workflow environment var
 
 The CLI composition root applies three source layers in a fixed order: a dictionary-backed set of built-in host defaults, the configured options file, then an optional dictionary-backed source produced from the `--config` array entries. The defaults are assembled centrally from the option models' default instances, with host-specific refinements where required; for example, core leaves the debugger frontend unspecified while the CLI refines that default to its registered `console` frontend. This gives the options file normal deployment-level precedence while preserving command-line overrides as the final per-invocation layer. CLI entries use `key[:type]=value`: configuration hierarchy is dot-delimited, untyped values remain strings, and the optional single-colon suffix selects a dynamic value provider that parses the JSON value.
 
-Configuration finalization recursively decomposes values implementing `IDecomposable` and stores only terminal values under dot-delimited hierarchical keys. A structured source value registered at `cyborg.core.debug`, for example, contributes `cyborg.core.debug.frontend` but is not retained as a value at `cyborg.core.debug`. Intermediate structured nodes therefore cannot become stale when a later source replaces one of their descendants: source precedence is evaluated only on the leaf keys that form the configuration state. Ignored keys are omitted while sources are incorporated. Once finalized, consumers read the stable leaf store through `IConfiguration`; the configuration layer does not implicitly reconstruct composite values.
+Configuration finalization recursively decomposes values implementing `IDecomposable` and stores only terminal values under dot-delimited hierarchical keys. A structured source value registered at `cyborg.core.debug`, for example, contributes `cyborg.core.debug.frontend` but is not retained as a value at `cyborg.core.debug`. Intermediate structured nodes therefore cannot become stale when a later source replaces one of their descendants: source precedence is evaluated only on the leaf keys that form the configuration state. Ignored keys are omitted while sources are incorporated. Once finalized, consumers read the stable leaf store through `IConfiguration` (an `IHierarchicalKeyValueStore`). Structured option types annotated with `[GeneratedDecomposition]` can be reconstructed from those leaves via generated `Compose` when a consumer needs the complex type rather than individual leaf keys.
 
 This configuration layer is also the selection mechanism for keyed host services. For example, the debugger frontend selection key reads `cyborg.core.debug.frontend`, while the CLI separately decides which concrete frontend implementations to register. Keeping source composition, leaf values, and keyed-service registration separate allows each host to define policy through ordinary configuration sources without moving frontend or deployment policy into `Cyborg.Core`.
 

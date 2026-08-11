@@ -4,4 +4,5 @@ internal enum ModelDecompositionGeneratorContract
 {
     IDecomposable,
     DynamicKeyValuePair,
+    IHierarchicalKeyValueStore,
 }
