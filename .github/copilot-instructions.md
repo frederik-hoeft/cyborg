@@ -175,6 +175,25 @@ Follow `/code-style.md` and `.editorconfig`. In particular:
 
 Match the established style in adjacent code. Avoid unrelated cleanup in focused changes.
 
+## Documentation Style
+
+Most documents under `/docs/architecture/` are architecture documentation, not exhaustive API references or implementation notes. Write them to help a new contributor build an accurate mental model of the system from the documentation alone.
+
+When writing or updating architecture documentation:
+
+- Describe the **current stable architecture in present tense**. Do not write documentation as a changelog with phrases such as “now does”, “was changed to”, or “previously used” unless migration history or compatibility behavior is itself part of the contract. When a design changes, rewrite the stale description into the new steady-state model instead of layering historical caveats on top of it.
+- Focus on **architectural components, responsibilities, contracts, data flow, lifecycle/phase ordering, and cross-subsystem interactions**. Explain why boundaries exist when that distinction is important to using or extending the system correctly.
+- Prefer a **coherent subsystem narrative** over a catalog of classes, methods, or fields. Mention concrete implementation types when they are important architectural anchors, extension points, ownership boundaries, or useful navigation aids; do not enumerate incidental helpers or every method signature.
+- Keep implementation details out of architecture docs unless they establish an externally relevant invariant, explain a non-obvious interaction, constrain extension/AOT behavior, or are necessary to understand the architecture. Leave local algorithms and ordinary control-flow details to the code and tests.
+- Preserve the established **structure, tone, verbosity, and abstraction level** of nearby up-to-date documentation. Make targeted edits to stale sections rather than broadly rewriting unrelated material.
+- Update all affected descriptions when a change creates a new cross-dependency or changes the interaction between documented subsystems. Avoid fixing one document while leaving a contradictory contract elsewhere.
+- Avoid over-documenting temporary implementation states. Prefer the durable conceptual model and important API contracts over details that are likely to change without affecting architecture.
+- Use examples, signatures, and snippets selectively to clarify a contract or data flow, not as a substitute for explaining the model.
+- Cross-link existing focused documents instead of duplicating large explanations. Keep the architecture overview broad enough to connect subsystems, and put subsystem-specific detail in the corresponding focused document.
+- Keep the README user-facing and task-oriented. Introduce major capabilities, configuration surfaces, and extension points there, but defer architectural depth to `/docs/architecture/`.
+
+For documentation cleanup, prefer small edits that remove accumulated change-over-time artifacts, inconsistent terminology, or misplaced implementation trivia while retaining sections that are already accurate and well-structured.
+
 ## Build and Validation
 
 Run commands from the repository root:
