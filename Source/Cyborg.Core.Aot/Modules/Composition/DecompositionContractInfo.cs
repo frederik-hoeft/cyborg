@@ -11,11 +11,14 @@ internal sealed class DecompositionContractInfo(Dictionary<ModelDecompositionGen
     [
         ModelDecompositionGeneratorContract.IDecomposable,
         ModelDecompositionGeneratorContract.DynamicKeyValuePair,
+        ModelDecompositionGeneratorContract.IHierarchicalKeyValueStore,
     ];
 
     public INamedTypeSymbol IDecomposable => ContractTypes[ModelDecompositionGeneratorContract.IDecomposable];
 
     public INamedTypeSymbol DynamicKeyValuePair => ContractTypes[ModelDecompositionGeneratorContract.DynamicKeyValuePair];
+
+    public INamedTypeSymbol IHierarchicalKeyValueStore => ContractTypes[ModelDecompositionGeneratorContract.IHierarchicalKeyValueStore];
 
     public static DecompositionContractInfo? Create(ContractExplorer explorer, SourceProductionContext context)
     {

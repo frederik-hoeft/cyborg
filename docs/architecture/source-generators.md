@@ -46,7 +46,7 @@ The generator layer produces four primary kinds of compile-time behavior:
 - **Module preparation and validation** — Generating defaults, override resolution, interpolation, constraint validation, and the `IValidationResult<TModule>` contract from annotated module records.
 - **Module descriptions** — Generating short module identity and asynchronous `IModuleDescriptor` traversal from the same property model used for validation. The format-neutral description tree can then be serialized by the debugger or other clients without per-module reflection. See [Workflow Debugging](debugging.md).
 - **Module loader factories** — Generating worker construction methods that resolve constructor dependencies from the DI container, eliminating boilerplate in module loaders.
-- **Model decomposition** — Generating `IDecomposable` implementations that project record properties into `DynamicKeyValuePair` collections for environment publishing and artifact flattening.
+- **Model decomposition and composition** — Generating `IDecomposable<TSelf>` implementations that project record properties into `DynamicKeyValuePair` collections for hierarchical leaf publication, and static `Compose` factories that rebuild instances from `IHierarchicalKeyValueStore` leaves.
 
 A contract-registration bootstrap supports these feature generators by establishing the compile-time type-discovery mechanism that decouples generator code from runtime assemblies.
 
@@ -62,7 +62,7 @@ Each generator declares a contract enum whose members correspond to the runtime 
 |----------|---------|---------|
 | `ModuleValidationGeneratorContract` | `IModuleRuntime`, `IModuleT`, `ModuleValidationContext`, `ValidationResult`, `IValidationResultT`, `ValidationError`, `IDefaultValueT`, `IParser`, `IModuleDescriptor`, `IObjectDescriptionBuilder`, `ModuleIdentity` | Validation and descriptor generation |
 | `ModuleLoaderFactoryGeneratorContract` | `IModuleWorker`, `ModuleLoaderT`, `IModuleWorkerContextT`, `ModuleWorkerContextImplementationT` | Loader factory generator |
-| `ModelDecompositionGeneratorContract` | `IDecomposable`, `DynamicKeyValuePair` | Decomposition generator |
+| `ModelDecompositionGeneratorContract` | `IDecomposable`, `DynamicKeyValuePair`, `IHierarchicalKeyValueStore` | Decomposition / composition generator |
 
 Runtime types register themselves against these contracts using `[GeneratorContractRegistration<TContract>(ContractMember)]`. A single contract may include both runtime execution types and description types when one generator emits code that participates in both subsystems.
 
@@ -179,11 +179,21 @@ The generator inspects the worker type's single constructor at compile time, det
 
 ### Trigger and Target
 
-The generator is triggered by `[GeneratedDecomposition]` on a `partial record` or `partial class`. It emits an `IDecomposable` implementation.
+The generator is triggered by `[GeneratedDecomposition]` on a `partial record` or `partial class`. It emits an `IDecomposable<TSelf>` implementation with both decomposition and composition members.
 
 ### Generated Output
 
-The generated `Decompose()` method returns a collection of `DynamicKeyValuePair` entries, one per public instance property visible on the annotated type, including inherited properties. Static properties and properties marked with `[DecomposeIgnore]` are excluded. If a derived type hides or overrides a property name, the most-derived property is emitted once. Each entry pairs a transformed property name (as the key) with the property value.
+The generator emits two members:
+
+1. **`Decompose()`** — Returns a collection of `DynamicKeyValuePair` entries, one per public instance property visible on the annotated type, including inherited properties. Static properties and properties marked with `[DecomposeIgnore]` are excluded. If a derived type hides or overrides a property name, the most-derived property is emitted once. Each entry pairs a transformed property name (as the key) with the property value. Nested decomposable values are returned as structured values; publishers expand them recursively into leaves.
+
+2. **`static Compose(IHierarchicalKeyValueStore store, string rootPath)`** — Reconstructs an instance from hierarchical leaves under `rootPath`. For each decomposable property:
+   - **Leaf properties** are read with `store.TryGetValue<T>(CombinePath(rootPath, convertedName), …)`.
+   - **Nested composable properties** call the nested type's `Compose` with the child path. Nullable nested composables are only composed when `HasValues` reports leaves under that child path; otherwise the property is `null`.
+
+Construction uses the type's primary (or best matching) constructor for properties that map to constructor parameters, then a `with` expression (records) or object initializer (classes) for remaining public properties such as inherited init-only members.
+
+Publishers (configuration finalization, environment `Publish`, artifact exposure) store **leaves only**. Intermediate paths that correspond to nested decomposable objects are never retained as values. Consumers that need the structured type call `Compose` (or the `IHierarchicalKeyValueStore` extension helpers) so that leaf overrides applied after the original publish are reflected in the reconstructed instance.
 
 ### Naming Policy
 
@@ -192,7 +202,7 @@ Property names are transformed using a configurable naming policy. The attribute
 - `NamingPolicyProvider` — The type containing the naming policy (defaults to `JsonNamingPolicy`).
 - `NamingPolicy` — The static property name on that type (defaults to `"SnakeCaseLower"`).
 
-The generated code calls the naming policy's `ConvertName` method on each property name at runtime, producing keys that match the JSON serialization convention (typically snake_case).
+The generated code calls the naming policy's `ConvertName` method on each property name at runtime, producing keys that match the JSON serialization convention (typically snake_case). The same converted names are used for both `Decompose` keys and `Compose` path segments so the round-trip is stable.
 
 ## Common Architecture
 

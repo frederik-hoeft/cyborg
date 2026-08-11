@@ -106,7 +106,7 @@ The `artifacts` property controls how a module's execution results are decompose
 | `namespace` | string | No | Module's effective namespace | Prefix for published artifact variable names. The effective namespace is the module's `name` if set, otherwise its `group`, otherwise the module ID. |
 | `exit_status_name` | string | No | `"$?"` | Variable name under which the module's exit status (`Success`, `Failed`, `Skipped`, `Canceled`) is stored. |
 | `environment` | object | No | `{ "scope": "parent" }` | Target environment for artifact publication. Uses the same scoping model as module contexts but defaults to `parent`, meaning artifacts flow to the parent module's environment. |
-| `decomposition_strategy` | enum | No | `leaves_only` | Controls how deeply result objects are flattened into variables. `leaves_only`: only leaf (non-decomposable) values are published. `shallow`: top-level properties are published. `full_hierarchy`: the root and all nested levels are published. |
+| `decomposition_strategy` | enum | No | `leaves_only` | Historical flatten-depth control. All strategies now publish recursive leaf values only; intermediate composed objects are never stored. Structured values are reconstructed with generated `Compose` when needed. `shallow` and `full_hierarchy` are obsolete aliases of `leaves_only`. |
 | `publish_null_values` | bool | No | `false` | Whether null-valued result properties are published. |
 
 For more details on artifact lifecycle and exposure patterns, see [Runtime Infrastructure -- Artifact Publishing](./architecture-overview.md#artifact-publishing).
@@ -149,7 +149,7 @@ Iterates over a collection variable, executing a body module for each item.
 **Behavior:**
 
 - Resolves the `collection` variable from the current environment.
-- For each item, creates a scoped environment and binds the item to `item_variable`. If the item supports decomposition (e.g., a structured record), its properties are published hierarchically (e.g., `current_host.hostname`, `current_host.port`).
+- For each item, creates a scoped environment and binds the item to `item_variable`. If the item supports decomposition (e.g., a structured record), its **leaf** properties are published hierarchically (e.g., `current_host.hostname`, `current_host.port`). Intermediate composed objects are not stored; body modules that need the structured type can recompose from leaves.
 - If `continue_on_error` is `false` (default), a failed iteration aborts the loop immediately.
 - Returns `Success` if at least one iteration succeeded; `Skipped` if all were skipped.
 

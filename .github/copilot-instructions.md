@@ -121,7 +121,7 @@ When changing generator behavior, add or update diagnostics and regression cover
 
 A dynamic value entry contains a non-null `key` and exactly one non-null typed-value property. Structural errors belong in the converter because dynamic values are also used outside module-validation paths. Semantic constraints belong in generated validation where applicable.
 
-New dynamic types require an `IDynamicValueProvider`, explicit service registration, and the appropriate source-generated JSON metadata. Use `[GeneratedDecomposition]` when a typed model must expose hierarchical environment paths through `IDecomposable`.
+New dynamic types require an `IDynamicValueProvider`, explicit service registration, and the appropriate source-generated JSON metadata. Use `[GeneratedDecomposition]` when a typed model must expose hierarchical environment/configuration paths through `IDecomposable<TSelf>` (`Decompose` for leaf publication, `Compose` for reconstruction from an `IHierarchicalKeyValueStore`). Hierarchical stores retain leaves only; do not rely on intermediate composed objects being present at parent paths.
 
 ### Dependency injection and serialization
 

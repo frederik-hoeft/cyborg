@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Configuration.Model;
+using System.Collections;
 
 namespace Cyborg.Core.Configuration;
 
@@ -41,6 +42,10 @@ public sealed class DefaultConfiguration : IConfiguration
         return defaultValue;
     }
 
+    public IEnumerator<KeyValuePair<string, object?>> GetEnumerator() => Sources.Options.GetEnumerator();
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
     void IConfiguration.FinalizeWith(IEnumerable<IConfigurationSource> sources, IReadOnlySet<string> ignoredKeys)
     {
         if (IsFinalized)
@@ -68,7 +73,7 @@ public sealed class DefaultConfiguration : IConfiguration
 
         private void AddValue(string? parentKey, DynamicKeyValuePair property, IReadOnlySet<string> ignoredKeys)
         {
-            string key = parentKey is null ? property.Key : $"{parentKey}.{property.Key}";
+            string key = parentKey is null ? property.Key : HierarchicalKeyValueStoreExtensions.CombinePath(parentKey, property.Key);
             if (ignoredKeys.Contains(key))
             {
                 return;

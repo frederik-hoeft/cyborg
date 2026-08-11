@@ -229,7 +229,7 @@ Represents files-cache sentinel options for a Borg create operation. See [Borg C
 
 ## Service Option Types
 
-Service option providers deserialize convenient structured source values. When these values are added to host configuration, `IConfiguration` recursively decomposes them and retains only their dot-addressed leaf values; the structured provider types are not stored as retrievable parent nodes.
+Service option providers deserialize convenient structured source values. When these values are added to host configuration, `IConfiguration` recursively decomposes them and retains only their dot-addressed leaf values; the structured provider types are not stored as retrievable parent nodes. Generated `Compose` can rebuild a structured option type from those leaves when a consumer needs the complex type rather than individual keys.
 
 ### `cyborg.types.services.trust.options.v1`
 
