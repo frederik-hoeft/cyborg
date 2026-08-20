@@ -8,7 +8,7 @@ internal sealed class UnrootedPathProcessor : AttributeProcessorBase<UnrootedPat
 {
     public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {
-        if (!ValidatePropertyType(attribute, in context, SpecialType.System_String))
+        if (!ValidateStringLikePropertyType(attribute, in context))
         {
             return false.WithDefaults(out aspect);
         }
@@ -22,7 +22,7 @@ internal sealed class UnrootedPathProcessor : AttributeProcessorBase<UnrootedPat
         {
             builder.AppendBlock(
             $$"""
-            if ({{model.AccessExpression}} is not null && {{KnownTypes.Path}}.IsPathRooted({{model.AccessExpression}}))
+            if ({{model.NullAwareCondition($"{KnownTypes.Path}.IsPathRooted({model.StringContentExpression})")}})
             {
                 errors.Add({{CreateValidationError(model, rule: "unrooted_path", $"Property '{{nameof({model.AccessExpression})}}' must be an unrooted path, but was '{{{model.AccessExpression}}}'")}});
             }

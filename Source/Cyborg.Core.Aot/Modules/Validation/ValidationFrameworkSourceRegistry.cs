@@ -35,6 +35,8 @@ internal static class ValidationFrameworkSourceRegistry
         static context => context.AddEmbeddedSource<NormalizedPathAttribute>(),
         static context => context.AddEmbeddedSource<IgnoreInterpolationAttribute>(),
         static context => context.AddEmbeddedSource<VariableIdentifierAttribute>(),
+        static context => context.AddEmbeddedSource<SecretAttribute>(),
+        static context => context.AddEmbeddedSource<UntaggedAttribute>(),
     ];
 
     public static void Emit(IncrementalGeneratorPostInitializationContext context)

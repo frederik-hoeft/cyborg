@@ -9,7 +9,7 @@ public sealed record ModuleEnvironmentReference
     [property: DefinedEnumValue]
     [property: DefaultValue<EnvironmentScopeReference>(EnvironmentScopeReference.Current)]
     EnvironmentScopeReference Scope,
-    string? Name
+    [property: Untagged] string? Name
 ) : IDefaultInstance<ModuleEnvironmentReference>
 {
     public static ModuleEnvironmentReference Default => new(EnvironmentScopeReference.Current, Name: null);

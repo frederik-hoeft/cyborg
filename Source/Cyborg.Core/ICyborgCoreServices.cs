@@ -19,6 +19,7 @@ using Cyborg.Core.Services.Metrics;
 using Cyborg.Core.Services.Network.Probe;
 using Cyborg.Core.Services.Pipelines;
 using Cyborg.Core.Services.Security.Trust;
+using Cyborg.Core.Text;
 using Jab;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -30,6 +31,7 @@ namespace Cyborg.Core;
 [Import<IConfigurationTrustServices>]
 [Import<IModuleDescriptionServices>]
 [Import<IDebugServices>]
+[Import<ITaggedStringServices>]
 [Singleton<IConfiguration, DefaultConfiguration>]
 [Transient<IConfigurationBuilder, DefaultConfigurationBuilder>]
 [Transient<IConfigurationFileLoader, ConfigurationFileLoader>]
@@ -44,6 +46,7 @@ namespace Cyborg.Core;
 [Singleton<JsonConverter, DynamicValueJsonConverter>]
 [Singleton<JsonConverter, DynamicKeyValuePairJsonConverter>]
 [Singleton<JsonConverter, ModuleContextJsonConverter>]
+[Singleton<JsonConverter, TaggedStringJsonConverter>]
 [Singleton<JsonConverter>(Factory = nameof(CreateEnvironmentScopeConverter))]
 [Singleton<JsonConverter>(Factory = nameof(CreateDecompositionStrategyConverter))]
 [Singleton<IModuleLoaderRegistry, DefaultModuleLoaderRegistry>]
@@ -62,7 +65,7 @@ namespace Cyborg.Core;
 [Singleton<IModuleResultBuilderFactory, ModuleResultBuilderFactory>]
 [Singleton<MetricsCollectorOptions>]
 [Singleton<IMetricsCollector, MetricsCollector>]
-[Singleton<GlobalRuntimeEnvironment>]
+[Singleton<GlobalRuntimeEnvironment>(Factory = nameof(CreateGlobalRuntimeEnvironment))]
 [Singleton<JsonSerializerContext>(Factory = nameof(GetCoreJsonSerializerContext))]
 public interface ICyborgCoreServices
 {
@@ -71,4 +74,12 @@ public interface ICyborgCoreServices
     static JsonConverter CreateEnvironmentScopeConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<EnvironmentScope>(namingPolicy);
 
     static JsonConverter CreateDecompositionStrategyConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<DecompositionStrategy>(namingPolicy);
+
+    static GlobalRuntimeEnvironment CreateGlobalRuntimeEnvironment(
+        JsonNamingPolicy namingPolicy,
+        ITaggedStringConversionObserver taggedStringConversionObserver) =>
+        new(namingPolicy)
+        {
+            TaggedStringConversionObserver = taggedStringConversionObserver
+        };
 }

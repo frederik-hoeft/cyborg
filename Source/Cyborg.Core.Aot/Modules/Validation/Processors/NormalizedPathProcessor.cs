@@ -8,7 +8,7 @@ internal sealed class NormalizedPathProcessor : AttributeProcessorBase<Normalize
 {
     public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {
-        if (!ValidatePropertyType(attribute, in context, SpecialType.System_String))
+        if (!ValidateStringLikePropertyType(attribute, in context))
         {
             return false.WithDefaults(out aspect);
         }
@@ -22,7 +22,7 @@ internal sealed class NormalizedPathProcessor : AttributeProcessorBase<Normalize
         {
             builder.AppendBlock(
             $$"""
-            if ({{model.AccessExpression}} is not null && !{{KnownTypes.ValidationRuntimeHelpers}}.IsNormalizedPath({{model.AccessExpression}}))
+            if ({{model.NullAwareCondition($"!{KnownTypes.ValidationRuntimeHelpers}.IsNormalizedPath({model.StringContentExpression})")}})
             {
                 errors.Add({{CreateValidationError(model, rule: "normalized_path", $"Property '{{nameof({model.AccessExpression})}}' must be a normalized path, but was '{{{model.AccessExpression}}}'")}});
             }

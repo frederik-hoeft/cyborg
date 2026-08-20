@@ -1,4 +1,5 @@
-﻿using Cyborg.Modules.Borg.Compact;
+﻿using Cyborg.Core.Text;
+using Cyborg.Modules.Borg.Compact;
 using Cyborg.Modules.Borg.Create;
 using Cyborg.Modules.Borg.Create.Model;
 using Cyborg.Modules.Borg.Prune;
@@ -15,4 +16,5 @@ namespace Cyborg.Modules.Borg;
 [JsonSerializable(typeof(BorgCreateModule))]
 [JsonSerializable(typeof(BorgPruneModule))]
 [JsonSerializable(typeof(BorgCompactModule))]
+[JsonSerializable(typeof(TaggedString))]
 public sealed partial class BorgJsonSerializerContext : JsonSerializerContext;

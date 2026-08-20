@@ -166,6 +166,8 @@ Description services are registered independently from debugger services. Applic
 
 Description properties and values may carry `ImmutableArray<string>` hints. Hints are arbitrary metadata keys with no mandatory semantics in the description tree. Generator aspects can contribute hints, the tree preserves them, and serializers decide which keys they understand. Unknown hints remain available to downstream consumers rather than being interpreted by the core model.
 
+`TaggedString` values are first-class atoms. Built-in text and JSON serializers render them through `ITaggedStringRenderer`, so a value tagged `cyborg.secret.v1` is written as `[REDACTED]` rather than the raw secret. `[Secret]` also contributes that tag as a descriptor hint. Hint-only redaction is not sufficient on its own because interpolation can introduce tags after the property was authored.
+
 ### Source-generated traversal
 
 The module-validation generator emits rich descriptor traversal from the same property model used for validation, defaults, overrides, and interpolation. Nested `[Validatable]` records and supported collections are therefore described with the same structural classification used by the preparation pipeline, without runtime reflection.

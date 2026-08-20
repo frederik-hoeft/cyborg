@@ -2,6 +2,7 @@
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Runtime.Environments.Syntax;
+using Cyborg.Core.Text;
 using Cyborg.Modules.Conditions;
 using System.Diagnostics.CodeAnalysis;
 
@@ -28,7 +29,7 @@ public sealed class AssertModuleWorker(IWorkerContext<AssertModule> context) : C
         if (!condition)
         {
             // must be interpolated after the assertion module has been executed, so that any variables it produces can be used in the message
-            string message = runtime.Environment.Interpolate(Module.Message);
+            TaggedString message = runtime.Environment.Interpolate(Module.Message);
             AssertModuleResult failure = new(message);
             return runtime.Exit(Failed(failure));
         }

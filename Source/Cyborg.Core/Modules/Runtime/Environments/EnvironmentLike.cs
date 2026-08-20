@@ -1,7 +1,9 @@
 ﻿using Cyborg.Core.Configuration.Model;
 using Cyborg.Core.Modules.Runtime.Environments.Artifacts;
 using Cyborg.Core.Modules.Runtime.Environments.Syntax;
+using Cyborg.Core.Text;
 using System.Collections;
+using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -12,16 +14,20 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
 {
     protected Dictionary<string, object?> Variables { get; } = [];
 
+    public ITaggedStringConversionObserver? TaggedStringConversionObserver { get; init; }
+
     protected JsonNamingPolicy NamingPolicy => SyntaxFactory.NamingPolicy;
 
-    protected virtual string InterpolateString(ResolutionContext context, string stringValue)
+    protected virtual TaggedString InterpolateString(ResolutionContext context, TaggedString tagged)
     {
         ArgumentNullException.ThrowIfNull(context);
+        string stringValue = tagged.Value;
         if (!SyntaxFactory.InterpolationRegex.IsMatch(stringValue))
         {
-            return stringValue;
+            return tagged;
         }
         StringBuilder sb = new();
+        ImmutableHashSet<string>.Builder tags = tagged.Tags.ToBuilder();
         int currentIndex = 0;
         ReadOnlySpan<char> valueSpan = stringValue.AsSpan();
         foreach (ValueMatch match in SyntaxFactory.InterpolationRegex.EnumerateMatches(stringValue))
@@ -31,7 +37,7 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
             string expression = variableSlice[2..^1].ToString();
             if (TryParseVariableReference(expression, out VariableReference reference) && TryResolveVariableReference(context, reference, out object? resolvedValue))
             {
-                sb.Append(resolvedValue);
+                AppendResolvedInterpolationValue(sb, tags, resolvedValue);
             }
             else
             {
@@ -41,7 +47,27 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
             currentIndex = match.Index + match.Length;
         }
         sb.Append(valueSpan[currentIndex..]);
-        return sb.ToString();
+        return new TaggedString(sb.ToString(), tags.ToImmutable());
+    }
+
+    private static void AppendResolvedInterpolationValue(StringBuilder builder, ImmutableHashSet<string>.Builder tags, object? resolvedValue)
+    {
+        switch (resolvedValue)
+        {
+            case TaggedString tagged:
+                builder.Append(tagged.Value);
+                foreach (string tag in tagged.Tags)
+                {
+                    tags.Add(tag);
+                }
+                break;
+            case string text:
+                builder.Append(text);
+                break;
+            default:
+                builder.Append(resolvedValue);
+                break;
+        }
     }
 
     protected virtual string FinalizeInterpolationLiterals(string value)
@@ -94,6 +120,16 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         }
         if (Variables.TryGetValue(context.Name, out object? objValue))
         {
+            if (objValue is TaggedString tagged)
+            {
+                if (TryResolveIndirectionCandidate(context, tagged.Value, out object? redirected))
+                {
+                    value = UnionResolvedValue(redirected, tagged.Tags);
+                    return true;
+                }
+                value = InterpolateString(context, tagged);
+                return true;
+            }
             // might need to resolve indirection via string variables, e.g. var1 = "${var2}", var2 = "actual_value"
             if (objValue is string s && TryResolveIndirectionCandidate(context, s, out value))
             {
@@ -102,7 +138,8 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
             // handle interpolation within string variables, e.g. var1 = "Value is ${var2}", var2 = "actual_value"
             if (objValue is string stringValue)
             {
-                value = InterpolateString(context, stringValue);
+                TaggedString interpolated = InterpolateString(context, stringValue);
+                value = interpolated.HasTags ? interpolated : interpolated.Value;
                 return true;
             }
             value = objValue;
@@ -134,9 +171,8 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         ArgumentNullException.ThrowIfNull(context);
         if (TryResolveVariableRecursiveCore(context, out object? objValue))
         {
-            if (objValue is T typedValue)
+            if (TryConvertResolvedValue(objValue, context.Name, notifyImplicitConversion: true, out value))
             {
-                value = typedValue;
                 return true;
             }
             throw new InvalidCastException($"Attempted to resolve variable '{context.Name}' as type {typeof(T).FullName}, but it is of type {objValue?.GetType().FullName}.");
@@ -168,6 +204,10 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         {
             value = (T)(object)FinalizeInterpolationLiterals(stringValue);
         }
+        else if (value is TaggedString tagged)
+        {
+            value = (T)(object)tagged.WithValue(FinalizeInterpolationLiterals(tagged.Value));
+        }
         return true;
     }
 
@@ -175,11 +215,16 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
 
     public virtual bool TryRemoveVariable(string name) => Variables.Remove(name);
 
-    public virtual string Interpolate(string template)
+    public virtual TaggedString Interpolate(string template)
     {
         ArgumentNullException.ThrowIfNull(template);
         return InterpolateCore(template, entryPoint: this);
     }
+
+    public virtual TaggedString Interpolate(TaggedString template) => InterpolateCore(template, entryPoint: this);
+
+    public virtual TaggedString Interpolate(TaggedString? template) =>
+        template is { } tagged ? InterpolateCore(tagged, entryPoint: this) : default;
 
     public virtual void Publish(string root, IDecomposable decomposable, DecompositionStrategy strategy, bool publishNullValues)
     {
@@ -221,9 +266,8 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         if (TryGetStoredVariableRecursiveCore(name, out object? objectValue))
         {
-            if (objectValue is T typedValue)
+            if (TryConvertResolvedValue(objectValue, name, notifyImplicitConversion: true, out value))
             {
-                value = typedValue;
                 return true;
             }
             throw new InvalidCastException($"Attempted to select stored variable '{name}' as type {typeof(T).FullName}, but it is of type {objectValue.GetType().FullName}.");
@@ -239,12 +283,56 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         return TryResolveVariableRecursiveCore(ResolutionContext.Create(entryPoint, name), out value);
     }
 
-    private protected string InterpolateCore(string template, EnvironmentLike entryPoint)
+    private protected TaggedString InterpolateCore(string template, EnvironmentLike entryPoint) =>
+        InterpolateCore(new TaggedString(template), entryPoint);
+
+    private protected TaggedString InterpolateCore(TaggedString template, EnvironmentLike entryPoint)
     {
-        ArgumentNullException.ThrowIfNull(template);
         ArgumentNullException.ThrowIfNull(entryPoint);
-        string interpolated = InterpolateString(ResolutionContext.CreateRoot(entryPoint), template);
-        return FinalizeInterpolationLiterals(interpolated);
+        TaggedString interpolated = InterpolateString(ResolutionContext.CreateRoot(entryPoint), template);
+        return interpolated.WithValue(FinalizeInterpolationLiterals(interpolated.Value));
+    }
+
+    private bool TryConvertResolvedValue<T>(object? objValue, string variableName, bool notifyImplicitConversion, [NotNullWhen(true)] out T? value)
+    {
+        if (objValue is T typedValue)
+        {
+            value = typedValue;
+            return true;
+        }
+        if (typeof(T) == typeof(string) && objValue is TaggedString tagged)
+        {
+            if (notifyImplicitConversion && tagged.HasTags)
+            {
+                TaggedStringConversionObserver?.OnImplicitStringRetrieval(variableName, tagged);
+            }
+            value = (T)(object)tagged.Value;
+            return true;
+        }
+        if (typeof(T) == typeof(TaggedString) && objValue is string text)
+        {
+            value = (T)(object)new TaggedString(text);
+            return true;
+        }
+        value = default;
+        return false;
+    }
+
+    private static object UnionResolvedValue(object resolvedValue, ImmutableHashSet<string> extraTags)
+    {
+        if (extraTags.IsEmpty)
+        {
+            return resolvedValue;
+        }
+        if (resolvedValue is TaggedString tagged)
+        {
+            return tagged.WithTags(extraTags);
+        }
+        if (resolvedValue is string text)
+        {
+            return new TaggedString(text, extraTags);
+        }
+        return resolvedValue;
     }
 
     private bool TryParseVariableReference(string expression, out VariableReference reference)

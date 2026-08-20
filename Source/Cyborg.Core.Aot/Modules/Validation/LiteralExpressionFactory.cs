@@ -15,6 +15,7 @@ internal static class LiteralExpressionFactory
             { Value: { } value } => targetType switch
             {
                 { SpecialType: SpecialType.System_String } => SymbolDisplay.FormatLiteral((string)value, quote: true),
+                _ when TypeSymbolHelpers.IsTaggedString(targetType) => SymbolDisplay.FormatLiteral((string)value, quote: true),
                 { SpecialType: SpecialType.System_Char } => SymbolDisplay.FormatLiteral((char)value, quote: true),
                 { SpecialType: SpecialType.System_Boolean } => (bool)value ? "true" : "false",
                 { SpecialType: SpecialType.System_Byte } => $"(byte){((byte)value).ToString(CultureInfo.InvariantCulture)}",

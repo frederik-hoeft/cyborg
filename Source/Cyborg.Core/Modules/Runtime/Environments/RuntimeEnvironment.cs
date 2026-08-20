@@ -1,5 +1,6 @@
 ﻿using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime.Environments.Syntax;
+using Cyborg.Core.Text;
 using System.Collections;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
@@ -48,7 +49,13 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         T? resolvedValue = ResolveCore(this, module, value, moduleExpression, valueExpression);
         if (resolvedValue is string stringValue)
         {
-            return (T)(object)InterpolateCore(stringValue, entryPoint: this);
+            TaggedString interpolated = InterpolateCore(stringValue, entryPoint: this);
+            return typeof(T) == typeof(string) ? (T)(object)interpolated.Value : (T)(object)interpolated;
+        }
+        if (resolvedValue is TaggedString tagged)
+        {
+            TaggedString interpolated = InterpolateCore(tagged, entryPoint: this);
+            return typeof(T) == typeof(string) ? (T)(object)interpolated.Value : (T)(object)interpolated;
         }
         return resolvedValue;
     }
@@ -76,6 +83,34 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
     [return: NotNullIfNotNull(nameof(value))]
     string? IRuntimeEnvironment.SelectRawStringOverride<TModule>(TModule module, string? value, string moduleExpression, string valueExpression) =>
         TrySelectRawStringOverrideCore(this, module, moduleExpression, valueExpression, out string? selectedValue) ? selectedValue : value;
+
+    TaggedString IRuntimeEnvironment.SelectRawTaggedStringOverride<TModule>(TModule module, TaggedString value, string moduleExpression, string valueExpression) =>
+        TrySelectRawTaggedStringOverrideCore(this, module, moduleExpression, valueExpression, out TaggedString selectedValue) ? selectedValue : value;
+
+    [return: NotNullIfNotNull(nameof(value))]
+    TaggedString? IRuntimeEnvironment.SelectRawTaggedStringOverride<TModule>(TModule module, TaggedString? value, string moduleExpression, string valueExpression) =>
+        TrySelectRawTaggedStringOverrideCore(this, module, moduleExpression, valueExpression, out TaggedString selectedValue) ? selectedValue : value;
+
+    internal protected virtual bool TrySelectRawTaggedStringOverrideCore<TModule>(EnvironmentLike entryPoint, TModule module, string? moduleExpression, string? valueExpression, out TaggedString value)
+        where TModule : ModuleBase, IModuleDefinition
+    {
+        ArgumentNullException.ThrowIfNull(entryPoint);
+        ArgumentNullException.ThrowIfNull(module);
+        string valuePath = ConstructValueResolutionPath<TaggedString>(value: default, moduleExpression, valueExpression);
+
+        foreach (string identifier in EnumerateOverrideIdentifiers(module.Name, module.Group, TModule.ModuleId))
+        {
+            string overridePath = SyntaxFactory.Path(identifier, valuePath).Override();
+            if (TryGetStoredVariable(overridePath, out TaggedString selectedValue))
+            {
+                value = selectedValue;
+                return true;
+            }
+        }
+
+        value = default;
+        return false;
+    }
 
     internal protected virtual bool TrySelectRawStringOverrideCore<TModule>(EnvironmentLike entryPoint, TModule module, string? moduleExpression, string? valueExpression, [NotNullWhen(true)] out string? value)
         where TModule : ModuleBase, IModuleDefinition
@@ -197,10 +232,16 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
     public IEnvironmentLike CreateArtifactCollection(ModuleArtifacts artifacts)
     {
         ArgumentNullException.ThrowIfNull(artifacts);
-        return new EnvironmentLike(SyntaxFactory, artifacts.Namespace ?? Namespace);
+        return new EnvironmentLike(SyntaxFactory, artifacts.Namespace ?? Namespace)
+        {
+            TaggedStringConversionObserver = TaggedStringConversionObserver
+        };
     }
 
-    public IEnvironmentLike CreateArtifactCollection() => new EnvironmentLike(SyntaxFactory, Namespace);
+    public IEnvironmentLike CreateArtifactCollection() => new EnvironmentLike(SyntaxFactory, Namespace)
+    {
+        TaggedStringConversionObserver = TaggedStringConversionObserver
+    };
 
     public IRuntimeEnvironment WithOverrideResolutionTags(IReadOnlyCollection<string> tags) => this with
     {

@@ -7,7 +7,7 @@ namespace Cyborg.Modules.Borg.Prune;
 [GeneratedModuleValidation]
 public sealed partial record BorgPruneModule
 (
-    string? GlobArchives,
+    [property: Untagged] string? GlobArchives,
     [property: Required] BorgPruneKeepRules Keep,
     bool SaveSpace,
     [property: DefaultTimeSpan("00:30:00")] TimeSpan CheckpointInterval

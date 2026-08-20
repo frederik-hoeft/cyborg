@@ -11,8 +11,8 @@ public sealed partial record ValidationPipelineTestModule
     [property: Required] ImmutableArray<ValidationPipelineTestItem> RequiredItems,
     ImmutableArray<ValidationPipelineTestItem> OptionalItems,
     ImmutableArray<ValidationPipelineTestItem>? NullableItems,
-    string InterpolatedValue,
-    [property: IgnoreInterpolation] string DeferredValue,
+    [property: Untagged] string InterpolatedValue,
+    [property: Untagged][property: IgnoreInterpolation] string DeferredValue,
     [property: Required(TargetsElements = true)]
     [property: VariableIdentifier(TargetsElements = true)]
     IReadOnlyCollection<string?>? Tags
@@ -20,6 +20,7 @@ public sealed partial record ValidationPipelineTestModule
 {
     [DefaultValue<string>("${deferred_default}")]
     [IgnoreInterpolation]
+    [Untagged]
     public string? DeferredDefault { get; init; }
 
     [Required]

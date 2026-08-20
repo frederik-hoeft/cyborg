@@ -6,4 +6,4 @@ namespace Cyborg.Core.Configuration.Model;
 
 [Validatable]
 [GeneratorContractRegistration<ModelDecompositionGeneratorContract>(ModelDecompositionGeneratorContract.DynamicKeyValuePair)]
-public sealed record DynamicKeyValuePair([property: Required] string Key, [property: Required][property: JsonIgnore] object? Value);
+public sealed record DynamicKeyValuePair([property: Required][property: Untagged] string Key, [property: Required][property: JsonIgnore] object? Value);

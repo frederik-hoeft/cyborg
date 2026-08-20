@@ -65,6 +65,15 @@ internal sealed class PropertyModelBuilder(GenerationCandidateFactory factory, L
             Children: children,
             Collection: collection);
 
+        if (TypeSymbolHelpers.IsStringType(property.Type) && !propertyModel.HasAspect<Processors.UntaggedAspect>())
+        {
+            AddDiagnostic(
+                ValidationGeneratorDiagnostics.PreferTaggedString,
+                property.Locations.FirstOrDefault(),
+                property.Name,
+                containingType.Name);
+        }
+
         return true;
     }
 

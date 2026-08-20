@@ -32,7 +32,7 @@ public abstract class BorgModuleWorker<TModule>
         {
             startInfo.Environment[BORG_RSH_ENV_VAR] = BuildBorgRsh(Module.RemoteShell);
         }
-        startInfo.Environment[BORG_PASSPHRASE_ENV_VAR] = Module.Passphrase;
+        startInfo.Environment[BORG_PASSPHRASE_ENV_VAR] = Module.Passphrase.Value;
     }
 
     protected virtual IMetricsLabelCollection AddDefaultLabels(IModuleRuntime runtime, IMetricsLabelCollection labels)

@@ -244,7 +244,7 @@ To back up a new Docker container (e.g., Gitea on a daily schedule):
   "module": {
     "cyborg.modules.config.map.v1": {
       "entries": [
-        { "key": "borg_passphrase", "string": "your-borg-passphrase-here" }
+        { "key": "borg_passphrase", "cyborg.types.secret.v1": "your-borg-passphrase-here" }
       ]
     }
   }

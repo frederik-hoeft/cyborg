@@ -8,7 +8,7 @@ internal sealed class RootedPathProcessor : AttributeProcessorBase<RootedPathAtt
 {
     public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {
-        if (!ValidatePropertyType(attribute, in context, SpecialType.System_String))
+        if (!ValidateStringLikePropertyType(attribute, in context))
         {
             return false.WithDefaults(out aspect);
         }
@@ -22,7 +22,7 @@ internal sealed class RootedPathProcessor : AttributeProcessorBase<RootedPathAtt
         {
             builder.AppendBlock(
             $$"""
-            if ({{model.AccessExpression}} is not null && !{{KnownTypes.Path}}.IsPathRooted({{model.AccessExpression}}))
+            if ({{model.NullAwareCondition($"!{KnownTypes.Path}.IsPathRooted({model.StringContentExpression})")}})
             {
                 errors.Add({{CreateValidationError(model, rule: "rooted_path", $"Property '{{nameof({model.AccessExpression})}}' must be a rooted path, but was '{{{model.AccessExpression}}}'")}});
             }

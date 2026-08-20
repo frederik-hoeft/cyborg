@@ -14,7 +14,7 @@ public sealed class SubprocessModuleWorker(IWorkerContext<SubprocessModule> cont
     protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
         string executable = Module.Command.Executable;
-        ImmutableArray<string> arguments = [.. Module.Command.Arguments];
+        ImmutableArray<string> arguments = [.. Module.Command.Arguments.Select(static argument => argument.Value)];
         if (Module.Impersonation is { } runUser)
         {
             executable = runUser.Executable;

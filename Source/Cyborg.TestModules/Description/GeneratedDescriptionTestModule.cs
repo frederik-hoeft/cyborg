@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Aot.Modules.Validation;
+using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Cyborg.Core.Modules;
 using System.Collections.Immutable;
 
@@ -9,8 +10,10 @@ public sealed partial record GeneratedDescriptionTestModule : ModuleBase, IModul
 {
     public static string ModuleId => "cyborg.tests.generated-description.v1";
 
+    [Untagged]
     public string Text { get; init; } = string.Empty;
 
+    [Untagged]
     public string? OptionalText { get; init; }
 
     public char Marker { get; init; }

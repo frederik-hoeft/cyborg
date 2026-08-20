@@ -80,6 +80,8 @@ The following scalar types are registered by the core runtime:
 | Type name | JSON value kind |
 |-----------|-----------------|
 | `string` | string |
+| `cyborg.types.taggedstring.v1` | string, or `{ "value": string, "tags": [string] }` |
+| `cyborg.types.secret.v1` | string, or `{ "value": string, "tags": [string] }` (always includes `cyborg.secret.v1`) |
 | `bool` | boolean |
 | `sbyte` | number |
 | `byte` | number |
@@ -92,6 +94,28 @@ The following scalar types are registered by the core runtime:
 | `float` | number |
 | `double` | number |
 | `decimal` | number |
+
+### Tagged strings and secrets
+
+`cyborg.types.taggedstring.v1` stores a `TaggedString`. A JSON string is an untagged value. A structural object supplies the raw `value` plus zero or more tag names.
+
+`cyborg.types.secret.v1` is a convenience form for configuration maps and other dynamic entries that should never appear in logs or debugger output. The resulting `TaggedString` always carries `cyborg.secret.v1`, in addition to any tags supplied structurally.
+
+```json
+{ "key": "borg_passphrase", "cyborg.types.secret.v1": "your-passphrase" }
+```
+
+```json
+{
+  "key": "token",
+  "cyborg.types.taggedstring.v1": {
+    "value": "payload",
+    "tags": ["cyborg.secret.v1", "application.custom.v1"]
+  }
+}
+```
+
+Display surfaces such as logs and debugger inspection render secret-tagged values as `[REDACTED]`. The raw string remains available through `TaggedString.Value` for subprocess execution and other trusted sinks.
 
 ### Configuration Enum Types
 

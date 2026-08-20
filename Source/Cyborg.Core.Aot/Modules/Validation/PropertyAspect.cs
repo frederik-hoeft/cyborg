@@ -11,6 +11,8 @@ internal abstract class PropertyAspect(bool ensuresDefault = false)
 
     public virtual string RewriteOverrideResolutionExpression(PropertyRewriteContext context, string currentExpression, string rootPathExpression) => currentExpression;
 
+    public virtual string RewriteInterpolationExpression(PropertyRewriteContext context, string currentExpression) => currentExpression;
+
     [return: NotNullIfNotNull(nameof(currentExpression))]
     public virtual string? RewriteDefaultAssignmentExpression(PropertyRewriteContext context, string? currentExpression) => currentExpression;
 
@@ -92,5 +94,12 @@ internal abstract class PropertyAspect(bool ensuresDefault = false)
     )
     {
         public string PropertyNameExpression => $"nameof({ErrorPropertyAccessExpression})";
+
+        public string StringContentExpression => TypeSymbolHelpers.CreateStringContentExpression(TargetType, AccessExpression);
+
+        public bool RequiresNullGuard => TypeSymbolHelpers.RequiresNullGuard(TargetType);
+
+        public string NullAwareCondition(string condition) =>
+            RequiresNullGuard ? $"{AccessExpression} is not null && {condition}" : condition;
     }
 }

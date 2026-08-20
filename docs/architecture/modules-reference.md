@@ -459,14 +459,14 @@ Executes an external process with optional impersonation and output capture.
 | `output` | object | No | `{ "read_stdout": false, "read_stderr": false }` | Controls stdout/stderr capture. |
 | `check_exit_code` | bool | No | `true` | When `true`, a non-zero exit code results in `Failed` status. |
 | `impersonation` | object | No | `null` | Run the command as a different user. See Impersonation below. |
-| `environment_variables` | array | No | `null` | Process-level environment variables to set. Each entry has `key` and `value` (both strings, both required). |
+| `environment_variables` | array | No | `null` | Process-level environment variables to set. Each entry has `key` (string) and `value` (`TaggedString`, both required). Values accept a JSON string or `{ "value": "...", "tags": [...] }`. |
 
 **Command:**
 
 | Property | Type | Required | Default | Constraints | Description |
 |----------|------|----------|---------|-------------|-------------|
 | `executable` | string | Yes | -- | Must exist on disk | Path to the executable. |
-| `arguments` | array of strings | Yes | -- | -- | Command-line arguments. |
+| `arguments` | array of TaggedString | Yes | -- | -- | Command-line arguments. Each element accepts a JSON string or `{ "value": "...", "tags": [...] }` so interpolated secrets keep their tags. |
 | `working_directory` | string | No | `null` | Rooted, normalized path; directory must exist | Assigned to `ProcessStartInfo.WorkingDirectory` before dispatch. |
 
 **Output Options:**
@@ -750,7 +750,7 @@ Borg v2.X compatibility will be added in a future release once the 2.0 API stabi
 | Property | Type | Required | Default | Constraints | Description |
 |----------|------|----------|---------|-------------|-------------|
 | `executable` | string | Yes | `"/usr/bin/borg"` | Must exist on disk | Path to the borg binary. |
-| `passphrase` | string | Yes | -- | -- | Repository passphrase (set as `BORG_PASSPHRASE`). |
+| `passphrase` | TaggedString | Yes | -- | Carries `cyborg.secret.v1` | Repository passphrase (set as `BORG_PASSPHRASE`). Accepts a JSON string or `{ "value": "...", "tags": [...] }`. Display surfaces redact it as `[REDACTED]`. |
 | `remote_shell` | object | No | `null` | -- | SSH transport options. See Remote Shell below. |
 | `remote_repository` | object | Yes | -- | -- | Remote repository connection details. See Remote Repository below. |
 

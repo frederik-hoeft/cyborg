@@ -7,8 +7,8 @@ namespace Cyborg.Core.Modules.Configuration.Model;
 [Validatable]
 public sealed record ModuleArtifacts
 (
-    string? Namespace,
-    [property: Required][property: DefaultValue<string>(Constants.DEFAULT_STATUS_CODE_NAME)] string ExitStatusName,
+    [property: Untagged] string? Namespace,
+    [property: Required][property: Untagged][property: DefaultValue<string>(Constants.DEFAULT_STATUS_CODE_NAME)] string ExitStatusName,
     [property: DefaultInstance] ArtifactModuleEnvironment Environment,
     [property: DefaultValue<DecompositionStrategy>(DecompositionStrategy.LeavesOnly)] DecompositionStrategy DecompositionStrategy,
     bool PublishNullValues

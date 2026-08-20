@@ -7,6 +7,6 @@ namespace Cyborg.Modules.Borg.Model;
 [GeneratedDecomposition]
 public sealed partial record BorgSshOptions
 (
-    [property: Required][property: DefaultValue<string>("/usr/bin/ssh")][property: FileExists] string Executable,
+    [property: Required][property: Untagged][property: DefaultValue<string>("/usr/bin/ssh")][property: FileExists] string Executable,
     BorgSshPass? SshPass
 );

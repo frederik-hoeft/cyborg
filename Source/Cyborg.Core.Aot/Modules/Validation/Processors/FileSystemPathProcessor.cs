@@ -15,7 +15,7 @@ internal abstract class FileSystemPathProcessor<TAttribute> : AttributeProcessor
 
     public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {
-        if (!ValidatePropertyType(attribute, in context, SpecialType.System_String))
+        if (!ValidateStringLikePropertyType(attribute, in context))
         {
             return false.WithDefaults(out aspect);
         }
@@ -32,7 +32,7 @@ internal abstract class FileSystemPathProcessor<TAttribute> : AttributeProcessor
         {
             builder.AppendBlock(
             $$"""
-            if ({{model.AccessExpression}} is not null && !{{existsExpression}}({{model.AccessExpression}}))
+            if ({{model.NullAwareCondition($"!{existsExpression}({model.StringContentExpression})")}})
             {
                 errors.Add({{CreateValidationError(model, errorCode, $"Property '{{nameof({model.AccessExpression})}}' requires an existing {pathKindDisplayName} at '{{{model.AccessExpression}}}'.")}});
             }

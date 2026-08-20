@@ -8,7 +8,7 @@ internal sealed class VariableIdentifierProcessor : PropertyValidationProcessorB
 {
     protected override bool TryProcessValidation(AttributeData attribute, ref readonly PropertyProcessingContext context, ref readonly PropertyValidationTarget target, out PropertyValidationAspect? aspect)
     {
-        if (!ValidateTargetType(attribute, in context, in target, SpecialType.System_String))
+        if (!ValidateStringLikeTargetType(attribute, in context, in target))
         {
             return false.WithDefaults(out aspect);
         }
@@ -22,7 +22,7 @@ internal sealed class VariableIdentifierProcessor : PropertyValidationProcessorB
         {
             builder.AppendBlock(
             $$"""
-            if ({{model.AccessExpression}} is not null && !runtime.Environment.SyntaxFactory.IsValidIdentifier({{model.AccessExpression}}))
+            if ({{model.NullAwareCondition($"!runtime.Environment.SyntaxFactory.IsValidIdentifier({model.StringContentExpression})")}})
             {
                 errors.Add({{CreateValidationError(model, rule: "valid_identifier", $"{model.TargetDescription} '{{{model.PropertyNameExpression}}}' must be a valid variable identifier, but was '{{{model.AccessExpression}}}'.")}});
             }

@@ -1,11 +1,13 @@
 ﻿using Cyborg.Core.Modules.Descriptors.Model;
+using Cyborg.Core.Text;
+using Cyborg.Core.Text.Rendering;
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text.Json;
 
 namespace Cyborg.Core.Modules.Descriptors.Writers;
 
-internal sealed class JsonModuleDescriptionComponentWriter(Utf8JsonWriter jsonWriter) : IDescriptionComponentWriter
+internal sealed class JsonModuleDescriptionComponentWriter(Utf8JsonWriter jsonWriter, ITaggedStringRenderer taggedStringRenderer) : IDescriptionComponentWriter
 {
     public ValueTask WriteAtomAsync<T>(T value, ImmutableArray<string> hints, CancellationToken cancellationToken)
     {
@@ -51,6 +53,9 @@ internal sealed class JsonModuleDescriptionComponentWriter(Utf8JsonWriter jsonWr
                 break;
             case decimal number:
                 jsonWriter.WriteNumberValue(number);
+                break;
+            case TaggedString tagged:
+                jsonWriter.WriteStringValue(taggedStringRenderer.Render(tagged));
                 break;
             case string text:
                 jsonWriter.WriteStringValue(text);

@@ -41,6 +41,8 @@ For how these attributes are processed by the source generators, see [Source Gen
 - [Override and Interpolation Control Attributes](#override-and-interpolation-control-attributes)
   - [IgnoreOverride](#ignoreoverride)
   - [IgnoreInterpolation](#ignoreinterpolation)
+  - [Secret](#secret)
+  - [Untagged](#untagged)
 - [Decomposition Attributes](#decomposition-attributes)
   - [DecomposeIgnore](#decomposeignore)
 
@@ -264,11 +266,23 @@ Prevents environment-driven override resolution for the annotated property.
 
 ### IgnoreInterpolation
 
-Prevents the generated interpolation phase from calling `runtime.Environment.Interpolate(...)` for the annotated string property. The raw string is preserved so a worker can interpolate it later, after context-specific variables or child artifacts exist.
+Prevents the generated interpolation phase from calling `runtime.Environment.Interpolate(...)` for the annotated string or `TaggedString` property. The raw string is preserved so a worker can interpolate it later, after context-specific variables or child artifacts exist.
 
-**Applies to:** `string` properties only.
+**Applies to:** `string` and `TaggedString` properties.
 
 This is used by `AssertModule.Message`, whose placeholders may refer to artifacts produced by the assertion module and therefore cannot be resolved during pre-execution validation. `ModuleBase.Name` and `ModuleBase.Group` also opt out because they define the environment namespace before interpolation runs.
+
+### Secret
+
+Valid only on `TaggedString` properties. Injects the `cyborg.secret.v1` tag during generated interpolation (including when `[IgnoreInterpolation]` defers evaluation) and asserts that the tag is present during constraint validation. The generated descriptor also contributes the same tag as a hint. Display surfaces redact secret-tagged values as `[REDACTED]`.
+
+**Applies to:** `TaggedString` properties only. Combining `[Secret]` with `[Untagged]` is an error.
+
+### Untagged
+
+Marks a string property as intentionally unable to carry tags. Suppresses `CYBORGVAL025`, which otherwise warns that interpolatable string properties should migrate to `TaggedString` so tags such as secrets propagate.
+
+**Applies to:** `string` properties only.
 
 
 ## Decomposition Attributes

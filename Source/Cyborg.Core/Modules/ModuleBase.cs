@@ -10,11 +10,13 @@ public abstract record ModuleBase : IModule
     [IgnoreOverride]
     [IgnoreInterpolation]
     [VariableIdentifier]
+    [Untagged]
     public virtual string? Name { get; init; }
 
     [IgnoreOverride]
     [IgnoreInterpolation]
     [VariableIdentifier]
+    [Untagged]
     public virtual string? Group { get; init; }
 
     [Required]

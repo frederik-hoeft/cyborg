@@ -72,6 +72,26 @@ internal abstract class PropertyValidationProcessorBase<TAttribute> : AttributeP
         return false;
     }
 
+    protected bool ValidateStringLikeTargetType(AttributeData attribute, ref readonly PropertyProcessingContext context, ref readonly PropertyValidationTarget target)
+    {
+        if (!target.IsCollectionElement)
+        {
+            return ValidateStringLikePropertyType(attribute, in context);
+        }
+        if (TypeSymbolHelpers.IsStringLikeType(target.Type))
+        {
+            return true;
+        }
+
+        context.Report(ValidationGeneratorDiagnostics.CollectionElementTypeMismatch,
+            context.Property.Name,
+            context.ContainingType.Name,
+            GetAttributeFriendlyName(attribute),
+            target.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
+            "string or TaggedString");
+        return false;
+    }
+
     private bool TryCreateCollectionElementTarget(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyValidationTarget target)
     {
         _ = context.Property.Type.TryUnwrapNullableType(out ITypeSymbol nonNullableType);

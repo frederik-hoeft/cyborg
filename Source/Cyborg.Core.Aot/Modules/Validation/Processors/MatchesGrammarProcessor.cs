@@ -8,7 +8,7 @@ internal sealed class MatchesGrammarProcessor : AttributeProcessorBase<MatchesGr
 {
     public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {
-        if (!ValidatePropertyType(attribute, in context, SpecialType.System_String)
+        if (!ValidateStringLikePropertyType(attribute, in context)
             || !TryGetConstructorArgumentValue(attribute, argumentIndex: 0, in context, out string? valueExpression))
         {
             return false.WithDefaults(out aspect);
@@ -44,7 +44,7 @@ internal sealed class MatchesGrammarProcessor : AttributeProcessorBase<MatchesGr
             // bool TryParse(string input, int offset, [NotNullWhen(true)] out ISyntaxNode? syntaxNode, out int charsConsumed);
             builder.AppendBlock(
             $$"""
-            if ({{model.AccessExpression}} is not null && !{{valueExpression}}.TryParse({{model.AccessExpression}}, out _, out _))
+            if ({{model.NullAwareCondition($"!{valueExpression}.TryParse({model.StringContentExpression}, out _, out _)")}})
             {
                 errors.Add({{CreateValidationError(model, "match_grammar", $"Property '{{nameof({model.AccessExpression})}}' does not match the required grammar.")}});
             }

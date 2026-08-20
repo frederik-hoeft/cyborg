@@ -90,7 +90,7 @@ For each annotated record, the generator emits a partial record implementing `IM
 
 2. **`ResolveOverridesAsync`** — For each property not suppressed by `[IgnoreOverride]`, emits an operation through `ModuleValidationContext`. String properties use raw override selection so `[IgnoreInterpolation]` can preserve the effective expression, while non-string properties and collections use typed resolution. `[IgnoreOverride]` suppresses the annotated node; `Recurse = true` also suppresses descendants. Defaults are applied again after this phase so injected type-default values receive their declared defaults.
 
-3. **`ApplyInterpolationAsync`** — Private instance helper that recursively rewrites eligible string properties through `ModuleValidationContext.Interpolate(...)`, including strings in nested `[Validatable]` records and supported collections. `[IgnoreInterpolation]` leaves a string untouched for later context-specific interpolation.
+3. **`ApplyInterpolationAsync`** — Private instance helper that recursively rewrites eligible string and `TaggedString` properties through `ModuleValidationContext.Interpolate(...)`, including values in nested `[Validatable]` records and supported collections. Tags union across interpolated operands. `[IgnoreInterpolation]` leaves a value untouched for later context-specific interpolation; `[Secret]` still injects `cyborg.secret.v1`. `[Untagged]` suppresses the diagnostic that recommends migrating remaining string properties to `TaggedString`.
 
 4. **`ValidateAsync`** — Creates one `ModuleValidationContext` from the runtime and service provider, orchestrates defaults → overrides → defaults → interpolation → constraints, collects `ValidationError` instances, and returns `IValidationResult<TModule>` through the shared `ValidationResult.Valid(...)` / `Invalid(...)` factories. Invalid generated results retain the fully prepared module so lifecycle hooks, debugger inspection, and diagnostics can observe the same state that would otherwise reach validation enforcement. Validation recurses into nested validatable records and supported collection elements.
 
@@ -129,6 +129,7 @@ The following attributes are recognized by the validation generator:
 | **Enum validation** | `[DefinedEnumValue]` |
 | **Override suppression** | `[IgnoreOverride]` |
 | **Interpolation suppression** | `[IgnoreInterpolation]` |
+| **Tagged strings** | `[Secret]`, `[Untagged]` |
 | **Nested validation** | `[Validatable]` (on nested record types) |
 
 All attributes are defined in `Cyborg.Core.Aot` and emitted into the consuming compilation, see [Validation Attributes Reference](validation-attributes-reference.md) for a complete reference of their parameters and behavior.
@@ -221,6 +222,6 @@ Each generator defines its own set of diagnostic descriptors with unique IDs:
 | `CYBORG` | Contract bootstrap | Missing or duplicate contract registrations |
 | `CYBORGMLF` | Loader factory | Invalid base type, missing constructor, incorrect method signature |
 | `CYBORGCOMP` | Decomposition | Non-partial type, invalid naming policy configuration |
-| `CYBORGVAL` | Validation | Non-partial record, invalid attribute usage |
+| `CYBORGVAL` | Validation | Non-partial record, invalid attribute usage, prefer `TaggedString` (`CYBORGVAL025`), `[Secret]`/`[Untagged]` misuse (`CYBORGVAL026`–`CYBORGVAL028`) |
 
 Diagnostics are reported through `DiagnosticsReporter` (validation) or directly via the source production context. All diagnostics include the source location of the triggering declaration.

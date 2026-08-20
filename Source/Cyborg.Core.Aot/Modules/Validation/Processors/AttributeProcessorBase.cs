@@ -156,4 +156,18 @@ internal abstract class AttributeProcessorBase : IPropertyAttributeProcessor
         }
         return true;
     }
+
+    protected bool ValidateStringLikePropertyType(AttributeData attribute, ref readonly PropertyProcessingContext context)
+    {
+        if (TypeSymbolHelpers.IsStringLikeType(context.Property.Type))
+        {
+            return true;
+        }
+        context.Report(ValidationGeneratorDiagnostics.TypeMismatch,
+            context.Property.Name,
+            context.ContainingType.Name,
+            GetAttributeFriendlyName(attribute),
+            "string or TaggedString");
+        return false;
+    }
 }

@@ -9,8 +9,8 @@ namespace Cyborg.Modules.Template;
 [GeneratedModuleValidation]
 public sealed partial record TemplateModule
 (
-    [property: Required][property: MatchesRegex(nameof(TemplateModule.NamespaceRegex))] string Namespace,
-    [property: Required][property: FileExists] string Path,
+    [property: Required][property: Untagged][property: MatchesRegex(nameof(TemplateModule.NamespaceRegex))] string Namespace,
+    [property: Required][property: Untagged][property: FileExists] string Path,
     [property: Required][property: DefaultInstanceFactory(nameof(TemplateModule.DefaultArgumentsFactory))] IReadOnlyCollection<DynamicKeyValuePair> Arguments,
     [property: Required][property: DefaultInstanceFactory(nameof(TemplateModule.DefaultOverridesFactory))] IReadOnlyCollection<DynamicKeyValuePair> Overrides
 ) : ModuleBase, IModule

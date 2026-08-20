@@ -163,9 +163,11 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
     private string CreateOverrideResolutionExpression(PropertyRewriteContext context, string rootPathExpression)
     {
         string arguments = $"{context.ModuleVariable}, {context.PropertyAccessExpression}, moduleExpression: \"{context.ModuleVariable}\", valueExpression: \"{rootPathExpression}\"";
-        string expression = context.Property.Symbol.Type.SpecialType is SpecialType.System_String
+        string expression = TypeSymbolHelpers.IsStringType(context.Property.Symbol.Type)
             ? $"{ContextVariable}.SelectRawStringOverride({arguments})"
-            : $"{ContextVariable}.ResolveOverride({arguments})";
+            : TypeSymbolHelpers.IsTaggedString(context.Property.Symbol.Type)
+                ? $"{ContextVariable}.SelectRawTaggedStringOverride({arguments})"
+                : $"{ContextVariable}.ResolveOverride({arguments})";
         foreach (PropertyAspect aspect in context.Property.Aspects)
         {
             expression = aspect.RewriteOverrideResolutionExpression(context, expression, rootPathExpression);

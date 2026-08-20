@@ -33,6 +33,8 @@ internal static class ValidationProcessorRegistry
         new UnrootedPathProcessor(),
         new NormalizedPathProcessor(),
         new VariableIdentifierProcessor(),
+        new SecretProcessor(),
+        new UntaggedProcessor(),
     ];
 
     private static FrozenDictionary<string, IPropertyAttributeProcessor> ByMetadataName =>

@@ -79,7 +79,7 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValid
     private static LengthTargetKind GetTargetKind(ITypeSymbol propertyType, out INamedTypeSymbol? collectionInterface)
     {
         collectionInterface = null;
-        if (propertyType.SpecialType == SpecialType.System_String)
+        if (propertyType.SpecialType == SpecialType.System_String || TypeSymbolHelpers.IsTaggedString(propertyType))
         {
             return LengthTargetKind.String;
         }
@@ -164,7 +164,7 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValid
             }
             string sizeExpression = targetKind switch
             {
-                LengthTargetKind.String => $"{accessExpression}.Length",
+                LengthTargetKind.String => $"{model.StringContentExpression}.Length",
                 LengthTargetKind.Collection => $"{accessExpression}.Count",
                 _ => throw new InvalidOperationException("Unsupported length target kind.")
             };

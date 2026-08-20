@@ -1,13 +1,12 @@
 ﻿using Cyborg.Core.Common.Text;
 using Cyborg.Core.Modules.Descriptors.Model;
+using Cyborg.Core.Text.Rendering;
 using System.Text;
 
 namespace Cyborg.Core.Modules.Descriptors.Writers;
 
-internal sealed class TextModuleDescriptionSerializer : IModuleDescriptionSerializer
+internal sealed class TextModuleDescriptionSerializer(ITaggedStringRenderer taggedStringRenderer) : IModuleDescriptionSerializer
 {
-    internal static TextModuleDescriptionSerializer Instance { get; } = new();
-
     public string Format => ModuleDescriptionFormats.Text;
 
     public async ValueTask<string> SerializeAsync(IDescriptionObjectComponent description, CancellationToken cancellationToken)
@@ -16,7 +15,7 @@ internal sealed class TextModuleDescriptionSerializer : IModuleDescriptionSerial
         cancellationToken.ThrowIfCancellationRequested();
 
         StringBuilder builder = new();
-        TextModuleDescriptionComponentWriter writer = new(new IndentedStringBuilder(builder, indentSize: 2));
+        TextModuleDescriptionComponentWriter writer = new(new IndentedStringBuilder(builder, indentSize: 2), taggedStringRenderer);
         await description.AcceptAsync(writer, cancellationToken);
         return builder.ToString();
     }

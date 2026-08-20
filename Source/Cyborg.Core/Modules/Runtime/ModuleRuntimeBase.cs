@@ -3,6 +3,7 @@ using Cyborg.Core.Modules.Hooks;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Runtime.Environments.Syntax;
 using Cyborg.Core.Services.Pipelines;
+using Cyborg.Core.Text;
 using Microsoft.Extensions.Logging;
 
 namespace Cyborg.Core.Modules.Runtime;
@@ -35,12 +36,24 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory, ILo
             transient = true;
             name = Guid.CreateVersion7().ToString();
         }
+        ITaggedStringConversionObserver? conversionObserver = parent.Environment is EnvironmentLike parentEnvironment
+            ? parentEnvironment.TaggedStringConversionObserver
+            : null;
         IRuntimeEnvironment environment = scope switch
         {
-            EnvironmentScope.Isolated => new RuntimeEnvironment(name, transient, SyntaxFactory, UNBOUND_ENVIRONMENT),
+            EnvironmentScope.Isolated => new RuntimeEnvironment(name, transient, SyntaxFactory, UNBOUND_ENVIRONMENT)
+            {
+                TaggedStringConversionObserver = conversionObserver
+            },
             EnvironmentScope.Global => parent.GlobalEnvironment,
-            EnvironmentScope.InheritParent => new InheritedRuntimeEnvironment(name, parent.Environment, transient, SyntaxFactory, UNBOUND_ENVIRONMENT),
-            EnvironmentScope.InheritGlobal => new InheritedRuntimeEnvironment(name, parent.GlobalEnvironment, transient, SyntaxFactory, UNBOUND_ENVIRONMENT),
+            EnvironmentScope.InheritParent => new InheritedRuntimeEnvironment(name, parent.Environment, transient, SyntaxFactory, UNBOUND_ENVIRONMENT)
+            {
+                TaggedStringConversionObserver = conversionObserver
+            },
+            EnvironmentScope.InheritGlobal => new InheritedRuntimeEnvironment(name, parent.GlobalEnvironment, transient, SyntaxFactory, UNBOUND_ENVIRONMENT)
+            {
+                TaggedStringConversionObserver = conversionObserver
+            },
             EnvironmentScope.Parent or EnvironmentScope.Current => parent.Environment.Bind(UNBOUND_ENVIRONMENT),
             EnvironmentScope.Reference => throw new ArgumentException("Attempting to create an environment by reference without providing an environment reference.", nameof(scope)),
             _ => throw new ArgumentOutOfRangeException(nameof(scope), scope, "Invalid environment scope.")

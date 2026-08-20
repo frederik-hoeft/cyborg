@@ -1,6 +1,8 @@
 ﻿using Cyborg.Core.Common.Text;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Descriptors.Model;
+using Cyborg.Core.Text;
+using Cyborg.Core.Text.Rendering;
 using System.Collections;
 using System.Collections.Immutable;
 using System.Globalization;
@@ -8,12 +10,12 @@ using System.Text;
 
 namespace Cyborg.Core.Modules.Descriptors.Writers;
 
-internal sealed class TextModuleDescriptionComponentWriter(IndentedStringBuilder builder) : IDescriptionComponentWriter
+internal sealed class TextModuleDescriptionComponentWriter(IndentedStringBuilder builder, ITaggedStringRenderer taggedStringRenderer) : IDescriptionComponentWriter
 {
     public ValueTask WriteAtomAsync<T>(T value, ImmutableArray<string> hints, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        WriteAtom(builder, value);
+        WriteAtom(builder, taggedStringRenderer, value);
         return ValueTask.CompletedTask;
     }
 
@@ -53,7 +55,7 @@ internal sealed class TextModuleDescriptionComponentWriter(IndentedStringBuilder
             if (item is IDescriptionObjectComponent or IDescriptionCollectionComponent)
             {
                 builder.GetInnerBuilder().AppendLine();
-                TextModuleDescriptionComponentWriter nestedWriter = new(builder.IncreaseIndent());
+                TextModuleDescriptionComponentWriter nestedWriter = new(builder.IncreaseIndent(), taggedStringRenderer);
                 await item.AcceptAsync(nestedWriter, cancellationToken).ConfigureAwait(false);
             }
             else
@@ -74,7 +76,7 @@ internal sealed class TextModuleDescriptionComponentWriter(IndentedStringBuilder
         if (propertyComponent.Value is IDescriptionObjectComponent or IDescriptionCollectionComponent)
         {
             builder.GetInnerBuilder().AppendLine();
-            TextModuleDescriptionComponentWriter nestedWriter = new(builder.IncreaseIndent());
+            TextModuleDescriptionComponentWriter nestedWriter = new(builder.IncreaseIndent(), taggedStringRenderer);
             await propertyComponent.Value.AcceptAsync(nestedWriter, cancellationToken).ConfigureAwait(false);
         }
         else
@@ -84,9 +86,10 @@ internal sealed class TextModuleDescriptionComponentWriter(IndentedStringBuilder
         }
     }
 
-    private static IndentedStringBuilder WriteAtom<T>(IndentedStringBuilder builder, T value) => value switch
+    private static IndentedStringBuilder WriteAtom<T>(IndentedStringBuilder builder, ITaggedStringRenderer taggedStringRenderer, T value) => value switch
     {
         null => builder.AppendLine("null"),
+        TaggedString tagged => AppendQuotedString(builder, taggedStringRenderer.Render(tagged), '"'),
         string text => AppendQuotedString(builder, text, '"'),
         char character => AppendQuotedString(builder, character.ToString(), '\''),
         bool flag => builder.AppendLine(flag ? "true" : "false"),

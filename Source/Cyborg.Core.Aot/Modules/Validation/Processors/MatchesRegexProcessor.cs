@@ -10,7 +10,7 @@ internal sealed class MatchesRegexProcessor : AttributeProcessorBase<MatchesRege
 {
     public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {
-        if (!ValidatePropertyType(attribute, in context, SpecialType.System_String)
+        if (!ValidateStringLikePropertyType(attribute, in context)
             || !TryGetConstructorArgumentValue(attribute, argumentIndex: 0, in context, out string? valueExpression))
         {
             return false.WithDefaults(out aspect);
@@ -52,7 +52,7 @@ internal sealed class MatchesRegexProcessor : AttributeProcessorBase<MatchesRege
         {
             builder.AppendBlock(
             $$"""
-            if ({{model.AccessExpression}} is not null && !{{regexMember}}.IsMatch({{model.AccessExpression}}))
+            if ({{model.NullAwareCondition($"!{regexMember}.IsMatch({model.StringContentExpression})")}})
             {
                 errors.Add({{CreateValidationError(model, "match_regex", $"Property '{{nameof({model.AccessExpression})}}' must match the following pattern: '{{{SymbolDisplay.FormatLiteral(pattern, quote: true)}}}'.")}});
             }

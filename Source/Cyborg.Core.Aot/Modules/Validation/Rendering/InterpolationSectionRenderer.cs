@@ -44,14 +44,16 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
             string propertyAccess = $"{targetVariable}.{property.Name}";
             string localName = $"{targetVariable}_{property.Name}";
 
-            bool isString = IsStringType(property.Symbol.Type);
+            bool isStringLike = TypeSymbolHelpers.IsStringLikeType(property.Symbol.Type);
+            bool hasSecret = property.HasAspect<SecretAspect>();
+            bool ignoreInterpolation = property.HasAspect<IgnoreInterpolationAspect>();
             bool hasNestedWork = property.HasValidatableChildren && HasInterpolationWork(property.Children);
             CollectionModel? collection = property.Collection;
             bool hasCollectionWork = collection is { SupportsElementRewrite: true }
-                && (IsStringType(collection.ElementType)
+                && (TypeSymbolHelpers.IsStringLikeType(collection.ElementType)
                     || (collection.IsElementValidatableType && HasInterpolationWork(collection.ElementChildren)));
 
-            if (!hasNestedWork && (!isString && !hasCollectionWork || property.HasAspect<IgnoreInterpolationAspect>()))
+            if (!hasNestedWork && !hasSecret && (!isStringLike && !hasCollectionWork || ignoreInterpolation))
             {
                 continue;
             }
@@ -62,9 +64,9 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
                 continue;
             }
 
-            if (isString)
+            if (isStringLike)
             {
-                EmitStringInterpolation(builder, property, localName, propertyAccess);
+                EmitStringInterpolation(builder, property, localName, propertyAccess, interpolate: !ignoreInterpolation);
             }
             else
             {
@@ -91,17 +93,37 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
         return true;
     }
 
-    private void EmitStringInterpolation(IndentedStringBuilder builder, PropertyModel property, string localName, string propertyAccess)
+    private void EmitStringInterpolation(IndentedStringBuilder builder, PropertyModel property, string localName, string propertyAccess, bool interpolate)
     {
+        bool isTaggedString = TypeSymbolHelpers.IsTaggedString(property.Symbol.Type);
+        string interpolatedExpression = interpolate
+            ? $"{ContextVariable}.Interpolate({propertyAccess})"
+            : propertyAccess;
+        PropertyRewriteContext rewriteContext = new(property, ContractInfo, DiagnosticsReporter, RootModuleVariable, ContextVariable, propertyAccess);
+        foreach (PropertyAspect aspect in property.Aspects)
+        {
+            interpolatedExpression = aspect.RewriteInterpolationExpression(rewriteContext, interpolatedExpression);
+        }
+        if (!isTaggedString)
+        {
+            interpolatedExpression = $"{interpolatedExpression}.Value";
+        }
+
+        if (!TypeSymbolHelpers.RequiresNullGuard(property.Symbol.Type))
+        {
+            builder.AppendLine($"{property.NullableTypeName} {localName} = {interpolatedExpression};");
+            return;
+        }
+
         if (property.IsNullable)
         {
-            builder.AppendLine($"{property.NullableTypeName} {localName} = {propertyAccess} is not null ? {ContextVariable}.Interpolate({propertyAccess}) : null;");
+            builder.AppendLine($"{property.NullableTypeName} {localName} = {propertyAccess} is not null ? {interpolatedExpression} : null;");
         }
         else
         {
             // Non-nullable: guard against null defensively (validation will catch it if it is null).
             // Use ! on the fallback so the ternary stays typed as non-nullable and avoids CS8600/CS8601.
-            builder.AppendLine($"{property.NullableTypeName} {localName} = {propertyAccess} is not null ? {ContextVariable}.Interpolate({propertyAccess}) : {propertyAccess}!;");
+            builder.AppendLine($"{property.NullableTypeName} {localName} = {propertyAccess} is not null ? {interpolatedExpression} : {propertyAccess}!;");
         }
     }
 
@@ -178,7 +200,7 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
             """);
         IndentedStringBuilder loopBuilder = builder.IncreaseIndent();
 
-        bool isStringElem = IsStringType(collection.ElementType);
+        bool isStringElem = TypeSymbolHelpers.IsStringLikeType(collection.ElementType);
 
         if (collection.ElementRequiresNullCheck)
         {
@@ -191,7 +213,7 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
             IndentedStringBuilder ifBuilder = loopBuilder.IncreaseIndent();
             if (isStringElem)
             {
-                ifBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elemValueVar} = {ContextVariable}.Interpolate({elemCurrentVar}!);");
+                ifBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elemValueVar} = {CreateElementInterpolationExpression(collection.ElementType, $"{elemCurrentVar}!")};");
                 ifBuilder.AppendLine($"{elemCurrentVar} = {elemValueVar};");
             }
             else
@@ -211,7 +233,7 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
         {
             if (isStringElem)
             {
-                loopBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elemCurrentVar} = {ContextVariable}.Interpolate({elemVar});");
+                loopBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elemCurrentVar} = {CreateElementInterpolationExpression(collection.ElementType, elemVar)};");
             }
             else
             {
@@ -264,7 +286,7 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
     {
         foreach (PropertyModel property in properties)
         {
-            if (IsStringType(property.Symbol.Type))
+            if (TypeSymbolHelpers.IsStringLikeType(property.Symbol.Type) || property.HasAspect<SecretAspect>())
             {
                 return true;
             }
@@ -274,7 +296,7 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
             }
             if (property.Collection is { SupportsElementRewrite: true } collection)
             {
-                if (IsStringType(collection.ElementType))
+                if (TypeSymbolHelpers.IsStringLikeType(collection.ElementType))
                 {
                     return true;
                 }
@@ -287,7 +309,11 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
         return false;
     }
 
-    private static bool IsStringType(ITypeSymbol type) => type.SpecialType == SpecialType.System_String;
+    private string CreateElementInterpolationExpression(ITypeSymbol elementType, string accessExpression)
+    {
+        string interpolated = $"{ContextVariable}.Interpolate({accessExpression})";
+        return TypeSymbolHelpers.IsTaggedString(elementType) ? interpolated : $"{interpolated}.Value";
+    }
 
     private static string CreateSafeIdentifier(string value) =>
         string.Concat(value.Select(static c => char.IsLetterOrDigit(c) ? c : '_'));

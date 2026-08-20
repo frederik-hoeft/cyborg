@@ -197,4 +197,36 @@ internal static class ValidationGeneratorDiagnostics
         category: CATEGORY,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
+
+    public static DiagnosticDescriptor PreferTaggedString { get; } = new(
+        id: "CYBORGVAL025",
+        title: "Prefer TaggedString for interpolatable strings",
+        messageFormat: "Property '{0}' on '{1}' is a string. Prefer TaggedString so interpolation can propagate tags such as secrets. Annotate with [Untagged] if this property must never carry tags",
+        category: CATEGORY,
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true);
+
+    public static DiagnosticDescriptor SecretRequiresTaggedString { get; } = new(
+        id: "CYBORGVAL026",
+        title: "SecretAttribute requires TaggedString",
+        messageFormat: "Property '{0}' on '{1}' uses [Secret], but type '{2}' is not TaggedString",
+        category: CATEGORY,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    public static DiagnosticDescriptor UntaggedRequiresString { get; } = new(
+        id: "CYBORGVAL027",
+        title: "UntaggedAttribute requires string",
+        messageFormat: "Property '{0}' on '{1}' uses [Untagged], but type '{2}' is not string. [Untagged] only applies to intentionally untagged string properties",
+        category: CATEGORY,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    public static DiagnosticDescriptor SecretAndUntaggedAreMutuallyExclusive { get; } = new(
+        id: "CYBORGVAL028",
+        title: "SecretAttribute and UntaggedAttribute cannot be combined",
+        messageFormat: "Property '{0}' on '{1}' cannot be annotated with both [Secret] and [Untagged]",
+        category: CATEGORY,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
 }
