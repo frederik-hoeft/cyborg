@@ -21,7 +21,7 @@ internal sealed class DefaultsSectionRenderer(ValidationContractInfo contractInf
             """);
 
         builder = builder.IncreaseIndent();
-        DefaultApplicationRenderer.AppendDefaultApplicationForObject(builder, model.Properties, RootModuleVariable, diagnosticsPhase: "defaults");
+        PropertyPreparationRenderer.AppendPreparationForObject(builder, model.Properties, RootModuleVariable, diagnosticsPhase: "defaults");
         builder = builder.DecreaseIndent();
         builder.AppendBlock(
             $$"""

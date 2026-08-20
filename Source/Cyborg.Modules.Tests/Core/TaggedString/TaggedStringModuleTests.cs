@@ -168,6 +168,23 @@ public sealed class TaggedStringModuleTests : ModuleTestBase
         MSAssert.DoesNotContain("s3cret", text);
     });
 
+    [TestMethod]
+    public Task Test_ToJsonAsync_SecretHint_RedactsBeforePreparationAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleSerializationService serializationService = services.GetRequiredService<IModuleSerializationService>();
+        TaggedStringTestModule module = new(
+            Plain: "visible",
+            Secret: "s3cret",
+            OptionalSecret: null,
+            IntentionallyUntagged: "id",
+            Values: ["one"]);
+
+        string json = await serializationService.ToJsonAsync(module, TestContext.CancellationToken);
+
+        MSAssert.Contains(global::Cyborg.Core.Text.SecretTagHandler.RedactedDisplay, json);
+        MSAssert.DoesNotContain("s3cret", json);
+    });
+
     private sealed class CustomTagRenderer : ITaggedStringRenderer
     {
         public const string Tag = "test.custom.v1";

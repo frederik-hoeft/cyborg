@@ -8,6 +8,5 @@ internal interface IConfigurationArgumentHandler
     bool TryProcessArgument(
         string[]? configurationEntries,
         IConfigurationBuilder configurationBuilder,
-        [NotNullWhen(false)] out string? invalidDefinition,
         [NotNullWhen(false)] out string? errorMessage);
 }

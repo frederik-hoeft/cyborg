@@ -43,6 +43,7 @@ For detailed reference material, see:
     - [Named Environments](#named-environments)
   - [Variable Resolution](#variable-resolution)
     - [Resolution Semantics](#resolution-semantics)
+    - [Tagged Textual Values](#tagged-textual-values)
     - [Cycle Detection](#cycle-detection)
     - [Variable Name Syntax](#variable-name-syntax)
     - [Decomposable Objects](#decomposable-objects)
@@ -183,11 +184,11 @@ The `ModuleWorker<TModule>` base class orchestrates the complete lifecycle from 
 
 Before a worker's `ExecuteAsync` method is invoked, `ModuleWorker<TModule>` calls the source-generated `ValidateAsync` implementation on the module. The generated method orchestrates five ordered phases:
 
-1. **Apply Defaults** — Fills null or type-default properties from `[DefaultValue<T>]`, `[DefaultInstance]`, `[DefaultInstanceFactory]`, and `[DefaultTimeSpan]`. Defaulting recurses into nested records marked with `[Validatable]` and supported collection elements.
+1. **Apply Defaults / Preparation Invariants** — Fills null or type-default properties from `[DefaultValue<T>]`, `[DefaultInstance]`, `[DefaultInstanceFactory]`, and `[DefaultTimeSpan]`, then applies property-level preparation invariants such as the intrinsic tag established by `[Secret]`. Preparation recurses into nested records marked with `[Validatable]` and supported collection elements.
 
 2. **Resolve Overrides** — Substitutes eligible module properties from runtime environment variables using the override subsystem described in [Module Property Overrides](#module-property-overrides). `[IgnoreOverride]` suppresses replacement of the annotated property; its optional `recurse` constructor argument also suppresses descendants when `true`.
 
-3. **Reapply Defaults** — Runs defaulting again so values introduced by overrides receive the same default semantics as values produced by deserialization.
+3. **Reapply Defaults / Preparation Invariants** — Runs the same preparation pass again so values introduced by overrides receive declared defaults and destination-level invariants are re-established.
 
 4. **Interpolate Strings** — Recursively applies `runtime.Environment.Interpolate(...)` to eligible strings on the module, nested `[Validatable]` records, and supported collection elements. `[IgnoreInterpolation]` preserves strings that require later context-specific interpolation. `ModuleBase.Name` and `ModuleBase.Group` opt out because they establish structural identity before validation; `AssertModule.Message` is interpolated by its worker after the assertion child has executed so it can reference child artifacts.
 
@@ -279,6 +280,16 @@ When `TryResolveVariable<T>(name)` is called, the runtime captures the environme
 5. **Interpolation** — If the stored value is a string or `TaggedString` containing `${...}` placeholders mixed with literal text, all placeholders are replaced with their resolved values using the same scope rules. Unresolvable placeholders are left as-is. Tags from the template and from every successfully resolved operand are unioned onto the result so values such as `"hello ${mySecret}"` cannot leak into an untagged string.
 6. **Parent fallback** — In an `InheritedRuntimeEnvironment`, if the variable is not found locally, the lookup is delegated to the parent chain.
 7. **Type casting** — The resolved value is matched against the requested type `T`. A type mismatch is treated as a resolution failure. `string` and `TaggedString` convert to each other: resolving a tagged value as `string` returns the raw value and discards tags (and logs a warning when tags were present), while resolving a stored string as `TaggedString` wraps it with no tags. Prefer `TryResolveVariable(..., out TaggedString)` so interpolation-introduced tags such as `cyborg.secret.v1` are preserved.
+
+#### Tagged Textual Values
+
+`TaggedString` is the native representation for textual values that must retain metadata while flowing through the runtime. It carries a raw string plus an opaque set of string tags. Environment storage and resolution do not interpret those tags; interpolation and indirection only preserve/union them. This keeps taint propagation independent from the policy attached to any particular tag.
+
+`cyborg.secret.v1` is the first globally interpreted tag. Safe presentation is centralized in `ITaggedStringRenderer`, whose tag handlers are supplied through dependency injection. Debugger serializers, generated validation diagnostics, tagged metrics labels, subprocess argument diagnostics, and other tag-aware presentation paths use that renderer rather than formatting raw values directly. Unknown tags remain attached even when no handler is registered.
+
+Raw-value access is intentionally separate from safe rendering. `TaggedString.Value` and compatibility retrieval as `string` expose the actual text for execution consumers; this discards the ability to enforce tag-aware presentation after that boundary. Child-process dispatch therefore retains tagged arguments/environment values in `ChildProcessInvocation` until the dispatcher renders diagnostics and materializes `ProcessStartInfo` immediately before execution.
+
+`TaggedString.ToString()` provides a conservative context-free fallback for code without DI, but application-aware output should use `ITaggedStringRenderer`. Direct JSON serialization of `TaggedString` is a data round-trip and writes the raw value together with its tags; it is not a redaction surface.
 
 #### Cycle Detection
 
@@ -396,7 +407,7 @@ Generated override preparation resolves module properties through `ModuleValidat
 1. The generator supplies the module and property expressions used to derive the snake_case property path.
 2. Override keys are constructed using every identifier that can address the module instance: first `@{name}.{property_name}`, then `@{group}.{property_name}` when a group is set, then `@{module_id}.{property_name}`, and finally `@{tag}.{property_name}` for each override resolution tag attached to the environment.
 3. The environment is checked for each override key in that order. The first matching override wins, so more specific identifiers take priority (`name` > `group` > `module_id` > tags).
-4. String properties select the raw stored override without interpolation. Non-string properties use typed resolution, including exact-reference indirection, and collections use a collection-specific resolver before generated code materializes the declared collection shape.
+4. Textual properties (`string` and `TaggedString`) select the raw stored override without interpolation. This preserves late-bound expressions and, for `TaggedString`, any tags attached to the selected value. Non-text properties use typed resolution, including exact-reference indirection, and collections use a collection-specific resolver before generated code materializes the declared collection shape.
 5. The later generated `ApplyInterpolationAsync` phase recursively interpolates every eligible string, including strings for which no override was applied and strings inside nested records and collections. `[IgnoreInterpolation]` skips this phase, so a raw string selected from an override remains available for worker-controlled interpolation.
 
 `[IgnoreOverride]` disables resolution of the annotated node without disabling the later interpolation phase. With the default `recurse: false`, eligible descendants may still resolve overrides; `recurse: true` suppresses the complete subtree. `[IgnoreInterpolation]` is a separate string-only control for values that must remain raw until worker execution.
@@ -409,7 +420,7 @@ The override subsystem supports any addressable property on the module, includin
 
 Override resolution is applied recursively within module properties, so a complex-typed property instance may have overrides applied to its own properties as well.
 
-The generated pipeline applies defaults before override resolution and again afterward. Overrides must therefore produce values that satisfy the module's constraints, but they can also inject a type-default value to trigger the second defaulting pass. Eligible strings are then processed by the recursive interpolation phase before constraints are evaluated.
+The generated pipeline applies defaults and property-level preparation invariants before override resolution and again afterward. Overrides must therefore produce values that satisfy the module's constraints, but they can also inject a type-default value to trigger the second defaulting pass. Intrinsic metadata such as `[Secret]` is re-applied after override selection, so changing the value cannot declassify the destination property. Eligible textual values are then processed by the recursive interpolation phase before constraints are evaluated.
 
 #### Override Resolution Tags
 
@@ -505,11 +516,11 @@ The parsing infrastructure serves two roles:
 
 ### Process Execution
 
-Subprocess execution is abstracted behind the `IChildProcessDispatcher` interface, which provides a single `ExecuteAsync` method accepting a `ProcessStartInfo` and returning a `ChildProcessResult` containing the exit code, captured standard output, and captured standard error.
+Subprocess execution is abstracted behind `IChildProcessDispatcher`. The preferred overload accepts `ChildProcessInvocation`, which retains `TaggedString` arguments and environment values until dispatch. A compatibility overload still accepts an already-materialized `ProcessStartInfo` for callers that do not carry tagged metadata. Both return a `ChildProcessResult` containing the exit code, captured standard output, and captured standard error.
 
-The default implementation handles stream redirection, asynchronous output capture, and process tree termination on cancellation. All subprocess arguments are passed via `ProcessStartInfo.ArgumentList` (array-based) rather than string concatenation, preventing shell injection vulnerabilities. See the [Security Design Principles](#security-design-principles) section for details.
+The default dispatcher renders tagged arguments through `ITaggedStringRenderer` for diagnostics, then materializes their raw values into `ProcessStartInfo` immediately before execution. The raw `ProcessStartInfo` overload deliberately omits argument logging because tag metadata has already been lost. Stream redirection, asynchronous output capture, and process-tree termination on cancellation are handled centrally. Arguments are always added through `ProcessStartInfo.ArgumentList` rather than shell-concatenated command text, preventing shell metacharacters from becoming an implicit execution language. See the [Security Design Principles](#security-design-principles) section for details.
 
-The `SubprocessModule` built-in module provides the JSON-configurable interface to this infrastructure, exposing options for impersonation, environment variable injection, exit code checking, and output capture configuration.
+The `SubprocessModule` built-in module provides the JSON-configurable interface to this infrastructure. Its command arguments and environment-variable values are `TaggedString` values, allowing secrets introduced by interpolation or structured configuration to remain tagged until dispatch; impersonation, exit-code checking, and output capture remain ordinary module options.
 
 ### Metrics Collection
 
@@ -550,7 +561,7 @@ Trust policies are themselves configured through the dynamic value system, allow
 
 #### Subprocess Safety
 
-All subprocess invocations use array-based argument passing (`ProcessStartInfo.ArgumentList`), never string concatenation or shell interpretation. This prevents command injection via `$()`, backticks, or argument injection via `;`, `&&`, `||`, and similar shell metacharacters.
+All subprocess invocations use array-based argument passing (`ProcessStartInfo.ArgumentList`), never string concatenation or shell interpretation. This prevents command injection via `$()`, backticks, or argument injection via `;`, `&&`, `||`, and similar shell metacharacters. Tag-aware callers keep arguments in `ChildProcessInvocation` until dispatch so diagnostic rendering does not require exposing the raw argument representation.
 
 #### Input Validation
 

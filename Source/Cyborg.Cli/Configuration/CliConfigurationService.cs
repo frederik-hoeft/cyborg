@@ -10,7 +10,6 @@ internal sealed class CliConfigurationService(IConfigurationArgumentHandler argu
         IConfigurationBuilder configurationBuilder,
         string optionsFilePath,
         string[]? configurationEntries,
-        [NotNullWhen(false)] out string? invalidDefinition,
         [NotNullWhen(false)] out string? errorMessage)
     {
         ArgumentNullException.ThrowIfNull(configurationBuilder);
@@ -18,6 +17,6 @@ internal sealed class CliConfigurationService(IConfigurationArgumentHandler argu
 
         configurationBuilder.AddDictionary(CliConfigurationDefaults.Values);
         configurationBuilder.AddFiles(files => files.Add(optionsFilePath));
-        return argumentHandler.TryProcessArgument(configurationEntries, configurationBuilder, out invalidDefinition, out errorMessage);
+        return argumentHandler.TryProcessArgument(configurationEntries, configurationBuilder, out errorMessage);
     }
 }

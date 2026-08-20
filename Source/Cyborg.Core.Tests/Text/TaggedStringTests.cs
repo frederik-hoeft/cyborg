@@ -18,7 +18,7 @@ public sealed class TaggedStringTests
     }
 
     [TestMethod]
-    public void ImplicitConversion_ToString_ReturnsRawValue()
+    public void ExplicitConversion_ToString_ReturnsRawValue()
     {
         TaggedString tagged = new("secret-value", [WellKnownTags.Secret]);
 
@@ -114,6 +114,25 @@ public sealed class TaggedStringTests
     }
 
     [TestMethod]
+    public void Renderer_HandlerBeforeSecret_IsUltimatelyRedacted()
+    {
+        DefaultTaggedStringRenderer renderer = new([new SecretTagHandler(), new LeadingDecoratingTagHandler()]);
+        TaggedString tagged = new("secret-value", [WellKnownTags.Secret, LeadingDecoratingTagHandler.TagName]);
+
+        string rendered = renderer.Render(tagged);
+
+        Assert.AreEqual(SecretTagHandler.RedactedDisplay, rendered);
+        Assert.DoesNotContain("secret-value", rendered);
+    }
+
+    [TestMethod]
+    public void Renderer_DuplicateTagHandlers_AreRejected()
+    {
+        Assert.ThrowsExactly<InvalidOperationException>(() =>
+            new DefaultTaggedStringRenderer([new SecretTagHandler(), new SecretTagHandler()]));
+    }
+
+    [TestMethod]
     public void Equals_Object_DoesNotClaimCrossTypeEquality()
     {
         TaggedString tagged = new("same");
@@ -122,6 +141,15 @@ public sealed class TaggedStringTests
         Assert.IsFalse(tagged.Equals(raw));
         Assert.IsFalse(raw.Equals(tagged));
         Assert.IsTrue(tagged.Equals("same"));
+    }
+
+    private sealed class LeadingDecoratingTagHandler : ITaggedStringTagHandler
+    {
+        public const string TagName = "aaa.test.decorate";
+
+        public string Tag => TagName;
+
+        public string Render(string current) => $"decorated({current})";
     }
 
     private sealed class DecoratingTagHandler : ITaggedStringTagHandler

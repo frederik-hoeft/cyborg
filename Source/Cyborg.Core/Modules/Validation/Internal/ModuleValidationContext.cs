@@ -21,6 +21,8 @@ public sealed class ModuleValidationContext
 
     public IServiceProvider ServiceProvider { get; }
 
+    private ITaggedStringRenderer TaggedStringRenderer => field ??= ServiceProvider.GetRequiredService<ITaggedStringRenderer>();
+
     private ModuleValidationContext(IModuleRuntime runtime, IServiceProvider serviceProvider)
     {
         Runtime = runtime;
@@ -37,7 +39,7 @@ public sealed class ModuleValidationContext
     public TaggedString Interpolate(TaggedString? value) => Runtime.Environment.Interpolate(value);
 
     /// <summary>Renders a tagged value through the application-configured rendering pipeline.</summary>
-    public string Render(TaggedString value) => ServiceProvider.GetRequiredService<ITaggedStringRenderer>().Render(value);
+    public string Render(TaggedString value) => TaggedStringRenderer.Render(value);
 
     /// <summary>Renders a nullable tagged value through the application-configured rendering pipeline.</summary>
     public string? Render(TaggedString? value) => value is { } tagged ? Render(tagged) : null;

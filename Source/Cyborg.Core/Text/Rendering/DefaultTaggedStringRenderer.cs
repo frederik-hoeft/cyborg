@@ -4,7 +4,7 @@ namespace Cyborg.Core.Text.Rendering;
 
 public sealed class DefaultTaggedStringRenderer : ITaggedStringRenderer
 {
-    internal static DefaultTaggedStringRenderer SafeFallback { get; } = new(new SecretTagHandler());
+    internal static DefaultTaggedStringRenderer ContextFreeFallback { get; } = new(new SecretTagHandler());
 
     private readonly FrozenDictionary<string, ITaggedStringTagHandler> _handlers;
 

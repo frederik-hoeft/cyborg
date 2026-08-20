@@ -75,7 +75,6 @@ internal sealed class Commands
             configurationBuilder,
             options,
             config,
-            out string? invalidConfigurationDefinition,
             out string? configurationArgumentError);
         ICliDebugArgumentHandler debugArgumentHandler = services.GetRequiredService<ICliDebugArgumentHandler>();
         bool debuggerArgumentsValid = debugArgumentHandler.TryConfigure(breakAt, out string? invalidBreakpointExpression, out string? debuggerArgumentError);

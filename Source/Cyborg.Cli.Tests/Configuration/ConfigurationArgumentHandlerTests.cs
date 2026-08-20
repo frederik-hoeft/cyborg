@@ -23,7 +23,7 @@ public sealed class ConfigurationArgumentHandlerTests : CyborgCliTestBase
         buildConfiguration: configuration =>
         {
             IConfigurationArgumentHandler handler = configuration.ServiceProvider.GetRequiredService<IConfigurationArgumentHandler>();
-            Assert.IsTrue(handler.TryProcessArgument(["cyborg.core.debug.frontend=console"], configuration, out _, out _));
+            Assert.IsTrue(handler.TryProcessArgument(["cyborg.core.debug.frontend=console"], configuration, out _));
         });
 
     [TestMethod]
@@ -36,7 +36,7 @@ public sealed class ConfigurationArgumentHandlerTests : CyborgCliTestBase
         buildConfiguration: configuration =>
         {
             IConfigurationArgumentHandler handler = configuration.ServiceProvider.GetRequiredService<IConfigurationArgumentHandler>();
-            Assert.IsTrue(handler.TryProcessArgument(["test=first", "test=second"], configuration, out _, out _));
+            Assert.IsTrue(handler.TryProcessArgument(["test=first", "test=second"], configuration, out _));
         });
 
     [TestMethod]
@@ -50,7 +50,7 @@ public sealed class ConfigurationArgumentHandlerTests : CyborgCliTestBase
         buildConfiguration: configuration =>
         {
             IConfigurationArgumentHandler handler = configuration.ServiceProvider.GetRequiredService<IConfigurationArgumentHandler>();
-            Assert.IsTrue(handler.TryProcessArgument(["test.enabled:bool=true"], configuration, out _, out _));
+            Assert.IsTrue(handler.TryProcessArgument(["test.enabled:bool=true"], configuration, out _));
         });
 
     [TestMethod]
@@ -69,7 +69,6 @@ public sealed class ConfigurationArgumentHandlerTests : CyborgCliTestBase
             Assert.IsTrue(handler.TryProcessArgument(
                 ["cyborg.services.metrics:cyborg.types.services.metrics.v1={\"namespace\":\"test\",\"file_path\":\"/tmp/cyborg.prom\"}"],
                 configuration,
-                out _,
                 out _));
         });
 
@@ -96,7 +95,6 @@ public sealed class ConfigurationArgumentHandlerTests : CyborgCliTestBase
                     "cyborg.services.trust.enforcement_mode:cyborg.types.services.trust.enforcement_mode.v1=\"log_only\"",
                 ],
                 configuration,
-                out _,
                 out _));
         });
 
@@ -111,10 +109,9 @@ public sealed class ConfigurationArgumentHandlerTests : CyborgCliTestBase
         buildConfiguration: configuration =>
         {
             IConfigurationArgumentHandler handler = configuration.ServiceProvider.GetRequiredService<IConfigurationArgumentHandler>();
-            bool configured = handler.TryProcessArgument(["first=value", "second:bool=not-json"], configuration, out string? invalidDefinition, out string? errorMessage);
+            bool configured = handler.TryProcessArgument(["first=value", "second:bool=not-json"], configuration, out string? errorMessage);
 
             Assert.IsFalse(configured);
-            Assert.AreEqual("second:bool=not-json", invalidDefinition);
             Assert.IsFalse(string.IsNullOrWhiteSpace(errorMessage));
         });
 
@@ -124,10 +121,9 @@ public sealed class ConfigurationArgumentHandlerTests : CyborgCliTestBase
         IConfigurationArgumentHandler handler = services.GetRequiredService<IConfigurationArgumentHandler>();
         IConfigurationBuilder configurationBuilder = services.GetRequiredService<IConfigurationBuilder>();
 
-        bool configured = handler.TryProcessArgument(["test:does.not.exist=1"], configurationBuilder, out string? invalidDefinition, out string? errorMessage);
+        bool configured = handler.TryProcessArgument(["test:does.not.exist=1"], configurationBuilder, out string? errorMessage);
 
         Assert.IsFalse(configured);
-        Assert.AreEqual("test:does.not.exist=1", invalidDefinition);
         Assert.IsNotNull(errorMessage);
         Assert.Contains("Unknown dynamic value type", errorMessage);
     });

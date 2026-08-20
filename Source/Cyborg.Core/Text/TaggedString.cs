@@ -100,7 +100,7 @@ public readonly struct TaggedString : IEquatable<TaggedString>, IEquatable<strin
     /// Returns a conservative context-free display representation. Cyborg presentation paths with
     /// access to dependency injection should use <see cref="ITaggedStringRenderer"/> instead.
     /// </summary>
-    public override string ToString() => DefaultTaggedStringRenderer.SafeFallback.Render(this);
+    public override string ToString() => DefaultTaggedStringRenderer.ContextFreeFallback.Render(this);
 
     public static bool operator ==(TaggedString left, TaggedString right) => left.Equals(right);
 

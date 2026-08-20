@@ -9,6 +9,5 @@ internal interface ICliConfigurationService
         IConfigurationBuilder configurationBuilder,
         string optionsFilePath,
         string[]? configurationEntries,
-        [NotNullWhen(false)] out string? invalidDefinition,
         [NotNullWhen(false)] out string? errorMessage);
 }

@@ -11,8 +11,6 @@ internal abstract class PropertyAspect(bool ensuresDefault = false)
 
     public virtual string RewriteOverrideResolutionExpression(PropertyRewriteContext context, string currentExpression, string rootPathExpression) => currentExpression;
 
-    public virtual string RewriteInterpolationExpression(PropertyRewriteContext context, string currentExpression) => currentExpression;
-
     /// <summary>
     /// Re-applies property-level invariants after ordinary default resolution. This stage runs both
     /// before and after override resolution, so destination invariants cannot be removed by an override.
@@ -115,7 +113,6 @@ internal abstract class PropertyAspect(bool ensuresDefault = false)
 
         public bool RequiresNullGuard => TypeSymbolHelpers.RequiresNullGuard(TargetType);
 
-        // TODO: if we're introducing a centralized helper like this, we should also consider default-valued value types like ImmutableArray.
         public string NullAwareCondition(string condition) =>
             RequiresNullGuard ? $"{AccessExpression} is not null && {condition}" : condition;
     }

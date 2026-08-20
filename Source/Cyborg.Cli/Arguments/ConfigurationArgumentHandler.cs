@@ -16,12 +16,10 @@ internal sealed class ConfigurationArgumentHandler
     public bool TryProcessArgument(
         string[]? configurationEntries,
         IConfigurationBuilder configurationBuilder,
-        [NotNullWhen(false)] out string? invalidDefinition,
         [NotNullWhen(false)] out string? errorMessage)
     {
         ArgumentNullException.ThrowIfNull(configurationBuilder);
 
-        invalidDefinition = null;
         errorMessage = null;
         if (configurationEntries is not [_, ..])
         {
@@ -33,7 +31,6 @@ internal sealed class ConfigurationArgumentHandler
         {
             if (!TryParseDefinition(definition, out string? key, out string? typeName, out string? valueText, out errorMessage))
             {
-                invalidDefinition = definition;
                 return false;
             }
 
@@ -44,7 +41,6 @@ internal sealed class ConfigurationArgumentHandler
             }
             else if (!TryParseDynamicValue(typeName, valueText, out value, out errorMessage))
             {
-                invalidDefinition = definition;
                 return false;
             }
             values[key] = value;

@@ -15,7 +15,7 @@ internal abstract class SectionRenderer(ValidationContractInfo contractInfo, Vis
 
     public DiagnosticsReporter DiagnosticsReporter => diagnosticsReporter;
 
-    public DefaultApplicationRenderer DefaultApplicationRenderer => field ??= new(parent: this);
+    public PropertyPreparationRenderer PropertyPreparationRenderer => field ??= new(parent: this);
 
     public abstract void RenderSection(IndentedStringBuilder builder, ModuleModel model);
 }

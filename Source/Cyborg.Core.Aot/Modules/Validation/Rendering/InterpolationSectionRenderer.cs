@@ -65,7 +65,7 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
 
             if (isStringLike)
             {
-                EmitStringInterpolation(builder, property, localName, propertyAccess, interpolate: !ignoreInterpolation);
+                EmitStringInterpolation(builder, property, localName, propertyAccess);
             }
             else
             {
@@ -92,17 +92,10 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
         return true;
     }
 
-    private void EmitStringInterpolation(IndentedStringBuilder builder, PropertyModel property, string localName, string propertyAccess, bool interpolate)
+    private void EmitStringInterpolation(IndentedStringBuilder builder, PropertyModel property, string localName, string propertyAccess)
     {
         bool isTaggedString = TypeSymbolHelpers.IsTaggedString(property.Symbol.Type, ContractInfo);
-        string interpolatedExpression = interpolate
-            ? $"{ContextVariable}.Interpolate({propertyAccess})"
-            : propertyAccess;
-        PropertyRewriteContext rewriteContext = new(property, ContractInfo, DiagnosticsReporter, RootModuleVariable, ContextVariable, propertyAccess);
-        foreach (PropertyAspect aspect in property.Aspects)
-        {
-            interpolatedExpression = aspect.RewriteInterpolationExpression(rewriteContext, interpolatedExpression);
-        }
+        string interpolatedExpression = $"{ContextVariable}.Interpolate({propertyAccess})";
         if (!isTaggedString)
         {
             interpolatedExpression = $"{interpolatedExpression}.Value";

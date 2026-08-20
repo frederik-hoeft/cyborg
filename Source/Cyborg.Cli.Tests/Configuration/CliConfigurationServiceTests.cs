@@ -41,7 +41,7 @@ public sealed class CliConfigurationServiceTests : CyborgCliTestBase
                 buildConfiguration: configuration =>
                 {
                     ICliConfigurationService service = configuration.ServiceProvider.GetRequiredService<ICliConfigurationService>();
-                    Assert.IsTrue(service.TryConfigure(configuration, optionsPath, configurationEntries: null, out _, out _));
+                    Assert.IsTrue(service.TryConfigure(configuration, optionsPath, configurationEntries: null, out _));
                 });
         }
         finally
@@ -69,7 +69,7 @@ public sealed class CliConfigurationServiceTests : CyborgCliTestBase
                 buildConfiguration: configuration =>
                 {
                     ICliConfigurationService service = configuration.ServiceProvider.GetRequiredService<ICliConfigurationService>();
-                    Assert.IsTrue(service.TryConfigure(configuration, optionsPath, configurationEntries: null, out _, out _));
+                    Assert.IsTrue(service.TryConfigure(configuration, optionsPath, configurationEntries: null, out _));
                 });
         }
         finally
@@ -100,7 +100,6 @@ public sealed class CliConfigurationServiceTests : CyborgCliTestBase
                         configuration,
                         optionsPath,
                         ["cyborg.services.metrics.file_path=/tmp/cli.prom"],
-                        out _,
                         out _));
                 });
         }
@@ -132,7 +131,6 @@ public sealed class CliConfigurationServiceTests : CyborgCliTestBase
                         configuration,
                         optionsPath,
                         ["cyborg.services.metrics:cyborg.types.services.metrics.v1={\"namespace\":\"cli\",\"file_path\":\"/tmp/cli.prom\"}"],
-                        out _,
                         out _));
                 });
         }
@@ -157,7 +155,7 @@ public sealed class CliConfigurationServiceTests : CyborgCliTestBase
                 buildConfiguration: configuration =>
                 {
                     ICliConfigurationService service = configuration.ServiceProvider.GetRequiredService<ICliConfigurationService>();
-                    Assert.IsTrue(service.TryConfigure(configuration, optionsPath, ["cyborg.core.debug.frontend=cli"], out _, out _));
+                    Assert.IsTrue(service.TryConfigure(configuration, optionsPath, ["cyborg.core.debug.frontend=cli"], out _));
                 });
         }
         finally

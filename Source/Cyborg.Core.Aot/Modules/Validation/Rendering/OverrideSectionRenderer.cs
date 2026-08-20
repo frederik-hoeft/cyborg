@@ -46,7 +46,7 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
             bool hasChildAssignments = property.IsValidatableType && property.Children.Any(child => HasOverrideWork(child, rewriteContext));
             bool hasCollectionElementAssignments = property.Collection is { SupportsElementRewrite: true } collection
                 && property.HasCollectionElementChildren
-                && DefaultApplicationRenderer.HasCollectionDefaultWork(collection, rewriteContext);
+                && PropertyPreparationRenderer.HasCollectionPreparationWork(collection, rewriteContext);
             bool ignoreOverride = property.TryGetAspect(out IgnoreOverrideAspect? ignoreOverrideAspect);
             if (ignoreOverride && (ignoreOverrideAspect is { Recurse: true } || !hasChildAssignments && !hasCollectionElementAssignments))
             {
@@ -70,7 +70,7 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
             {
                 PropertyAccessExpression = localName
             };
-            DefaultApplicationRenderer.AppendDirectDefaultApplicationForProperty(builder, nestedRewriteContext);
+            PropertyPreparationRenderer.AppendDirectPreparationForProperty(builder, nestedRewriteContext);
 
             if (hasChildAssignments)
             {
@@ -79,7 +79,7 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
 
             if (hasCollectionElementAssignments)
             {
-                DefaultApplicationRenderer.AppendCollectionDefaultApplicationForProperty(builder, property, localName, diagnosticsPhase: "overrides");
+                PropertyPreparationRenderer.AppendCollectionPreparationForProperty(builder, property, localName, diagnosticsPhase: "overrides");
             }
 
             assignments.Add((property.Name, localName));
