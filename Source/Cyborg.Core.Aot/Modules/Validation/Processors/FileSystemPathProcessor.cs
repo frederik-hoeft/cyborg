@@ -34,7 +34,7 @@ internal abstract class FileSystemPathProcessor<TAttribute> : AttributeProcessor
             $$"""
             if ({{model.NullAwareCondition($"!{existsExpression}({model.StringContentExpression})")}})
             {
-                errors.Add({{CreateValidationError(model, errorCode, $"Property '{{nameof({model.AccessExpression})}}' requires an existing {pathKindDisplayName} at '{{{model.AccessExpression}}}'.")}});
+                errors.Add({{CreateValidationError(model, errorCode, $"Property '{{nameof({model.AccessExpression})}}' requires an existing {pathKindDisplayName} at '{{{model.DisplayExpression}}}'.")}});
             }
             """);
         }

@@ -3,6 +3,7 @@ using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Validation;
 using Cyborg.Core.Text;
+using Cyborg.Core.Text.Rendering;
 using Cyborg.Modules.Subprocess;
 using Cyborg.TestModules.Secrets;
 using Microsoft.Extensions.DependencyInjection;
@@ -116,12 +117,46 @@ public sealed class TaggedStringModuleTests : ModuleTestBase
             });
 
     [TestMethod]
+    public Task TestValidationAsync_CustomTag_UsesDiRendererInErrorMessageAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        TaggedStringValidationDisplayTestModule module = new(new TaggedString("not valid", [CustomTagRenderer.Tag]));
+
+        IValidationResult<TaggedStringValidationDisplayTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
+
+        MSAssert.IsFalse(result.IsValid);
+        MSAssert.HasCount(1, result.Errors);
+        ValidationError error = result.Errors[0];
+        MSAssert.Contains(CustomTagRenderer.RenderedValue, error.Message);
+        MSAssert.DoesNotContain("not valid", error.Message);
+    }, static services => services.AddSingleton<ITaggedStringRenderer, CustomTagRenderer>());
+
+    [TestMethod]
+    public Task TestValidationAsync_SecretNullableIgnoreInterpolation_InjectsSecretTagAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        TaggedStringTestModule module = new(
+            Plain: "visible",
+            Secret: "secret",
+            OptionalSecret: "deferred-${not-resolved}",
+            IntentionallyUntagged: "id",
+            Values: ["one"]);
+
+        IValidationResult<TaggedStringTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
+
+        MSAssert.IsTrue(result.IsValid);
+        MSAssert.IsTrue(result.Module.OptionalSecret.HasValue);
+        MSAssert.AreEqual("deferred-${not-resolved}", result.Module.OptionalSecret.Value.Value);
+        MSAssert.IsTrue(result.Module.OptionalSecret.Value.HasTag(WellKnownTags.Secret));
+    });
+
+    [TestMethod]
     public Task Test_ToTextAsync_SecretTaggedString_IsRedactedAsync() => TestWithDIAsync(async services =>
     {
         IModuleSerializationService serializationService = services.GetRequiredService<IModuleSerializationService>();
         TaggedStringTestModule module = new(
             Plain: "visible",
-            Secret: new global::Cyborg.Core.Text.TaggedString("s3cret", [WellKnownTags.Secret]),
+            Secret: "s3cret",
             OptionalSecret: null,
             IntentionallyUntagged: "id",
             Values: ["one"]);
@@ -129,7 +164,15 @@ public sealed class TaggedStringModuleTests : ModuleTestBase
         string text = await serializationService.ToTextAsync(module, TestContext.CancellationToken);
 
         MSAssert.Contains("visible", text);
-        MSAssert.Contains(global::Cyborg.Core.Text.TaggedString.RedactedDisplay, text);
+        MSAssert.Contains(global::Cyborg.Core.Text.SecretTagHandler.RedactedDisplay, text);
         MSAssert.DoesNotContain("s3cret", text);
     });
+
+    private sealed class CustomTagRenderer : ITaggedStringRenderer
+    {
+        public const string Tag = "test.custom.v1";
+        public const string RenderedValue = "[CUSTOM]";
+
+        public string Render(TaggedString value) => value.HasTag(Tag) ? RenderedValue : value.Value;
+    }
 }

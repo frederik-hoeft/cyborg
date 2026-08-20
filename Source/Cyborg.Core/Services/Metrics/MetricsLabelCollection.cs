@@ -1,9 +1,11 @@
 ﻿using Cyborg.Core.Metrics;
 using Cyborg.Core.Metrics.Factory;
+using Cyborg.Core.Text;
+using Cyborg.Core.Text.Rendering;
 
 namespace Cyborg.Core.Services.Metrics;
 
-internal sealed class MetricsLabelCollection : IMetricsLabelCollection
+internal sealed class MetricsLabelCollection(ITaggedStringRenderer taggedStringRenderer) : IMetricsLabelCollection
 {
     private readonly List<PrometheusLabel> _labels = [];
 
@@ -18,6 +20,9 @@ internal sealed class MetricsLabelCollection : IMetricsLabelCollection
         _labels.Add(Prometheus.Label(name, value));
         return this;
     }
+
+    public IMetricsLabelCollection AddLabel(string name, TaggedString value) =>
+        AddLabel(name, taggedStringRenderer.Render(value));
 
     IReadOnlyList<PrometheusLabel> IMetricsLabelCollection.GetLabels() => _labels;
 }

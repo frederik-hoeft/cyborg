@@ -273,12 +273,22 @@ internal sealed class DefaultApplicationRenderer(SectionRenderer parent)
 
     private static string? CreateDefaultAssignmentExpression(PropertyRewriteContext context)
     {
-        string? expression = null;
+        string? defaultExpression = null;
         foreach (PropertyAspect aspect in context.Property.Aspects)
         {
-            expression = aspect.RewriteDefaultAssignmentExpression(context, expression);
+            defaultExpression = aspect.RewriteDefaultAssignmentExpression(context, defaultExpression);
         }
-        return expression;
+
+        string expression = defaultExpression ?? context.PropertyAccessExpression;
+        bool hasInvariantRewrite = false;
+        foreach (PropertyAspect aspect in context.Property.Aspects)
+        {
+            string rewritten = aspect.RewritePreparedValueExpression(context, expression);
+            hasInvariantRewrite |= !string.Equals(rewritten, expression, StringComparison.Ordinal);
+            expression = rewritten;
+        }
+
+        return defaultExpression is null && !hasInvariantRewrite ? null : expression;
     }
 
     private static string CreateSafeIdentifier(string value) => string.Concat(value.Select(static character => char.IsLetterOrDigit(character) ? character : '_'));

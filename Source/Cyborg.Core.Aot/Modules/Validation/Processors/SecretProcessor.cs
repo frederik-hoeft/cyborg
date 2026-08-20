@@ -1,4 +1,4 @@
-using Cyborg.Core.Aot.Extensions;
+﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using Microsoft.CodeAnalysis;
@@ -17,7 +17,7 @@ internal sealed class SecretProcessor : AttributeProcessorBase<SecretAttribute>
                 context.ContainingType.Name);
             return false.WithDefaults(out aspect);
         }
-        if (!TypeSymbolHelpers.IsTaggedString(context.Property.Type))
+        if (!TypeSymbolHelpers.IsTaggedString(context.Property.Type, context.ContractInfo))
         {
             context.Report(
                 ValidationGeneratorDiagnostics.SecretRequiresTaggedString,
@@ -35,29 +35,39 @@ internal sealed class SecretAspect : PropertyAspect
 {
     public override void RegisterDescriptorHints(
         List<string> hints,
+        ValidationContractInfo contractInfo,
         DiagnosticsReporter diagnosticsReporter,
         PropertyModel property)
     {
-        if (!hints.Contains(TypeSymbolHelpers.WellKnownSecretTag))
+        if (!hints.Contains(contractInfo.SecretTag))
         {
-            hints.Add(TypeSymbolHelpers.WellKnownSecretTag);
+            hints.Add(contractInfo.SecretTag);
         }
     }
 
-    public override string RewriteInterpolationExpression(PropertyRewriteContext context, string currentExpression) =>
-        $"{currentExpression}.WithTag({TypeSymbolHelpers.WellKnownTagsSecretExpression})";
+    public override string RewritePreparedValueExpression(PropertyRewriteContext context, string currentExpression)
+    {
+        string taggedStringType = context.ContractInfo.TaggedString.RenderGlobal();
+        string tagExpression = context.ContractInfo.SecretTagExpression;
+        if (context.Property.IsNullable)
+        {
+            return $"({currentExpression}) is {taggedStringType} secretValue ? secretValue.WithTag({tagExpression}) : null";
+        }
+
+        return $"({currentExpression}).WithTag({tagExpression})";
+    }
 
     protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
     {
         string access = model.AccessExpression;
         string condition = model.RequiresNullGuard
-            ? $"{access} is {{ }} secretValue && !secretValue.HasTag({TypeSymbolHelpers.WellKnownTagsSecretExpression})"
-            : $"!{access}.HasTag({TypeSymbolHelpers.WellKnownTagsSecretExpression})";
+            ? $"{access} is {{ }} secretValue && !secretValue.HasTag({model.ContractInfo.SecretTagExpression})"
+            : $"!{access}.HasTag({model.ContractInfo.SecretTagExpression})";
         builder.AppendBlock(
         $$"""
         if ({{condition}})
         {
-            errors.Add({{CreateValidationError(model, "secret", $"{model.TargetDescription} '{{{model.PropertyNameExpression}}}' must carry the '{TypeSymbolHelpers.WellKnownSecretTag}' tag.")}});
+            errors.Add({{CreateValidationError(model, "secret", $"{model.TargetDescription} '{{{model.PropertyNameExpression}}}' must carry the '{model.ContractInfo.SecretTag}' tag.")}});
         }
         """);
     }

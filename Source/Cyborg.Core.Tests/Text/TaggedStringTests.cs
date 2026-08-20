@@ -1,4 +1,5 @@
-using Cyborg.Core.Text;
+﻿using Cyborg.Core.Text;
+using Cyborg.Core.Text.Rendering;
 using System.Collections.Immutable;
 
 namespace Cyborg.Core.Tests.Text;
@@ -31,7 +32,7 @@ public sealed class TaggedStringTests
     {
         TaggedString tagged = new("secret-value", [WellKnownTags.Secret]);
 
-        Assert.AreEqual(TaggedString.RedactedDisplay, tagged.ToString());
+        Assert.AreEqual(SecretTagHandler.RedactedDisplay, tagged.ToString());
     }
 
     [TestMethod]
@@ -66,7 +67,7 @@ public sealed class TaggedStringTests
         Assert.AreEqual("hello world", combined.Value);
         Assert.IsTrue(combined.HasTag("greeting"));
         Assert.IsTrue(combined.HasTag(WellKnownTags.Secret));
-        Assert.AreEqual(TaggedString.RedactedDisplay, combined.ToString());
+        Assert.AreEqual(SecretTagHandler.RedactedDisplay, combined.ToString());
     }
 
     [TestMethod]
@@ -98,5 +99,37 @@ public sealed class TaggedStringTests
         Assert.IsFalse(tagged.HasTags);
         Assert.IsTrue(tagged.IsEmpty);
         CollectionAssert.AreEqual(ImmutableHashSet<string>.Empty.ToArray(), tagged.Tags.ToArray());
+    }
+
+    [TestMethod]
+    public void Renderer_HandlerAfterSecret_CannotRecoverRawValue()
+    {
+        DefaultTaggedStringRenderer renderer = new([new SecretTagHandler(), new DecoratingTagHandler()]);
+        TaggedString tagged = new("secret-value", [WellKnownTags.Secret, DecoratingTagHandler.TagName]);
+
+        string rendered = renderer.Render(tagged);
+
+        Assert.AreEqual($"decorated({SecretTagHandler.RedactedDisplay})", rendered);
+        Assert.DoesNotContain("secret-value", rendered);
+    }
+
+    [TestMethod]
+    public void Equals_Object_DoesNotClaimCrossTypeEquality()
+    {
+        TaggedString tagged = new("same");
+        object raw = "same";
+
+        Assert.IsFalse(tagged.Equals(raw));
+        Assert.IsFalse(raw.Equals(tagged));
+        Assert.IsTrue(tagged.Equals("same"));
+    }
+
+    private sealed class DecoratingTagHandler : ITaggedStringTagHandler
+    {
+        public const string TagName = "zzz.test.decorate";
+
+        public string Tag => TagName;
+
+        public string Render(string current) => $"decorated({current})";
     }
 }

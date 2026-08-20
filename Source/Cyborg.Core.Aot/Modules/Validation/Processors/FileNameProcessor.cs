@@ -24,7 +24,7 @@ internal sealed class FileNameProcessor : AttributeProcessorBase<FileNameAttribu
             $$"""
             if ({{model.NullAwareCondition($"!{KnownTypes.ValidationRuntimeHelpers}.IsValidFileName({model.StringContentExpression})")}})
             {
-                errors.Add({{CreateValidationError(model, rule: "file_name", $"Property '{{nameof({model.AccessExpression})}}' must be a valid file name, but was '{{{model.AccessExpression}}}'")}});
+                errors.Add({{CreateValidationError(model, rule: "file_name", $"Property '{{nameof({model.AccessExpression})}}' must be a valid file name, but was '{{{model.DisplayExpression}}}'")}});
             }
             """);
         }

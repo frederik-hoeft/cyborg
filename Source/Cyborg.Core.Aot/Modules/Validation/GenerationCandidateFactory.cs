@@ -7,17 +7,20 @@ namespace Cyborg.Core.Aot.Modules.Validation;
 
 internal sealed class GenerationCandidateFactory
 {
-    public GeneratorAttributeSyntaxContext Context { get; }
+    public Compilation Compilation { get; }
 
     public INamedTypeSymbol TypeSymbol { get; }
 
-    private GenerationCandidateFactory(GeneratorAttributeSyntaxContext context, INamedTypeSymbol typeSymbol)
+    public ValidationContractInfo ContractInfo { get; }
+
+    private GenerationCandidateFactory(Compilation compilation, INamedTypeSymbol typeSymbol, ValidationContractInfo contractInfo)
     {
-        Context = context;
+        Compilation = compilation;
         TypeSymbol = typeSymbol;
+        ContractInfo = contractInfo;
     }
 
-    private GenerationCandidate? Create()
+    private GenerationCandidate Create()
     {
         List<Diagnostic> diagnostics = [];
         PropertyModelBuilder builder = new(this, diagnostics);
@@ -55,12 +58,9 @@ internal sealed class GenerationCandidateFactory
         return [.. stack];
     }
 
-    public static GenerationCandidate? Create(GeneratorAttributeSyntaxContext context)
+    public static GenerationCandidate Create(ValidationAnnotatedTarget target, ValidationContractInfo contractInfo)
     {
-        if (context.TargetSymbol is not INamedTypeSymbol typeSymbol)
-        {
-            return null;
-        }
+        INamedTypeSymbol typeSymbol = target.TypeSymbol;
         if (!typeSymbol.IsRecord)
         {
             return CreateFailureCandidate(typeSymbol, ValidationGeneratorDiagnostics.TypeMustBeRecord);
@@ -69,10 +69,11 @@ internal sealed class GenerationCandidateFactory
         {
             return CreateFailureCandidate(typeSymbol, ValidationGeneratorDiagnostics.TypeMustBePartial);
         }
-        GenerationCandidateFactory factory = new(context, typeSymbol);
+
+        GenerationCandidateFactory factory = new(contractInfo.Compilation, typeSymbol, contractInfo);
         return factory.Create();
     }
 
-    private static GenerationCandidate CreateFailureCandidate(INamedTypeSymbol symbol, DiagnosticDescriptor descriptor)
-        => new(symbol.ToDisplayString(), Model: null, [Diagnostic.Create(descriptor, symbol.Locations.FirstOrDefault(), symbol.Name)]);
+    private static GenerationCandidate CreateFailureCandidate(INamedTypeSymbol symbol, DiagnosticDescriptor descriptor) =>
+        new(symbol.ToDisplayString(), Model: null, [Diagnostic.Create(descriptor, symbol.Locations.FirstOrDefault(), symbol.Name)]);
 }

@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Extensions;
 using Microsoft.CodeAnalysis;
 using System.Diagnostics.CodeAnalysis;
 
@@ -40,7 +40,7 @@ internal abstract class AttributeProcessorBase : IPropertyAttributeProcessor
         {
             return false.WithDefaults(out expression);
         }
-        if (!LiteralExpressionFactory.TryGetLiteralExpression(argument.Value, context.Property.Type, out expression))
+        if (!LiteralExpressionFactory.TryGetLiteralExpression(argument.Value, context.Property.Type, context.ContractInfo, out expression))
         {
             context.Report(
                 ValidationGeneratorDiagnostics.UnsupportedAttributeLiteral,
@@ -93,7 +93,7 @@ internal abstract class AttributeProcessorBase : IPropertyAttributeProcessor
         {
             if (!named.Value.IsNull)
             {
-                if (!LiteralExpressionFactory.TryGetLiteralExpression(named.Value, context.Property.Type, out string? expression))
+                if (!LiteralExpressionFactory.TryGetLiteralExpression(named.Value, context.Property.Type, context.ContractInfo, out string? expression))
                 {
                     context.Report(
                         ValidationGeneratorDiagnostics.UnsupportedAttributeLiteral,
@@ -159,7 +159,7 @@ internal abstract class AttributeProcessorBase : IPropertyAttributeProcessor
 
     protected bool ValidateStringLikePropertyType(AttributeData attribute, ref readonly PropertyProcessingContext context)
     {
-        if (TypeSymbolHelpers.IsStringLikeType(context.Property.Type))
+        if (TypeSymbolHelpers.IsStringLikeType(context.Property.Type, context.ContractInfo))
         {
             return true;
         }

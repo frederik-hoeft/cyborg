@@ -1,3 +1,4 @@
+using Cyborg.Core.Aot.Contracts;
 using Cyborg.Core.Configuration.Serialization;
 using Cyborg.Core.Text.Rendering;
 using System.Collections.Immutable;
@@ -10,29 +11,16 @@ namespace Cyborg.Core.Text;
 /// indirection so taint such as <see cref="WellKnownTags.Secret"/> cannot be stripped by composition.
 /// </summary>
 /// <remarks>
-/// Use <see cref="Value"/> to read the raw string (for example when launching a subprocess).
-/// <see cref="ToString"/> and <see cref="ITaggedStringRenderer"/> are the display surfaces and redact
-/// well-known tags such as secrets.
+/// Use <see cref="Value"/> to read the raw string at an execution boundary. Cyborg-controlled
+/// presentation paths should use <see cref="ITaggedStringRenderer"/>. <see cref="ToString"/> is a
+/// conservative context-free fallback for callers that cannot access DI.
 /// </remarks>
 [JsonConverter(typeof(TaggedStringJsonConverter))]
+[GeneratorContractRegistration<ModuleValidationGeneratorContract>(ModuleValidationGeneratorContract.TaggedString)]
 public readonly struct TaggedString : IEquatable<TaggedString>, IEquatable<string>
 {
-    public const string RedactedDisplay = "[REDACTED]";
-
-    private readonly string? _value;
     private readonly ImmutableHashSet<string>? _tags;
-
-    public TaggedString(string? value, IEnumerable<string>? tags = null)
-    {
-        _value = value ?? string.Empty;
-        _tags = NormalizeTags(tags);
-    }
-
-    public TaggedString(string? value, ImmutableHashSet<string>? tags)
-    {
-        _value = value ?? string.Empty;
-        _tags = NormalizeTags(tags);
-    }
+    private readonly string? _value;
 
     /// <summary>
     /// The raw string value. This is the execution-facing surface and is never redacted.
@@ -45,6 +33,12 @@ public readonly struct TaggedString : IEquatable<TaggedString>, IEquatable<strin
 
     public bool IsEmpty => Value.Length == 0 && !HasTags;
 
+    public TaggedString(string? value, IEnumerable<string>? tags = null)
+    {
+        _value = value ?? string.Empty;
+        _tags = NormalizeTags(tags);
+    }
+
     public bool HasTag(string tag)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tag);
@@ -56,11 +50,7 @@ public readonly struct TaggedString : IEquatable<TaggedString>, IEquatable<strin
     public TaggedString WithTag(string tag)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tag);
-        if (Tags.Contains(tag))
-        {
-            return this;
-        }
-        return new TaggedString(Value, Tags.Add(tag));
+        return Tags.Contains(tag) ? this : new TaggedString(Value, Tags.Add(tag));
     }
 
     public TaggedString WithTags(IEnumerable<string>? tags)
@@ -93,18 +83,13 @@ public readonly struct TaggedString : IEquatable<TaggedString>, IEquatable<strin
 
     public bool Equals(string? other) => string.Equals(Value, other, StringComparison.Ordinal);
 
-    public override bool Equals(object? obj) => obj switch
-    {
-        TaggedString tagged => Equals(tagged),
-        string text => Equals(text),
-        _ => false
-    };
+    public override bool Equals(object? obj) => obj is TaggedString tagged && Equals(tagged);
 
     public override int GetHashCode()
     {
         HashCode hash = new();
         hash.Add(Value, StringComparer.Ordinal);
-        foreach (string tag in Tags.OrderBy(static t => t, StringComparer.Ordinal))
+        foreach (string tag in Tags.OrderBy(static tag => tag, StringComparer.Ordinal))
         {
             hash.Add(tag, StringComparer.Ordinal);
         }
@@ -112,9 +97,10 @@ public readonly struct TaggedString : IEquatable<TaggedString>, IEquatable<strin
     }
 
     /// <summary>
-    /// Display form. Secrets are redacted. Use <see cref="Value"/> for the raw string.
+    /// Returns a conservative context-free display representation. Cyborg presentation paths with
+    /// access to dependency injection should use <see cref="ITaggedStringRenderer"/> instead.
     /// </summary>
-    public override string ToString() => DefaultTaggedStringRenderer.Fallback.Render(this);
+    public override string ToString() => DefaultTaggedStringRenderer.SafeFallback.Render(this);
 
     public static bool operator ==(TaggedString left, TaggedString right) => left.Equals(right);
 

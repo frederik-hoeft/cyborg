@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using Microsoft.CodeAnalysis;
@@ -9,7 +9,7 @@ namespace Cyborg.Core.Aot.Modules.Validation;
 
 internal sealed class PropertyModelBuilder(GenerationCandidateFactory factory, List<Diagnostic> diagnostics)
 {
-    private readonly VisibilityContext<INamedTypeSymbol> _visibilityContext = new(factory.Context.SemanticModel.Compilation, factory.TypeSymbol);
+    private readonly VisibilityContext<INamedTypeSymbol> _visibilityContext = new(factory.Compilation, factory.TypeSymbol);
 
     private INamedTypeSymbol CandidateType => factory.TypeSymbol;
 
@@ -39,7 +39,7 @@ internal sealed class PropertyModelBuilder(GenerationCandidateFactory factory, L
 
     private bool TryCreatePropertyModel(INamedTypeSymbol containingType, IPropertySymbol property, ImmutableHashSet<INamedTypeSymbol> traversalPath, [NotNullWhen(true)] out PropertyModel? propertyModel)
     {
-        PropertyProcessingContext processingContext = new(factory.Context.SemanticModel.Compilation, containingType, property, diagnostics);
+        PropertyProcessingContext processingContext = new(factory.Compilation, containingType, property, factory.ContractInfo, diagnostics);
         if (!ValidationProcessorRegistry.TryProcess(in processingContext, out ImmutableArray<PropertyAspect> aspects))
         {
             propertyModel = null;
@@ -79,7 +79,7 @@ internal sealed class PropertyModelBuilder(GenerationCandidateFactory factory, L
 
     private CollectionModel? TryCreateCollectionModel(INamedTypeSymbol containingType, IPropertySymbol property, ITypeSymbol nonNullableType, ImmutableHashSet<INamedTypeSymbol> traversalPath)
     {
-        if (!CollectionTypeInspector.TryDescribe(factory.Context.SemanticModel.Compilation, nonNullableType, out CollectionTypeInspector.CollectionTypeDescriptor? descriptor))
+        if (!CollectionTypeInspector.TryDescribe(factory.Compilation, nonNullableType, out CollectionTypeInspector.CollectionTypeDescriptor? descriptor))
         {
             return null;
         }

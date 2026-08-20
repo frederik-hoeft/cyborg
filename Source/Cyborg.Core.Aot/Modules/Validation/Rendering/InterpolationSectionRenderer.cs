@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using Cyborg.Core.Aot.Modules.Validation.Processors;
 using Microsoft.CodeAnalysis;
@@ -44,16 +44,15 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
             string propertyAccess = $"{targetVariable}.{property.Name}";
             string localName = $"{targetVariable}_{property.Name}";
 
-            bool isStringLike = TypeSymbolHelpers.IsStringLikeType(property.Symbol.Type);
-            bool hasSecret = property.HasAspect<SecretAspect>();
+            bool isStringLike = TypeSymbolHelpers.IsStringLikeType(property.Symbol.Type, ContractInfo);
             bool ignoreInterpolation = property.HasAspect<IgnoreInterpolationAspect>();
             bool hasNestedWork = property.HasValidatableChildren && HasInterpolationWork(property.Children);
             CollectionModel? collection = property.Collection;
             bool hasCollectionWork = collection is { SupportsElementRewrite: true }
-                && (TypeSymbolHelpers.IsStringLikeType(collection.ElementType)
+                && (TypeSymbolHelpers.IsStringLikeType(collection.ElementType, ContractInfo)
                     || (collection.IsElementValidatableType && HasInterpolationWork(collection.ElementChildren)));
 
-            if (!hasNestedWork && !hasSecret && (!isStringLike && !hasCollectionWork || ignoreInterpolation))
+            if (!hasNestedWork && (!isStringLike && !hasCollectionWork || ignoreInterpolation))
             {
                 continue;
             }
@@ -95,7 +94,7 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
 
     private void EmitStringInterpolation(IndentedStringBuilder builder, PropertyModel property, string localName, string propertyAccess, bool interpolate)
     {
-        bool isTaggedString = TypeSymbolHelpers.IsTaggedString(property.Symbol.Type);
+        bool isTaggedString = TypeSymbolHelpers.IsTaggedString(property.Symbol.Type, ContractInfo);
         string interpolatedExpression = interpolate
             ? $"{ContextVariable}.Interpolate({propertyAccess})"
             : propertyAccess;
@@ -200,7 +199,7 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
             """);
         IndentedStringBuilder loopBuilder = builder.IncreaseIndent();
 
-        bool isStringElem = TypeSymbolHelpers.IsStringLikeType(collection.ElementType);
+        bool isStringElem = TypeSymbolHelpers.IsStringLikeType(collection.ElementType, ContractInfo);
 
         if (collection.ElementRequiresNullCheck)
         {
@@ -286,7 +285,7 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
     {
         foreach (PropertyModel property in properties)
         {
-            if (TypeSymbolHelpers.IsStringLikeType(property.Symbol.Type) || property.HasAspect<SecretAspect>())
+            if (TypeSymbolHelpers.IsStringLikeType(property.Symbol.Type, ContractInfo))
             {
                 return true;
             }
@@ -296,7 +295,7 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
             }
             if (property.Collection is { SupportsElementRewrite: true } collection)
             {
-                if (TypeSymbolHelpers.IsStringLikeType(collection.ElementType))
+                if (TypeSymbolHelpers.IsStringLikeType(collection.ElementType, ContractInfo))
                 {
                     return true;
                 }
@@ -312,7 +311,7 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
     private string CreateElementInterpolationExpression(ITypeSymbol elementType, string accessExpression)
     {
         string interpolated = $"{ContextVariable}.Interpolate({accessExpression})";
-        return TypeSymbolHelpers.IsTaggedString(elementType) ? interpolated : $"{interpolated}.Value";
+        return TypeSymbolHelpers.IsTaggedString(elementType, ContractInfo) ? interpolated : $"{interpolated}.Value";
     }
 
     private static string CreateSafeIdentifier(string value) =>

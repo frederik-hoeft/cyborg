@@ -1,6 +1,8 @@
-﻿using Cyborg.Core.Aot.Contracts;
+using Cyborg.Core.Aot.Contracts;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Text;
+using Cyborg.Core.Text.Rendering;
+using Microsoft.Extensions.DependencyInjection;
 using System.ComponentModel;
 
 namespace Cyborg.Core.Modules.Validation.Internal;
@@ -33,6 +35,12 @@ public sealed class ModuleValidationContext
     public TaggedString Interpolate(TaggedString value) => Runtime.Environment.Interpolate(value);
 
     public TaggedString Interpolate(TaggedString? value) => Runtime.Environment.Interpolate(value);
+
+    /// <summary>Renders a tagged value through the application-configured rendering pipeline.</summary>
+    public string Render(TaggedString value) => ServiceProvider.GetRequiredService<ITaggedStringRenderer>().Render(value);
+
+    /// <summary>Renders a nullable tagged value through the application-configured rendering pipeline.</summary>
+    public string? Render(TaggedString? value) => value is { } tagged ? Render(tagged) : null;
 
     [return: NotNullIfNotNull(nameof(value))]
     public string? SelectRawStringOverride<TModule>(TModule module, string? value, string moduleExpression, string valueExpression) where TModule : ModuleBase, IModuleDefinition =>

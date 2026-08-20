@@ -247,7 +247,7 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
         List<string> hints = [];
         foreach (PropertyAspect aspect in property.Aspects)
         {
-            aspect.RegisterDescriptorHints(hints, DiagnosticsReporter, property);
+            aspect.RegisterDescriptorHints(hints, ContractInfo, DiagnosticsReporter, property);
         }
 
         return hints.Count == 0 ? null : $"[{string.Join(", ", hints.Select(static hint => SymbolDisplay.FormatLiteral(hint, quote: true)))}]";

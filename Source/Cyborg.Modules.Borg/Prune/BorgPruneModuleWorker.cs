@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Modules;
+using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Services.Dispatch;
 using Cyborg.Core.Services.Metrics;
@@ -6,7 +6,6 @@ using Cyborg.Modules.Borg.Prune.Metrics;
 using Cyborg.Modules.Borg.Prune.Metrics.Model;
 using Cyborg.Modules.Borg.Shared.Json.Logging;
 using Cyborg.Modules.Borg.Shared.Output;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 
@@ -74,10 +73,10 @@ public sealed class BorgPruneModuleWorker
             }
         }
         arguments.Add(Module.RemoteRepository.GetRepositoryUri());
-        ProcessStartInfo startInfo = new(Module.Executable, arguments);
-        AddDefaults(startInfo);
+        ChildProcessInvocation invocation = new(Module.Executable, arguments);
+        AddDefaults(invocation);
         _stopwatch.Restart();
-        ChildProcessResult executionResult = await processDispatcher.ExecuteAsync(startInfo, cancellationToken);
+        ChildProcessResult executionResult = await processDispatcher.ExecuteAsync(invocation, cancellationToken);
         _stopwatch.Stop();
 
         CollectMetrics(runtime, executionResult);

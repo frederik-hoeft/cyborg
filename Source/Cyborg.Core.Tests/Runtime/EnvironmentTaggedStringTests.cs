@@ -1,6 +1,7 @@
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Text;
+using Cyborg.Core.Text.Rendering;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Cyborg.Core.Tests.Runtime;
@@ -18,7 +19,7 @@ public sealed class EnvironmentTaggedStringTests : CyborgCoreTestBase
 
         Assert.AreEqual("hello s3cret", actual.Value);
         Assert.IsTrue(actual.HasTag(WellKnownTags.Secret));
-        Assert.AreEqual(TaggedString.RedactedDisplay, actual.ToString());
+        Assert.AreEqual(SecretTagHandler.RedactedDisplay, actual.ToString());
     });
 
     [TestMethod]

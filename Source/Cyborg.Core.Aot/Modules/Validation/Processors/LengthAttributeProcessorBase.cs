@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Microsoft.CodeAnalysis;
 using System.Globalization;
@@ -11,7 +11,7 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValid
     {
         aspect = null;
 
-        LengthTargetKind targetKind = GetTargetKind(target.Type, out INamedTypeSymbol? collectionInterface);
+        LengthTargetKind targetKind = GetTargetKind(target.Type, context.ContractInfo, out INamedTypeSymbol? collectionInterface);
         if (targetKind == LengthTargetKind.None)
         {
             context.Report(
@@ -76,10 +76,10 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValid
     private static bool RequiresNullGuard(ITypeSymbol propertyType) =>
         propertyType.IsReferenceType || propertyType.NullableAnnotation == NullableAnnotation.Annotated;
 
-    private static LengthTargetKind GetTargetKind(ITypeSymbol propertyType, out INamedTypeSymbol? collectionInterface)
+    private static LengthTargetKind GetTargetKind(ITypeSymbol propertyType, ValidationContractInfo contractInfo, out INamedTypeSymbol? collectionInterface)
     {
         collectionInterface = null;
-        if (propertyType.SpecialType == SpecialType.System_String || TypeSymbolHelpers.IsTaggedString(propertyType))
+        if (propertyType.SpecialType == SpecialType.System_String || TypeSymbolHelpers.IsTaggedString(propertyType, contractInfo))
         {
             return LengthTargetKind.String;
         }

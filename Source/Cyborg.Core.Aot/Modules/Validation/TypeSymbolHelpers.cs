@@ -5,19 +5,11 @@ namespace Cyborg.Core.Aot.Modules.Validation;
 
 internal static class TypeSymbolHelpers
 {
-    public const string TaggedStringMetadataName = "Cyborg.Core.Text.TaggedString";
-
-    public const string WellKnownSecretTag = "cyborg.secret.v1";
-
-    public const string TaggedStringGlobalTypeName = "global::Cyborg.Core.Text.TaggedString";
-
-    public const string WellKnownTagsSecretExpression = "global::Cyborg.Core.Text.WellKnownTags.Secret";
-
-    public static bool IsTaggedString(ITypeSymbol type)
+    public static bool IsTaggedString(ITypeSymbol type, ValidationContractInfo contractInfo)
     {
+        ArgumentNullException.ThrowIfNull(contractInfo);
         _ = type.TryUnwrapNullableType(out ITypeSymbol unwrapped);
-        return unwrapped is INamedTypeSymbol named
-            && named.GetFullMetadataName().Equals(TaggedStringMetadataName, StringComparison.Ordinal);
+        return SymbolEqualityComparer.Default.Equals(unwrapped, contractInfo.TaggedString);
     }
 
     public static bool IsStringType(ITypeSymbol type)
@@ -26,7 +18,8 @@ internal static class TypeSymbolHelpers
         return unwrapped.SpecialType == SpecialType.System_String;
     }
 
-    public static bool IsStringLikeType(ITypeSymbol type) => IsStringType(type) || IsTaggedString(type);
+    public static bool IsStringLikeType(ITypeSymbol type, ValidationContractInfo contractInfo) =>
+        IsStringType(type) || IsTaggedString(type, contractInfo);
 
     public static bool RequiresNullGuard(ITypeSymbol type)
     {
@@ -37,9 +30,9 @@ internal static class TypeSymbolHelpers
         return !type.IsValueType && (type.IsReferenceType || type.NullableAnnotation == NullableAnnotation.Annotated);
     }
 
-    public static string CreateStringContentExpression(ITypeSymbol type, string accessExpression)
+    public static string CreateStringContentExpression(ITypeSymbol type, ValidationContractInfo contractInfo, string accessExpression)
     {
-        if (!IsTaggedString(type))
+        if (!IsTaggedString(type, contractInfo))
         {
             return accessExpression;
         }

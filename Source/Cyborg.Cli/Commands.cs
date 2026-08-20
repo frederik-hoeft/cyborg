@@ -1,4 +1,6 @@
-﻿using ConsoleAppFramework;
+using Cyborg.Core.Text;
+using Cyborg.Core.Text.Rendering;
+using ConsoleAppFramework;
 using Cyborg.Cli.Arguments;
 using Cyborg.Cli.Configuration;
 using Cyborg.Cli.Debugging;
@@ -23,8 +25,6 @@ internal sealed class Commands
 {
     private const string CYBORG_ROOT = "/etc/cyborg";
     private const string LAST_RUN_SUCCESS = "last_run_success";
-
-    private static string QuoteArg(string arg) => $"\"{arg.Replace("\\", "\\\\").Replace("\"", "\\\"")}\"";
 
     /// <summary>
     /// Executes a backup run using the provided configuration and command-line options.
@@ -99,11 +99,11 @@ internal sealed class Commands
             }
 
             ILogger logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("cyborg.cli.main");
-            logger.LogStartup(string.Join(' ', Array.ConvertAll(Environment.GetCommandLineArgs()[1..], QuoteArg)));
+            logger.LogStartup();
 
             if (!configurationArgumentsValid)
             {
-                logger.LogInvalidConfigurationOverride(invalidConfigurationDefinition!, configurationArgumentError!);
+                logger.LogInvalidConfigurationOverride(configurationArgumentError!);
                 return 1;
             }
             if (!debuggerArgumentsValid)
@@ -130,16 +130,17 @@ internal sealed class Commands
                 Environment = module.Environment ?? ModuleEnvironment.Default,
             };
             IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
-            string target = globalEnvironment.ResolveVariableOrDefault(WellKnownVariables.Target, "<unspecified>");
-            logger.LogRunStarted(target);
+            TaggedString target = globalEnvironment.ResolveVariableOrDefault(WellKnownVariables.Target, new TaggedString("<unspecified>"));
+            string renderedTarget = services.GetRequiredService<ITaggedStringRenderer>().Render(target);
+            logger.LogRunStarted(renderedTarget);
             IModuleExecutionResult result = await runtime.ExecuteAsync(module, cancellationToken);
             if (result.Status is ModuleExitStatus.Success or ModuleExitStatus.Skipped)
             {
-                logger.LogRunCompleted(target);
+                logger.LogRunCompleted(renderedTarget);
             }
             else
             {
-                logger.LogRunCompletedWithStatus(target, result.Status.ToString());
+                logger.LogRunCompletedWithStatus(renderedTarget, result.Status.ToString());
                 if (!(configuration.TryGetValue(CliConfigurationDefaults.CONSOLE_LOGGING_ENABLED_KEY, out bool enabled) && enabled)
                     && configuration.TryGetValue(CliConfigurationDefaults.FILE_LOGGING_ENABLED_KEY, out enabled) && enabled)
                 {
@@ -163,7 +164,7 @@ internal sealed class Commands
     private static void CollectRunMetrics(GlobalRuntimeEnvironment environment, IMetricsCollector metricsCollector, bool runSucceeded)
     {
         IMetricsLabelCollection labels = metricsCollector.CreateLabels();
-        if (environment.TryResolveVariable(WellKnownVariables.Target, out string? target))
+        if (environment.TryResolveVariable(WellKnownVariables.Target, out TaggedString target))
         {
             labels.AddLabel("target", target);
         }

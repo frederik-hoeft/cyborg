@@ -1,4 +1,4 @@
-﻿namespace Cyborg.Core.Aot.Contracts;
+namespace Cyborg.Core.Aot.Contracts;
 
 internal enum ModuleValidationGeneratorContract
 {
@@ -13,4 +13,6 @@ internal enum ModuleValidationGeneratorContract
     IModuleDescriptor,
     IObjectDescriptionBuilder,
     ModuleIdentity,
+    TaggedString,
+    WellKnownTags,
 }

@@ -24,7 +24,7 @@ internal sealed class EnvironmentVariableArgumentHandler
         {
             if (!TryParseSplit(env, '=', out ReadOnlySpan<char> keyPart, out ReadOnlySpan<char> value, enforceSingleDelimiter: false))
             {
-                logger.LogInvalidEnvironmentVariable(env);
+                logger.LogInvalidEnvironmentVariable();
                 return false;
             }
             object valueObj;
@@ -33,12 +33,12 @@ internal sealed class EnvironmentVariableArgumentHandler
                 string typeName = dataType.ToString();
                 if (!providerRegistry.TryGetProvider(typeName, out IDynamicValueProvider? provider))
                 {
-                    logger.LogUnknownEnvironmentVariableType(env, typeName);
+                    logger.LogUnknownEnvironmentVariableType(typeName);
                     return false;
                 }
                 if (!DynamicArgumentValueParser.TryParse(provider, jsonLoaderContext, value.ToString(), out object? dynamicValue, out _))
                 {
-                    logger.LogInvalidEnvironmentVariable(env);
+                    logger.LogInvalidEnvironmentVariable();
                     return false;
                 }
                 valueObj = dynamicValue;
@@ -51,7 +51,7 @@ internal sealed class EnvironmentVariableArgumentHandler
             }
             if (!environment.SyntaxFactory.IsValidIdentifier(key))
             {
-                logger.LogInvalidEnvironmentVariable(env);
+                logger.LogInvalidEnvironmentVariable();
                 return false;
             }
             environment.SetVariable(key.ToString(), valueObj);

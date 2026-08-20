@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Common.Text;
+using Cyborg.Core.Common.Text;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Descriptors.Model;
 using Cyborg.Core.Text;
@@ -15,7 +15,7 @@ internal sealed class TextModuleDescriptionComponentWriter(IndentedStringBuilder
     public ValueTask WriteAtomAsync<T>(T value, ImmutableArray<string> hints, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        WriteAtom(builder, taggedStringRenderer, value);
+        WriteAtom(builder, taggedStringRenderer, value, hints);
         return ValueTask.CompletedTask;
     }
 
@@ -86,10 +86,11 @@ internal sealed class TextModuleDescriptionComponentWriter(IndentedStringBuilder
         }
     }
 
-    private static IndentedStringBuilder WriteAtom<T>(IndentedStringBuilder builder, ITaggedStringRenderer taggedStringRenderer, T value) => value switch
+    private static IndentedStringBuilder WriteAtom<T>(IndentedStringBuilder builder, ITaggedStringRenderer taggedStringRenderer, T value, ImmutableArray<string> hints) => value switch
     {
         null => builder.AppendLine("null"),
-        TaggedString tagged => AppendQuotedString(builder, taggedStringRenderer.Render(tagged), '"'),
+        TaggedString tagged => AppendQuotedString(builder, taggedStringRenderer.Render(tagged.WithTags(hints)), '"'),
+        string text when !hints.IsEmpty => AppendQuotedString(builder, taggedStringRenderer.Render(new TaggedString(text, hints)), '"'),
         string text => AppendQuotedString(builder, text, '"'),
         char character => AppendQuotedString(builder, character.ToString(), '\''),
         bool flag => builder.AppendLine(flag ? "true" : "false"),

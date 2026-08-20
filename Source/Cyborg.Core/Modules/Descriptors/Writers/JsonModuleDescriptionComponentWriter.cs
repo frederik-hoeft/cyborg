@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Modules.Descriptors.Model;
+using Cyborg.Core.Modules.Descriptors.Model;
 using Cyborg.Core.Text;
 using Cyborg.Core.Text.Rendering;
 using System.Collections.Immutable;
@@ -55,7 +55,10 @@ internal sealed class JsonModuleDescriptionComponentWriter(Utf8JsonWriter jsonWr
                 jsonWriter.WriteNumberValue(number);
                 break;
             case TaggedString tagged:
-                jsonWriter.WriteStringValue(taggedStringRenderer.Render(tagged));
+                jsonWriter.WriteStringValue(taggedStringRenderer.Render(tagged.WithTags(hints)));
+                break;
+            case string text when !hints.IsEmpty:
+                jsonWriter.WriteStringValue(taggedStringRenderer.Render(new TaggedString(text, hints)));
                 break;
             case string text:
                 jsonWriter.WriteStringValue(text);

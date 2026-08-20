@@ -11,7 +11,7 @@ public sealed partial record TaggedStringTestModule
 (
     TaggedString Plain,
     [property: Secret] TaggedString Secret,
-    TaggedString? OptionalSecret,
+    [property: Secret][property: IgnoreInterpolation] TaggedString? OptionalSecret,
     [property: Untagged] string IntentionallyUntagged,
     ImmutableArray<TaggedString> Values
 ) : ModuleBase, IModule

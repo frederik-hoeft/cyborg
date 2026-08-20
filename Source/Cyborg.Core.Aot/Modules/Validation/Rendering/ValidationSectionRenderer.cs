@@ -57,7 +57,7 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
         {
             if (aspect is not CollectionElementValidationAspect)
             {
-                aspect.EmitValidation(builder, ContractInfo, DiagnosticsReporter, property, moduleVariableName, propertyAccessExpression);
+                aspect.EmitValidation(builder, ContractInfo, DiagnosticsReporter, property, moduleVariableName, ContextVariable, propertyAccessExpression);
             }
         }
 
@@ -141,6 +141,7 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
                     DiagnosticsReporter,
                     property,
                     moduleVariableName,
+                    ContextVariable,
                     propertyAccessExpression,
                     elementVariable,
                     indexVariable);

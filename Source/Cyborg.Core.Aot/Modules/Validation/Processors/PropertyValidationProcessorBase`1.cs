@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Microsoft.CodeAnalysis;
 
@@ -78,7 +78,7 @@ internal abstract class PropertyValidationProcessorBase<TAttribute> : AttributeP
         {
             return ValidateStringLikePropertyType(attribute, in context);
         }
-        if (TypeSymbolHelpers.IsStringLikeType(target.Type))
+        if (TypeSymbolHelpers.IsStringLikeType(target.Type, context.ContractInfo))
         {
             return true;
         }

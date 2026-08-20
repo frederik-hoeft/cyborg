@@ -1,7 +1,6 @@
-﻿using Cyborg.Core.Modules;
+using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Services.Dispatch;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Modules.Network.SshShutdown;
@@ -18,8 +17,8 @@ public sealed class SshShutdownModuleWorker(IWorkerContext<SshShutdownModule> co
             { MatchPrompt: null } sshPass => (sshPass.Executable, [$"-f{sshPass.FilePath}", Module.Executable, .. sshArguments]),
             _ => (Module.Executable, sshArguments),
         };
-        ProcessStartInfo startInfo = new(executable, arguments);
-        ChildProcessResult processResult = await dispatcher.ExecuteAsync(startInfo, cancellationToken);
+        ChildProcessInvocation invocation = new(executable, arguments);
+        ChildProcessResult processResult = await dispatcher.ExecuteAsync(invocation, cancellationToken);
         SshShutdownModuleResult result = new(processResult.ExitCode, processResult.StandardOutput, processResult.StandardError);
         if (result.ExitCode != 0)
         {

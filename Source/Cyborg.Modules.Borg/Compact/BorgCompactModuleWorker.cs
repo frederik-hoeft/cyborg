@@ -1,8 +1,7 @@
-﻿using Cyborg.Core.Modules;
+using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Services.Dispatch;
 using Cyborg.Core.Services.Metrics;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.RegularExpressions;
@@ -40,11 +39,11 @@ public sealed partial class BorgCompactModuleWorker
         ];
         arguments.Add(Module.RemoteRepository.GetRepositoryUri());
 
-        ProcessStartInfo startInfo = new(Module.Executable, arguments);
-        AddDefaults(startInfo);
+        ChildProcessInvocation invocation = new(Module.Executable, arguments);
+        AddDefaults(invocation);
 
         _stopwatch.Restart();
-        ChildProcessResult executionResult = await processDispatcher.ExecuteAsync(startInfo, cancellationToken);
+        ChildProcessResult executionResult = await processDispatcher.ExecuteAsync(invocation, cancellationToken);
         _stopwatch.Stop();
 
         CollectMetrics(runtime, executionResult);

@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
@@ -11,7 +11,7 @@ internal sealed class DefaultValueProcessor : AttributeProcessorBase
 
     public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {
-        ITypeSymbol expectedTypeArgument = TypeSymbolHelpers.IsTaggedString(context.Property.Type)
+        ITypeSymbol expectedTypeArgument = TypeSymbolHelpers.IsTaggedString(context.Property.Type, context.ContractInfo)
             ? context.Compilation.GetSpecialType(SpecialType.System_String)
             : context.Property.Type;
         if (!ValidateTypeArguments(attribute, in context, expectedTypeArgument)
@@ -25,7 +25,7 @@ internal sealed class DefaultValueProcessor : AttributeProcessorBase
         {
             foreach (TypedConstant item in attribute.ConstructorArguments[1].Values)
             {
-                if (!LiteralExpressionFactory.TryGetLiteralExpression(item, context.Property.Type, out string? itemExpression))
+                if (!LiteralExpressionFactory.TryGetLiteralExpression(item, context.Property.Type, context.ContractInfo, out string? itemExpression))
                 {
                     context.Report(ValidationGeneratorDiagnostics.UnsupportedAttributeLiteral, context.Property.Name, context.ContainingType.Name, GetAttributeFriendlyName(attribute));
                     return false.WithDefaults(out aspect);

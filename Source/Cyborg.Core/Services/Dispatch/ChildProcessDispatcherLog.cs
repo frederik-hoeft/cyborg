@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using ZLogger;
 
 namespace Cyborg.Core.Services.Dispatch;
@@ -7,6 +7,9 @@ internal static partial class ChildProcessDispatcherLog
 {
     [ZLoggerMessage(LogLevel.Debug, "Launching process: {executable} {arguments}")]
     public static partial void LogProcessLaunching(this ILogger logger, string executable, string arguments);
+
+    [ZLoggerMessage(LogLevel.Debug, "Launching process: {executable} (arguments omitted because tag metadata is unavailable)")]
+    public static partial void LogProcessLaunching(this ILogger logger, string executable);
 
     [ZLoggerMessage(LogLevel.Information, "Process started: {executable}")]
     public static partial void LogProcessStarted(this ILogger logger, string executable);

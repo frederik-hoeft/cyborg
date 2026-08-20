@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using Cyborg.Core.Aot.Modules.Validation.Processors;
 using Microsoft.CodeAnalysis;
@@ -165,7 +165,7 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
         string arguments = $"{context.ModuleVariable}, {context.PropertyAccessExpression}, moduleExpression: \"{context.ModuleVariable}\", valueExpression: \"{rootPathExpression}\"";
         string expression = TypeSymbolHelpers.IsStringType(context.Property.Symbol.Type)
             ? $"{ContextVariable}.SelectRawStringOverride({arguments})"
-            : TypeSymbolHelpers.IsTaggedString(context.Property.Symbol.Type)
+            : TypeSymbolHelpers.IsTaggedString(context.Property.Symbol.Type, ContractInfo)
                 ? $"{ContextVariable}.SelectRawTaggedStringOverride({arguments})"
                 : $"{ContextVariable}.ResolveOverride({arguments})";
         foreach (PropertyAspect aspect in context.Property.Aspects)

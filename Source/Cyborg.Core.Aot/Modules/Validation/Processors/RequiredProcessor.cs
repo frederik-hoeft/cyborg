@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Microsoft.CodeAnalysis;
 
@@ -16,7 +16,7 @@ internal sealed class RequiredProcessor : PropertyValidationProcessorBase<Requir
     {
         protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
         {
-            if (TypeSymbolHelpers.IsStringLikeType(model.TargetType))
+            if (TypeSymbolHelpers.IsStringLikeType(model.TargetType, model.ContractInfo))
             {
                 builder.AppendLine($"if (string.{nameof(string.IsNullOrWhiteSpace)}({model.StringContentExpression}))");
             }

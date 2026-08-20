@@ -13,11 +13,18 @@ internal abstract class PropertyAspect(bool ensuresDefault = false)
 
     public virtual string RewriteInterpolationExpression(PropertyRewriteContext context, string currentExpression) => currentExpression;
 
+    /// <summary>
+    /// Re-applies property-level invariants after ordinary default resolution. This stage runs both
+    /// before and after override resolution, so destination invariants cannot be removed by an override.
+    /// </summary>
+    public virtual string RewritePreparedValueExpression(PropertyRewriteContext context, string currentExpression) => currentExpression;
+
     [return: NotNullIfNotNull(nameof(currentExpression))]
     public virtual string? RewriteDefaultAssignmentExpression(PropertyRewriteContext context, string? currentExpression) => currentExpression;
 
     public virtual void RegisterDescriptorHints(
         List<string> hints,
+        ValidationContractInfo contractInfo,
         DiagnosticsReporter diagnosticsReporter,
         PropertyModel property)
     {
@@ -33,6 +40,7 @@ internal abstract class PropertyAspect(bool ensuresDefault = false)
         DiagnosticsReporter diagnosticsReporter,
         PropertyModel property,
         string moduleVariableName,
+        string validationContextVariable,
         string propertyAccessExpression)
     {
         ModulePropertyModel model = new(
@@ -40,6 +48,7 @@ internal abstract class PropertyAspect(bool ensuresDefault = false)
             ContractInfo: contractInfo,
             DiagnosticsReporter: diagnosticsReporter,
             ModuleVariable: moduleVariableName,
+            ValidationContextVariable: validationContextVariable,
             AccessExpression: propertyAccessExpression,
             ErrorPropertyAccessExpression: propertyAccessExpression,
             TargetType: property.Symbol.Type,
@@ -54,6 +63,7 @@ internal abstract class PropertyAspect(bool ensuresDefault = false)
         DiagnosticsReporter diagnosticsReporter,
         PropertyModel property,
         string moduleVariableName,
+        string validationContextVariable,
         string propertyAccessExpression,
         string elementAccessExpression,
         string indexVariable)
@@ -65,6 +75,7 @@ internal abstract class PropertyAspect(bool ensuresDefault = false)
             ContractInfo: contractInfo,
             DiagnosticsReporter: diagnosticsReporter,
             ModuleVariable: moduleVariableName,
+            ValidationContextVariable: validationContextVariable,
             AccessExpression: elementAccessExpression,
             ErrorPropertyAccessExpression: propertyAccessExpression,
             TargetType: collection.ElementType,
@@ -85,6 +96,7 @@ internal abstract class PropertyAspect(bool ensuresDefault = false)
         ValidationContractInfo ContractInfo,
         DiagnosticsReporter DiagnosticsReporter,
         string ModuleVariable,
+        string ValidationContextVariable,
         string AccessExpression,
         string ErrorPropertyAccessExpression,
         ITypeSymbol TargetType,
@@ -95,10 +107,15 @@ internal abstract class PropertyAspect(bool ensuresDefault = false)
     {
         public string PropertyNameExpression => $"nameof({ErrorPropertyAccessExpression})";
 
-        public string StringContentExpression => TypeSymbolHelpers.CreateStringContentExpression(TargetType, AccessExpression);
+        public string StringContentExpression => TypeSymbolHelpers.CreateStringContentExpression(TargetType, ContractInfo, AccessExpression);
+
+        public string DisplayExpression => TypeSymbolHelpers.IsTaggedString(TargetType, ContractInfo)
+            ? $"{ValidationContextVariable}.Render({AccessExpression})"
+            : AccessExpression;
 
         public bool RequiresNullGuard => TypeSymbolHelpers.RequiresNullGuard(TargetType);
 
+        // TODO: if we're introducing a centralized helper like this, we should also consider default-valued value types like ImmutableArray.
         public string NullAwareCondition(string condition) =>
             RequiresNullGuard ? $"{AccessExpression} is not null && {condition}" : condition;
     }
