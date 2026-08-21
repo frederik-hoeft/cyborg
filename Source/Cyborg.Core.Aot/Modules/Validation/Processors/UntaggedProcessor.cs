@@ -1,4 +1,4 @@
-using Cyborg.Core.Aot.Extensions;
+﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Microsoft.CodeAnalysis;
 
@@ -16,7 +16,7 @@ internal sealed class UntaggedProcessor : AttributeProcessorBase<UntaggedAttribu
                 context.ContainingType.Name);
             return false.WithDefaults(out aspect);
         }
-        if (!context.Property.Type.IsStringType())
+        if (!context.Property.Type.EqualsIgnoreNullability(SpecialType.System_String))
         {
             context.Report(
                 ValidationGeneratorDiagnostics.UntaggedRequiresString,

@@ -1,8 +1,8 @@
-namespace Cyborg.Core.Text.Rendering;
+﻿namespace Cyborg.Core.Text.Rendering;
 
 public sealed class SecretTagHandler : ITaggedStringTagHandler
 {
-    public const string RedactedDisplay = "[REDACTED]";
+    public static string RedactedDisplay => "[REDACTED]";
 
     public string Tag => WellKnownTags.Secret;
 

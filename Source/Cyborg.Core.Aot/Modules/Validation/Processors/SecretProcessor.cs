@@ -17,7 +17,7 @@ internal sealed class SecretProcessor : AttributeProcessorBase<SecretAttribute>
                 context.ContainingType.Name);
             return false.WithDefaults(out aspect);
         }
-        if (!context.Property.Type.IsOrNullableOf(context.ContractInfo.TaggedString))
+        if (!context.Property.Type.EqualsIgnoreNullability(context.ContractInfo.TaggedString))
         {
             context.Report(
                 ValidationGeneratorDiagnostics.SecretRequiresTaggedString,
@@ -57,17 +57,17 @@ internal sealed class SecretAspect : PropertyAspect
         return $"({currentExpression}).WithTag({tagExpression})";
     }
 
-    protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
+    protected override void EmitValidation(IndentedStringBuilder builder, PropertyValidationModel model)
     {
         string access = model.AccessExpression;
-        string condition = model.RequiresNullGuard
+        string condition = model.TargetType.CanEverBeNull
             ? $"{access} is {{ }} secretValue && !secretValue.HasTag({model.ContractInfo.SecretTagExpression})"
             : $"!{access}.HasTag({model.ContractInfo.SecretTagExpression})";
         builder.AppendBlock(
         $$"""
         if ({{condition}})
         {
-            errors.Add({{CreateValidationError(model, "secret", $"{model.TargetDescription} '{{{model.PropertyNameExpression}}}' must carry the '{model.ContractInfo.SecretTag}' tag.")}});
+            {{model.Variables.Errors}}.Add({{CreateValidationError(model, "secret", $"{model.TargetDescription} '{{{model.PropertyNameExpression}}}' must carry the '{model.ContractInfo.SecretTag}' tag.")}});
         }
         """);
     }

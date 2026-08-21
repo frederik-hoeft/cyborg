@@ -1,4 +1,4 @@
-using Cyborg.Core.Aot.Extensions;
+﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Microsoft.CodeAnalysis;
 
@@ -14,7 +14,7 @@ internal sealed class RequiredProcessor : PropertyValidationProcessorBase<Requir
 
     private sealed class RequiredValidationAspect : PropertyValidationAspect
     {
-        protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
+        protected override void EmitValidation(IndentedStringBuilder builder, PropertyValidationModel model)
         {
             if (model.TargetType.IsStringLike(model.ContractInfo.TaggedString))
             {
@@ -28,7 +28,7 @@ internal sealed class RequiredProcessor : PropertyValidationProcessorBase<Requir
             builder.AppendBlock(
             $$"""
             {
-                errors.Add({{CreateValidationError(model, "required", $"{model.TargetDescription} '{{{model.PropertyNameExpression}}}' is required.")}});
+                {{model.Variables.Errors}}.Add({{CreateValidationError(model, "required", $"{model.TargetDescription} '{{{model.PropertyNameExpression}}}' is required.")}});
             }
             """);
         }

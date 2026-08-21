@@ -1,4 +1,4 @@
-using Cyborg.Core.Modules.Descriptors;
+﻿using Cyborg.Core.Modules.Descriptors;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Validation;
@@ -8,7 +8,7 @@ using Cyborg.Modules.Subprocess;
 using Cyborg.TestModules.Secrets;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Cyborg.Modules.Tests.Core.Secrets;
+namespace Cyborg.Modules.Tests.Core.Text;
 
 [TestClass]
 public sealed class TaggedStringModuleTests : ModuleTestBase
@@ -37,7 +37,7 @@ public sealed class TaggedStringModuleTests : ModuleTestBase
     public Task TestValidationAsync_InterpolationUnionsSecretIntoTaggedStringPropertyAsync() => TestWithDIAsync(async services =>
     {
         IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
-        runtime.Environment.SetVariable("token", new global::Cyborg.Core.Text.TaggedString("abc", [WellKnownTags.Secret]));
+        runtime.Environment.SetVariable("token", new TaggedString("abc", [WellKnownTags.Secret]));
         TaggedStringTestModule module = new(
             Plain: "pre-${token}-post",
             Secret: "static",
@@ -70,7 +70,7 @@ public sealed class TaggedStringModuleTests : ModuleTestBase
             """,
             module =>
             {
-                List<global::Cyborg.Core.Text.TaggedString> arguments = [.. module.Command.Arguments];
+                List<TaggedString> arguments = [.. module.Command.Arguments];
                 MSAssert.HasCount(2, arguments);
                 MSAssert.AreEqual("plain", arguments[0].Value);
                 MSAssert.IsFalse(arguments[0].HasTags);
@@ -102,15 +102,15 @@ public sealed class TaggedStringModuleTests : ModuleTestBase
             {
                 MSAssert.AreEqual(ModuleExitStatus.Success, result.Status);
                 IRuntimeEnvironment environment = scope.Runtime.Environment;
-                MSAssert.IsTrue(environment.TryResolveVariable("plain", out global::Cyborg.Core.Text.TaggedString plain));
+                MSAssert.IsTrue(environment.TryResolveVariable("plain", out TaggedString plain));
                 MSAssert.AreEqual("visible", plain.Value);
                 MSAssert.IsFalse(plain.HasTags);
 
-                MSAssert.IsTrue(environment.TryResolveVariable("secret", out global::Cyborg.Core.Text.TaggedString secret));
+                MSAssert.IsTrue(environment.TryResolveVariable("secret", out TaggedString secret));
                 MSAssert.AreEqual("s3cret", secret.Value);
                 MSAssert.IsTrue(secret.HasTag(WellKnownTags.Secret));
 
-                MSAssert.IsTrue(environment.TryResolveVariable("tagged", out global::Cyborg.Core.Text.TaggedString tagged));
+                MSAssert.IsTrue(environment.TryResolveVariable("tagged", out TaggedString tagged));
                 MSAssert.AreEqual("payload", tagged.Value);
                 MSAssert.IsTrue(tagged.HasTag("custom"));
                 return Task.CompletedTask;
@@ -164,7 +164,7 @@ public sealed class TaggedStringModuleTests : ModuleTestBase
         string text = await serializationService.ToTextAsync(module, TestContext.CancellationToken);
 
         MSAssert.Contains("visible", text);
-        MSAssert.Contains(global::Cyborg.Core.Text.SecretTagHandler.RedactedDisplay, text);
+        MSAssert.Contains(SecretTagHandler.RedactedDisplay, text);
         MSAssert.DoesNotContain("s3cret", text);
     });
 
@@ -181,7 +181,7 @@ public sealed class TaggedStringModuleTests : ModuleTestBase
 
         string json = await serializationService.ToJsonAsync(module, TestContext.CancellationToken);
 
-        MSAssert.Contains(global::Cyborg.Core.Text.SecretTagHandler.RedactedDisplay, json);
+        MSAssert.Contains(SecretTagHandler.RedactedDisplay, json);
         MSAssert.DoesNotContain("s3cret", json);
     });
 

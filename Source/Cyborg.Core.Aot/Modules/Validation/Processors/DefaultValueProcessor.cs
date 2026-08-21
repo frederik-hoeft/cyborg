@@ -1,4 +1,4 @@
-using Cyborg.Core.Aot.Extensions;
+﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
@@ -11,7 +11,7 @@ internal sealed class DefaultValueProcessor : AttributeProcessorBase
 
     public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {
-        ITypeSymbol expectedTypeArgument = context.Property.Type.IsOrNullableOf(context.ContractInfo.TaggedString)
+        ITypeSymbol expectedTypeArgument = context.Property.Type.EqualsIgnoreNullability(context.ContractInfo.TaggedString)
             ? context.Compilation.GetSpecialType(SpecialType.System_String)
             : context.Property.Type;
         if (!ValidateTypeArguments(attribute, in context, expectedTypeArgument)

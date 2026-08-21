@@ -18,13 +18,13 @@ internal sealed class UnrootedPathProcessor : AttributeProcessorBase<UnrootedPat
 
     private sealed class UnrootedPathValidationAspect : PropertyAspect
     {
-        protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
+        protected override void EmitValidation(IndentedStringBuilder builder, PropertyValidationModel model)
         {
             builder.AppendBlock(
             $$"""
             if ({{model.NullAwareCondition($"{KnownTypes.Path}.IsPathRooted({model.StringContentExpression})")}})
             {
-                errors.Add({{CreateValidationError(model, rule: "unrooted_path", $"Property '{{nameof({model.AccessExpression})}}' must be an unrooted path, but was '{{{model.DisplayExpression}}}'")}});
+                {{model.Variables.Errors}}.Add({{CreateValidationError(model, rule: "unrooted_path", $"Property '{{nameof({model.AccessExpression})}}' must be an unrooted path, but was '{{{model.DisplayExpression}}}'")}});
             }
             """);
         }

@@ -1,4 +1,4 @@
-using Cyborg.Core.Aot.Extensions;
+﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Microsoft.CodeAnalysis;
 using System.Globalization;
@@ -66,18 +66,17 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValid
             collectionInterface,
             minExpression: min?.ToString(CultureInfo.InvariantCulture),
             maxExpression: max?.ToString(CultureInfo.InvariantCulture),
-            requiresNullGuard: target.Type.RequiresNullCheck());
+            requiresNullGuard: target.Type.CanEverBeNull);
 
         return true;
     }
 
     protected abstract bool TryGetBounds(AttributeData attribute, ref readonly PropertyProcessingContext context, out int? min, out int? max);
 
-
     private static LengthTargetKind GetTargetKind(ITypeSymbol propertyType, ValidationContractInfo contractInfo, out INamedTypeSymbol? collectionInterface)
     {
         collectionInterface = null;
-        if (propertyType.SpecialType == SpecialType.System_String || propertyType.IsOrNullableOf(contractInfo.TaggedString))
+        if (propertyType.SpecialType == SpecialType.System_String || propertyType.EqualsIgnoreNullability(contractInfo.TaggedString))
         {
             return LengthTargetKind.String;
         }
@@ -134,7 +133,7 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValid
         bool requiresNullGuard
     ) : PropertyValidationAspect
     {
-        protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
+        protected override void EmitValidation(IndentedStringBuilder builder, PropertyValidationModel model)
         {
             if (requiresNullGuard)
             {
@@ -148,7 +147,7 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValid
             EmitLengthValidation(builder, model);
         }
 
-        private void EmitLengthValidation(IndentedStringBuilder builder, ModulePropertyModel model)
+        private void EmitLengthValidation(IndentedStringBuilder builder, PropertyValidationModel model)
         {
             string accessExpression;
             if (collectionInterface is null)
@@ -173,7 +172,7 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValid
                 $$"""
                 if ({{sizeExpression}} < {{minExpression}})
                 {
-                    errors.Add({{CreateValidationError(model, "length", $"{model.TargetDescription} '{{{model.PropertyNameExpression}}}' must have a length/count not smaller than configured minimum '{minExpression}', was '{{{sizeExpression}}}'.")}});
+                    {{model.Variables.Errors}}.Add({{CreateValidationError(model, "length", $"{model.TargetDescription} '{{{model.PropertyNameExpression}}}' must have a length/count not smaller than configured minimum '{minExpression}', was '{{{sizeExpression}}}'.")}});
                 }
                 """);
             }
@@ -184,7 +183,7 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValid
                 $$"""
                 if ({{sizeExpression}} > {{maxExpression}})
                 {
-                    errors.Add({{CreateValidationError(model, "length", $"{model.TargetDescription} '{{{model.PropertyNameExpression}}}' must have a length/count not greater than configured maximum '{maxExpression}', was '{{{sizeExpression}}}'.")}});
+                    {{model.Variables.Errors}}.Add({{CreateValidationError(model, "length", $"{model.TargetDescription} '{{{model.PropertyNameExpression}}}' must have a length/count not greater than configured maximum '{maxExpression}', was '{{{sizeExpression}}}'.")}});
                 }
                 """);
             }

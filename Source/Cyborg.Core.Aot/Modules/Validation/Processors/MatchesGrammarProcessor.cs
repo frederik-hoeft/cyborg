@@ -28,7 +28,7 @@ internal sealed class MatchesGrammarProcessor : AttributeProcessorBase<MatchesGr
 
     private sealed class GrammarValidationAspect(IPropertySymbol parserProperty, string valueExpression) : PropertyAspect
     {
-        protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
+        protected override void EmitValidation(IndentedStringBuilder builder, PropertyValidationModel model)
         {
             if (!SymbolEqualityComparer.Default.Equals(parserProperty.Type, model.ContractInfo.IParser))
             {
@@ -46,7 +46,7 @@ internal sealed class MatchesGrammarProcessor : AttributeProcessorBase<MatchesGr
             $$"""
             if ({{model.NullAwareCondition($"!{valueExpression}.TryParse({model.StringContentExpression}, out _, out _)")}})
             {
-                errors.Add({{CreateValidationError(model, "match_grammar", $"Property '{{nameof({model.AccessExpression})}}' does not match the required grammar.")}});
+                {{model.Variables.Errors}}.Add({{CreateValidationError(model, "match_grammar", $"Property '{{nameof({model.AccessExpression})}}' does not match the required grammar.")}});
             }
             """);
         }

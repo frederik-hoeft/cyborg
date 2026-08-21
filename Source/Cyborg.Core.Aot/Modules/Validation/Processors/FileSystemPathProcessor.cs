@@ -28,13 +28,13 @@ internal abstract class FileSystemPathProcessor<TAttribute> : AttributeProcessor
 
     private sealed class FilesystemPathValidationAspect(string errorCode, string pathKindDisplayName, string existsExpression) : PropertyAspect
     {
-        protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
+        protected override void EmitValidation(IndentedStringBuilder builder, PropertyValidationModel model)
         {
             builder.AppendBlock(
             $$"""
             if ({{model.NullAwareCondition($"!{existsExpression}({model.StringContentExpression})")}})
             {
-                errors.Add({{CreateValidationError(model, errorCode, $"Property '{{nameof({model.AccessExpression})}}' requires an existing {pathKindDisplayName} at '{{{model.DisplayExpression}}}'.")}});
+                {{model.Variables.Errors}}.Add({{CreateValidationError(model, errorCode, $"Property '{{nameof({model.AccessExpression})}}' requires an existing {pathKindDisplayName} at '{{{model.DisplayExpression}}}'.")}});
             }
             """);
         }

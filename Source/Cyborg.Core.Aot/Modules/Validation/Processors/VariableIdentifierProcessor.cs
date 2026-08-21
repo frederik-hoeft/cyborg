@@ -18,13 +18,13 @@ internal sealed class VariableIdentifierProcessor : PropertyValidationProcessorB
 
     private sealed class VariableIdentifierAspect : PropertyValidationAspect
     {
-        protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
+        protected override void EmitValidation(IndentedStringBuilder builder, PropertyValidationModel model)
         {
             builder.AppendBlock(
             $$"""
             if ({{model.NullAwareCondition($"!runtime.Environment.SyntaxFactory.IsValidIdentifier({model.StringContentExpression})")}})
             {
-                errors.Add({{CreateValidationError(model, rule: "valid_identifier", $"{model.TargetDescription} '{{{model.PropertyNameExpression}}}' must be a valid variable identifier, but was '{{{model.DisplayExpression}}}'.")}});
+                {{model.Variables.Errors}}.Add({{CreateValidationError(model, rule: "valid_identifier", $"{model.TargetDescription} '{{{model.PropertyNameExpression}}}' must be a valid variable identifier, but was '{{{model.DisplayExpression}}}'.")}});
             }
             """);
         }

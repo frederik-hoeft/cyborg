@@ -13,11 +13,13 @@ internal sealed class DefaultInstanceFactoryProcessor : AttributeProcessorBase<D
         {
             return false.WithDefaults(out aspect);
         }
+        ITypeSymbol propertyType = context.Property.Type;
+        Compilation compilation = context.Compilation;
         IEnumerable<IMethodSymbol> candidateMethods = context.ContainingType
             .GetMembers(valueExpression)
             .OfType<IMethodSymbol>();
         IMethodSymbol? factoryMethod = candidateMethods.FirstOrDefault(method =>
-            IsCompatibleFactoryMethod(context.Property.Type, context.Compilation, method));
+            IsCompatibleFactoryMethod(propertyType, compilation, method));
         if (factoryMethod is null)
         {
             context.Report(

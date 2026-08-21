@@ -48,13 +48,13 @@ internal sealed class MatchesRegexProcessor : AttributeProcessorBase<MatchesRege
 
     private sealed class RegexValidationAspect(string regexMember, string pattern) : PropertyAspect
     {
-        protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
+        protected override void EmitValidation(IndentedStringBuilder builder, PropertyValidationModel model)
         {
             builder.AppendBlock(
             $$"""
             if ({{model.NullAwareCondition($"!{regexMember}.IsMatch({model.StringContentExpression})")}})
             {
-                errors.Add({{CreateValidationError(model, "match_regex", $"Property '{{nameof({model.AccessExpression})}}' must match the following pattern: '{{{SymbolDisplay.FormatLiteral(pattern, quote: true)}}}'.")}});
+                {{model.Variables.Errors}}.Add({{CreateValidationError(model, "match_regex", $"Property '{{nameof({model.AccessExpression})}}' must match the following pattern: '{{{SymbolDisplay.FormatLiteral(pattern, quote: true)}}}'.")}});
             }
             """);
         }

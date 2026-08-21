@@ -1,4 +1,4 @@
-using Cyborg.Core.Aot.Extensions;
+﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using Cyborg.Core.Aot.Modules.Validation.Processors;
 using Microsoft.CodeAnalysis;
@@ -94,14 +94,14 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
 
     private void EmitStringInterpolation(IndentedStringBuilder builder, PropertyModel property, string localName, string propertyAccess)
     {
-        bool isTaggedString = property.Symbol.Type.IsOrNullableOf(ContractInfo.TaggedString);
+        bool isTaggedString = property.Symbol.Type.EqualsIgnoreNullability(ContractInfo.TaggedString);
         string interpolatedExpression = $"{ContextVariable}.Interpolate({propertyAccess})";
         if (!isTaggedString)
         {
             interpolatedExpression = $"{interpolatedExpression}.Value";
         }
 
-        if (!property.Symbol.Type.RequiresNullCheck())
+        if (!property.Symbol.Type.CanEverBeNull)
         {
             builder.AppendLine($"{property.NullableTypeName} {localName} = {interpolatedExpression};");
             return;
@@ -304,7 +304,7 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
     private string CreateElementInterpolationExpression(ITypeSymbol elementType, string accessExpression)
     {
         string interpolated = $"{ContextVariable}.Interpolate({accessExpression})";
-        return elementType.IsOrNullableOf(ContractInfo.TaggedString) ? interpolated : $"{interpolated}.Value";
+        return elementType.EqualsIgnoreNullability(ContractInfo.TaggedString) ? interpolated : $"{interpolated}.Value";
     }
 
     private static string CreateSafeIdentifier(string value) =>

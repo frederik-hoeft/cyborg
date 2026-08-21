@@ -1,5 +1,6 @@
 ﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
+using Cyborg.Core.Aot.Modules.Validation.Rendering;
 using Microsoft.CodeAnalysis;
 using System.Diagnostics.CodeAnalysis;
 
@@ -28,7 +29,7 @@ internal abstract class PropertyAspect(bool ensuresDefault = false)
     {
     }
 
-    protected virtual void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
+    protected virtual void EmitValidation(IndentedStringBuilder builder, PropertyValidationModel model)
     {
     }
 
@@ -37,16 +38,14 @@ internal abstract class PropertyAspect(bool ensuresDefault = false)
         ValidationContractInfo contractInfo,
         DiagnosticsReporter diagnosticsReporter,
         PropertyModel property,
-        string moduleVariableName,
-        string validationContextVariable,
+        ValidationSectionRenderer.ValidationVariables variables,
         string propertyAccessExpression)
     {
-        ModulePropertyModel model = new(
+        PropertyValidationModel model = new(
             Property: property,
             ContractInfo: contractInfo,
             DiagnosticsReporter: diagnosticsReporter,
-            ModuleVariable: moduleVariableName,
-            ValidationContextVariable: validationContextVariable,
+            Variables: variables,
             AccessExpression: propertyAccessExpression,
             ErrorPropertyAccessExpression: propertyAccessExpression,
             TargetType: property.Symbol.Type,
@@ -60,20 +59,18 @@ internal abstract class PropertyAspect(bool ensuresDefault = false)
         ValidationContractInfo contractInfo,
         DiagnosticsReporter diagnosticsReporter,
         PropertyModel property,
-        string moduleVariableName,
-        string validationContextVariable,
+        ValidationSectionRenderer.ValidationVariables variables,
         string propertyAccessExpression,
         string elementAccessExpression,
         string indexVariable)
     {
         CollectionModel collection = property.Collection
             ?? throw new InvalidOperationException($"Property '{property.Name}' does not describe a collection.");
-        ModulePropertyModel model = new(
+        PropertyValidationModel model = new(
             Property: property,
             ContractInfo: contractInfo,
             DiagnosticsReporter: diagnosticsReporter,
-            ModuleVariable: moduleVariableName,
-            ValidationContextVariable: validationContextVariable,
+            Variables: variables,
             AccessExpression: elementAccessExpression,
             ErrorPropertyAccessExpression: propertyAccessExpression,
             TargetType: collection.ElementType,
@@ -83,18 +80,17 @@ internal abstract class PropertyAspect(bool ensuresDefault = false)
         EmitValidation(builder, model);
     }
 
-    protected static string CreateValidationError(ModulePropertyModel model, string rule, string message) =>
+    protected static string CreateValidationError(PropertyValidationModel model, string rule, string message) =>
         $"""
         new {model.ContractInfo.ValidationError.RenderGlobal()}({model.PropertyNameExpression}, "{rule}", $"{message}")
         """;
 
-    protected sealed record ModulePropertyModel
+    protected sealed record PropertyValidationModel
     (
         PropertyModel Property,
         ValidationContractInfo ContractInfo,
         DiagnosticsReporter DiagnosticsReporter,
-        string ModuleVariable,
-        string ValidationContextVariable,
+        ValidationSectionRenderer.ValidationVariables Variables,
         string AccessExpression,
         string ErrorPropertyAccessExpression,
         ITypeSymbol TargetType,
@@ -105,19 +101,19 @@ internal abstract class PropertyAspect(bool ensuresDefault = false)
     {
         public string PropertyNameExpression => $"nameof({ErrorPropertyAccessExpression})";
 
-        public bool IsTaggedString => TargetType.IsOrNullableOf(ContractInfo.TaggedString);
-
-        public bool RequiresNullGuard => TargetType.RequiresNullCheck();
+        public bool IsTaggedString => TargetType.EqualsIgnoreNullability(ContractInfo.TaggedString);
 
         public string StringContentExpression => IsTaggedString
-            ? RequiresNullGuard ? $"{AccessExpression}?.Value" : $"{AccessExpression}.Value"
+            ? TargetType.CanEverBeNull
+                ? $"{AccessExpression}?.Value"
+                : $"{AccessExpression}.Value"
             : AccessExpression;
 
         public string DisplayExpression => IsTaggedString
-            ? $"{ValidationContextVariable}.Render({AccessExpression})"
+            ? $"{Variables.Context}.Render({AccessExpression})"
             : AccessExpression;
 
         public string NullAwareCondition(string condition) =>
-            RequiresNullGuard ? $"{AccessExpression} is not null && {condition}" : condition;
+            TargetType.CanEverBeNull ? $"{AccessExpression} is not null && {condition}" : condition;
     }
 }

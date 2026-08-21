@@ -56,7 +56,7 @@ internal sealed class DefinedEnumValueProcessor : AttributeProcessorBase<Defined
 
     private sealed class DefinedEnumValueValidationAspect(string enumTypeName, bool isNullableEnum) : PropertyAspect
     {
-        protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
+        protected override void EmitValidation(IndentedStringBuilder builder, PropertyValidationModel model)
         {
             if (isNullableEnum)
             {
@@ -64,7 +64,7 @@ internal sealed class DefinedEnumValueProcessor : AttributeProcessorBase<Defined
                 $$"""
                 if ({{model.AccessExpression}} is not null && !{{KnownTypes.Enum}}.IsDefined<{{enumTypeName}}>({{model.AccessExpression}}.Value))
                 {
-                    errors.Add({{CreateValidationError(model, "enum", $"Property '{{nameof({model.AccessExpression})}}' must be a defined enum value.")}});
+                    {{model.Variables.Errors}}.Add({{CreateValidationError(model, "enum", $"Property '{{nameof({model.AccessExpression})}}' must be a defined enum value.")}});
                 }
                 """);
 
@@ -75,7 +75,7 @@ internal sealed class DefinedEnumValueProcessor : AttributeProcessorBase<Defined
             $$"""
             if (!{{KnownTypes.Enum}}.IsDefined<{{enumTypeName}}>({{model.AccessExpression}}))
             {
-                errors.Add({{CreateValidationError(model, "enum", $"Property '{{nameof({model.AccessExpression})}}' must be a defined enum value.")}});
+                {{model.Variables.Errors}}.Add({{CreateValidationError(model, "enum", $"Property '{{nameof({model.AccessExpression})}}' must be a defined enum value.")}});
             }
             """);
         }

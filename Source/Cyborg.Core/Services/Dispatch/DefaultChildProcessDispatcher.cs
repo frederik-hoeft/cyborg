@@ -43,7 +43,7 @@ public sealed class DefaultChildProcessDispatcher(ILoggerFactory loggerFactory, 
         string executable = processStartInfo.FileName;
         if (renderedArguments is null)
         {
-            _logger.LogProcessLaunching(executable);
+            _logger.LogProcessLaunchingWithoutArguments(executable);
         }
         else
         {
