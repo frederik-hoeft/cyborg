@@ -77,7 +77,7 @@ internal sealed record PropertyModel
     public bool HasCollectionValidationWork => Collection is not null
         && (HasCollectionElementValidationAspects || HasCollectionElementChildValidationWork);
 
-    public bool HasValidationWork => Aspects<IPropertyValidationAspect>().Any()
+    public bool HasValidationWork => this.Aspects<IPropertyValidationAspect>().Any()
         || HasNestedValidationWork
         || HasCollectionValidationWork;
 }

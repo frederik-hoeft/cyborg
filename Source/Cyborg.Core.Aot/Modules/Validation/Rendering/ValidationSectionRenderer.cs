@@ -42,11 +42,7 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
         builder = builder.IncreaseIndent();
         foreach (PropertyModel property in model.Properties)
         {
-            AppendValidationForProperty(
-                builder,
-                property,
-                $"{Variables.Module}.{property.Name}",
-                ValidationPath.ForProperty(property.Name));
+            AppendValidationForProperty(builder, property, $"{Variables.Module}.{property.Name}", ValidationPath.ForProperty(property.Name));
         }
         builder = builder.DecreaseIndent();
         builder.AppendBlock(
@@ -58,11 +54,7 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
             """);
     }
 
-    private void AppendValidationForProperty(
-        IndentedStringBuilder builder,
-        PropertyModel property,
-        string propertyAccessExpression,
-        ValidationPath path)
+    private void AppendValidationForProperty(IndentedStringBuilder builder, PropertyModel property, string propertyAccessExpression, ValidationPath path)
     {
         foreach (IPropertyValidationAspect aspect in property.Aspects<IPropertyValidationAspect>())
         {
@@ -71,23 +63,17 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
                 aspect.EmitValidation(this, builder, property, propertyAccessExpression, path);
             }
         }
-
         if (property.HasNestedValidationWork)
         {
             AppendNestedValidationForProperty(builder, property, propertyAccessExpression, path);
         }
-
         if (property.HasCollectionValidationWork)
         {
             AppendCollectionValidationForProperty(builder, property, propertyAccessExpression, path);
         }
     }
 
-    private void AppendNestedValidationForProperty(
-        IndentedStringBuilder builder,
-        PropertyModel property,
-        string propertyAccessExpression,
-        ValidationPath path)
+    private void AppendNestedValidationForProperty(IndentedStringBuilder builder, PropertyModel property, string propertyAccessExpression, ValidationPath path)
     {
         ObjectModel objectModel = property.Object
             ?? throw new InvalidOperationException($"Nested validation requires object metadata for property '{property.Name}'.");
@@ -114,11 +100,7 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
         }
     }
 
-    private void AppendCollectionValidationForProperty(
-        IndentedStringBuilder builder,
-        PropertyModel property,
-        string propertyAccessExpression,
-        ValidationPath path)
+    private void AppendCollectionValidationForProperty(IndentedStringBuilder builder, PropertyModel property, string propertyAccessExpression, ValidationPath path)
     {
         CollectionModel collection = property.Collection!;
         string safeIdentifier = CreateSafeIdentifier(propertyAccessExpression);
@@ -176,11 +158,7 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
         }
     }
 
-    private void AppendCollectionElementChildValidation(
-        IndentedStringBuilder builder,
-        PropertyModel property,
-        string elementVariable,
-        ValidationPath elementPath)
+    private void AppendCollectionElementChildValidation(IndentedStringBuilder builder, PropertyModel property, string elementVariable, ValidationPath elementPath)
     {
         if (property is not { Collection.ElementObject: { } elementObject })
         {
