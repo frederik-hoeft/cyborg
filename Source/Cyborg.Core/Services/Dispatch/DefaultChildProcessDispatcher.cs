@@ -8,24 +8,11 @@ public sealed class DefaultChildProcessDispatcher(ILoggerFactory loggerFactory, 
 {
     private readonly ILogger _logger = loggerFactory.CreateLogger("cyborg.core.services.childprocess");
 
-    public Task<ChildProcessResult> ExecuteAsync(ChildProcessInvocation invocation, CancellationToken cancellationToken)
+    public async Task<ChildProcessResult> ExecuteAsync(ChildProcessInvocation invocation, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(invocation);
         ProcessStartInfo processStartInfo = invocation.CreateProcessStartInfo();
         string renderedArguments = string.Join(" ", invocation.ArgumentList.Select(taggedStringRenderer.Render));
-        return ExecuteAsync(processStartInfo, renderedArguments, cancellationToken);
-    }
-
-    public Task<ChildProcessResult> ExecuteAsync(ProcessStartInfo processStartInfo, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(processStartInfo);
-        // A raw ProcessStartInfo has already discarded any TaggedString metadata. Do not mirror its
-        // arguments into logs because there is no safe way to determine how they should be rendered.
-        return ExecuteAsync(processStartInfo, renderedArguments: null, cancellationToken);
-    }
-
-    private async Task<ChildProcessResult> ExecuteAsync(ProcessStartInfo processStartInfo, string? renderedArguments, CancellationToken cancellationToken)
-    {
         // always disable shell execution to ensure that we can redirect streams and kill the process tree if needed
         processStartInfo.UseShellExecute = false;
         bool readStdout = processStartInfo.RedirectStandardOutput;
@@ -40,14 +27,7 @@ public sealed class DefaultChildProcessDispatcher(ILoggerFactory loggerFactory, 
         SubprocessResultBuilder builder = new();
         List<Task> streamTasks = [];
         string executable = processStartInfo.FileName;
-        if (renderedArguments is null)
-        {
-            _logger.LogProcessLaunchingWithoutArguments(executable);
-        }
-        else
-        {
-            _logger.LogProcessLaunching(executable, renderedArguments);
-        }
+        _logger.LogProcessLaunching(executable, renderedArguments);
         try
         {
             try

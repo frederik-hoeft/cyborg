@@ -81,7 +81,7 @@ public sealed class TaggedStringTests
         Assert.AreEqual(left, right);
         Assert.AreNotEqual(left, differentTags);
         Assert.AreNotEqual(left, differentValue);
-        Assert.IsTrue(left.Equals("same"));
+        Assert.IsTrue(left.ValueEquals("same"));
     }
 
     [TestMethod]
@@ -140,7 +140,7 @@ public sealed class TaggedStringTests
 
         Assert.IsFalse(tagged.Equals(raw));
         Assert.IsFalse(raw.Equals(tagged));
-        Assert.IsTrue(tagged.Equals("same"));
+        Assert.IsTrue(tagged.ValueEquals("same"));
     }
 
     private sealed class LeadingDecoratingTagHandler : ITaggedStringTagHandler

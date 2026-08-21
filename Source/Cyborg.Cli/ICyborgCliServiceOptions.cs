@@ -1,4 +1,5 @@
-﻿using Cyborg.Cli.Configuration;
+﻿using Cyborg.Cli.Arguments;
+using Cyborg.Cli.Configuration;
 using Cyborg.Cli.Logging;
 using Cyborg.Cli.Logging.Options;
 using Cyborg.Cli.Metrics;
@@ -15,6 +16,7 @@ namespace Cyborg.Cli;
 
 [ServiceProviderModule]
 [Singleton<LoggingOptions>]
+[Singleton<DynamicArgumentLogRenderer>]
 [Singleton<ILoggingConfigurator, ConsoleLoggingConfigurator>]
 [Singleton<ILoggingConfigurator, RollingFileLoggingConfigurator>]
 [Singleton<ILoggingConfigurator, FileLoggingConfigurator>]

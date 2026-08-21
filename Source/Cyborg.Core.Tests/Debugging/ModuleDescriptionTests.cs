@@ -62,6 +62,28 @@ public sealed class ModuleDescriptionTests : CyborgCoreTestBase
     });
 
     [TestMethod]
+    public Task Test_ToTextAsync_HintsDoNotChangeBuiltInRenderingAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleSerializationService serializationService = services.GetRequiredService<IModuleSerializationService>();
+        HintDescriptor descriptor = new();
+
+        string result = await serializationService.ToTextAsync(descriptor, TestContext.CancellationToken);
+
+        Assert.Contains("sensitive", result);
+    });
+
+    [TestMethod]
+    public Task Test_ToJsonAsync_HintsDoNotChangeBuiltInRenderingAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleSerializationService serializationService = services.GetRequiredService<IModuleSerializationService>();
+        HintDescriptor descriptor = new();
+
+        string result = await serializationService.ToJsonAsync(descriptor, TestContext.CancellationToken);
+
+        Assert.Contains("sensitive", result);
+    });
+
+    [TestMethod]
     public Task Test_SerializeAsync_CustomSerializerCanInterpretHintsAsync() => TestWithDIAsync(async services =>
     {
         IModuleSerializationService serializationService = services.GetRequiredService<IModuleSerializationService>();

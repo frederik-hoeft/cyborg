@@ -24,7 +24,7 @@ Handlers now receive only the current display value. Rendering is deterministic 
 
 `SubprocessModule` carried tagged arguments, but workers converted them to `ProcessStartInfo.ArgumentList` before dispatch. The default dispatcher then logged the already-untagged command line.
 
-`ChildProcessInvocation` now carries tagged arguments and environment values to the dispatcher. The dispatcher renders arguments for diagnostics through `ITaggedStringRenderer` and separately materializes raw values immediately before process execution. The legacy `ProcessStartInfo` dispatch overload remains compatible, but deliberately omits argument logging because metadata is unavailable at that boundary.
+`ChildProcessInvocation` now carries tagged arguments and environment values to the dispatcher. The dispatcher renders arguments for diagnostics through `ITaggedStringRenderer` and separately materializes raw values immediately before process execution. `IChildProcessDispatcher` accepts only this metadata-aware invocation, so callers cannot accidentally cross the raw `ProcessStartInfo` boundary before diagnostic rendering.
 
 This boundary is also used by Borg and the built-in network modules that launch child processes.
 
@@ -32,7 +32,7 @@ This boundary is also used by Borg and the built-in network modules that launch 
 
 The CLI previously logged the complete process command line before typed dynamic values were parsed. A secret supplied through `cyborg.types.secret.v1` could therefore be persisted to a log before it became a tagged value.
 
-Startup logging no longer mirrors raw arguments. Invalid environment/configuration definitions are reported without echoing the supplied value. Configuration parsing diagnostics describe the structural/type error rather than logging the original definition. The configuration-argument APIs no longer return the full invalid definition either; retaining that raw value after deciding it must not be logged only creates another accidental disclosure path for future callers.
+Startup logging records an effective argument snapshot only after configuration and environment definitions have been parsed. Tagged dynamic values are rendered through `ITaggedStringRenderer`, while structured typed payloads are summarized rather than mirrored verbatim. Invalid environment/configuration definitions are still echoed with a reason because taint metadata cannot be established for malformed input and the diagnostic value of identifying the rejected definition is higher than treating every invalid value as implicitly secret.
 
 ### `[Secret]` was coupled to interpolation
 
@@ -46,7 +46,7 @@ The source generator initially hard-coded metadata names for `TaggedString` and 
 
 ### Value and presentation responsibilities were mixed
 
-`TaggedString` initially exposed a secret-specific redaction constant and object equality claimed cross-type equality with `string`. Secret presentation now lives with `SecretTagHandler`; `TaggedString` owns only raw value/tag semantics and conservative context-free formatting. Object equality is type-consistent while explicit textual comparison remains available through `IEquatable<string>` and the convenience operators.
+`TaggedString` initially exposed a secret-specific redaction constant and object equality claimed cross-type equality with `string`. Secret presentation now lives with `SecretTagHandler`; `TaggedString` owns only raw value/tag semantics and conservative context-free formatting. Object equality is type-consistent, while `ValueEquals(string?)` and the convenience operators provide explicit raw-value comparison without presenting cross-type `Equals` semantics.
 
 ### Migration diagnostics needed a deliberate compatibility boundary
 
@@ -66,8 +66,8 @@ The shared generator helper used by both the defaults and override sections cont
 - `TaggedString.ToString()` is a context-free fallback containing only globally built-in fallback policy. It is not the rendering mechanism for DI-aware Cyborg consumers.
 - `[Secret]` imposes an intrinsic property tag during generated preparation and final validation asserts the invariant.
 - `ChildProcessInvocation` retains tags until the child-process execution boundary. Raw subprocess values and compatibility retrieval as `string` are intentional metadata-loss operations.
-- Description serializers, generated validation diagnostics, metrics labels, switch diagnostics, subprocess argument logging, and CLI target logging render tagged values through the DI policy.
-- Raw CLI argument text is not mirrored into startup/error logs because it exists before tag metadata can be established.
+- Description serializers, generated validation diagnostics, metrics labels, switch diagnostics, subprocess argument logging, CLI target logging, and valid typed CLI definitions render tagged values through the DI policy.
+- Startup logging uses parsed effective arguments rather than the raw process command line; malformed definitions are echoed only on their explicit error path together with the parse/type failure reason.
 
 ## Boundaries and limitations
 

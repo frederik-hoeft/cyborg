@@ -125,6 +125,8 @@ public sealed class ConfigurationArgumentHandlerTests : CyborgCliTestBase
 
         Assert.IsFalse(configured);
         Assert.IsNotNull(errorMessage);
+        Assert.Contains("test:does.not.exist=1", errorMessage);
+        Assert.Contains("Reason:", errorMessage);
         Assert.Contains("Unknown dynamic value type", errorMessage);
     });
 }

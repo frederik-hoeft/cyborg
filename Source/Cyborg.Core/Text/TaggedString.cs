@@ -17,7 +17,7 @@ namespace Cyborg.Core.Text;
 /// </remarks>
 [JsonConverter(typeof(TaggedStringJsonConverter))]
 [GeneratorContractRegistration<ModuleValidationGeneratorContract>(ModuleValidationGeneratorContract.TaggedString)]
-public readonly struct TaggedString : IEquatable<TaggedString>, IEquatable<string>
+public readonly struct TaggedString : IEquatable<TaggedString>
 {
     private readonly ImmutableHashSet<string>? _tags;
     private readonly string? _value;
@@ -81,7 +81,7 @@ public readonly struct TaggedString : IEquatable<TaggedString>, IEquatable<strin
     public bool Equals(TaggedString other) =>
         string.Equals(Value, other.Value, StringComparison.Ordinal) && Tags.SetEquals(other.Tags);
 
-    public bool Equals(string? other) => string.Equals(Value, other, StringComparison.Ordinal);
+    public bool ValueEquals(string? other) => string.Equals(Value, other, StringComparison.Ordinal);
 
     public override bool Equals(object? obj) => obj is TaggedString tagged && Equals(tagged);
 
@@ -106,13 +106,13 @@ public readonly struct TaggedString : IEquatable<TaggedString>, IEquatable<strin
 
     public static bool operator !=(TaggedString left, TaggedString right) => !left.Equals(right);
 
-    public static bool operator ==(TaggedString left, string? right) => left.Equals(right);
+    public static bool operator ==(TaggedString left, string? right) => left.ValueEquals(right);
 
-    public static bool operator !=(TaggedString left, string? right) => !left.Equals(right);
+    public static bool operator !=(TaggedString left, string? right) => !left.ValueEquals(right);
 
-    public static bool operator ==(string? left, TaggedString right) => right.Equals(left);
+    public static bool operator ==(string? left, TaggedString right) => right.ValueEquals(left);
 
-    public static bool operator !=(string? left, TaggedString right) => !right.Equals(left);
+    public static bool operator !=(string? left, TaggedString right) => !right.ValueEquals(left);
 
     internal static ImmutableHashSet<string> UnionTags(IEnumerable<string>? left, IEnumerable<string>? right)
     {

@@ -32,16 +32,8 @@ internal sealed class SecretProcessor : AttributeProcessorBase<SecretAttribute>
         return true;
     }
 
-    private sealed class SecretAspect : PropertyValidationAspect, IPropertyDescriptionAspect, IPropertyPreparationAspect
+    private sealed class SecretAspect : PropertyValidationAspect, IPropertyPreparationAspect
     {
-        public void RegisterDescriptorHints(List<string> hints, ValidationContractInfo contractInfo, DiagnosticsReporter diagnosticsReporter, PropertyModel property)
-        {
-            if (!hints.Contains(contractInfo.SecretTag))
-            {
-                hints.Add(contractInfo.SecretTag);
-            }
-        }
-
         public string RewritePreparedValueExpression(PropertyRewriteContext context, string currentExpression)
         {
             string taggedStringType = context.ContractInfo.TaggedString.RenderGlobal();

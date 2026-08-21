@@ -153,6 +153,7 @@ public sealed class TaggedStringModuleTests : ModuleTestBase
     [TestMethod]
     public Task Test_ToTextAsync_SecretTaggedString_IsRedactedAsync() => TestWithDIAsync(async services =>
     {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
         IModuleSerializationService serializationService = services.GetRequiredService<IModuleSerializationService>();
         TaggedStringTestModule module = new(
             Plain: "visible",
@@ -160,8 +161,10 @@ public sealed class TaggedStringModuleTests : ModuleTestBase
             OptionalSecret: null,
             IntentionallyUntagged: "id",
             Values: ["one"]);
+        IValidationResult<TaggedStringTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
 
-        string text = await serializationService.ToTextAsync(module, TestContext.CancellationToken);
+        MSAssert.IsTrue(result.IsValid);
+        string text = await serializationService.ToTextAsync(result.Module, TestContext.CancellationToken);
 
         MSAssert.Contains("visible", text);
         MSAssert.Contains(SecretTagHandler.RedactedDisplay, text);
@@ -169,8 +172,9 @@ public sealed class TaggedStringModuleTests : ModuleTestBase
     });
 
     [TestMethod]
-    public Task Test_ToJsonAsync_SecretHint_RedactsBeforePreparationAsync() => TestWithDIAsync(async services =>
+    public Task Test_ToJsonAsync_SecretTaggedString_IsRedactedAsync() => TestWithDIAsync(async services =>
     {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
         IModuleSerializationService serializationService = services.GetRequiredService<IModuleSerializationService>();
         TaggedStringTestModule module = new(
             Plain: "visible",
@@ -178,8 +182,10 @@ public sealed class TaggedStringModuleTests : ModuleTestBase
             OptionalSecret: null,
             IntentionallyUntagged: "id",
             Values: ["one"]);
+        IValidationResult<TaggedStringTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
 
-        string json = await serializationService.ToJsonAsync(module, TestContext.CancellationToken);
+        MSAssert.IsTrue(result.IsValid);
+        string json = await serializationService.ToJsonAsync(result.Module, TestContext.CancellationToken);
 
         MSAssert.Contains(SecretTagHandler.RedactedDisplay, json);
         MSAssert.DoesNotContain("s3cret", json);

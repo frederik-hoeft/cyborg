@@ -274,7 +274,7 @@ This is used by `AssertModule.Message`, whose placeholders may refer to artifact
 
 ### Secret
 
-Valid only on `TaggedString` properties. Declares `cyborg.secret.v1` as an intrinsic property tag. Generated preparation ensures the tag is present both before and after override selection, so an override may replace the value but cannot declassify the property; final validation asserts the invariant. This is independent of interpolation, including when `[IgnoreInterpolation]` defers evaluation. The generated descriptor contributes the same tag as a hint so inspection is safe even before normal preparation has run. Cyborg-controlled display surfaces redact secret-tagged values as `[REDACTED]`.
+Valid only on `TaggedString` properties. Declares `cyborg.secret.v1` as an intrinsic property tag. Generated preparation ensures the tag is present both before and after override selection, so an override may replace the value but cannot declassify the property; final validation asserts the invariant. This is independent of interpolation, including when `[IgnoreInterpolation]` defers evaluation. Cyborg-controlled display surfaces render the resulting tagged value through `ITaggedStringRenderer`, which redacts the built-in secret tag as `[REDACTED]`.
 
 **Applies to:** `TaggedString` properties only. Combining `[Secret]` with `[Untagged]` is an error.
 

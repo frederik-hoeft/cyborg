@@ -1,4 +1,4 @@
-# Source Generators
+﻿# Source Generators
 
 This document describes the Roslyn source generators in `Cyborg.Core.Aot`. The generator layer produces the compile-time code that makes the module system, validation pipeline, and decomposition model work without runtime reflection, enabling native AOT compilation and trim safety.
 
@@ -107,7 +107,7 @@ Two processor interfaces exist:
 - **`IPropertyAttributeProcessor`** — Triggered when its `AttributeMetadataName` matches an attribute on the property being processed. Handles attribute-driven behaviors like `[Required]`, `[Range<T>]`, and `[DefaultValue<T>]`.
 - **`IDynamicPropertyProcessor`** — Invoked for every property regardless of attributes. Handles context-dependent behaviors such as collection override resolution, where the processing logic depends on the property type rather than an attribute.
 
-Each processor returns one or more property-aspect objects implementing the stage interfaces they participate in (`IPropertyDefaultAspect`, `IPropertyPreparationAspect`, `IPropertyOverrideAspect`, `IPropertyDescriptionAspect`, and `IPropertyValidationAspect`). `IPropertyAspect` is only the common marker stored by the property model; renderers select aspects by the stage interface they consume. This keeps stage contracts explicit without forcing unrelated behaviors through a broad base class. `[DefaultValue<T>]` contributes only default selection, while `[Secret]` participates in preparation, description, and final validation through the corresponding interfaces.
+Each processor returns one or more property-aspect objects implementing the stage interfaces they participate in (`IPropertyDefaultAspect`, `IPropertyPreparationAspect`, `IPropertyOverrideAspect`, and `IPropertyValidationAspect`). `IPropertyAspect` is only the common marker stored by the property model; renderers select aspects by the stage interface they consume. This keeps stage contracts explicit without forcing unrelated behaviors through a broad base class. `[DefaultValue<T>]` contributes only default selection, while `[Secret]` participates in preparation and final validation through the corresponding interfaces.
 
 Validation attributes that support collection elements derive from `PropertyValidationAttribute` and are processed through `PropertyValidationProcessorBase<TAttribute>`. The base processor resolves the optional `TargetsElements` flag, verifies that the property is a supported collection when element targeting is requested, and evaluates attribute-specific type requirements against either the property type or the collection element type. Element-targeted constraints are wrapped in a `CollectionElementValidationAspect`, allowing the individual attribute processors to emit the same validation logic for either target without implementing collection traversal themselves. Because these attributes are repeatable, a property can contribute both an ordinary property aspect and one or more element-targeted aspects.
 
@@ -146,7 +146,7 @@ The validation generator renders one partial module declaration from a shared pr
 | `ValidateAsync` | Orchestrate preparation and emit constraint checks |
 | `GetDescriptor` / `DescribeAsync` | Expose format-neutral identity and structural description |
 
-The description traversal uses the same recursive property graph and collection guards as the preparation pipeline, so validation and inspection agree on which values are scalar, nested, absent, or enumerable. Property aspects may also contribute arbitrary descriptor-hint keys. Hints are emitted as metadata and remain serializer-neutral; interpretation belongs to description consumers rather than the generator.
+The description traversal uses the same recursive property graph and collection guards as the preparation pipeline, so validation and inspection agree on which values are scalar, nested, absent, or enumerable. Descriptor APIs may carry arbitrary hint metadata for custom consumers, but generated validation aspects do not use hints as a second taint channel; built-in presentation policy follows the runtime `TaggedString` tags on the described value.
 
 ### Nested and Collection Handling
 

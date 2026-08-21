@@ -98,7 +98,6 @@ internal sealed class Commands
             }
 
             ILogger logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("cyborg.cli.main");
-            logger.LogStartup();
 
             if (!configurationArgumentsValid)
             {
@@ -121,6 +120,9 @@ internal sealed class Commands
             {
                 return 1;
             }
+
+            DynamicArgumentLogRenderer argumentLogRenderer = services.GetRequiredService<DynamicArgumentLogRenderer>();
+            logger.LogStartup(RenderRunArguments(main, options, environmentVariables, config, metrics, logLevel, breakAt, argumentLogRenderer));
 
             IModuleConfigurationLoader moduleLoader = services.GetRequiredService<IModuleConfigurationLoader>();
             ModuleContext module = await moduleLoader.LoadModuleAsync(main, cancellationToken);
@@ -158,6 +160,56 @@ internal sealed class Commands
             CollectRunMetrics(globalEnvironment, metricsCollector, runSucceeded);
             await WriteMetricsAsync(metricsCollector, metricsDestinationPath, CancellationToken.None);
         }
+    }
+
+    private static string RenderRunArguments(
+        string main,
+        string options,
+        string[]? environmentVariables,
+        string[]? config,
+        string? metrics,
+        LogLevel? logLevel,
+        string[]? breakAt,
+        DynamicArgumentLogRenderer dynamicArgumentLogRenderer)
+    {
+        return string.Join(", ",
+        [
+            $"main={QuoteArgument(main)}",
+            $"options={QuoteArgument(options)}",
+            $"environmentVariables={RenderArgumentArray(environmentVariables, dynamicArgumentLogRenderer.RenderDefinition)}",
+            $"config={RenderArgumentArray(config, dynamicArgumentLogRenderer.RenderDefinition)}",
+            $"metrics={RenderOptionalArgument(metrics)}",
+            $"logLevel={(logLevel.HasValue ? logLevel.Value.ToString() : "null")}",
+            $"breakAt={RenderArgumentArray(breakAt)}",
+        ]);
+    }
+
+    private static string RenderArgumentArray(string[]? values, Func<string, string>? renderer = null)
+    {
+        if (values is null)
+        {
+            return "null";
+        }
+
+        List<string> renderedValues = [];
+        foreach (string value in values)
+        {
+            string renderedValue = renderer is null ? value : renderer(value);
+            renderedValues.Add(QuoteArgument(renderedValue));
+        }
+        return $"[{string.Join(", ", renderedValues)}]";
+    }
+
+    private static string RenderOptionalArgument(string? value) => value is null ? "null" : QuoteArgument(value);
+
+    private static string QuoteArgument(string value)
+    {
+        string escaped = value
+            .Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("\"", "\\\"", StringComparison.Ordinal)
+            .Replace("\r", "\\r", StringComparison.Ordinal)
+            .Replace("\n", "\\n", StringComparison.Ordinal);
+        return $"\"{escaped}\"";
     }
 
     private static void CollectRunMetrics(GlobalRuntimeEnvironment environment, IMetricsCollector metricsCollector, bool runSucceeded)

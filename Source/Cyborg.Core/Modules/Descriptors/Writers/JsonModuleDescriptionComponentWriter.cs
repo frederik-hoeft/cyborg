@@ -55,10 +55,7 @@ internal sealed class JsonModuleDescriptionComponentWriter(Utf8JsonWriter jsonWr
                 jsonWriter.WriteNumberValue(number);
                 break;
             case TaggedString tagged:
-                jsonWriter.WriteStringValue(taggedStringRenderer.Render(tagged.WithTags(hints)));
-                break;
-            case string text when !hints.IsEmpty:
-                jsonWriter.WriteStringValue(taggedStringRenderer.Render(new TaggedString(text, hints)));
+                jsonWriter.WriteStringValue(taggedStringRenderer.Render(tagged));
                 break;
             case string text:
                 jsonWriter.WriteStringValue(text);

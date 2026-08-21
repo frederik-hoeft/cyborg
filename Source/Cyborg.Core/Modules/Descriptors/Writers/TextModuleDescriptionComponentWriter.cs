@@ -87,8 +87,7 @@ internal sealed class TextModuleDescriptionComponentWriter(IndentedStringBuilder
     private static IndentedStringBuilder WriteAtom<T>(IndentedStringBuilder builder, ITaggedStringRenderer taggedStringRenderer, T value, ImmutableArray<string> hints) => value switch
     {
         null => builder.AppendLine("null"),
-        TaggedString tagged => AppendQuotedString(builder, taggedStringRenderer.Render(tagged.WithTags(hints)), '"'),
-        string text when !hints.IsEmpty => AppendQuotedString(builder, taggedStringRenderer.Render(new TaggedString(text, hints)), '"'),
+        TaggedString tagged => AppendQuotedString(builder, taggedStringRenderer.Render(tagged), '"'),
         string text => AppendQuotedString(builder, text, '"'),
         char character => AppendQuotedString(builder, character.ToString(), '\''),
         bool flag => builder.AppendLine(flag ? "true" : "false"),
