@@ -182,9 +182,9 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
         IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
 
         MSAssert.IsFalse(result.IsValid);
-        MSAssert.AreEqual(1, result.Errors.Count(error =>
+        MSAssert.ContainsSingle(error =>
             error.Rule == "length"
-            && error.PropertyName.EndsWith(nameof(ValidationPipelineTestModule.NestedLengthItems), StringComparison.Ordinal)));
+            && error.PropertyName.EndsWith(nameof(ValidationPipelineTestModule.NestedLengthItems), StringComparison.Ordinal), result.Errors);
         MSAssert.Contains(
             error => error.Rule == "length"
                 && error.Message.StartsWith("Collection element 1 of property", StringComparison.Ordinal),
@@ -233,8 +233,7 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
         IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
         runtime.Environment.SetVariable("fallback", "resolved-default");
 
-        ValidationPipelineStructCollection<ValidationPipelineTestItem> items = new();
-        items.Add(new(Value: null!));
+        ValidationPipelineStructCollection<ValidationPipelineTestItem> items = [new(Value: null!)];
         ValidationPipelineTestModule module = CreateValidModule() with
         {
             StructCollectionItems = items,

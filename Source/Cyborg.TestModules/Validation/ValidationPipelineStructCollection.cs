@@ -11,27 +11,21 @@ public struct ValidationPipelineStructCollection<T> : ICollection<T>
         _items = null;
     }
 
-    public int Count => _items?.Count ?? 0;
+    public readonly int Count => _items?.Count ?? 0;
 
-    public bool IsReadOnly => false;
+    public readonly bool IsReadOnly => false;
 
     public void Add(T item) => (_items ??= []).Add(item);
 
-    public void Clear() => _items?.Clear();
+    public readonly void Clear() => _items?.Clear();
 
-    public bool Contains(T item) => _items?.Contains(item) ?? false;
+    public readonly bool Contains(T item) => _items?.Contains(item) ?? false;
 
-    public void CopyTo(T[] array, int arrayIndex)
-    {
-        if (_items is not null)
-        {
-            _items.CopyTo(array, arrayIndex);
-        }
-    }
+    public readonly void CopyTo(T[] array, int arrayIndex) => _items?.CopyTo(array, arrayIndex);
 
-    public bool Remove(T item) => _items?.Remove(item) ?? false;
+    public readonly bool Remove(T item) => _items?.Remove(item) ?? false;
 
-    public IEnumerator<T> GetEnumerator() => (_items ?? []).GetEnumerator();
+    public readonly IEnumerator<T> GetEnumerator() => (_items ?? []).GetEnumerator();
 
-    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    readonly IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }

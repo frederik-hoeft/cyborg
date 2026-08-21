@@ -1,5 +1,6 @@
 ﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
+using Cyborg.Core.Aot.Modules.Validation.Rendering.Collections;
 using Microsoft.CodeAnalysis;
 using System.Text;
 
@@ -102,7 +103,7 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
         string safeIdentifier = CreateSafeIdentifier(propertyAccessExpression);
         string collectionAccessExpression = propertyAccessExpression;
         string elementVariable = $"{safeIdentifier}Element";
-        CollectionValueAccess access = CollectionCodeGeneration.CreateAccess(collection.Shape, propertyAccessExpression);
+        CollectionValueAccess access = collection.Shape.Renderer.Access(propertyAccessExpression);
 
         if (access.RequiresGuard)
         {
@@ -160,7 +161,7 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
     {
         CollectionModel collection = property.Collection!;
         string elementCurrentVariable = $"{elementVariable}Current";
-        CollectionValueAccess elementAccess = CollectionCodeGeneration.CreateElementAccess(collection.Shape, elementVariable);
+        CollectionValueAccess elementAccess = collection.Shape.Renderer.ElementAccess(elementVariable);
         int validationIndentLevel = builder.IndentLevel + (elementAccess.RequiresGuard ? 1 : 0);
         StringBuilder validationRawBuilder = new();
         IndentedStringBuilder validationBuilder = new(validationRawBuilder, validationIndentLevel);

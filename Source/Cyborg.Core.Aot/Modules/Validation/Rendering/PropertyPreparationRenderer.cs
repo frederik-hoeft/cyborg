@@ -1,5 +1,6 @@
 ﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
+using Cyborg.Core.Aot.Modules.Validation.Rendering.Collections;
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
 
@@ -75,7 +76,7 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
     public void AppendCollectionPreparationForProperty(IndentedStringBuilder builder, PropertyModel property, string localName, string diagnosticsPhase)
     {
         CollectionModel collection = property.Collection!;
-        CollectionValueAccess access = CollectionCodeGeneration.CreateAccess(collection.Shape, localName);
+        CollectionValueAccess access = collection.Shape.Renderer.Access(localName);
         if (access.RequiresGuard)
         {
             string collectionCurrentVariable = $"{localName}Current";
@@ -170,7 +171,7 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
             """);
 
         IndentedStringBuilder loopBuilder = builder.IncreaseIndent();
-        CollectionValueAccess elementAccess = CollectionCodeGeneration.CreateElementAccess(collection.Shape, elementVariable);
+        CollectionValueAccess elementAccess = collection.Shape.Renderer.ElementAccess(elementVariable);
         if (elementAccess.RequiresGuard)
         {
             loopBuilder.AppendLine($"{collection.ElementNullableTypeName} {elementCurrentVariable} = {elementVariable};");
@@ -197,7 +198,7 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
         }
 
         builder.AppendLine("}");
-        CollectionCodeGeneration.AppendMaterialization(builder, collection, collectionVariable, rewrittenItemsVariable);
+        collection.Renderer.AppendMaterialization(builder, collectionVariable, rewrittenItemsVariable);
     }
 
     private bool HasPreparationWork(MutablePropertyRewriteContext rewriteContext)

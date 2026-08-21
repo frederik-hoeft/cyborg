@@ -1,7 +1,7 @@
 ﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Cyborg.Core.Aot.Modules.Validation.Models;
-using Cyborg.Core.Aot.Modules.Validation.Rendering;
+using Cyborg.Core.Aot.Modules.Validation.Rendering.Collections;
 using Microsoft.CodeAnalysis;
 using System.Globalization;
 
@@ -13,7 +13,7 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValid
     {
         aspect = null;
 
-        LengthTargetKind targetKind = GetTargetKind(context.Compilation, target.Type, context.ContractInfo, out CollectionShape? collectionShape);
+        LengthTargetKind targetKind = GetTargetKind(target.Type, in context, out CollectionShape? collectionShape);
         if (targetKind == LengthTargetKind.None)
         {
             context.Report(
@@ -74,15 +74,15 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValid
 
     protected abstract bool TryGetBounds(AttributeData attribute, ref readonly PropertyProcessingContext context, out int? min, out int? max);
 
-    private static LengthTargetKind GetTargetKind(Compilation compilation, ITypeSymbol targetType, ValidationContractInfo contractInfo, out CollectionShape? collectionShape)
+    private static LengthTargetKind GetTargetKind(ITypeSymbol targetType, ref readonly PropertyProcessingContext context, out CollectionShape? collectionShape)
     {
         collectionShape = null;
-        if (targetType.IsStringLike(contractInfo.TaggedString))
+        if (targetType.IsStringLike(context.ContractInfo.TaggedString))
         {
             return LengthTargetKind.String;
         }
 
-        if (CollectionTypeInspector.TryDescribe(compilation, targetType, out collectionShape) && collectionShape.SupportsCount)
+        if (CollectionTypeInspector.TryDescribe(context.Compilation, targetType, out collectionShape) && collectionShape.SupportsCount)
         {
             return LengthTargetKind.Collection;
         }
@@ -111,7 +111,7 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValid
             {
                 CollectionShape shape = collectionShape
                     ?? throw new InvalidOperationException("Collection length validation is missing collection shape metadata.");
-                CollectionValueAccess access = CollectionCodeGeneration.CreateAccess(shape, model.AccessExpression);
+                CollectionValueAccess access = shape.Renderer.Access(model.AccessExpression);
                 if (access.RequiresGuard)
                 {
                     builder.AppendBlock(
@@ -119,12 +119,12 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValid
                         if ({{access.GuardExpression}})
                         {
                         """);
-                    EmitLengthValidation(builder.IncreaseIndent(), model, CollectionCodeGeneration.CreateCountExpression(shape, access.ValueExpression));
+                    EmitLengthValidation(builder.IncreaseIndent(), model, shape.Renderer.CountExpression(access.ValueExpression));
                     builder.AppendLine("}");
                     return;
                 }
 
-                EmitLengthValidation(builder, model, CollectionCodeGeneration.CreateCountExpression(shape, access.ValueExpression));
+                EmitLengthValidation(builder, model, shape.Renderer.CountExpression(access.ValueExpression));
                 return;
             }
 

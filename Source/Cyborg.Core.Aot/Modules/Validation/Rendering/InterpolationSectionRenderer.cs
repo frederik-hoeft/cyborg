@@ -1,6 +1,7 @@
 ﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using Cyborg.Core.Aot.Modules.Validation.Processors;
+using Cyborg.Core.Aot.Modules.Validation.Rendering.Collections;
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
 
@@ -151,7 +152,7 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
 
     private void AppendCollectionInterpolation(IndentedStringBuilder builder, PropertyModel property, CollectionModel collection, string localName)
     {
-        CollectionValueAccess access = CollectionCodeGeneration.CreateAccess(collection.Shape, localName);
+        CollectionValueAccess access = collection.Shape.Renderer.Access(localName);
         if (access.RequiresGuard)
         {
             string collectionCurrentVar = $"{localName}Current";
@@ -194,12 +195,12 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
         IndentedStringBuilder loopBuilder = builder.IncreaseIndent();
 
         bool isStringElem = collection.ElementType.IsStringLike(ContractInfo.TaggedString);
-        CollectionValueAccess elementAccess = CollectionCodeGeneration.CreateElementAccess(collection.Shape, elemVar);
+        CollectionValueAccess elementAccess = collection.Shape.Renderer.ElementAccess(elemVar);
 
         if (elementAccess.RequiresGuard)
         {
             loopBuilder.AppendLine($"{collection.ElementNullableTypeName} {elemCurrentVar} = {elemVar};");
-            elementAccess = CollectionCodeGeneration.CreateElementAccess(collection.Shape, elemCurrentVar);
+            elementAccess = collection.Shape.Renderer.ElementAccess(elemCurrentVar);
             loopBuilder.AppendBlock(
                 $$"""
                 if ({{elementAccess.GuardExpression}})
@@ -239,7 +240,7 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
         }
 
         builder.AppendLine("}");
-        CollectionCodeGeneration.AppendMaterialization(builder, collection, collectionVar, rewrittenItemsVar);
+        collection.Renderer.AppendMaterialization(builder, collectionVar, rewrittenItemsVar);
     }
 
     private bool HasInterpolationWork(ImmutableArray<PropertyModel> properties)

@@ -43,7 +43,7 @@ public sealed partial record ValidationPipelineTestModule
 
     public ImmutableArray<ValidationPipelineValueItem?> NullableValueElementItems { get; init; } = [];
 
-    public ValidationPipelineStructCollection<ValidationPipelineTestItem> StructCollectionItems { get; init; } = new();
+    public ValidationPipelineStructCollection<ValidationPipelineTestItem> StructCollectionItems { get; init; } = [];
 
     [MinLength(1, TargetsElements = true)]
     public IReadOnlyCollection<ImmutableArray<string>?> NestedLengthItems { get; init; } = [];

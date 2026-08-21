@@ -1,5 +1,6 @@
 ﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
+using Cyborg.Core.Aot.Modules.Validation.Rendering.Collections;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
@@ -130,7 +131,7 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
         string symbolPath, string? hintsExpression, bool isProperty)
     {
         CollectionModel collection = property.Collection!;
-        CollectionValueAccess access = CollectionCodeGeneration.CreateAccess(collection.Shape, nodeAccessExpression);
+        CollectionValueAccess access = collection.Shape.Renderer.Access(nodeAccessExpression);
         if (!access.RequiresGuard)
         {
             AppendCollectionBody(builder, property, builderVariableName, access.ValueExpression, displayName, symbolPath, hintsExpression, isProperty);
@@ -155,6 +156,7 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
     private void AppendCollectionBody(IndentedStringBuilder builder, PropertyModel property, string builderVariableName, string collectionAccessExpression,
         string displayName, string symbolPath, string? hintsExpression, bool isProperty)
     {
+        CollectionModel collection = property.Collection ?? throw new InvalidOperationException($"A collection model is required for property '{property.Name}' to render a collection body.");
         string collectionBuilderName = SymbolNameGenerator.MakeCamelCase($"{symbolPath}Builder");
         string elementName = SymbolNameGenerator.MakeCamelCase($"{symbolPath}Element");
 
@@ -192,7 +194,7 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
     private void AppendCollectionObjectElement(IndentedStringBuilder builder, CollectionModel collection, string collectionBuilderName, string elementName, string symbolPath)
     {
         string elementBuilderName = SymbolNameGenerator.MakeCamelCase($"{symbolPath}ElementBuilder");
-        CollectionValueAccess elementAccess = CollectionCodeGeneration.CreateElementAccess(collection.Shape, elementName);
+        CollectionValueAccess elementAccess = collection.Shape.Renderer.ElementAccess(elementName);
 
         if (elementAccess.RequiresGuard)
         {
