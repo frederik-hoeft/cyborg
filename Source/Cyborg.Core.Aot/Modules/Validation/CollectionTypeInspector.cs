@@ -50,6 +50,11 @@ internal static class CollectionTypeInspector
             ? CollectionCountKind.ReadOnlyCollection
             : CollectionCountKind.None;
 
+        if (isImmutableArray)
+        {
+            countKind = CollectionCountKind.ArrayLength;
+        }
+
         shape = new CollectionShape(
             ElementType: elementType,
             AccessKind: DetermineAccessKind(type, isImmutableArray),
