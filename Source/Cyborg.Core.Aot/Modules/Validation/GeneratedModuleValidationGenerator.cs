@@ -16,29 +16,26 @@ public sealed class GeneratedModuleValidationGenerator : IIncrementalGenerator
     {
         context.RegisterPostInitializationOutput(ValidationFrameworkSourceRegistry.Emit);
 
-        IncrementalValuesProvider<GenerationCandidate?> candidates = context.SyntaxProvider.ForAttributeWithMetadataName(
-            fullyQualifiedMetadataName: typeof(GeneratedModuleValidationAttribute).FullName,
+        IncrementalValuesProvider<ValidationAnnotatedTarget> targets = context.SyntaxProvider.ForAttributeWithMetadataName(
+            fullyQualifiedMetadataName: typeof(GeneratedModuleValidationAttribute).FullName!,
             predicate: static (node, _) => node is RecordDeclarationSyntax or ClassDeclarationSyntax,
-            transform: static (attributeContext, cancellationToken) => GenerationCandidateFactory.Create(attributeContext));
+            transform: static (attributeContext, _) => ValidationAnnotatedTarget.Create(attributeContext));
 
-        IncrementalValuesProvider<GenerationCandidate> validCandidates = candidates
-            .Where(static candidate => candidate is not null)
-            .Select(static (candidate, _) => candidate!);
+        IncrementalValueProvider<(Compilation Compilation, ImmutableArray<ValidationAnnotatedTarget> Targets)> pipeline =
+            context.CompilationProvider.Combine(targets.Collect());
 
-        IncrementalValueProvider<(Compilation, ImmutableArray<GenerationCandidate>)> compilationAndCandidates =
-            context.CompilationProvider.Combine(validCandidates.Collect());
-
-        context.RegisterSourceOutput(compilationAndCandidates, static (sourceProductionContext, compilationAndCandidates) =>
+        context.RegisterSourceOutput(pipeline, static (sourceProductionContext, state) =>
         {
-            (Compilation compilation, ImmutableArray<GenerationCandidate> candidates) = compilationAndCandidates;
-            ContractExplorer explorer = new(compilation);
-            ValidationContractInfo? contractInfo = ValidationContractInfo.Create(explorer, sourceProductionContext);
+            (Compilation compilation, ImmutableArray<ValidationAnnotatedTarget> discoveredTargets) = state;
+            ValidationContractInfo? contractInfo = ValidationContractInfo.Create(new ContractExplorer(compilation), sourceProductionContext);
             if (contractInfo is null)
             {
                 return;
             }
-            foreach (GenerationCandidate candidate in candidates)
+
+            foreach (ValidationAnnotatedTarget target in discoveredTargets)
             {
+                GenerationCandidate candidate = GenerationCandidateFactory.Create(target, contractInfo);
                 foreach (Diagnostic diagnostic in candidate.Diagnostics)
                 {
                     sourceProductionContext.ReportDiagnostic(diagnostic);
@@ -48,6 +45,7 @@ public sealed class GeneratedModuleValidationGenerator : IIncrementalGenerator
                 {
                     continue;
                 }
+
                 DiagnosticsReporter diagnosticsReporter = new([]);
                 string source = ModuleValidationRenderer.Render(candidate.Model, contractInfo, diagnosticsReporter);
                 foreach (Diagnostic diagnostic in diagnosticsReporter.Diagnostics)

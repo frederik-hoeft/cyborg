@@ -1,14 +1,17 @@
 ﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Aspects;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
+using Cyborg.Core.Aot.Modules.Validation.Models;
+using Cyborg.Shared.Text;
 using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
 internal sealed class FileNameProcessor : AttributeProcessorBase<FileNameAttribute>
 {
-    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
+    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out IPropertyAspect? aspect)
     {
-        if (!ValidatePropertyType(attribute, in context, SpecialType.System_String))
+        if (!ValidateStringLikePropertyType(attribute, in context))
         {
             return false.WithDefaults(out aspect);
         }
@@ -16,15 +19,15 @@ internal sealed class FileNameProcessor : AttributeProcessorBase<FileNameAttribu
         return true;
     }
 
-    private sealed class FileNameValidationAspect : PropertyAspect
+    private sealed class FileNameValidationAspect : PropertyValidationAspect
     {
-        protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
+        public override void EmitValidation(IndentedStringBuilder builder, PropertyValidationModel model)
         {
             builder.AppendBlock(
             $$"""
-            if ({{model.AccessExpression}} is not null && !{{KnownTypes.ValidationRuntimeHelpers}}.IsValidFileName({{model.AccessExpression}}))
+            if ({{model.NullAwareCondition($"!{KnownTypes.ValidationRuntimeHelpers}.IsValidFileName({model.StringContentExpression})")}})
             {
-                errors.Add({{CreateValidationError(model, rule: "file_name", $"Property '{{nameof({model.AccessExpression})}}' must be a valid file name, but was '{{{model.AccessExpression}}}'")}});
+                {{model.Variables.Errors}}.Add({{CreateValidationError(model, rule: "file_name", $"{model.TargetDescription} must be a valid file name, but was '{{{model.DisplayExpression}}}'")}});
             }
             """);
         }

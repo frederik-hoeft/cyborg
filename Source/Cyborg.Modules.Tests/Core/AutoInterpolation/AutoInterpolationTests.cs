@@ -138,7 +138,7 @@ public sealed class AutoInterpolationTests : ModuleTestBase
             },
             module =>
             {
-                List<string> args = [.. module.Command.Arguments];
+                List<string> args = [.. module.Command.Arguments.Select(static argument => argument.Value)];
                 MSAssert.HasCount(3, args);
                 MSAssert.AreEqual("first", args[0]);
                 MSAssert.AreEqual("literal-arg", args[1]);
@@ -222,7 +222,7 @@ public sealed class AutoInterpolationTests : ModuleTestBase
                 MSAssert.HasCount(1, module.EnvironmentVariables);
                 EnvironmentVariable entry = module.EnvironmentVariables.First();
                 MSAssert.AreEqual("MY_KEY", entry.Key);
-                MSAssert.AreEqual("my-value", entry.Value);
+                MSAssert.AreEqual("my-value", entry.Value.Value);
             });
     }
 
@@ -259,9 +259,9 @@ public sealed class AutoInterpolationTests : ModuleTestBase
                 List<EnvironmentVariable> envVars = [.. module.EnvironmentVariables];
                 MSAssert.HasCount(2, envVars);
                 MSAssert.AreEqual("KEY_ONE", envVars[0].Key);
-                MSAssert.AreEqual("val-one", envVars[0].Value);
+                MSAssert.AreEqual("val-one", envVars[0].Value.Value);
                 MSAssert.AreEqual("KEY_TWO", envVars[1].Key);
-                MSAssert.AreEqual("val-two", envVars[1].Value);
+                MSAssert.AreEqual("val-two", envVars[1].Value.Value);
             });
     }
 

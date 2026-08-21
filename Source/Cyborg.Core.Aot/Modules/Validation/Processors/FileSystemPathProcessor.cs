@@ -1,4 +1,7 @@
 ﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Aspects;
+using Cyborg.Core.Aot.Modules.Validation.Models;
+using Cyborg.Shared.Text;
 using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
@@ -13,9 +16,9 @@ internal abstract class FileSystemPathProcessor<TAttribute> : AttributeProcessor
 
     protected abstract string BuildExistsExpression();
 
-    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
+    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out IPropertyAspect? aspect)
     {
-        if (!ValidatePropertyType(attribute, in context, SpecialType.System_String))
+        if (!ValidateStringLikePropertyType(attribute, in context))
         {
             return false.WithDefaults(out aspect);
         }
@@ -26,15 +29,15 @@ internal abstract class FileSystemPathProcessor<TAttribute> : AttributeProcessor
         return true;
     }
 
-    private sealed class FilesystemPathValidationAspect(string errorCode, string pathKindDisplayName, string existsExpression) : PropertyAspect
+    private sealed class FilesystemPathValidationAspect(string errorCode, string pathKindDisplayName, string existsExpression) : PropertyValidationAspect
     {
-        protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
+        public override void EmitValidation(IndentedStringBuilder builder, PropertyValidationModel model)
         {
             builder.AppendBlock(
             $$"""
-            if ({{model.AccessExpression}} is not null && !{{existsExpression}}({{model.AccessExpression}}))
+            if ({{model.NullAwareCondition($"!{existsExpression}({model.StringContentExpression})")}})
             {
-                errors.Add({{CreateValidationError(model, errorCode, $"Property '{{nameof({model.AccessExpression})}}' requires an existing {pathKindDisplayName} at '{{{model.AccessExpression}}}'.")}});
+                {{model.Variables.Errors}}.Add({{CreateValidationError(model, errorCode, $"{model.TargetDescription} requires an existing {pathKindDisplayName} at '{{{model.DisplayExpression}}}'.")}});
             }
             """);
         }

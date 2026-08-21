@@ -7,6 +7,7 @@ internal readonly record struct PropertyProcessingContext
     Compilation Compilation,
     INamedTypeSymbol ContainingType,
     IPropertySymbol Property,
+    ValidationContractInfo ContractInfo,
     List<Diagnostic> Diagnostics
 )
 {

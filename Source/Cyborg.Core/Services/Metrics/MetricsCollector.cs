@@ -1,13 +1,14 @@
 ﻿using Cyborg.Core.Metrics;
 using Cyborg.Core.Metrics.Factory;
+using Cyborg.Core.Text.Rendering;
 
 namespace Cyborg.Core.Services.Metrics;
 
-public sealed class MetricsCollector(MetricsCollectorOptions options) : IMetricsCollector
+public sealed class MetricsCollector(MetricsCollectorOptions options, ITaggedStringRenderer taggedStringRenderer) : IMetricsCollector
 {
     private readonly PrometheusBuilder _builder = new(options.Namespace);
 
-    public IMetricsLabelCollection CreateLabels() => new MetricsLabelCollection();
+    public IMetricsLabelCollection CreateLabels() => new MetricsLabelCollection(taggedStringRenderer);
 
     public void AddCounter(string metricName, string description, Action<IMetricSampleCollection> buildSamples) =>
         AddMetric(metricName, Prometheus.Counter(description), buildSamples);
@@ -23,7 +24,7 @@ public sealed class MetricsCollector(MetricsCollectorOptions options) : IMetrics
         ArgumentNullException.ThrowIfNull(metricName);
         ArgumentNullException.ThrowIfNull(buildSamples);
         PrometheusMetricBuilder builder = _builder.GetMetricBuilder(metricName, type, options.IncludeTimeStamp);
-        MetricSampleCollection samples = new(builder);
+        MetricSampleCollection samples = new(builder, taggedStringRenderer);
         buildSamples(samples);
     }
 

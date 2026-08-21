@@ -6,6 +6,7 @@ namespace Cyborg.TestModules.Validation;
 public sealed record ValidationPipelineTestItem
 (
     [property: Required]
+    [property: Untagged]
     [property: DefaultValue<string>("${fallback}")]
     string Value
 );

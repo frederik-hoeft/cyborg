@@ -2,6 +2,8 @@
 
 Cyborg writes Prometheus exposition data to the configured metrics file after each CLI run. The default namespace is `cyborg`, so metric names are emitted with the `cyborg_` prefix unless a different namespace is configured.
 
+Metric labels may be supplied as `TaggedString` values. The metrics subsystem renders those labels through `ITaggedStringRenderer` before writing exposition data, so secret-tagged labels use the same redaction policy as other Cyborg-controlled presentation surfaces.
+
 ## Global run status
 
 The CLI emits the following global gauge independently of module-specific metrics:

@@ -17,7 +17,7 @@ public sealed class EnvironmentInterpolationTests : CyborgCoreTestBase
     {
         IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
 
-        string actual = runtime.Environment.Interpolate(value);
+        string actual = runtime.Environment.Interpolate(value).Value;
 
         Assert.AreEqual(expected, actual);
     });
@@ -29,7 +29,7 @@ public sealed class EnvironmentInterpolationTests : CyborgCoreTestBase
         IRuntimeEnvironment environment = runtime.Environment;
         environment.SetVariable("prefix", "resolved");
 
-        string actual = environment.Interpolate("${prefix}/${#HOME}");
+        string actual = environment.Interpolate("${prefix}/${#HOME}").Value;
 
         Assert.AreEqual("resolved/${HOME}", actual);
     });
@@ -41,7 +41,7 @@ public sealed class EnvironmentInterpolationTests : CyborgCoreTestBase
         IRuntimeEnvironment environment = runtime.Environment;
         environment.SetVariable("HOME", "resolved-home");
 
-        string actual = environment.Interpolate("${#HOME}");
+        string actual = environment.Interpolate("${#HOME}").Value;
 
         Assert.AreEqual("${HOME}", actual);
     });
@@ -53,9 +53,9 @@ public sealed class EnvironmentInterpolationTests : CyborgCoreTestBase
         IRuntimeEnvironment environment = runtime.Environment;
         environment.SetVariable("HOME", "resolved-home");
 
-        string firstPass = environment.Interpolate("${##HOME}");
-        string secondPass = environment.Interpolate(firstPass);
-        string thirdPass = environment.Interpolate(secondPass);
+        string firstPass = environment.Interpolate("${##HOME}").Value;
+        string secondPass = environment.Interpolate(firstPass).Value;
+        string thirdPass = environment.Interpolate(secondPass).Value;
 
         Assert.AreEqual("${#HOME}", firstPass);
         Assert.AreEqual("${HOME}", secondPass);
@@ -139,7 +139,7 @@ public sealed class EnvironmentInterpolationTests : CyborgCoreTestBase
         IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
         IRuntimeEnvironment environment = runtime.Environment;
 
-        string actual = environment.Interpolate("before ${missing} after");
+        string actual = environment.Interpolate("before ${missing} after").Value;
 
         Assert.AreEqual("before ${missing} after", actual);
     });

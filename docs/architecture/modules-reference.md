@@ -119,7 +119,7 @@ For more details on artifact lifecycle and exposure patterns, see [Runtime Infra
 
 Executes a list of child modules in order.
 
-**Properties:**
+**Properties:***
 
 | Property | Type | Required | Default | Constraints | Description |
 |----------|------|----------|---------|-------------|-------------|
@@ -243,7 +243,7 @@ Validates a condition and fails with a diagnostic message if the assertion is fa
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
 | `assertion` | module reference | Yes | -- | A condition module that produces a boolean result. |
-| `message` | string | Yes | -- | Failure message. Supports `${...}` interpolation after the assertion child has executed, so the message may reference variables or artifacts produced by that child. |
+| `message` | TaggedString | Yes | -- | Failure message. Accepts a JSON string or tagged-string object. Interpolation runs after the assertion child has executed, so child variables/artifacts and their tags propagate into the result. |
 
 **Behavior:**
 
@@ -459,14 +459,14 @@ Executes an external process with optional impersonation and output capture.
 | `output` | object | No | `{ "read_stdout": false, "read_stderr": false }` | Controls stdout/stderr capture. |
 | `check_exit_code` | bool | No | `true` | When `true`, a non-zero exit code results in `Failed` status. |
 | `impersonation` | object | No | `null` | Run the command as a different user. See Impersonation below. |
-| `environment_variables` | array | No | `null` | Process-level environment variables to set. Each entry has `key` and `value` (both strings, both required). |
+| `environment_variables` | array | No | `null` | Process-level environment variables to set. Each entry has `key` (string) and `value` (`TaggedString`, both required). Values accept a JSON string or `{ "value": "...", "tags": [...] }`. |
 
 **Command:**
 
 | Property | Type | Required | Default | Constraints | Description |
 |----------|------|----------|---------|-------------|-------------|
 | `executable` | string | Yes | -- | Must exist on disk | Path to the executable. |
-| `arguments` | array of strings | Yes | -- | -- | Command-line arguments. |
+| `arguments` | array of TaggedString | Yes | -- | -- | Command-line arguments. Each element accepts a JSON string or `{ "value": "...", "tags": [...] }` so interpolated secrets keep their tags. |
 | `working_directory` | string | No | `null` | Rooted, normalized path; directory must exist | Assigned to `ProcessStartInfo.WorkingDirectory` before dispatch. |
 
 **Output Options:**
@@ -741,16 +741,14 @@ Both variables are optional. They can be injected at any level of the environmen
 
 ### Borg v1.4.X Modules
 
-These modules are designed for Borg v1.4.X, which is the latest stable release series as of this writing. They leverage features and improvements introduced in the 1.4 release, such as enhanced JSON output and new pruning options. Support for older versions of Borg may be added in the future if needed, but v1.4 is recommended for its performance and reliability benefits.
-
-Borg v2.X compatibility will be added in a future release once the 2.0 API stabilizes and we can define a clear set of properties and behaviors for the new version.
+These modules target Borg v1.4.X and use the JSON output and command-line behavior of that release series. Other Borg major/minor series are outside this module contract.
 
 **Shared Borg Properties:**
 
 | Property | Type | Required | Default | Constraints | Description |
 |----------|------|----------|---------|-------------|-------------|
 | `executable` | string | Yes | `"/usr/bin/borg"` | Must exist on disk | Path to the borg binary. |
-| `passphrase` | string | Yes | -- | -- | Repository passphrase (set as `BORG_PASSPHRASE`). |
+| `passphrase` | TaggedString | Yes | -- | Carries `cyborg.secret.v1` | Repository passphrase (set as `BORG_PASSPHRASE`). Accepts a JSON string or `{ "value": "...", "tags": [...] }`. Display surfaces redact it as `[REDACTED]`. |
 | `remote_shell` | object | No | `null` | -- | SSH transport options. See Remote Shell below. |
 | `remote_repository` | object | Yes | -- | -- | Remote repository connection details. See Remote Repository below. |
 

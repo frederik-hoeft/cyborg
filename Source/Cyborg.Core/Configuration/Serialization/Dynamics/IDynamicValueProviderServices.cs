@@ -19,4 +19,6 @@ namespace Cyborg.Core.Configuration.Serialization.Dynamics;
 [Singleton<IDynamicValueProvider, DynamicDecimalProvider>]
 [Singleton<IDynamicValueProvider, DynamicBooleanProvider>]
 [Singleton<IDynamicValueProvider, DynamicStringProvider>]
+[Singleton<IDynamicValueProvider, DynamicTaggedStringProvider>]
+[Singleton<IDynamicValueProvider, DynamicSecretProvider>]
 public interface IDynamicValueProviderServices;

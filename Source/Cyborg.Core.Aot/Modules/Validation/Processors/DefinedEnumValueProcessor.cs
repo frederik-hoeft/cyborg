@@ -1,5 +1,8 @@
 ﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Aspects;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
+using Cyborg.Core.Aot.Modules.Validation.Models;
+using Cyborg.Shared.Text;
 using Microsoft.CodeAnalysis;
 using System.Diagnostics.CodeAnalysis;
 
@@ -7,7 +10,7 @@ namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
 internal sealed class DefinedEnumValueProcessor : AttributeProcessorBase<DefinedEnumValueAttribute>
 {
-    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
+    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out IPropertyAspect? aspect)
     {
         if (!TryGetEnumShape(context.Property.Type, out ITypeSymbol? enumType, out bool isNullableEnum))
         {
@@ -54,9 +57,9 @@ internal sealed class DefinedEnumValueProcessor : AttributeProcessorBase<Defined
         return false;
     }
 
-    private sealed class DefinedEnumValueValidationAspect(string enumTypeName, bool isNullableEnum) : PropertyAspect
+    private sealed class DefinedEnumValueValidationAspect(string enumTypeName, bool isNullableEnum) : PropertyValidationAspect
     {
-        protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
+        public override void EmitValidation(IndentedStringBuilder builder, PropertyValidationModel model)
         {
             if (isNullableEnum)
             {
@@ -64,7 +67,7 @@ internal sealed class DefinedEnumValueProcessor : AttributeProcessorBase<Defined
                 $$"""
                 if ({{model.AccessExpression}} is not null && !{{KnownTypes.Enum}}.IsDefined<{{enumTypeName}}>({{model.AccessExpression}}.Value))
                 {
-                    errors.Add({{CreateValidationError(model, "enum", $"Property '{{nameof({model.AccessExpression})}}' must be a defined enum value.")}});
+                    {{model.Variables.Errors}}.Add({{CreateValidationError(model, "enum", $"{model.TargetDescription} must be a defined enum value.")}});
                 }
                 """);
 
@@ -75,7 +78,7 @@ internal sealed class DefinedEnumValueProcessor : AttributeProcessorBase<Defined
             $$"""
             if (!{{KnownTypes.Enum}}.IsDefined<{{enumTypeName}}>({{model.AccessExpression}}))
             {
-                errors.Add({{CreateValidationError(model, "enum", $"Property '{{nameof({model.AccessExpression})}}' must be a defined enum value.")}});
+                {{model.Variables.Errors}}.Add({{CreateValidationError(model, "enum", $"{model.TargetDescription} must be a defined enum value.")}});
             }
             """);
         }

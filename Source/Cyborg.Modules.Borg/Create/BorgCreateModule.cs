@@ -11,9 +11,9 @@ namespace Cyborg.Modules.Borg.Create;
 [GeneratedModuleValidation]
 public sealed partial record BorgCreateModule
 (
-    [property: Required] string ArchiveName,
-    [property: Required][property: DirectoryExists] string SourcePath,
-    [property: Required][property: DefaultValue<string>("lz4")][property: MatchesGrammar(nameof(BorgCreateModule.CompressionGrammar))] string Compression,
+    [property: Required][property: Untagged] string ArchiveName,
+    [property: Required][property: Untagged][property: DirectoryExists] string SourcePath,
+    [property: Required][property: Untagged][property: DefaultValue<string>("lz4")][property: MatchesGrammar(nameof(BorgCreateModule.CompressionGrammar))] string Compression,
     [property: Required][property: DefaultInstance] BorgExcludeOptions Exclude,
     [property: Required][property: DefaultInstance] BorgFilesCacheSentinelOptions FilesCacheSentinel
 ) : BorgModuleBase, IModule

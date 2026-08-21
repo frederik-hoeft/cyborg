@@ -9,8 +9,8 @@ namespace Cyborg.Modules.Borg.Create.Model;
 public sealed partial record BorgFilesCacheSentinelOptions
 (
     bool Enabled,
-    [property: Required][property: UnrootedPath][property: NormalizedPath][property: DefaultValue<string>(BorgFilesCacheSentinelOptions.DEFAULT_ARCHIVE_PATH)] string ArchivePath,
-    [property: Required][property: FileName][property: DefaultValue<string>(BorgFilesCacheSentinelOptions.DEFAULT_SENTINEL_FILE_NAME)] string SentinelFileName
+    [property: Required][property: Untagged][property: UnrootedPath][property: NormalizedPath][property: DefaultValue<string>(BorgFilesCacheSentinelOptions.DEFAULT_ARCHIVE_PATH)] string ArchivePath,
+    [property: Required][property: Untagged][property: FileName][property: DefaultValue<string>(BorgFilesCacheSentinelOptions.DEFAULT_SENTINEL_FILE_NAME)] string SentinelFileName
 ) : IDefaultInstance<BorgFilesCacheSentinelOptions>
 {
     private const string DEFAULT_ARCHIVE_PATH = ".cyborg";

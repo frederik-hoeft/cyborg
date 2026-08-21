@@ -9,62 +9,101 @@ namespace Cyborg.Core.Aot.Modules.Validation;
 
 internal static class CollectionTypeInspector
 {
-    public static bool TryDescribe(Compilation compilation, ITypeSymbol type, [NotNullWhen(true)] out CollectionTypeDescriptor? descriptor)
+    public static bool TryDescribe(Compilation compilation, ITypeSymbol type, [NotNullWhen(true)] out CollectionShape? shape)
     {
-        descriptor = null;
+        shape = null;
+        _ = type.TryUnwrapNullableType(out ITypeSymbol nonNullableType);
 
-        if (type.SpecialType == SpecialType.System_String)
+        if (nonNullableType.SpecialType == SpecialType.System_String)
         {
             return false;
         }
 
-        if (type is IArrayTypeSymbol arrayType)
+        if (nonNullableType is IArrayTypeSymbol arrayType)
         {
-            descriptor = new CollectionTypeDescriptor(
+            shape = new CollectionShape(
                 ElementType: arrayType.ElementType,
+                AccessKind: DetermineAccessKind(type, isImmutableArray: false),
+                ElementAccessKind: ValueAccessInspector.Describe(arrayType.ElementType),
+                CountKind: CollectionCountKind.ArrayLength,
+                CountInterface: null,
                 MaterializationKind: CollectionMaterializationKind.UseArray,
                 MaterializationTypeName: null);
 
             return true;
         }
 
-        if (type is not INamedTypeSymbol namedType)
+        if (nonNullableType is not INamedTypeSymbol namedType)
         {
             return false;
         }
 
-        if (!TryGetEnumerableInterface(namedType, out INamedTypeSymbol? enumerableInterface))
+        if (!TryGetGenericInterface(namedType, SpecialType.System_Collections_Generic_IEnumerable_T, out INamedTypeSymbol? enumerableInterface))
         {
             return false;
         }
 
         ITypeSymbol elementType = enumerableInterface.TypeArguments[0];
         CollectionMaterializationKind materializationKind = DetermineMaterializationKind(compilation, namedType, elementType, out string? materializationTypeName);
+        bool isImmutableArray = IsImmutableArray(namedType);
+        CollectionCountKind countKind = TryGetGenericInterface(namedType, SpecialType.System_Collections_Generic_IReadOnlyCollection_T, out INamedTypeSymbol? countInterface)
+            ? CollectionCountKind.ReadOnlyCollection
+            : CollectionCountKind.None;
 
-        descriptor = new CollectionTypeDescriptor(elementType, materializationKind, materializationTypeName);
+        if (isImmutableArray)
+        {
+            countKind = CollectionCountKind.ArrayLength;
+        }
+
+        shape = new CollectionShape(
+            ElementType: elementType,
+            AccessKind: DetermineAccessKind(type, isImmutableArray),
+            ElementAccessKind: ValueAccessInspector.Describe(elementType),
+            CountKind: countKind,
+            CountInterface: countInterface,
+            MaterializationKind: materializationKind,
+            MaterializationTypeName: materializationTypeName);
 
         return true;
     }
 
-    private static bool TryGetEnumerableInterface(INamedTypeSymbol type, [NotNullWhen(true)] out INamedTypeSymbol? enumerableInterface)
+    private static CollectionAccessKind DetermineAccessKind(ITypeSymbol declaredType, bool isImmutableArray)
     {
-        enumerableInterface = null;
-
-        if (IsEnumerable(type))
+        ValueAccessKind valueAccess = ValueAccessInspector.Describe(declaredType);
+        if (isImmutableArray)
         {
-            enumerableInterface = type;
+            return valueAccess == ValueAccessKind.NullableValue
+                ? CollectionAccessKind.NullableImmutableArray
+                : CollectionAccessKind.ImmutableArray;
+        }
+
+        return valueAccess switch
+        {
+            ValueAccessKind.Direct => CollectionAccessKind.Direct,
+            ValueAccessKind.NullGuard => CollectionAccessKind.NullGuard,
+            ValueAccessKind.NullableValue => CollectionAccessKind.NullableValue,
+            _ => throw new InvalidOperationException($"Unsupported value access kind '{valueAccess}'."),
+        };
+    }
+
+    private static bool TryGetGenericInterface(INamedTypeSymbol type, SpecialType interfaceSpecialType, [NotNullWhen(true)] out INamedTypeSymbol? interfaceType)
+    {
+        if (type.OriginalDefinition.SpecialType == interfaceSpecialType)
+        {
+            interfaceType = type;
             return true;
         }
 
         foreach (INamedTypeSymbol candidate in type.AllInterfaces)
         {
-            if (IsEnumerable(candidate))
+            if (candidate.OriginalDefinition.SpecialType == interfaceSpecialType)
             {
-                enumerableInterface = candidate;
+                interfaceType = candidate;
                 return true;
             }
         }
 
+        interfaceType = null;
         return false;
     }
 
@@ -77,7 +116,7 @@ internal static class CollectionTypeInspector
             return CollectionMaterializationKind.UseList;
         }
 
-        if (type.IsGenericType && type.OriginalDefinition.GetFullMetadataName().Equals(typeof(ImmutableArray<>).FullName, StringComparison.Ordinal))
+        if (IsImmutableArray(type))
         {
             return CollectionMaterializationKind.UseImmutableArray;
         }
@@ -101,7 +140,7 @@ internal static class CollectionTypeInspector
             return CollectionMaterializationKind.ConstructFromList;
         }
 
-        if (HasPublicParameterlessConstructor(type) && ImplementsCollection(type))
+        if (!type.IsAbstract && HasPublicParameterlessConstructor(type) && ImplementsCollection(type))
         {
             materializationTypeName = type.ToDisplayString(KnownSymbolFormats.NonNullable);
             return CollectionMaterializationKind.ParameterlessAdd;
@@ -135,7 +174,7 @@ internal static class CollectionTypeInspector
             }
 
             Conversion conversion = compilation.ClassifyConversion(constructedListType, constructor.Parameters[0].Type);
-            if (!conversion.Exists)
+            if (!conversion.IsImplicit)
             {
                 continue;
             }
@@ -160,29 +199,9 @@ internal static class CollectionTypeInspector
         return false;
     }
 
-    private static bool ImplementsCollection(INamedTypeSymbol type)
-    {
-        if (IsCollection(type))
-        {
-            return true;
-        }
+    private static bool ImplementsCollection(INamedTypeSymbol type) =>
+        TryGetGenericInterface(type, SpecialType.System_Collections_Generic_ICollection_T, out _);
 
-        foreach (INamedTypeSymbol candidate in type.AllInterfaces)
-        {
-            if (IsCollection(candidate))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool IsEnumerable(INamedTypeSymbol type) =>
-        type.OriginalDefinition.SpecialType == SpecialType.System_Collections_Generic_IEnumerable_T;
-
-    private static bool IsCollection(INamedTypeSymbol type) =>
-        type.OriginalDefinition.SpecialType == SpecialType.System_Collections_Generic_ICollection_T;
-
-    internal sealed record CollectionTypeDescriptor(ITypeSymbol ElementType, CollectionMaterializationKind MaterializationKind, string? MaterializationTypeName);
+    private static bool IsImmutableArray(INamedTypeSymbol type) =>
+        type.IsGenericType && type.OriginalDefinition.GetFullMetadataName().Equals(typeof(ImmutableArray<>).FullName, StringComparison.Ordinal);
 }

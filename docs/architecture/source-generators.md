@@ -1,4 +1,4 @@
-# Source Generators
+﻿# Source Generators
 
 This document describes the Roslyn source generators in `Cyborg.Core.Aot`. The generator layer produces the compile-time code that makes the module system, validation pipeline, and decomposition model work without runtime reflection, enabling native AOT compilation and trim safety.
 
@@ -60,7 +60,7 @@ Each generator declares a contract enum whose members correspond to the runtime 
 
 | Contract | Members | Used By |
 |----------|---------|---------|
-| `ModuleValidationGeneratorContract` | `IModuleRuntime`, `IModuleT`, `ModuleValidationContext`, `ValidationResult`, `IValidationResultT`, `ValidationError`, `IDefaultValueT`, `IParser`, `IModuleDescriptor`, `IObjectDescriptionBuilder`, `ModuleIdentity` | Validation and descriptor generation |
+| `ModuleValidationGeneratorContract` | `IModuleRuntime`, `IModuleT`, `ModuleValidationContext`, `ValidationResult`, `IValidationResultT`, `ValidationError`, `IDefaultValueT`, `IParser`, `IModuleDescriptor`, `IObjectDescriptionBuilder`, `ModuleIdentity`, `TaggedString`, `WellKnownTags` | Validation and descriptor generation |
 | `ModuleLoaderFactoryGeneratorContract` | `IModuleWorker`, `ModuleLoaderT`, `IModuleWorkerContextT`, `ModuleWorkerContextImplementationT` | Loader factory generator |
 | `ModelDecompositionGeneratorContract` | `IDecomposable`, `DynamicKeyValuePair` | Decomposition generator |
 
@@ -86,11 +86,11 @@ The generator is triggered by the `[GeneratedModuleValidation]` attribute on a `
 
 For each annotated record, the generator emits a partial record implementing `IModule<TModule>` and `IModuleDescriptor`. The validation pipeline consists of one public async validation method and three private async instance helpers:
 
-1. **`ApplyDefaultsAsync`** — For each property carrying a default attribute (`[DefaultValue<T>]`, `[DefaultInstance]`, `[DefaultInstanceFactory]`, `[DefaultTimeSpan]`), emits a `with`-expression that replaces null or zero-valued properties with their declared defaults. Recursively applies defaults to nested records marked `[Validatable]` and to elements within collections.
+1. **`ApplyDefaultsAsync`** — Applies declared defaults and property-level preparation invariants through generated `with`-expressions. Default attributes (`[DefaultValue<T>]`, `[DefaultInstance]`, `[DefaultInstanceFactory]`, `[DefaultTimeSpan]`) replace null or zero-valued properties, while aspects such as `[Secret]` rewrite the effective value to re-establish destination metadata. The pass recurses into nested records marked `[Validatable]` and supported collection elements.
 
-2. **`ResolveOverridesAsync`** — For each property not suppressed by `[IgnoreOverride]`, emits an operation through `ModuleValidationContext`. String properties use raw override selection so `[IgnoreInterpolation]` can preserve the effective expression, while non-string properties and collections use typed resolution. `[IgnoreOverride]` suppresses the annotated node; `Recurse = true` also suppresses descendants. Defaults are applied again after this phase so injected type-default values receive their declared defaults.
+2. **`ResolveOverridesAsync`** — For each property not suppressed by `[IgnoreOverride]`, emits an operation through `ModuleValidationContext`. `string` and `TaggedString` properties use raw override selection so `[IgnoreInterpolation]` can preserve the effective expression and tagged values retain their metadata; non-text properties and collections use typed resolution. `[IgnoreOverride]` suppresses the annotated node; `Recurse = true` also suppresses descendants. The preparation pass runs again after this phase so injected type-default values receive declared defaults and destination invariants are re-established.
 
-3. **`ApplyInterpolationAsync`** — Private instance helper that recursively rewrites eligible string properties through `ModuleValidationContext.Interpolate(...)`, including strings in nested `[Validatable]` records and supported collections. `[IgnoreInterpolation]` leaves a string untouched for later context-specific interpolation.
+3. **`ApplyInterpolationAsync`** — Private instance helper that recursively rewrites eligible string and `TaggedString` properties through `ModuleValidationContext.Interpolate(...)`, including values in nested `[Validatable]` records and supported collections. Tags union across interpolated operands. `[IgnoreInterpolation]` leaves a value untouched for later context-specific interpolation. `[Untagged]` suppresses the diagnostic that recommends migrating remaining string properties to `TaggedString`.
 
 4. **`ValidateAsync`** — Creates one `ModuleValidationContext` from the runtime and service provider, orchestrates defaults → overrides → defaults → interpolation → constraints, collects `ValidationError` instances, and returns `IValidationResult<TModule>` through the shared `ValidationResult.Valid(...)` / `Invalid(...)` factories. Invalid generated results retain the fully prepared module so lifecycle hooks, debugger inspection, and diagnostics can observe the same state that would otherwise reach validation enforcement. Validation recurses into nested validatable records and supported collection elements.
 
@@ -107,7 +107,7 @@ Two processor interfaces exist:
 - **`IPropertyAttributeProcessor`** — Triggered when its `AttributeMetadataName` matches an attribute on the property being processed. Handles attribute-driven behaviors like `[Required]`, `[Range<T>]`, and `[DefaultValue<T>]`.
 - **`IDynamicPropertyProcessor`** — Invoked for every property regardless of attributes. Handles context-dependent behaviors such as collection override resolution, where the processing logic depends on the property type rather than an attribute.
 
-Each processor returns a `PropertyAspect` — an object that can contribute to one or more pipeline stages. An aspect exposes virtual methods for rewriting the default assignment expression, rewriting the override resolution expression, and emitting validation code. This design allows a single attribute to influence multiple stages of the pipeline. For example, a `[DefaultValue<T>]` attribute produces an aspect that contributes a default in the defaults stage but contributes nothing to validation.
+Each processor returns one or more property-aspect objects implementing the stage interfaces they participate in (`IPropertyDefaultAspect`, `IPropertyPreparationAspect`, `IPropertyOverrideAspect`, and `IPropertyValidationAspect`). `IPropertyAspect` is only the common marker stored by the property model; renderers select aspects by the stage interface they consume. This keeps stage contracts explicit without forcing unrelated behaviors through a broad base class. `[DefaultValue<T>]` contributes only default selection, while `[Secret]` participates in preparation and final validation through the corresponding interfaces.
 
 Validation attributes that support collection elements derive from `PropertyValidationAttribute` and are processed through `PropertyValidationProcessorBase<TAttribute>`. The base processor resolves the optional `TargetsElements` flag, verifies that the property is a supported collection when element targeting is requested, and evaluates attribute-specific type requirements against either the property type or the collection element type. Element-targeted constraints are wrapped in a `CollectionElementValidationAspect`, allowing the individual attribute processors to emit the same validation logic for either target without implementing collection traversal themselves. Because these attributes are repeatable, a property can contribute both an ordinary property aspect and one or more element-targeted aspects.
 
@@ -129,7 +129,8 @@ The following attributes are recognized by the validation generator:
 | **Enum validation** | `[DefinedEnumValue]` |
 | **Override suppression** | `[IgnoreOverride]` |
 | **Interpolation suppression** | `[IgnoreInterpolation]` |
-| **Nested validation** | `[Validatable]` (on nested record types) |
+| **Tagged strings** | `[Secret]`, `[Untagged]` |
+| **Nested validation** | `[Validatable]` (on nested record classes and record structs) |
 
 All attributes are defined in `Cyborg.Core.Aot` and emitted into the consuming compilation, see [Validation Attributes Reference](validation-attributes-reference.md) for a complete reference of their parameters and behavior.
 
@@ -139,21 +140,21 @@ The validation generator renders one partial module declaration from a shared pr
 
 | Generated member | Responsibility |
 |------------------|----------------|
-| `ApplyDefaultsAsync` | Apply declared defaults recursively |
+| `ApplyDefaultsAsync` | Apply declared defaults and preparation invariants recursively |
 | `ResolveOverridesAsync` | Resolve eligible runtime overrides recursively |
-| `ApplyInterpolationAsync` | Interpolate eligible strings recursively |
+| `ApplyInterpolationAsync` | Interpolate eligible textual values recursively while preserving tags |
 | `ValidateAsync` | Orchestrate preparation and emit constraint checks |
 | `GetDescriptor` / `DescribeAsync` | Expose format-neutral identity and structural description |
 
-The description traversal uses the same recursive property graph and collection guards as the preparation pipeline, so validation and inspection agree on which values are scalar, nested, absent, or enumerable. Property aspects may also contribute arbitrary descriptor-hint keys. Hints are emitted as metadata and remain serializer-neutral; interpretation belongs to description consumers rather than the generator.
+The description traversal uses the same recursive property graph and collection guards as the preparation pipeline, so validation and inspection agree on which values are scalar, nested, absent, or enumerable. Descriptor APIs may carry arbitrary hint metadata for custom consumers, but generated validation aspects do not use hints as a second taint channel; built-in presentation policy follows the runtime `TaggedString` tags on the described value.
 
 ### Nested and Collection Handling
 
 The generator supports recursive validation of nested record types and collection elements:
 
-- **Nested records** — Properties whose type is marked `[Validatable]` are processed recursively. The generator detects cycles in the type graph to prevent infinite recursion during generation.
-- **Collections** — Properties typed as supported enumerable shapes are rewritten and validated element-by-element when their element type requires work. `CollectionTypeInspector` selects a `CollectionMaterializationKind` for arrays, `List<T>`, `ImmutableArray<T>`, supported collection interfaces, and constructible concrete collections; `string` is explicitly excluded and remains a scalar despite implementing `IEnumerable<char>`. Shared enumeration guards preserve collection absence semantics across validation, interpolation, defaults, and description generation: null references are skipped, nullable value types are unwrapped only when present, and default `ImmutableArray<T>` values are never enumerated or silently converted to empty arrays.
-- **Element-targeted constraints** — Selected validation attributes can set `TargetsElements = true` to apply their constraint to each immediate collection element. The same guarded loop is shared with recursive validation of `[Validatable]` element records, while ordinary property constraints remain outside the guard. This allows repeated attributes to constrain the collection and its elements independently. Attribute-specific target checks use the element type, and element validation errors retain the parent property name while identifying the zero-based element index in the message.
+- **Nested records** — Properties whose record class or record struct type is marked `[Validatable]` are processed recursively. `ObjectTypeInspector` classifies the declared value once, and the object renderer supplies the same guarded usable-value and rewrite semantics to defaults, overrides, interpolation, validation, and description generation. Nullable record structs are unwrapped only inside their presence guard, reference records are guarded defensively, and non-nullable record structs are traversed directly. The generator detects cycles in the type graph to prevent infinite recursion during generation.
+- **Collections** — Properties typed as supported enumerable shapes are rewritten and validated element-by-element when their element type requires work. `CollectionTypeInspector` produces one `CollectionShape` that records element type, default-state semantics, count capability, and rewrite materialization for arrays, `List<T>`, `ImmutableArray<T>`, supported collection interfaces, and constructible concrete collections; `string` is explicitly excluded and remains a scalar despite implementing `IEnumerable<char>`. `CollectionShapeRenderer` owns guarded collection/count access while `CollectionRenderer` owns reconstruction. Validation, interpolation, defaults, and description generation therefore share absence semantics for null references, nullable value types, and default `ImmutableArray<T>` values. Default immutable arrays are never counted or enumerated, while initialized empty arrays remain ordinary zero-length collections.
+- **Element-targeted constraints** — Selected validation attributes can set `TargetsElements = true` to apply their constraint to each immediate collection element. The same guarded loop is shared with recursive validation of `[Validatable]` element records, while ordinary property constraints remain outside the guard. This allows repeated attributes to constrain the collection and its elements independently. Attribute-specific target checks use the element type. Validation traversal also carries a separate user-facing target path, so `ValidationError.PropertyName` and generated messages identify recursive locations such as `Tags[2]`, `Items[1].Value`, or deeper combinations of object properties and collection indices rather than exposing generated local-variable names.
 
 ## Module Loader Factory Generator
 
@@ -221,6 +222,6 @@ Each generator defines its own set of diagnostic descriptors with unique IDs:
 | `CYBORG` | Contract bootstrap | Missing or duplicate contract registrations |
 | `CYBORGMLF` | Loader factory | Invalid base type, missing constructor, incorrect method signature |
 | `CYBORGCOMP` | Decomposition | Non-partial type, invalid naming policy configuration |
-| `CYBORGVAL` | Validation | Non-partial record, invalid attribute usage |
+| `CYBORGVAL` | Validation | Non-partial record, invalid attribute usage, prefer `TaggedString` (`CYBORGVAL025`), `[Secret]`/`[Untagged]` misuse (`CYBORGVAL026`–`CYBORGVAL028`) |
 
 Diagnostics are reported through `DiagnosticsReporter` (validation) or directly via the source production context. All diagnostics include the source location of the triggering declaration.

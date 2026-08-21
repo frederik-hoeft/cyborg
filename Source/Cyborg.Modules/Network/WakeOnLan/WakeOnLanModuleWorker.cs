@@ -2,7 +2,6 @@
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Services.Dispatch;
 using Cyborg.Core.Services.Network.Probe;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Modules.Network.WakeOnLan;
@@ -20,8 +19,8 @@ public sealed class WakeOnLanModuleWorker(IWorkerContext<WakeOnLanModule> contex
             return runtime.Exit(Success(new WakeOnLanModuleResult(WokeUp: false)));
         }
         Logger.LogWolSendingPacket(Module.TargetHost, Module.MacAddress);
-        ProcessStartInfo startInfo = new(Module.Executable, ["-i", Module.TargetHost, Module.MacAddress]);
-        ChildProcessResult result = await dispatcher.ExecuteAsync(startInfo, cancellationToken).ConfigureAwait(false);
+        ChildProcessInvocation invocation = new(Module.Executable, ["-i", Module.TargetHost, Module.MacAddress]);
+        ChildProcessResult result = await dispatcher.ExecuteAsync(invocation, cancellationToken).ConfigureAwait(false);
         if (result.ExitCode != 0)
         {
             Logger.LogWolCommandFailed(result.ExitCode, result.StandardError);

@@ -7,7 +7,7 @@ namespace Cyborg.Modules.Conditions.DirectoryExists;
 [GeneratedModuleValidation]
 public sealed partial record DirectoryExistsModule
 (
-    [property: Required] string Path
+    [property: Required][property: Untagged] string Path
 ) : ModuleBase, IModule
 {
     public static string ModuleId => "cyborg.modules.condition.directory_exists.v1";

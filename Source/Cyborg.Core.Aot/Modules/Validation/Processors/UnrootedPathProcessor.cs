@@ -1,14 +1,17 @@
 ﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Aspects;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
+using Cyborg.Core.Aot.Modules.Validation.Models;
+using Cyborg.Shared.Text;
 using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
 internal sealed class UnrootedPathProcessor : AttributeProcessorBase<UnrootedPathAttribute>
 {
-    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
+    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out IPropertyAspect? aspect)
     {
-        if (!ValidatePropertyType(attribute, in context, SpecialType.System_String))
+        if (!ValidateStringLikePropertyType(attribute, in context))
         {
             return false.WithDefaults(out aspect);
         }
@@ -16,15 +19,15 @@ internal sealed class UnrootedPathProcessor : AttributeProcessorBase<UnrootedPat
         return true;
     }
 
-    private sealed class UnrootedPathValidationAspect : PropertyAspect
+    private sealed class UnrootedPathValidationAspect : PropertyValidationAspect
     {
-        protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
+        public override void EmitValidation(IndentedStringBuilder builder, PropertyValidationModel model)
         {
             builder.AppendBlock(
             $$"""
-            if ({{model.AccessExpression}} is not null && {{KnownTypes.Path}}.IsPathRooted({{model.AccessExpression}}))
+            if ({{model.NullAwareCondition($"{KnownTypes.Path}.IsPathRooted({model.StringContentExpression})")}})
             {
-                errors.Add({{CreateValidationError(model, rule: "unrooted_path", $"Property '{{nameof({model.AccessExpression})}}' must be an unrooted path, but was '{{{model.AccessExpression}}}'")}});
+                {{model.Variables.Errors}}.Add({{CreateValidationError(model, rule: "unrooted_path", $"{model.TargetDescription} must be an unrooted path, but was '{{{model.DisplayExpression}}}'")}});
             }
             """);
         }

@@ -11,6 +11,7 @@ public record ModuleEnvironment : IDefaultInstance<ModuleEnvironment>
     [DefaultValue<EnvironmentScope>(EnvironmentScope.InheritParent)]
     public virtual EnvironmentScope Scope { get; init; }
 
+    [Untagged]
     public virtual string? Name { get; init; }
 
     public virtual bool Transient { get; init; }

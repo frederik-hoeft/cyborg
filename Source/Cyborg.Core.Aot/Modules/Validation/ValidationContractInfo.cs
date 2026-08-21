@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Aot.Contracts;
+using Cyborg.Core.Aot.Extensions;
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
 
@@ -20,6 +21,8 @@ internal sealed class ValidationContractInfo(Dictionary<ModuleValidationGenerato
         ModuleValidationGeneratorContract.IModuleDescriptor,
         ModuleValidationGeneratorContract.IObjectDescriptionBuilder,
         ModuleValidationGeneratorContract.ModuleIdentity,
+        ModuleValidationGeneratorContract.TaggedString,
+        ModuleValidationGeneratorContract.WellKnownTags,
     ];
 
     public INamedTypeSymbol IModuleRuntime => ContractTypes[ModuleValidationGeneratorContract.IModuleRuntime];
@@ -44,6 +47,15 @@ internal sealed class ValidationContractInfo(Dictionary<ModuleValidationGenerato
 
     public INamedTypeSymbol ModuleIdentity => ContractTypes[ModuleValidationGeneratorContract.ModuleIdentity];
 
+    public INamedTypeSymbol TaggedString => ContractTypes[ModuleValidationGeneratorContract.TaggedString];
+
+    public INamedTypeSymbol WellKnownTags => ContractTypes[ModuleValidationGeneratorContract.WellKnownTags];
+
+    public string SecretTagExpression => $"{WellKnownTags.RenderGlobal()}.{GetRequiredConstantField(WellKnownTags, "SECRET").Name}";
+
+    public string SecretTag => (string)(GetRequiredConstantField(WellKnownTags, "SECRET").ConstantValue
+        ?? throw new InvalidOperationException("The registered WellKnownTags.SECRET member is not a compile-time constant."));
+
     public static ValidationContractInfo? Create(ContractExplorer contractExplorer, SourceProductionContext context)
     {
         Dictionary<ModuleValidationGeneratorContract, INamedTypeSymbol>? contracts = FetchContracts(contractExplorer, context, s_allContracts);
@@ -54,4 +66,8 @@ internal sealed class ValidationContractInfo(Dictionary<ModuleValidationGenerato
 
         return new ValidationContractInfo(contracts, contractExplorer.Compilation);
     }
+
+    private static IFieldSymbol GetRequiredConstantField(INamedTypeSymbol type, string memberName) =>
+        type.GetMembers(memberName).OfType<IFieldSymbol>().SingleOrDefault(static field => field.HasConstantValue)
+        ?? throw new InvalidOperationException($"Registered contract type '{type.ToDisplayString()}' must expose constant field '{memberName}'.");
 }

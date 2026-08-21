@@ -77,11 +77,11 @@ public sealed class BorgCreateModuleWorker
             arguments.Add(sentinelSlashDotPath);
         }
 
-        ProcessStartInfo startInfo = new(Module.Executable, arguments);
-        AddDefaults(startInfo);
+        ChildProcessInvocation invocation = new(Module.Executable, arguments);
+        AddDefaults(invocation);
 
         _stopwatch.Restart();
-        ChildProcessResult executionResult = await processDispatcher.ExecuteAsync(startInfo, cancellationToken);
+        ChildProcessResult executionResult = await processDispatcher.ExecuteAsync(invocation, cancellationToken);
         _stopwatch.Stop();
 
         CollectMetrics(runtime, executionResult);

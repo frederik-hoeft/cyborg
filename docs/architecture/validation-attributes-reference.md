@@ -41,6 +41,8 @@ For how these attributes are processed by the source generators, see [Source Gen
 - [Override and Interpolation Control Attributes](#override-and-interpolation-control-attributes)
   - [IgnoreOverride](#ignoreoverride)
   - [IgnoreInterpolation](#ignoreinterpolation)
+  - [Secret](#secret)
+  - [Untagged](#untagged)
 - [Decomposition Attributes](#decomposition-attributes)
   - [DecomposeIgnore](#decomposeignore)
 
@@ -59,9 +61,9 @@ Triggers the validation generator on a module record. The target must be a `part
 
 ### Validatable
 
-Marks a nested record type for recursive validation. When a property on a `[GeneratedModuleValidation]` record has a type marked `[Validatable]`, the generated pipeline applies defaults, overrides, interpolation, and validation recursively to that nested record's properties.
+Marks a nested record type for recursive validation. Record classes and record structs are supported. When a property on a `[GeneratedModuleValidation]` record has a type marked `[Validatable]`, the generated pipeline applies defaults, overrides, interpolation, and validation recursively to that nested record's properties. Nullable record values are treated as absent until a value exists; non-nullable record structs are traversed directly.
 
-**Target:** `class` (record)
+**Target:** `class` or `struct` (record)
 
 ### GeneratedModuleLoaderFactory
 
@@ -85,7 +87,9 @@ Triggers the decomposition generator on a record or class. The generator emits a
 
 ## Validation Attributes
 
-These attributes declare constraints that are checked during the `ValidateAsync` stage of the generated pipeline. If a constraint is violated, a `ValidationError` is added to the result. All validation attributes are applied to properties; selected attributes can redirect their constraint to each immediate element of a collection property.
+These attributes declare constraints that are checked during the `ValidateAsync` stage of the generated pipeline. If a constraint is violated, a `ValidationError` is added to the result. Generated errors carry a user-facing recursive property path (for example, `Options.Path`, `Tags[2]`, or `Items[1].Value`) so nested and collection failures remain attributable to the concrete input location. All validation attributes are applied to properties; selected attributes can redirect their constraint to each immediate element of a collection property.
+
+For validation purposes, a **textual** or **string-like** target means either `string` or `TaggedString`. String-oriented constraints inspect `TaggedString.Value`, while any value included in a generated diagnostic is rendered through the validation context so secret-tagged text is not exposed by the error message.
 
 ### Collection Element Targeting
 
@@ -103,11 +107,11 @@ The supporting attributes allow multiple applications, so a collection and its e
 IReadOnlyCollection<string?>? Values
 ```
 
-In this example, the first attribute rejects a null collection while the second rejects null or whitespace elements. Attribute-specific type requirements are evaluated against the element type when `TargetsElements` is enabled; for example, `[VariableIdentifier(TargetsElements = true)]` requires a collection of strings. Applying `TargetsElements` to a non-collection property, or to an incompatible element type, produces a source-generator diagnostic. Targeting is limited to the immediate elements of the annotated collection; it does not recursively apply the same attribute to deeper collection layers.
+In this example, the first attribute rejects a null collection while the second rejects null or whitespace elements. Attribute-specific type requirements are evaluated against the element type when `TargetsElements` is enabled; for example, `[VariableIdentifier(TargetsElements = true)]` requires a collection of `string` or `TaggedString` values. Applying `TargetsElements` to a non-collection property, or to an incompatible element type, produces a source-generator diagnostic. Targeting is limited to the immediate elements of the annotated collection; it does not recursively apply the same attribute to deeper collection layers.
 
 ### Required
 
-Validates that the property has a meaningful value. For strings, checks that the value is not null or whitespace. For other types, checks that the value is not equal to its type's default (e.g., `0` for integers, `null` for reference types, or a default `ImmutableArray<T>`). An initialized empty collection is distinct from a default immutable array and requires a length constraint when emptiness itself is invalid.
+Validates that the property has a meaningful value. For `string` and `TaggedString`, checks that the textual value is not null or whitespace. Collection presence follows the same collection-shape semantics used by traversal: null references, absent nullable value types, and default `ImmutableArray<T>` values are missing. Other values are compared with their type default (for example, `0` for integers). An initialized empty collection is distinct from a default immutable array and requires a length constraint when emptiness itself is invalid.
 
 ### Range
 
@@ -122,7 +126,7 @@ The attribute is generic: `[Range<int>]`, `[Range<long>]`, `[Range<double>]`, et
 
 ### MinLength
 
-Validates that a string or collection property has at least the specified number of elements or characters.
+Validates that a textual or countable collection property has at least the specified number of elements or characters.
 
 **Parameters:**
 
@@ -130,7 +134,7 @@ Validates that a string or collection property has at least the specified number
 
 ### MaxLength
 
-Validates that a string or collection property has at most the specified number of elements or characters.
+Validates that a textual or countable collection property has at most the specified number of elements or characters.
 
 **Parameters:**
 
@@ -138,7 +142,7 @@ Validates that a string or collection property has at most the specified number 
 
 ### ExactLength
 
-Validates that a string or collection property has exactly the specified number of elements or characters.
+Validates that a textual or countable collection property has exactly the specified number of elements or characters.
 
 **Parameters:**
 
@@ -146,7 +150,7 @@ Validates that a string or collection property has exactly the specified number 
 
 ### Length
 
-Validates that a string or collection property length falls within a range. Combines the behavior of `[MinLength]` and `[MaxLength]` into a single attribute.
+Validates that a textual or supported countable collection property length falls within a range. Combines the behavior of `[MinLength]` and `[MaxLength]` into a single attribute. Arrays and `ImmutableArray<T>` use their native `Length`; other countable collection shapes use their `IReadOnlyCollection<T>` count contract. Collection absence is guarded before count access, so null collections and default `ImmutableArray<T>` values are skipped rather than treated as empty or dereferenced.
 
 **Parameters:**
 
@@ -155,15 +159,15 @@ Validates that a string or collection property length falls within a range. Comb
 
 ### VariableIdentifier
 
-Validates that a string conforms to the canonical environment variable-identifier grammar used by `IRuntimeEnvironment.SyntaxFactory.IsValidIdentifier`. An identifier starts with an ASCII letter, underscore, or hyphen. Subsequent characters may be ASCII letters, digits, underscores, or hyphens; periods may separate non-empty suffixes. Empty segments, consecutive periods, and trailing periods are invalid. See [Architecture Overview -- Variable Name Syntax](architecture-overview.md#variable-name-syntax) for the complete variable and interpolation grammar.
+Validates that a textual value conforms to the canonical environment variable-identifier grammar used by `IRuntimeEnvironment.SyntaxFactory.IsValidIdentifier`. An identifier starts with an ASCII letter, underscore, or hyphen. Subsequent characters may be ASCII letters, digits, underscores, or hyphens; periods may separate non-empty suffixes. Empty segments, consecutive periods, and trailing periods are invalid. See [Architecture Overview -- Variable Name Syntax](architecture-overview.md#variable-name-syntax) for the complete variable and interpolation grammar.
 
 Null values are ignored by this constraint; combine it with `[Required]` when null must also be rejected. Because validation follows interpolation, the final interpolated value is checked rather than the original placeholder expression.
 
-**Applies to:** `string` properties, or immediate `string` collection elements when `TargetsElements = true`.
+**Applies to:** `string` or `TaggedString` properties, or immediate collection elements of either type when `TargetsElements = true`.
 
 ### MatchesRegex
 
-Validates that a string property matches a regular expression. The regex is referenced by member name — the attribute points to a static property or field on the containing type that provides the `Regex` instance.
+Validates that a `string` or `TaggedString` property matches a regular expression. The regex is referenced by member name — the attribute points to a static property or field on the containing type that provides the `Regex` instance.
 
 **Parameters:**
 
@@ -171,7 +175,7 @@ Validates that a string property matches a regular expression. The regex is refe
 
 ### MatchesGrammar
 
-Validates that a string property can be parsed by a grammar. The parser is referenced by member name — the attribute points to a static property or field on the containing type that provides an `IParser` instance.
+Validates that a `string` or `TaggedString` property can be parsed by a grammar. The parser is referenced by member name — the attribute points to a static property or field on the containing type that provides an `IParser` instance.
 
 **Parameters:**
 
@@ -179,35 +183,35 @@ Validates that a string property can be parsed by a grammar. The parser is refer
 
 ### FileExists
 
-Validates that the string property contains a path to an existing file. Checked at validation time against the file system.
+Validates that a `string` or `TaggedString` property contains a path to an existing file. Checked at validation time against the file system.
 
 ### DirectoryExists
 
-Validates that the string property contains a path to an existing directory. Checked at validation time against the file system.
+Validates that a `string` or `TaggedString` property contains a path to an existing directory. Checked at validation time against the file system.
 
 ### FileName
 
-Validates that a string contains a valid file name: it must be non-empty, must not be `.` or `..`, and must not contain characters returned by `Path.GetInvalidFileNameChars()`.
+Validates that a textual value contains a valid file name: it must be non-empty, must not be `.` or `..`, and must not contain characters returned by `Path.GetInvalidFileNameChars()`.
 
-**Applies to:** `string` properties only.
+**Applies to:** `string` and `TaggedString` properties.
 
 ### RootedPath
 
-Validates that a string contains a rooted (absolute) path according to `Path.IsPathRooted`.
+Validates that a textual value contains a rooted (absolute) path according to `Path.IsPathRooted`.
 
-**Applies to:** `string` properties only.
+**Applies to:** `string` and `TaggedString` properties.
 
 ### UnrootedPath
 
-Validates that a string contains an unrooted (relative) path according to `Path.IsPathRooted`.
+Validates that a textual value contains an unrooted (relative) path according to `Path.IsPathRooted`.
 
-**Applies to:** `string` properties only.
+**Applies to:** `string` and `TaggedString` properties.
 
 ### NormalizedPath
 
-Validates that a string contains a normalized path: no segment may be `.` or `..`, and consecutive directory separators may not create empty segments. The check does not resolve the path against the current working directory.
+Validates that a textual value contains a normalized path: no segment may be `.` or `..`, and consecutive directory separators may not create empty segments. The check does not resolve the path against the current working directory.
 
-**Applies to:** `string` properties only.
+**Applies to:** `string` and `TaggedString` properties.
 
 ### DefinedEnumValue
 
@@ -220,7 +224,7 @@ These attributes declare default values applied during the `ApplyDefaultsAsync` 
 
 ### DefaultValue
 
-Provides a compile-time constant default value for a property. The attribute is generic and the type parameter must match the property type.
+Provides a compile-time constant default value for a property. The attribute is generic and the type parameter normally matches the property type. `TaggedString` properties use `DefaultValue<string>` because attribute arguments must be compile-time constants; the generated assignment converts the literal string to an untagged `TaggedString` before later preparation invariants such as `[Secret]` are applied.
 
 **Parameters:**
 
@@ -264,11 +268,23 @@ Prevents environment-driven override resolution for the annotated property.
 
 ### IgnoreInterpolation
 
-Prevents the generated interpolation phase from calling `runtime.Environment.Interpolate(...)` for the annotated string property. The raw string is preserved so a worker can interpolate it later, after context-specific variables or child artifacts exist.
+Prevents the generated interpolation phase from calling `runtime.Environment.Interpolate(...)` for the annotated string or `TaggedString` property. The value is preserved so a worker can interpolate it later, after context-specific variables or child artifacts exist.
 
-**Applies to:** `string` properties only.
+**Applies to:** `string` and `TaggedString` properties.
 
 This is used by `AssertModule.Message`, whose placeholders may refer to artifacts produced by the assertion module and therefore cannot be resolved during pre-execution validation. `ModuleBase.Name` and `ModuleBase.Group` also opt out because they define the environment namespace before interpolation runs.
+
+### Secret
+
+Valid only on `TaggedString` properties. Declares `cyborg.secret.v1` as an intrinsic property tag. Generated preparation ensures the tag is present both before and after override selection, so an override may replace the value but cannot declassify the property; final validation asserts the invariant. This is independent of interpolation, including when `[IgnoreInterpolation]` defers evaluation. Cyborg-controlled display surfaces render the resulting tagged value through `ITaggedStringRenderer`, which redacts the built-in secret tag as `[REDACTED]`.
+
+**Applies to:** `TaggedString` properties only. Combining `[Secret]` with `[Untagged]` is an error.
+
+### Untagged
+
+Marks a string property as intentionally unable to carry tags. Suppresses `CYBORGVAL025`, which otherwise warns that interpolatable string properties should migrate to `TaggedString` so tags such as secrets propagate.
+
+**Applies to:** `string` properties only.
 
 
 ## Decomposition Attributes

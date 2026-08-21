@@ -3,8 +3,7 @@ using Cyborg.Core.Configuration.Model;
 using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Services.Dispatch;
-using System.Collections.Immutable;
-using System.Diagnostics;
+using Cyborg.Core.Text;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Modules.Subprocess;
@@ -14,7 +13,7 @@ public sealed class SubprocessModuleWorker(IWorkerContext<SubprocessModule> cont
     protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
         string executable = Module.Command.Executable;
-        ImmutableArray<string> arguments = [.. Module.Command.Arguments];
+        List<TaggedString> arguments = [.. Module.Command.Arguments];
         if (Module.Impersonation is { } runUser)
         {
             executable = runUser.Executable;
@@ -25,16 +24,22 @@ public sealed class SubprocessModuleWorker(IWorkerContext<SubprocessModule> cont
                 ..arguments
             ];
         }
-        ProcessStartInfo startInfo = new(executable, arguments)
+
+        ChildProcessInvocation invocation = new(executable, arguments)
         {
             RedirectStandardOutput = Module.Output.ReadStdout,
             RedirectStandardError = Module.Output.ReadStderr,
+            WorkingDirectory = Module.Command.WorkingDirectory,
         };
-        if (!string.IsNullOrEmpty(Module.Command.WorkingDirectory))
+        if (Module.EnvironmentVariables is not null)
         {
-            startInfo.WorkingDirectory = Module.Command.WorkingDirectory;
+            foreach (EnvironmentVariable variable in Module.EnvironmentVariables)
+            {
+                invocation.Environment[variable.Key] = variable.Value;
+            }
         }
-        ChildProcessResult executionResult = await dispatcher.ExecuteAsync(startInfo, cancellationToken);
+
+        ChildProcessResult executionResult = await dispatcher.ExecuteAsync(invocation, cancellationToken);
         SubprocessModuleResult result = new(executionResult.ExitCode, executionResult.StandardOutput, executionResult.StandardError);
         if (Module.CheckExitCode && result.ExitCode != 0)
         {

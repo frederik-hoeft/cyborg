@@ -1,10 +1,10 @@
 ﻿using System.Text;
 
-namespace Cyborg.Core.Aot.Extensions;
+namespace Cyborg.Shared.Text;
 
-internal sealed class IndentedStringBuilder(StringBuilder builder, int indentLevel = 0, int indentSize = 4)
+public sealed class IndentedStringBuilder(StringBuilder builder, int indentLevel = 0, int indentSize = 4)
 {
-    public StringBuilder Raw => builder;
+    public StringBuilder InnerBuilder => builder;
 
     public int IndentSize => indentSize;
 
@@ -16,19 +16,35 @@ internal sealed class IndentedStringBuilder(StringBuilder builder, int indentLev
 
     public IndentedStringBuilder DecreaseIndent(int levels = 1) => new(builder, Math.Max(0, indentLevel - levels), indentSize);
 
+    public IndentedStringBuilder Append(char c)
+    {
+        TryIndent();
+        builder.Append(c);
+        return this;
+    }
+
     public IndentedStringBuilder Append(string text)
+    {
+        TryIndent();
+        builder.Append(text);
+        return this;
+    }
+
+    private void TryIndent()
     {
         if (builder.Length == 0 || builder[^1] == '\n')
         {
             builder.Append(IndentString);
         }
-        builder.Append(text);
-        return this;
     }
 
-    public IndentedStringBuilder AppendLine(string line)
+    public IndentedStringBuilder AppendLine(char c) => Append(c).AppendLine();
+
+    public IndentedStringBuilder AppendLine(string line) => Append(line).AppendLine();
+
+    public IndentedStringBuilder AppendLine()
     {
-        Append(line).Raw.AppendLine();
+        builder.AppendLine();
         return this;
     }
 

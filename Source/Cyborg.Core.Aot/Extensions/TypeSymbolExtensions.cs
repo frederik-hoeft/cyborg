@@ -30,5 +30,35 @@ internal static class TypeSymbolExtensions
             unwrapped = self;
             return false;
         }
+
+        public bool EqualsIgnoreNullability(SpecialType specialType)
+        {
+            _ = self.TryUnwrapNullableType(out ITypeSymbol unwrapped);
+            return unwrapped.SpecialType == specialType;
+        }
+
+        /// <summary>
+        /// Determines whether the type, after removing nullable wrapping/annotation, matches <paramref name="expectedType"/>.
+        /// </summary>
+        public bool EqualsIgnoreNullability(ITypeSymbol expectedType)
+        {
+            _ = self.TryUnwrapNullableType(out ITypeSymbol unwrapped);
+            return SymbolEqualityComparer.Default.Equals(unwrapped, expectedType);
+        }
+
+        /// <summary>
+        /// Determines whether the type is either a CLR string or the configured tagged-string type.
+        /// </summary>
+        public bool IsStringLike(ITypeSymbol taggedStringType) =>
+            self.EqualsIgnoreNullability(SpecialType.System_String) || self.EqualsIgnoreNullability(taggedStringType);
+
+        /// <summary>
+        /// Determines whether this type can ever be null, i.e., whether generated code should emit a null check for it.
+        /// </summary>
+        public bool CanEverBeNull => self
+            is { IsReferenceType: true }
+            or INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T }
+            // catch-all for unbound generic type parameters: T?
+            or { NullableAnnotation: NullableAnnotation.Annotated };
     }
 }

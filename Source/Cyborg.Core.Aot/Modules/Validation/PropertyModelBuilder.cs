@@ -1,5 +1,5 @@
 ﻿using Cyborg.Core.Aot.Extensions;
-using Cyborg.Core.Aot.Modules.Validation.Attributes;
+using Cyborg.Core.Aot.Modules.Validation.Aspects;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
@@ -9,7 +9,7 @@ namespace Cyborg.Core.Aot.Modules.Validation;
 
 internal sealed class PropertyModelBuilder(GenerationCandidateFactory factory, List<Diagnostic> diagnostics)
 {
-    private readonly VisibilityContext<INamedTypeSymbol> _visibilityContext = new(factory.Context.SemanticModel.Compilation, factory.TypeSymbol);
+    private readonly VisibilityContext<INamedTypeSymbol> _visibilityContext = new(factory.Compilation, factory.TypeSymbol);
 
     private INamedTypeSymbol CandidateType => factory.TypeSymbol;
 
@@ -39,20 +39,16 @@ internal sealed class PropertyModelBuilder(GenerationCandidateFactory factory, L
 
     private bool TryCreatePropertyModel(INamedTypeSymbol containingType, IPropertySymbol property, ImmutableHashSet<INamedTypeSymbol> traversalPath, [NotNullWhen(true)] out PropertyModel? propertyModel)
     {
-        PropertyProcessingContext processingContext = new(factory.Context.SemanticModel.Compilation, containingType, property, diagnostics);
-        if (!ValidationProcessorRegistry.TryProcess(in processingContext, out ImmutableArray<PropertyAspect> aspects))
+        PropertyProcessingContext processingContext = new(factory.Compilation, containingType, property, factory.ContractInfo, diagnostics);
+        if (!ValidationProcessorRegistry.TryProcess(in processingContext, out ImmutableArray<IPropertyAspect> aspects))
         {
             propertyModel = null;
             return false;
         }
 
         bool isNullable = property.Type.TryUnwrapNullableType(out ITypeSymbol nonNullableType);
-        bool isValidatableType = TryGetValidatableType(nonNullableType, out INamedTypeSymbol? validatableType);
-        ImmutableArray<PropertyModel> children = isValidatableType
-            ? BuildValidatableChildren(validatableType!, property, traversalPath)
-            : [];
-
-        CollectionModel? collection = TryCreateCollectionModel(containingType, property, nonNullableType, traversalPath);
+        ObjectModel? objectModel = TryCreateObjectModel(property.Type, property, traversalPath);
+        CollectionModel? collection = TryCreateCollectionModel(containingType, property, traversalPath);
 
         propertyModel = new PropertyModel(
             Symbol: property,
@@ -60,47 +56,58 @@ internal sealed class PropertyModelBuilder(GenerationCandidateFactory factory, L
             NullableTypeName: property.Type.ToDisplayString(KnownSymbolFormats.Nullable),
             NonNullableTypeName: nonNullableType.ToDisplayString(KnownSymbolFormats.Nullable),
             IsNullable: isNullable,
-            IsValidatableType: isValidatableType,
             Aspects: aspects,
-            Children: children,
+            Object: objectModel,
             Collection: collection);
+
+        if (property.Type.EqualsIgnoreNullability(SpecialType.System_String) && !propertyModel.HasAspect<Processors.UntaggedAspect>())
+        {
+            AddDiagnostic(
+                ValidationGeneratorDiagnostics.PreferTaggedString,
+                property.Locations.FirstOrDefault(),
+                property.Name,
+                containingType.Name);
+        }
 
         return true;
     }
 
-    private CollectionModel? TryCreateCollectionModel(INamedTypeSymbol containingType, IPropertySymbol property, ITypeSymbol nonNullableType, ImmutableHashSet<INamedTypeSymbol> traversalPath)
+    private CollectionModel? TryCreateCollectionModel(INamedTypeSymbol containingType, IPropertySymbol property, ImmutableHashSet<INamedTypeSymbol> traversalPath)
     {
-        if (!CollectionTypeInspector.TryDescribe(factory.Context.SemanticModel.Compilation, nonNullableType, out CollectionTypeInspector.CollectionTypeDescriptor? descriptor))
+        if (!CollectionTypeInspector.TryDescribe(factory.Compilation, property.Type, out CollectionShape? shape))
         {
             return null;
         }
 
-        bool isElementNullable = descriptor.ElementType.TryUnwrapNullableType(out ITypeSymbol nonNullableElementType);
-        bool isElementValidatableType = TryGetValidatableType(nonNullableElementType, out INamedTypeSymbol? validatableElementType);
-        ImmutableArray<PropertyModel> elementChildren = isElementValidatableType
-            ? BuildValidatableChildren(validatableElementType!, property, traversalPath)
-            : [];
+        _ = shape.ElementType.TryUnwrapNullableType(out ITypeSymbol nonNullableElementType);
+        ObjectModel? elementObject = TryCreateObjectModel(shape.ElementType, property, traversalPath);
 
-        if (isElementValidatableType && descriptor.MaterializationKind == CollectionMaterializationKind.None)
+        if (elementObject is not null && !shape.SupportsElementRewrite)
         {
             AddDiagnostic(
                 ValidationGeneratorDiagnostics.UnsupportedValidatableCollectionShape,
                 property.Locations.FirstOrDefault(),
                 property.Name,
                 containingType.Name,
-                nonNullableType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat));
+                property.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat));
         }
 
         return new CollectionModel(
-            ElementType: descriptor.ElementType,
-            ElementNullableTypeName: descriptor.ElementType.ToDisplayString(KnownSymbolFormats.Nullable),
+            Shape: shape,
+            ElementNullableTypeName: shape.ElementType.ToDisplayString(KnownSymbolFormats.Nullable),
             ElementNonNullableTypeName: nonNullableElementType.ToDisplayString(KnownSymbolFormats.Nullable),
-            IsElementNullable: isElementNullable,
-            ElementRequiresNullCheck: descriptor.ElementType.IsReferenceType || isElementNullable,
-            IsElementValidatableType: isElementValidatableType,
-            MaterializationKind: descriptor.MaterializationKind,
-            MaterializationTypeName: descriptor.MaterializationTypeName,
-            ElementChildren: elementChildren);
+            ElementObject: elementObject);
+    }
+
+    private ObjectModel? TryCreateObjectModel(ITypeSymbol declaredType, IPropertySymbol sourceProperty, ImmutableHashSet<INamedTypeSymbol> traversalPath)
+    {
+        if (!ObjectTypeInspector.TryDescribe(declaredType, out ObjectShape? shape))
+        {
+            return null;
+        }
+
+        ImmutableArray<PropertyModel> children = BuildValidatableChildren(shape.Type, sourceProperty, traversalPath);
+        return new ObjectModel(shape, children);
     }
 
     private ImmutableArray<PropertyModel> BuildValidatableChildren(INamedTypeSymbol validatableType, IPropertySymbol sourceProperty, ImmutableHashSet<INamedTypeSymbol> traversalPath)
@@ -140,17 +147,5 @@ internal sealed class PropertyModelBuilder(GenerationCandidateFactory factory, L
         }
 
         return childBuilder.ToImmutable();
-    }
-
-    private static bool TryGetValidatableType(ITypeSymbol type, [NotNullWhen(true)] out INamedTypeSymbol? validatableType)
-    {
-        if (type is INamedTypeSymbol namedType && namedType.HasAttribute<ValidatableAttribute>())
-        {
-            validatableType = namedType;
-            return true;
-        }
-
-        validatableType = null;
-        return false;
     }
 }

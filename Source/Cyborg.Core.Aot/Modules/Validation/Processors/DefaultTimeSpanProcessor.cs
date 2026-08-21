@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Aspects;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -8,7 +9,7 @@ namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
 internal sealed class DefaultTimeSpanProcessor : AttributeProcessorBase<DefaultTimeSpanAttribute>
 {
-    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
+    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out IPropertyAspect? aspect)
     {
         // ensure property is of type TimeSpan
         string actual = context.Property.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
@@ -34,9 +35,9 @@ internal sealed class DefaultTimeSpanProcessor : AttributeProcessorBase<DefaultT
         return true;
     }
 
-    private sealed class DefaultValueValidationAspect(string valueExpression) : PropertyAspect(ensuresDefault: true)
+    private sealed class DefaultValueValidationAspect(string valueExpression) : IPropertyDefaultAspect
     {
-        public override string? RewriteDefaultAssignmentExpression(PropertyRewriteContext context, string? currentExpression)
+        public string? RewriteDefaultAssignmentExpression(PropertyRewriteContext context, string? currentExpression)
         {
             string propertyAccessExpression = context.PropertyAccessExpression;
             string equalityComparer = KnownTypes.DefaultEqualityComparerOfT(context.Property.NullableTypeName);

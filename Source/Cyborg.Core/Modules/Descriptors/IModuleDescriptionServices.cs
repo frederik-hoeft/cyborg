@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Modules.Descriptors.Writers;
+using Cyborg.Core.Text.Rendering;
 using Jab;
 
 namespace Cyborg.Core.Modules.Descriptors;
@@ -10,9 +11,11 @@ namespace Cyborg.Core.Modules.Descriptors;
 [Singleton<IModuleSerializationService>(Factory = nameof(CreateSerializationService))]
 public interface IModuleDescriptionServices
 {
-    static IModuleDescriptionSerializer CreateTextSerializer() => TextModuleDescriptionSerializer.Instance;
+    static IModuleDescriptionSerializer CreateTextSerializer(ITaggedStringRenderer taggedStringRenderer) =>
+        new TextModuleDescriptionSerializer(taggedStringRenderer);
 
-    static IModuleDescriptionSerializer CreateJsonSerializer() => new JsonModuleDescriptionSerializer(indented: true);
+    static IModuleDescriptionSerializer CreateJsonSerializer(ITaggedStringRenderer taggedStringRenderer) =>
+        new JsonModuleDescriptionSerializer(indented: true, taggedStringRenderer);
 
     static IModuleDescriptionSerializerRegistry CreateSerializerRegistry(IEnumerable<IModuleDescriptionSerializer> serializers) =>
         new DefaultModuleDescriptionSerializerRegistry(serializers);

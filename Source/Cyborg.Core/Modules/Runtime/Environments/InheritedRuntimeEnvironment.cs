@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Modules.Runtime.Environments.Syntax;
+using Cyborg.Core.Text;
 
 namespace Cyborg.Core.Modules.Runtime.Environments;
 
@@ -41,6 +42,20 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
         if (Parent is RuntimeEnvironment runtimeParent)
         {
             return runtimeParent.TrySelectRawStringOverrideCore(entryPoint, module, moduleExpression, valueExpression, out value);
+        }
+        value = default;
+        return false;
+    }
+
+    internal protected override bool TrySelectRawTaggedStringOverrideCore<TModule>(EnvironmentLike entryPoint, TModule module, string? moduleExpression, string? valueExpression, out TaggedString value)
+    {
+        if (base.TrySelectRawTaggedStringOverrideCore(entryPoint, module, moduleExpression, valueExpression, out value))
+        {
+            return true;
+        }
+        if (Parent is RuntimeEnvironment runtimeParent)
+        {
+            return runtimeParent.TrySelectRawTaggedStringOverrideCore(entryPoint, module, moduleExpression, valueExpression, out value);
         }
         value = default;
         return false;

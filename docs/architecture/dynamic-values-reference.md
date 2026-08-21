@@ -17,6 +17,7 @@ For runtime semantics such as scoping, interpolation, decomposition, and overrid
   - [Entry Shape](#entry-shape)
   - [Type Name Syntax](#type-name-syntax)
 - [Scalar Types](#scalar-types)
+  - [Tagged strings and secrets](#tagged-strings-and-secrets)
   - [Configuration Enum Types](#configuration-enum-types)
 - [Runtime Composition Types](#runtime-composition-types)
   - [`cyborg.types.module.reference.v1`](#cyborgtypesmodulereferencev1)
@@ -80,6 +81,8 @@ The following scalar types are registered by the core runtime:
 | Type name | JSON value kind |
 |-----------|-----------------|
 | `string` | string |
+| `cyborg.types.taggedstring.v1` | string, or `{ "value": string, "tags": [string] }` |
+| `cyborg.types.secret.v1` | string, or `{ "value": string, "tags": [string] }` (always includes `cyborg.secret.v1`) |
 | `bool` | boolean |
 | `sbyte` | number |
 | `byte` | number |
@@ -92,6 +95,28 @@ The following scalar types are registered by the core runtime:
 | `float` | number |
 | `double` | number |
 | `decimal` | number |
+
+### Tagged strings and secrets
+
+`cyborg.types.taggedstring.v1` stores a `TaggedString`. A JSON string is an untagged value. A structural object supplies the raw `value` plus zero or more tag names.
+
+`cyborg.types.secret.v1` is a convenience form for configuration maps and other dynamic entries that should be treated as secrets by Cyborg-controlled presentation paths. The resulting `TaggedString` always carries `cyborg.secret.v1`, in addition to any tags supplied structurally.
+
+```json
+{ "key": "borg_passphrase", "cyborg.types.secret.v1": "your-passphrase" }
+```
+
+```json
+{
+  "key": "token",
+  "cyborg.types.taggedstring.v1": {
+    "value": "payload",
+    "tags": ["cyborg.secret.v1", "application.custom.v1"]
+  }
+}
+```
+
+DI-aware Cyborg presentation surfaces render secret-tagged values through `ITaggedStringRenderer`; the built-in secret policy produces `[REDACTED]`. Interpolation and exact-reference resolution preserve or union tags, so a secret introduced through a dynamic value remains secret when composed into another tagged value. The raw string remains available through `TaggedString.Value` for subprocess execution and other explicit execution boundaries. Converting to raw `string` intentionally leaves the tagged-value model, so arbitrary code operating on that string is responsible for how it is subsequently exposed.
 
 ### Configuration Enum Types
 

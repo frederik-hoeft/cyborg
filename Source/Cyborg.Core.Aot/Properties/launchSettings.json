@@ -1,8 +1,8 @@
 {
   "profiles": {
-    "Profile 1": {
+    "Cyborg.Core.Aot": {
       "commandName": "DebugRoslynComponent",
-      "targetProject": "..\\Cyborg.TestModules\\Cyborg.TestModules.csproj"
+      "targetProject": "..\\Cyborg.Modules\\Cyborg.Modules.csproj"
     }
   }
 }

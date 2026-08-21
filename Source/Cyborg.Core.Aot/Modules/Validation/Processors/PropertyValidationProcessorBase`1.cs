@@ -1,12 +1,14 @@
 ﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Aspects;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
+using Cyborg.Core.Aot.Modules.Validation.Models;
 using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
 internal abstract class PropertyValidationProcessorBase<TAttribute> : AttributeProcessorBase<TAttribute> where TAttribute : PropertyValidationAttribute
 {
-    public sealed override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
+    public sealed override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out IPropertyAspect? aspect)
     {
         bool targetsElements = false;
         if (TryGetNamedArgument(attribute, nameof(PropertyValidationAttribute.TargetsElements), out TypedConstant? targetsElementsArgument))
@@ -72,13 +74,32 @@ internal abstract class PropertyValidationProcessorBase<TAttribute> : AttributeP
         return false;
     }
 
+    protected bool ValidateStringLikeTargetType(AttributeData attribute, ref readonly PropertyProcessingContext context, ref readonly PropertyValidationTarget target)
+    {
+        if (!target.IsCollectionElement)
+        {
+            return ValidateStringLikePropertyType(attribute, in context);
+        }
+        if (target.Type.IsStringLike(context.ContractInfo.TaggedString))
+        {
+            return true;
+        }
+
+        context.Report(ValidationGeneratorDiagnostics.CollectionElementTypeMismatch,
+            context.Property.Name,
+            context.ContainingType.Name,
+            GetAttributeFriendlyName(attribute),
+            target.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
+            "string or TaggedString");
+        return false;
+    }
+
     private bool TryCreateCollectionElementTarget(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyValidationTarget target)
     {
-        _ = context.Property.Type.TryUnwrapNullableType(out ITypeSymbol nonNullableType);
         if (!CollectionTypeInspector.TryDescribe(
             context.Compilation,
-            nonNullableType,
-            out CollectionTypeInspector.CollectionTypeDescriptor? descriptor))
+            context.Property.Type,
+            out CollectionShape? shape))
         {
             context.Report(
                 ValidationGeneratorDiagnostics.CollectionApplicationRequiresCollection,
@@ -90,7 +111,7 @@ internal abstract class PropertyValidationProcessorBase<TAttribute> : AttributeP
             return false;
         }
 
-        target = new PropertyValidationTarget(descriptor.ElementType, IsCollectionElement: true);
+        target = new PropertyValidationTarget(shape.ElementType, IsCollectionElement: true);
         return true;
     }
 }

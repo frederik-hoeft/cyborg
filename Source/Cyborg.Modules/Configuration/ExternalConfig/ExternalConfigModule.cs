@@ -7,7 +7,7 @@ namespace Cyborg.Modules.Configuration.ExternalConfig;
 [GeneratedModuleValidation]
 public sealed partial record ExternalConfigModule
 (
-    [property: Required][property: FileExists] string Path
+    [property: Required][property: Untagged][property: FileExists] string Path
 ) : ModuleBase, IConfigurationModule
 {
     public static string ModuleId => "cyborg.modules.config.external.v1";

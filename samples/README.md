@@ -107,7 +107,7 @@ Remote backup hosts may be powered off between runs. Before executing jobs, Cybo
 
 ### Security
 
-Cyborg's trust subsystem audits file ownership and permissions before deserializing any configuration. The sample [`cyborg.options.jconf`](cyborg.options.jconf) enforces that all configuration files are root-owned and not group/other-writable. Secrets files (`.jsecrets`) should be mode `600`.
+Cyborg's trust subsystem audits file ownership and permissions before deserializing any configuration. The sample [`cyborg.options.jconf`](cyborg.options.jconf) enforces that all configuration files are root-owned and not group/other-writable. Secrets files (`.jsecrets`) should be mode `600`. Secret entries use `cyborg.types.secret.v1` so their values retain the `cyborg.secret.v1` tag through interpolation and are redacted by Cyborg-controlled diagnostics.
 
 ### Monitoring
 
@@ -244,7 +244,7 @@ To back up a new Docker container (e.g., Gitea on a daily schedule):
   "module": {
     "cyborg.modules.config.map.v1": {
       "entries": [
-        { "key": "borg_passphrase", "string": "your-borg-passphrase-here" }
+        { "key": "borg_passphrase", "cyborg.types.secret.v1": "your-borg-passphrase-here" }
       ]
     }
   }

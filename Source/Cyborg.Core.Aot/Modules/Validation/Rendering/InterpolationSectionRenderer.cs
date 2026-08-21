@@ -1,6 +1,9 @@
 ﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using Cyborg.Core.Aot.Modules.Validation.Processors;
+using Cyborg.Core.Aot.Modules.Validation.Rendering.Collections;
+using Cyborg.Core.Aot.Modules.Validation.Rendering.Objects;
+using Cyborg.Shared.Text;
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
 
@@ -44,14 +47,16 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
             string propertyAccess = $"{targetVariable}.{property.Name}";
             string localName = $"{targetVariable}_{property.Name}";
 
-            bool isString = IsStringType(property.Symbol.Type);
-            bool hasNestedWork = property.HasValidatableChildren && HasInterpolationWork(property.Children);
+            bool isStringLike = property.Symbol.Type.IsStringLike(ContractInfo.TaggedString);
+            bool ignoreInterpolation = property.HasAspect<IgnoreInterpolationAspect>();
+            bool hasNestedWork = property.Object is { HasChildren: true } objectModel
+                && HasInterpolationWork(objectModel.Children);
             CollectionModel? collection = property.Collection;
-            bool hasCollectionWork = collection is { SupportsElementRewrite: true }
-                && (IsStringType(collection.ElementType)
-                    || (collection.IsElementValidatableType && HasInterpolationWork(collection.ElementChildren)));
+            bool hasCollectionWork = collection is { Shape.SupportsElementRewrite: true }
+                && (collection.ElementType.IsStringLike(ContractInfo.TaggedString)
+                    || (collection.ElementObject is { } elementObject && HasInterpolationWork(elementObject.Children)));
 
-            if (!hasNestedWork && (!isString && !hasCollectionWork || property.HasAspect<IgnoreInterpolationAspect>()))
+            if (!hasNestedWork && (!isStringLike && !hasCollectionWork || ignoreInterpolation))
             {
                 continue;
             }
@@ -62,7 +67,7 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
                 continue;
             }
 
-            if (isString)
+            if (isStringLike)
             {
                 EmitStringInterpolation(builder, property, localName, propertyAccess);
             }
@@ -93,58 +98,55 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
 
     private void EmitStringInterpolation(IndentedStringBuilder builder, PropertyModel property, string localName, string propertyAccess)
     {
+        bool isTaggedString = property.Symbol.Type.EqualsIgnoreNullability(ContractInfo.TaggedString);
+        string interpolatedExpression = $"{ContextVariable}.Interpolate({propertyAccess})";
+        if (!isTaggedString)
+        {
+            interpolatedExpression = $"{interpolatedExpression}.Value";
+        }
+
+        if (!property.Symbol.Type.CanEverBeNull)
+        {
+            builder.AppendLine($"{property.NullableTypeName} {localName} = {interpolatedExpression};");
+            return;
+        }
+
         if (property.IsNullable)
         {
-            builder.AppendLine($"{property.NullableTypeName} {localName} = {propertyAccess} is not null ? {ContextVariable}.Interpolate({propertyAccess}) : null;");
+            builder.AppendLine($"{property.NullableTypeName} {localName} = {propertyAccess} is not null ? {interpolatedExpression} : null;");
         }
         else
         {
             // Non-nullable: guard against null defensively (validation will catch it if it is null).
             // Use ! on the fallback so the ternary stays typed as non-nullable and avoids CS8600/CS8601.
-            builder.AppendLine($"{property.NullableTypeName} {localName} = {propertyAccess} is not null ? {ContextVariable}.Interpolate({propertyAccess}) : {propertyAccess}!;");
+            builder.AppendLine($"{property.NullableTypeName} {localName} = {propertyAccess} is not null ? {interpolatedExpression} : {propertyAccess}!;");
         }
     }
 
     private void AppendNestedInterpolation(IndentedStringBuilder builder, PropertyModel property, string localName)
     {
-        string nestedVar = $"{localName}Current";
+        ObjectModel objectModel = property.Object
+            ?? throw new InvalidOperationException($"Nested interpolation requires object metadata for property '{property.Name}'.");
+        string nestedVariable = $"{localName}Current";
 
-        if (property.IsNullable || !property.HasDefault)
-        {
-            builder.AppendBlock(
-                $$"""
-                if ({{localName}} is not null)
-                {
-                    {{property.NonNullableTypeName}} {{nestedVar}} = {{localName}};
-                """);
-            AppendInterpolationForObject(builder.IncreaseIndent(), property.Children, nestedVar);
-            builder.AppendBlock(
-                $$"""
-                    {{localName}} = {{nestedVar}};
-                }
-                """);
-            if (!property.IsNullable)
-            {
-                builder.AppendLine($"{ModuleValidationRenderer.Helpers}.{ModuleValidationRenderer.HelperMembers.NullableRelax}({localName});");
-            }
-            return;
-        }
-
-        builder.AppendLine($"{property.NonNullableTypeName} {nestedVar} = {localName};");
-        AppendInterpolationForObject(builder, property.Children, nestedVar);
-        builder.AppendLine($"{localName} = {nestedVar};");
+        objectModel.Renderer.AppendRewrite(
+            builder,
+            localName,
+            nestedVariable,
+            (nestedBuilder, currentVariable) => AppendInterpolationForObject(nestedBuilder, objectModel.Children, currentVariable));
     }
 
     private void AppendCollectionInterpolation(IndentedStringBuilder builder, PropertyModel property, CollectionModel collection, string localName)
     {
-        if (CollectionHelpers.TryConstructEnumerationGuardExpression(property, localName, out string? conditionExpression, out string valueExpression))
+        ValueAccess access = collection.Shape.Renderer.Access(localName);
+        if (access.RequiresGuard)
         {
             string collectionCurrentVar = $"{localName}Current";
             builder.AppendBlock(
                 $$"""
-                if ({{conditionExpression}})
+                if ({{access.GuardExpression}})
                 {
-                    {{property.NonNullableTypeName}} {{collectionCurrentVar}} = {{valueExpression}};
+                    {{property.NonNullableTypeName}} {{collectionCurrentVar}} = {{access.ValueExpression}};
                 """);
             AppendCollectionInterpolationBody(builder.IncreaseIndent(), collection, collectionCurrentVar);
             builder.AppendBlock(
@@ -178,107 +180,67 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
             """);
         IndentedStringBuilder loopBuilder = builder.IncreaseIndent();
 
-        bool isStringElem = IsStringType(collection.ElementType);
-
-        if (collection.ElementRequiresNullCheck)
+        bool isStringElement = collection.ElementType.IsStringLike(ContractInfo.TaggedString);
+        if (isStringElement)
         {
-            loopBuilder.AppendLine($"{collection.ElementNullableTypeName} {elemCurrentVar} = {elemVar};");
-            loopBuilder.AppendBlock(
-                $$"""
-                if ({{elemCurrentVar}} is not null)
-                {
-                """);
-            IndentedStringBuilder ifBuilder = loopBuilder.IncreaseIndent();
-            if (isStringElem)
+            ValueAccess elementAccess = collection.Shape.Renderer.ElementAccess(elemVar);
+            if (elementAccess.RequiresGuard)
             {
-                ifBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elemValueVar} = {ContextVariable}.Interpolate({elemCurrentVar}!);");
-                ifBuilder.AppendLine($"{elemCurrentVar} = {elemValueVar};");
+                loopBuilder.AppendLine($"{collection.ElementNullableTypeName} {elemCurrentVar} = {elemVar};");
+                elementAccess = collection.Shape.Renderer.ElementAccess(elemCurrentVar);
+                loopBuilder.AppendBlock(
+                    $$"""
+                    if ({{elementAccess.GuardExpression}})
+                    {
+                        {{collection.ElementNonNullableTypeName}} {{elemValueVar}} = {{CreateElementInterpolationExpression(collection.ElementType, elementAccess.ValueExpression)}};
+                        {{elemCurrentVar}} = {{elemValueVar}};
+                    }
+                    """);
+                loopBuilder.AppendLine($"{ModuleValidationRenderer.Helpers}.{ModuleValidationRenderer.HelperMembers.NullableRelax}({elemCurrentVar});");
+                loopBuilder.AppendLine($"{rewrittenItemsVar}.Add({elemCurrentVar});");
             }
             else
             {
-                ifBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elemValueVar} = {elemCurrentVar}!;");
-                AppendInterpolationForObject(ifBuilder, collection.ElementChildren, elemValueVar);
-                ifBuilder.AppendLine($"{elemCurrentVar} = {elemValueVar};");
+                loopBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elemCurrentVar} = {CreateElementInterpolationExpression(collection.ElementType, elementAccess.ValueExpression)};");
+                loopBuilder.AppendLine($"{rewrittenItemsVar}.Add({elemCurrentVar});");
             }
-            loopBuilder.AppendBlock(
-                $$"""
-                }
-                {{ModuleValidationRenderer.Helpers}}.{{ModuleValidationRenderer.HelperMembers.NullableRelax}}({{elemCurrentVar}});
-                {{rewrittenItemsVar}}.Add({{elemCurrentVar}});
-                """);
         }
         else
         {
-            if (isStringElem)
-            {
-                loopBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elemCurrentVar} = {ContextVariable}.Interpolate({elemVar});");
-            }
-            else
-            {
-                loopBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elemCurrentVar} = {elemVar};");
-                AppendInterpolationForObject(loopBuilder, collection.ElementChildren, elemCurrentVar);
-            }
+            ObjectModel elementObject = collection.ElementObject
+                ?? throw new InvalidOperationException("Collection element interpolation requires validatable object metadata.");
+            loopBuilder.AppendLine($"{collection.ElementNullableTypeName} {elemCurrentVar} = {elemVar};");
+            elementObject.Renderer.AppendRewrite(
+                loopBuilder,
+                elemCurrentVar,
+                elemValueVar,
+                (elementBuilder, currentVariable) => AppendInterpolationForObject(elementBuilder, elementObject.Children, currentVariable));
             loopBuilder.AppendLine($"{rewrittenItemsVar}.Add({elemCurrentVar});");
         }
 
         builder.AppendLine("}");
-        AppendCollectionMaterialization(builder, collection, collectionVar, rewrittenItemsVar);
+        collection.Renderer.AppendMaterialization(builder, collectionVar, rewrittenItemsVar);
     }
 
-    private static void AppendCollectionMaterialization(IndentedStringBuilder builder, CollectionModel collection, string targetVariable, string rewrittenItemsVariable)
-    {
-        switch (collection.MaterializationKind)
-        {
-            case CollectionMaterializationKind.UseList:
-                builder.AppendLine($"{targetVariable} = {rewrittenItemsVariable};");
-                break;
-            case CollectionMaterializationKind.UseArray:
-                builder.AppendLine($"{targetVariable} = {KnownTypes.Enumerable}.ToArray({rewrittenItemsVariable});");
-                break;
-            case CollectionMaterializationKind.UseImmutableArray:
-                builder.AppendLine($"{targetVariable} = {KnownTypes.ImmutableArray}.CreateRange({rewrittenItemsVariable});");
-                break;
-            case CollectionMaterializationKind.ConstructFromList:
-                builder.AppendLine($"{targetVariable} = new {collection.MaterializationTypeName}({rewrittenItemsVariable});");
-                break;
-            case CollectionMaterializationKind.ParameterlessAdd:
-                string safeId = CreateSafeIdentifier(targetVariable);
-                string rewrittenCollectionVar = $"{safeId}Collection";
-                string rewrittenCollectionItemsVar = $"{safeId}CollectionItems";
-                string rewrittenItemVar = $"{safeId}Item";
-                builder.AppendBlock(
-                    $$"""
-                    {{collection.MaterializationTypeName}} {{rewrittenCollectionVar}} = new();
-                    {{KnownTypes.ICollectionOfT(collection.ElementNullableTypeName)}} {{rewrittenCollectionItemsVar}} = {{rewrittenCollectionVar}};
-                    foreach ({{collection.ElementNullableTypeName}} {{rewrittenItemVar}} in {{rewrittenItemsVariable}})
-                    {
-                        {{rewrittenCollectionItemsVar}}.Add({{rewrittenItemVar}});
-                    }
-                    {{targetVariable}} = {{rewrittenCollectionVar}};
-                    """);
-                break;
-        }
-    }
-
-    internal static bool HasInterpolationWork(ImmutableArray<PropertyModel> properties)
+    private bool HasInterpolationWork(ImmutableArray<PropertyModel> properties)
     {
         foreach (PropertyModel property in properties)
         {
-            if (IsStringType(property.Symbol.Type))
+            if (property.Symbol.Type.IsStringLike(ContractInfo.TaggedString))
             {
                 return true;
             }
-            if (property.HasValidatableChildren && HasInterpolationWork(property.Children))
+            if (property.Object is { HasChildren: true } objectModel && HasInterpolationWork(objectModel.Children))
             {
                 return true;
             }
-            if (property.Collection is { SupportsElementRewrite: true } collection)
+            if (property.Collection is { Shape.SupportsElementRewrite: true } collection)
             {
-                if (IsStringType(collection.ElementType))
+                if (collection.ElementType.IsStringLike(ContractInfo.TaggedString))
                 {
                     return true;
                 }
-                if (collection.IsElementValidatableType && HasInterpolationWork(collection.ElementChildren))
+                if (collection.ElementObject is { } elementObject && HasInterpolationWork(elementObject.Children))
                 {
                     return true;
                 }
@@ -287,7 +249,11 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
         return false;
     }
 
-    private static bool IsStringType(ITypeSymbol type) => type.SpecialType == SpecialType.System_String;
+    private string CreateElementInterpolationExpression(ITypeSymbol elementType, string accessExpression)
+    {
+        string interpolated = $"{ContextVariable}.Interpolate({accessExpression})";
+        return elementType.EqualsIgnoreNullability(ContractInfo.TaggedString) ? interpolated : $"{interpolated}.Value";
+    }
 
     private static string CreateSafeIdentifier(string value) =>
         string.Concat(value.Select(static c => char.IsLetterOrDigit(c) ? c : '_'));

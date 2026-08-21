@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Aspects;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Cyborg.Core.Aot.Modules.Validation.Rendering;
 using Microsoft.CodeAnalysis;
@@ -7,7 +8,7 @@ namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
 internal sealed class DefaultInstanceProcessor : AttributeProcessorBase<DefaultInstanceAttribute>
 {
-    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
+    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out IPropertyAspect? aspect)
     {
         ITypeSymbol propertyType = NormalizePropertyType(context.Property.Type);
 
@@ -29,9 +30,9 @@ internal sealed class DefaultInstanceProcessor : AttributeProcessorBase<DefaultI
         // Nullable<T> value types are invalid anyway because IDefaultInstance<TSelf> has `where TSelf : class`.
         propertyType.WithNullableAnnotation(NullableAnnotation.None);
 
-    private sealed class DefaultInstanceValidationAspect(INamedTypeSymbol containingType, INamedTypeSymbol propertyType, IPropertySymbol property) : PropertyAspect(ensuresDefault: true)
+    private sealed class DefaultInstanceValidationAspect(INamedTypeSymbol containingType, INamedTypeSymbol propertyType, IPropertySymbol property) : IPropertyDefaultAspect
     {
-        public override string? RewriteDefaultAssignmentExpression(PropertyRewriteContext context, string? currentExpression)
+        public string? RewriteDefaultAssignmentExpression(PropertyRewriteContext context, string? currentExpression)
         {
             if (!ImplementsMatchingDefaultInstanceInterface(propertyType, context.ContractInfo))
             {

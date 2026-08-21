@@ -1,4 +1,5 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
     <PropertyGroup>
         <TargetFramework>netstandard2.0</TargetFramework>
         <LangVersion>14</LangVersion>
@@ -16,7 +17,7 @@
         <DevelopmentDependency>true</DevelopmentDependency>
         <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     </PropertyGroup>
-        
+
     <ItemGroup>
         <EmbeddedResource Include="Contracts\ModuleLoaderFactoryGeneratorContract.cs" />
         <EmbeddedResource Include="Contracts\ModuleValidationGeneratorContract.cs" />
@@ -38,6 +39,8 @@
         <EmbeddedResource Include="Modules\Validation\Attributes\IgnoreOverrideAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\LengthAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\VariableIdentifierAttribute.cs" />
+        <EmbeddedResource Include="Modules\Validation\Attributes\SecretAttribute.cs" />
+        <EmbeddedResource Include="Modules\Validation\Attributes\UntaggedAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\MaxLengthAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\MinLengthAttribute.cs" />
         <EmbeddedResource Include="Modules\Validation\Attributes\MatchesGrammarAttribute.cs" />
@@ -53,6 +56,7 @@
         <EmbeddedResource Include="Contracts\GeneratorContractRegistrationAttribute`1.cs" />
     </ItemGroup>
 
+    <Import Project="..\Cyborg.Shared\Cyborg.Shared.projitems" />
     <ItemGroup>
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
         <PackageReference Include="PolySharp" Version="1.16.0">

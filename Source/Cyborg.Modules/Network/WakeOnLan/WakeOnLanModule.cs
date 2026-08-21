@@ -8,12 +8,12 @@ namespace Cyborg.Modules.Network.WakeOnLan;
 [GeneratedModuleValidation]
 public sealed partial record WakeOnLanModule
 (
-    [property: Required] string TargetHost,
-    [property: Required][property: MatchesRegex(nameof(WakeOnLanModule.MacAddressRegex))] string MacAddress,
+    [property: Required][property: Untagged] string TargetHost,
+    [property: Required][property: Untagged][property: MatchesRegex(nameof(WakeOnLanModule.MacAddressRegex))] string MacAddress,
     [property: Required][property: Range<int>(Min = 1, Max = ushort.MaxValue)] int LivenessProbePort,
     [property: DefaultTimeSpan("00:05:00")] TimeSpan MaxWaitTime,
     [property: DefaultTimeSpan("00:00:05")] TimeSpan HostDiscoveryTimeout,
-    [property: Required][property: DefaultValue<string>("/usr/bin/wakeonlan")][property: FileExists] string Executable
+    [property: Required][property: Untagged][property: DefaultValue<string>("/usr/bin/wakeonlan")][property: FileExists] string Executable
 ) : ModuleBase, IModule
 {
     public static string ModuleId => "cyborg.modules.network.wol.v1";

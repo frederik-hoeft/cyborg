@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Aspects;
 using Microsoft.CodeAnalysis;
 using System.Diagnostics.CodeAnalysis;
 
@@ -12,7 +13,7 @@ internal abstract class AttributeProcessorBase : IPropertyAttributeProcessor
 
     protected virtual string GetAttributeFriendlyName(AttributeData attribute) => attribute.AttributeClass?.Name ?? "Unknown";
 
-    public abstract bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect);
+    public abstract bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out IPropertyAspect? aspect);
 
     protected bool ValidateTypeArguments(AttributeData attribute, ref readonly PropertyProcessingContext context, params ReadOnlySpan<ITypeSymbol> expectedTypeArguments)
     {
@@ -40,7 +41,7 @@ internal abstract class AttributeProcessorBase : IPropertyAttributeProcessor
         {
             return false.WithDefaults(out expression);
         }
-        if (!LiteralExpressionFactory.TryGetLiteralExpression(argument.Value, context.Property.Type, out expression))
+        if (!LiteralExpressionFactory.TryGetLiteralExpression(argument.Value, context.Property.Type, context.ContractInfo, out expression))
         {
             context.Report(
                 ValidationGeneratorDiagnostics.UnsupportedAttributeLiteral,
@@ -93,7 +94,7 @@ internal abstract class AttributeProcessorBase : IPropertyAttributeProcessor
         {
             if (!named.Value.IsNull)
             {
-                if (!LiteralExpressionFactory.TryGetLiteralExpression(named.Value, context.Property.Type, out string? expression))
+                if (!LiteralExpressionFactory.TryGetLiteralExpression(named.Value, context.Property.Type, context.ContractInfo, out string? expression))
                 {
                     context.Report(
                         ValidationGeneratorDiagnostics.UnsupportedAttributeLiteral,
@@ -155,5 +156,19 @@ internal abstract class AttributeProcessorBase : IPropertyAttributeProcessor
             return false;
         }
         return true;
+    }
+
+    protected bool ValidateStringLikePropertyType(AttributeData attribute, ref readonly PropertyProcessingContext context)
+    {
+        if (context.Property.Type.IsStringLike(context.ContractInfo.TaggedString))
+        {
+            return true;
+        }
+        context.Report(ValidationGeneratorDiagnostics.TypeMismatch,
+            context.Property.Name,
+            context.ContainingType.Name,
+            GetAttributeFriendlyName(attribute),
+            "string or TaggedString");
+        return false;
     }
 }

@@ -7,12 +7,12 @@ namespace Cyborg.Modules.Borg;
 [GeneratedDecomposition]
 public sealed partial record BorgRemoteRepository
 (
-    [property: Required][property: DefaultValue<string>("ssh://")] string Protocol,
-    [property: Required] string Username,
-    [property: Required] string Hostname,
+    [property: Required][property: Untagged][property: DefaultValue<string>("ssh://")] string Protocol,
+    [property: Required][property: Untagged] string Username,
+    [property: Required][property: Untagged] string Hostname,
     [property: Required][property: Range<int>(Min = 1, Max = ushort.MaxValue)] int Port,
-    string? RepositoryRoot,
-    [property: Required] string RepositoryName
+    [property: Untagged] string? RepositoryRoot,
+    [property: Required][property: Untagged] string RepositoryName
 )
 {
     public string GetRepositoryUri() => $"{Protocol}{Username}@{Hostname}:{Port}{RepositoryRoot}/{RepositoryName}";

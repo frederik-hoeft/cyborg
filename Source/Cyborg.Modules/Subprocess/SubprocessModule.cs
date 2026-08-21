@@ -4,6 +4,7 @@ using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Cyborg.Core.Configuration.Model;
 using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Validation;
+using Cyborg.Core.Text;
 
 namespace Cyborg.Modules.Subprocess;
 
@@ -23,16 +24,16 @@ public sealed partial record SubprocessModule
 [Validatable]
 public sealed record ImpersonationContext
 (
-    [property: Required][property: DefaultValue<string>("/usr/sbin/runuser")][property: FileExists] string Executable,
-    [property: Required] string User
+    [property: Required][property: Untagged][property: DefaultValue<string>("/usr/sbin/runuser")][property: FileExists] string Executable,
+    [property: Required][property: Untagged] string User
 );
 
 [Validatable]
 public sealed record SubprocessCommand
 (
-    [property: Required][property: FileExists] string Executable,
-    [property: Required] IReadOnlyCollection<string> Arguments,
-    [property: RootedPath][property: NormalizedPath][property: DirectoryExists] string? WorkingDirectory
+    [property: Required][property: Untagged][property: FileExists] string Executable,
+    [property: Required] IReadOnlyCollection<TaggedString> Arguments,
+    [property: Untagged][property: RootedPath][property: NormalizedPath][property: DirectoryExists] string? WorkingDirectory
 );
 
 [Validatable]
@@ -49,6 +50,6 @@ public sealed record SubprocessOutputOptions
 [GeneratedDecomposition]
 public sealed partial record EnvironmentVariable
 (
-    [property: Required] string Key,
-    [property: Required] string Value
+    [property: Required][property: Untagged] string Key,
+    [property: Required] TaggedString Value
 ) : IDecomposable;

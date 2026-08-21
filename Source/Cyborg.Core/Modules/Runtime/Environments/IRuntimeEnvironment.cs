@@ -1,5 +1,6 @@
 ﻿using Cyborg.Core.Configuration.Model;
 using Cyborg.Core.Modules.Configuration.Model;
+using Cyborg.Core.Text;
 using System.Runtime.CompilerServices;
 
 namespace Cyborg.Core.Modules.Runtime.Environments;
@@ -31,6 +32,11 @@ public interface IRuntimeEnvironment : IEnvironmentLike
 
     [return: NotNullIfNotNull(nameof(value))]
     internal string? SelectRawStringOverride<TModule>(TModule module, string? value, string moduleExpression, string valueExpression) where TModule : ModuleBase, IModuleDefinition;
+
+    internal TaggedString SelectRawTaggedStringOverride<TModule>(TModule module, TaggedString value, string moduleExpression, string valueExpression) where TModule : ModuleBase, IModuleDefinition;
+
+    [return: NotNullIfNotNull(nameof(value))]
+    internal TaggedString? SelectRawTaggedStringOverride<TModule>(TModule module, TaggedString? value, string moduleExpression, string valueExpression) where TModule : ModuleBase, IModuleDefinition;
 
     [return: NotNullIfNotNull(nameof(value))]
     internal IReadOnlyCollection<T>? ResolveCollection<TModule, T>(TModule module, IReadOnlyCollection<T>? value, string moduleExpression, string valueExpression) where TModule : ModuleBase, IModuleDefinition;

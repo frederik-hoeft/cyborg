@@ -13,4 +13,6 @@ internal enum ModuleValidationGeneratorContract
     IModuleDescriptor,
     IObjectDescriptionBuilder,
     ModuleIdentity,
+    TaggedString,
+    WellKnownTags,
 }

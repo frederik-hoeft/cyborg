@@ -12,6 +12,8 @@ using Cyborg.Core.Modules.Extensions;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Services.Metrics;
+using Cyborg.Core.Text;
+using Cyborg.Core.Text.Rendering;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics.CodeAnalysis;
@@ -23,8 +25,6 @@ internal sealed class Commands
 {
     private const string CYBORG_ROOT = "/etc/cyborg";
     private const string LAST_RUN_SUCCESS = "last_run_success";
-
-    private static string QuoteArg(string arg) => $"\"{arg.Replace("\\", "\\\\").Replace("\"", "\\\"")}\"";
 
     /// <summary>
     /// Executes a backup run using the provided configuration and command-line options.
@@ -75,7 +75,6 @@ internal sealed class Commands
             configurationBuilder,
             options,
             config,
-            out string? invalidConfigurationDefinition,
             out string? configurationArgumentError);
         ICliDebugArgumentHandler debugArgumentHandler = services.GetRequiredService<ICliDebugArgumentHandler>();
         bool debuggerArgumentsValid = debugArgumentHandler.TryConfigure(breakAt, out string? invalidBreakpointExpression, out string? debuggerArgumentError);
@@ -99,11 +98,10 @@ internal sealed class Commands
             }
 
             ILogger logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("cyborg.cli.main");
-            logger.LogStartup(string.Join(' ', Array.ConvertAll(Environment.GetCommandLineArgs()[1..], QuoteArg)));
 
             if (!configurationArgumentsValid)
             {
-                logger.LogInvalidConfigurationOverride(invalidConfigurationDefinition!, configurationArgumentError!);
+                logger.LogInvalidConfigurationOverride(configurationArgumentError!);
                 return 1;
             }
             if (!debuggerArgumentsValid)
@@ -123,6 +121,9 @@ internal sealed class Commands
                 return 1;
             }
 
+            DynamicArgumentLogRenderer argumentLogRenderer = services.GetRequiredService<DynamicArgumentLogRenderer>();
+            logger.LogStartup(RenderRunArguments(main, options, environmentVariables, config, metrics, logLevel, breakAt, argumentLogRenderer));
+
             IModuleConfigurationLoader moduleLoader = services.GetRequiredService<IModuleConfigurationLoader>();
             ModuleContext module = await moduleLoader.LoadModuleAsync(main, cancellationToken);
             module = module with
@@ -130,16 +131,17 @@ internal sealed class Commands
                 Environment = module.Environment ?? ModuleEnvironment.Default,
             };
             IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
-            string target = globalEnvironment.ResolveVariableOrDefault(WellKnownVariables.Target, "<unspecified>");
-            logger.LogRunStarted(target);
+            TaggedString target = globalEnvironment.ResolveVariableOrDefault(WellKnownVariables.Target, new TaggedString("<unspecified>"));
+            string renderedTarget = services.GetRequiredService<ITaggedStringRenderer>().Render(target);
+            logger.LogRunStarted(renderedTarget);
             IModuleExecutionResult result = await runtime.ExecuteAsync(module, cancellationToken);
             if (result.Status is ModuleExitStatus.Success or ModuleExitStatus.Skipped)
             {
-                logger.LogRunCompleted(target);
+                logger.LogRunCompleted(renderedTarget);
             }
             else
             {
-                logger.LogRunCompletedWithStatus(target, result.Status.ToString());
+                logger.LogRunCompletedWithStatus(renderedTarget, result.Status.ToString());
                 if (!(configuration.TryGetValue(CliConfigurationDefaults.CONSOLE_LOGGING_ENABLED_KEY, out bool enabled) && enabled)
                     && configuration.TryGetValue(CliConfigurationDefaults.FILE_LOGGING_ENABLED_KEY, out enabled) && enabled)
                 {
@@ -160,10 +162,60 @@ internal sealed class Commands
         }
     }
 
+    private static string RenderRunArguments(
+        string main,
+        string options,
+        string[]? environmentVariables,
+        string[]? config,
+        string? metrics,
+        LogLevel? logLevel,
+        string[]? breakAt,
+        DynamicArgumentLogRenderer dynamicArgumentLogRenderer)
+    {
+        return string.Join(", ",
+        [
+            $"main={QuoteArgument(main)}",
+            $"options={QuoteArgument(options)}",
+            $"environmentVariables={RenderArgumentArray(environmentVariables, dynamicArgumentLogRenderer.RenderDefinition)}",
+            $"config={RenderArgumentArray(config, dynamicArgumentLogRenderer.RenderDefinition)}",
+            $"metrics={RenderOptionalArgument(metrics)}",
+            $"logLevel={(logLevel.HasValue ? logLevel.Value.ToString() : "null")}",
+            $"breakAt={RenderArgumentArray(breakAt)}",
+        ]);
+    }
+
+    private static string RenderArgumentArray(string[]? values, Func<string, string>? renderer = null)
+    {
+        if (values is null)
+        {
+            return "null";
+        }
+
+        List<string> renderedValues = [];
+        foreach (string value in values)
+        {
+            string renderedValue = renderer is null ? value : renderer(value);
+            renderedValues.Add(QuoteArgument(renderedValue));
+        }
+        return $"[{string.Join(", ", renderedValues)}]";
+    }
+
+    private static string RenderOptionalArgument(string? value) => value is null ? "null" : QuoteArgument(value);
+
+    private static string QuoteArgument(string value)
+    {
+        string escaped = value
+            .Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("\"", "\\\"", StringComparison.Ordinal)
+            .Replace("\r", "\\r", StringComparison.Ordinal)
+            .Replace("\n", "\\n", StringComparison.Ordinal);
+        return $"\"{escaped}\"";
+    }
+
     private static void CollectRunMetrics(GlobalRuntimeEnvironment environment, IMetricsCollector metricsCollector, bool runSucceeded)
     {
         IMetricsLabelCollection labels = metricsCollector.CreateLabels();
-        if (environment.TryResolveVariable(WellKnownVariables.Target, out string? target))
+        if (environment.TryResolveVariable(WellKnownVariables.Target, out TaggedString target))
         {
             labels.AddLabel("target", target);
         }

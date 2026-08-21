@@ -3,8 +3,8 @@ using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Validation;
 using Cyborg.Core.Services.Dispatch;
 using Cyborg.Core.Services.Metrics;
+using Cyborg.Core.Text;
 using Cyborg.Modules.Borg.Model;
-using System.Diagnostics;
 
 namespace Cyborg.Modules.Borg;
 
@@ -23,16 +23,16 @@ public abstract class BorgModuleWorker<TModule>
         return runtime.Environment.TryResolveVariable(BorgWellKnownVariables.DRY_RUN, out bool dryRun) && dryRun;
     }
 
-    protected void AddDefaults(ProcessStartInfo startInfo)
+    protected void AddDefaults(ChildProcessInvocation invocation)
     {
-        ArgumentNullException.ThrowIfNull(startInfo);
-        startInfo.RedirectStandardError = true;
-        startInfo.RedirectStandardOutput = true;
+        ArgumentNullException.ThrowIfNull(invocation);
+        invocation.RedirectStandardError = true;
+        invocation.RedirectStandardOutput = true;
         if (Module.RemoteShell is not null)
         {
-            startInfo.Environment[BORG_RSH_ENV_VAR] = BuildBorgRsh(Module.RemoteShell);
+            invocation.Environment[BORG_RSH_ENV_VAR] = BuildBorgRsh(Module.RemoteShell);
         }
-        startInfo.Environment[BORG_PASSPHRASE_ENV_VAR] = Module.Passphrase;
+        invocation.Environment[BORG_PASSPHRASE_ENV_VAR] = Module.Passphrase;
     }
 
     protected virtual IMetricsLabelCollection AddDefaultLabels(IModuleRuntime runtime, IMetricsLabelCollection labels)
@@ -43,7 +43,7 @@ public abstract class BorgModuleWorker<TModule>
         {
             labels = labels.AddLabel("repository_root", Module.RemoteRepository.RepositoryRoot);
         }
-        if (runtime.Environment.TryResolveVariable(BorgWellKnownVariables.FREQUENCY, out string? frequency))
+        if (runtime.Environment.TryResolveVariable(BorgWellKnownVariables.FREQUENCY, out TaggedString frequency))
         {
             labels = labels.AddLabel("frequency", frequency);
         }

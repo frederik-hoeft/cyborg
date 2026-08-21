@@ -1,14 +1,17 @@
 ﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Aspects;
 using Cyborg.Core.Aot.Modules.Validation.Models;
+using Cyborg.Core.Aot.Modules.Validation.Rendering.Collections;
+using Cyborg.Core.Aot.Modules.Validation.Rendering.Objects;
+using Cyborg.Shared.Text;
 using Microsoft.CodeAnalysis;
-using System.Text;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
 
 internal sealed class ValidationSectionRenderer(ValidationContractInfo contractInfo, VisibilityContext visibilityContext, DiagnosticsReporter diagnosticsReporter)
     : SectionRenderer(contractInfo, visibilityContext, diagnosticsReporter)
 {
-    private const string ERRORS_VARIABLE = "errors";
+    public ValidationVariables Variables => field ??= new ValidationVariables(RootModuleVariable, ContextVariable, Errors: "errors");
 
     public override void RenderSection(IndentedStringBuilder builder, ModuleModel model)
     {
@@ -23,100 +26,96 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
                 {{KnownTypes.CancellationToken}} cancellationToken)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                {{validationContextType}} {{ContextVariable}} = {{validationContextType}}.Create(runtime, serviceProvider);
+                {{validationContextType}} {{Variables.Context}} = {{validationContextType}}.Create(runtime, serviceProvider);
                 // apply defaults first to avoid overriding properties of null objects
-                {{qualifiedType}} {{RootModuleVariable}} = await this.{{ModuleValidationRenderer.ApplyDefaultsAsync}}({{ContextVariable}}, cancellationToken);
+                {{qualifiedType}} {{Variables.Module}} = await this.{{ModuleValidationRenderer.ApplyDefaultsAsync}}({{Variables.Context}}, cancellationToken);
                 // resolve any overrides that may have been applied to the module
-                {{RootModuleVariable}} = await {{RootModuleVariable}}.{{ModuleValidationRenderer.ResolveOverridesAsync}}({{ContextVariable}}, cancellationToken);
+                {{Variables.Module}} = await {{Variables.Module}}.{{ModuleValidationRenderer.ResolveOverridesAsync}}({{Variables.Context}}, cancellationToken);
                 // ensure that defaults are also applied to values injected via overrides
-                {{RootModuleVariable}} = await {{RootModuleVariable}}.{{ModuleValidationRenderer.ApplyDefaultsAsync}}({{ContextVariable}}, cancellationToken);
+                {{Variables.Module}} = await {{Variables.Module}}.{{ModuleValidationRenderer.ApplyDefaultsAsync}}({{Variables.Context}}, cancellationToken);
                 // interpolate all string members against the runtime environment
-                {{RootModuleVariable}} = await {{RootModuleVariable}}.{{ModuleValidationRenderer.ApplyInterpolationAsync}}({{ContextVariable}}, cancellationToken);
-                {{KnownTypes.ListOfT(ContractInfo.ValidationError.RenderGlobal())}} {{ERRORS_VARIABLE}} = [];
+                {{Variables.Module}} = await {{Variables.Module}}.{{ModuleValidationRenderer.ApplyInterpolationAsync}}({{Variables.Context}}, cancellationToken);
+                {{KnownTypes.ListOfT(ContractInfo.ValidationError.RenderGlobal())}} {{Variables.Errors}} = [];
 
             """);
 
         builder = builder.IncreaseIndent();
         foreach (PropertyModel property in model.Properties)
         {
-            AppendValidationForProperty(builder, property, RootModuleVariable, $"{RootModuleVariable}.{property.Name}");
+            AppendValidationForProperty(builder, property, $"{Variables.Module}.{property.Name}", ValidationPath.ForProperty(property.Name));
         }
         builder = builder.DecreaseIndent();
         builder.AppendBlock(
             $$"""
-                return {{ERRORS_VARIABLE}}.Count == 0
-                    ? {{ContractInfo.ValidationResult.RenderGlobal()}}.Valid({{RootModuleVariable}})
-                    : {{ContractInfo.ValidationResult.RenderGlobal()}}.Invalid({{RootModuleVariable}}, {{ERRORS_VARIABLE}});
+                return {{Variables.Errors}}.Count == 0
+                    ? {{ContractInfo.ValidationResult.RenderGlobal()}}.Valid({{Variables.Module}})
+                    : {{ContractInfo.ValidationResult.RenderGlobal()}}.Invalid({{Variables.Module}}, {{Variables.Errors}});
             }
             """);
     }
 
-    private void AppendValidationForProperty(IndentedStringBuilder builder, PropertyModel property, string moduleVariableName, string propertyAccessExpression)
+    private void AppendValidationForProperty(IndentedStringBuilder builder, PropertyModel property, string propertyAccessExpression, ValidationPath path)
     {
-        foreach (PropertyAspect aspect in property.Aspects)
+        foreach (IPropertyValidationAspect aspect in property.Aspects<IPropertyValidationAspect>())
         {
             if (aspect is not CollectionElementValidationAspect)
             {
-                aspect.EmitValidation(builder, ContractInfo, DiagnosticsReporter, property, moduleVariableName, propertyAccessExpression);
+                aspect.EmitValidation(this, builder, property, propertyAccessExpression, path);
             }
         }
-
-        if (property.HasValidatableChildren)
+        if (property.HasNestedValidationWork)
         {
-            AppendNestedValidationForProperty(builder, property, moduleVariableName, propertyAccessExpression);
+            AppendNestedValidationForProperty(builder, property, propertyAccessExpression, path);
         }
-
         if (property.HasCollectionValidationWork)
         {
-            AppendCollectionValidationForProperty(builder, property, moduleVariableName, propertyAccessExpression);
+            AppendCollectionValidationForProperty(builder, property, propertyAccessExpression, path);
         }
     }
 
-    private void AppendNestedValidationForProperty(IndentedStringBuilder builder, PropertyModel property, string moduleVariableName, string propertyAccessExpression)
+    private void AppendNestedValidationForProperty(IndentedStringBuilder builder, PropertyModel property, string propertyAccessExpression, ValidationPath path)
     {
-        StringBuilder nestedRawBuilder = new();
-        IndentedStringBuilder nestedBuilder = new(nestedRawBuilder, indentLevel: builder.IndentLevel + 1);
-
-        foreach (PropertyModel child in property.Children)
+        ObjectModel objectModel = property.Object
+            ?? throw new InvalidOperationException($"Nested validation requires object metadata for property '{property.Name}'.");
+        ValueAccess access = objectModel.Shape.Renderer.Access(propertyAccessExpression);
+        if (access.RequiresGuard)
         {
-            AppendValidationForProperty(nestedBuilder, child, moduleVariableName, $"{propertyAccessExpression}.{child.Name}");
+            builder.AppendBlock(
+                $$"""
+                if ({{access.GuardExpression}})
+                {
+                """);
+            builder = builder.IncreaseIndent();
         }
 
-        if (nestedRawBuilder.Length == 0)
+        foreach (PropertyModel child in objectModel.Children)
         {
-            return;
+            AppendValidationForProperty(builder, child, $"{access.ValueExpression}.{child.Name}", path.AppendProperty(child.Name));
         }
 
-        builder.AppendBlock(
-            $$"""
-            if ({{propertyAccessExpression}} is not null)
-            {
-            """);
-        builder.Raw.Append(nestedRawBuilder.ToString());
-        builder.AppendLine("}");
+        if (access.RequiresGuard)
+        {
+            builder = builder.DecreaseIndent();
+            builder.AppendLine("}");
+        }
     }
 
-    private void AppendCollectionValidationForProperty(IndentedStringBuilder builder, PropertyModel property, string moduleVariableName, string propertyAccessExpression)
+    private void AppendCollectionValidationForProperty(IndentedStringBuilder builder, PropertyModel property, string propertyAccessExpression, ValidationPath path)
     {
         CollectionModel collection = property.Collection!;
         string safeIdentifier = CreateSafeIdentifier(propertyAccessExpression);
         string collectionAccessExpression = propertyAccessExpression;
         string elementVariable = $"{safeIdentifier}Element";
-        bool needsCollectionEnumerationGuard = CollectionHelpers.TryConstructEnumerationGuardExpression(property, propertyAccessExpression, out string? guardCondition, out string valueExpression);
-        if (!needsCollectionEnumerationGuard && property.Symbol.Type.IsReferenceType)
-        {
-            needsCollectionEnumerationGuard = true;
-            guardCondition = $"{propertyAccessExpression} is not null";
-        }
+        ValueAccess access = collection.Shape.Renderer.Access(propertyAccessExpression);
 
-        if (needsCollectionEnumerationGuard)
+        if (access.RequiresGuard)
         {
             string collectionCurrentVariable = $"{safeIdentifier}CollectionCurrent";
             builder.AppendBlock(
                 $$"""
-                if ({{guardCondition}})
+                if ({{access.GuardExpression}})
                 {
-                    {{property.NonNullableTypeName}} {{collectionCurrentVariable}} = {{valueExpression}};
+                    {{property.NonNullableTypeName}} {{collectionCurrentVariable}} = {{access.ValueExpression}};
                 """);
             builder = builder.IncreaseIndent();
             collectionAccessExpression = collectionCurrentVariable;
@@ -130,74 +129,64 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
             {
             """);
         IndentedStringBuilder loopBuilder = builder.IncreaseIndent();
+        ValidationPath elementPath = path.AppendElement(indexVariable);
 
         if (property.TryGetAspects(out List<CollectionElementValidationAspect>? elementValidationAspects))
         {
             foreach (CollectionElementValidationAspect elementValidationAspect in elementValidationAspects)
             {
                 elementValidationAspect.ValidationAspect.EmitCollectionElementValidation(
+                    this,
                     loopBuilder,
-                    ContractInfo,
-                    DiagnosticsReporter,
                     property,
-                    moduleVariableName,
-                    propertyAccessExpression,
                     elementVariable,
-                    indexVariable);
+                    elementPath);
             }
         }
 
-        if (property.HasCollectionElementChildren)
+        if (property.HasCollectionElementChildValidationWork)
         {
-            AppendCollectionElementChildValidation(loopBuilder, property, moduleVariableName, elementVariable);
+            AppendCollectionElementChildValidation(loopBuilder, property, elementVariable, elementPath);
         }
         loopBuilder.AppendLine($"++{indexVariable};");
         builder.AppendLine("}");
 
-        if (needsCollectionEnumerationGuard)
+        if (access.RequiresGuard)
         {
             builder = builder.DecreaseIndent();
             builder.AppendLine("}");
         }
     }
 
-    private void AppendCollectionElementChildValidation(IndentedStringBuilder builder, PropertyModel property, string moduleVariableName, string elementVariable)
+    private void AppendCollectionElementChildValidation(IndentedStringBuilder builder, PropertyModel property, string elementVariable, ValidationPath elementPath)
     {
-        CollectionModel collection = property.Collection!;
-        string elementCurrentVariable = $"{elementVariable}Current";
-        int validationIndentLevel = builder.IndentLevel + (collection.ElementRequiresNullCheck ? 1 : 0);
-        StringBuilder validationRawBuilder = new();
-        IndentedStringBuilder validationBuilder = new(validationRawBuilder, validationIndentLevel);
-        foreach (PropertyModel child in collection.ElementChildren)
+        if (property is not { Collection.ElementObject: { } elementObject })
         {
-            AppendValidationForProperty(validationBuilder, child, moduleVariableName, $"{elementCurrentVariable}.{child.Name}");
+            throw new InvalidOperationException("Collection element child validation requires validatable object metadata.");
         }
-        if (validationRawBuilder.Length == 0)
+        ValueAccess access = elementObject.Shape.Renderer.Access(elementVariable);
+        if (access.RequiresGuard)
         {
-            return;
-        }
-
-        if (collection.ElementRequiresNullCheck)
-        {
-            (string collectionElementCheck, string collectionElementAccessExpression) = collection switch
-            {
-                { ElementType.IsValueType: true, IsElementNullable: true } => ($"{elementVariable}.HasValue", $"{elementVariable}.Value"),
-                _ => ($"{elementVariable} is not null", elementVariable),
-            };
             builder.AppendBlock(
                 $$"""
-                if ({{collectionElementCheck}})
+                if ({{access.GuardExpression}})
                 {
-                    {{collection.ElementNonNullableTypeName}} {{elementCurrentVariable}} = {{collectionElementAccessExpression}};
                 """);
-            builder.Raw.Append(validationRawBuilder.ToString());
-            builder.AppendLine("}");
-            return;
+            builder = builder.IncreaseIndent();
         }
 
-        builder.AppendLine($"{collection.ElementNonNullableTypeName} {elementCurrentVariable} = {elementVariable};");
-        builder.Raw.Append(validationRawBuilder.ToString());
+        foreach (PropertyModel child in elementObject.Children)
+        {
+            AppendValidationForProperty(builder, child, $"{access.ValueExpression}.{child.Name}", elementPath.AppendProperty(child.Name));
+        }
+        if (access.RequiresGuard)
+        {
+            builder = builder.DecreaseIndent();
+            builder.AppendLine("}");
+        }
     }
 
     private static string CreateSafeIdentifier(string value) => string.Concat(value.Select(static character => char.IsLetterOrDigit(character) ? character : '_'));
+
+    public sealed record ValidationVariables(string Module, string Context, string Errors);
 }

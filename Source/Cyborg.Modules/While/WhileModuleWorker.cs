@@ -44,7 +44,7 @@ public sealed class WhileModuleWorker(IWorkerContext<WhileModule> context) : Mod
             }
             // ${@}.result, via ${@} self reference
             string resultAccessExpression = environment.SyntaxFactory.Self().Ref().Member(nameof(ConditionalResult.Result));
-            string resultVariable = runtime.Environment.Interpolate(resultAccessExpression);
+            string resultVariable = runtime.Environment.Interpolate(resultAccessExpression).Value;
             if (!result.Artifacts.TryResolveVariable(resultVariable, out bool condition))
             {
                 // this is not a valid result from the condition module

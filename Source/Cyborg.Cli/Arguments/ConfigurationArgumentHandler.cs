@@ -11,17 +11,13 @@ internal sealed class ConfigurationArgumentHandler
     IJsonLoaderContext jsonLoaderContext
 ) : IConfigurationArgumentHandler
 {
-    private const char TYPE_DELIMITER = ':';
-
     public bool TryProcessArgument(
         string[]? configurationEntries,
         IConfigurationBuilder configurationBuilder,
-        [NotNullWhen(false)] out string? invalidDefinition,
         [NotNullWhen(false)] out string? errorMessage)
     {
         ArgumentNullException.ThrowIfNull(configurationBuilder);
 
-        invalidDefinition = null;
         errorMessage = null;
         if (configurationEntries is not [_, ..])
         {
@@ -31,23 +27,23 @@ internal sealed class ConfigurationArgumentHandler
         Dictionary<string, object> values = [];
         foreach (string definition in configurationEntries)
         {
-            if (!TryParseDefinition(definition, out string? key, out string? typeName, out string? valueText, out errorMessage))
+            if (!DynamicArgumentDefinitionParser.TryParse(definition, out DynamicArgumentDefinition parsed, out string? parseError))
             {
-                invalidDefinition = definition;
+                errorMessage = $"'{definition}'. Reason: {parseError}";
                 return false;
             }
 
             object? value;
-            if (typeName is null)
+            if (parsed.TypeName is null)
             {
-                value = valueText;
+                value = parsed.Value;
             }
-            else if (!TryParseDynamicValue(typeName, valueText, out value, out errorMessage))
+            else if (!TryParseDynamicValue(parsed.TypeName, parsed.Value, out value, out string? dynamicValueError))
             {
-                invalidDefinition = definition;
+                errorMessage = $"'{definition}'. Reason: {dynamicValueError}";
                 return false;
             }
-            values[key] = value;
+            values[parsed.Key] = value;
         }
 
         configurationBuilder.AddDictionary(values);
@@ -68,59 +64,6 @@ internal sealed class ConfigurationArgumentHandler
             errorMessage = $"Value is not valid for dynamic value type '{typeName}': {parseError}";
             return false;
         }
-        errorMessage = null;
-        return true;
-    }
-
-    private static bool TryParseDefinition(
-        string definition,
-        [NotNullWhen(true)] out string? key,
-        out string? typeName,
-        [NotNullWhen(true)] out string? value,
-        [NotNullWhen(false)] out string? errorMessage)
-    {
-        int assignmentDelimiter = definition.IndexOf('=');
-        if (assignmentDelimiter <= 0)
-        {
-            key = null;
-            typeName = null;
-            value = null;
-            errorMessage = "Expected format 'key[:type]=value'.";
-            return false;
-        }
-
-        string keyAndType = definition[..assignmentDelimiter];
-        value = definition[(assignmentDelimiter + 1)..];
-        int typeDelimiter = keyAndType.IndexOf(TYPE_DELIMITER);
-        if (typeDelimiter < 0)
-        {
-            key = keyAndType;
-            typeName = null;
-        }
-        else
-        {
-            if (typeDelimiter != keyAndType.LastIndexOf(TYPE_DELIMITER))
-            {
-                key = null;
-                typeName = null;
-                errorMessage = "Configuration definitions may contain at most one type delimiter ':' before the assignment.";
-                return false;
-            }
-            key = keyAndType[..typeDelimiter];
-            typeName = keyAndType[(typeDelimiter + 1)..];
-            if (string.IsNullOrWhiteSpace(typeName))
-            {
-                errorMessage = "Dynamic value type must not be empty.";
-                return false;
-            }
-        }
-
-        if (string.IsNullOrWhiteSpace(key))
-        {
-            errorMessage = "Configuration key must not be empty.";
-            return false;
-        }
-
         errorMessage = null;
         return true;
     }

@@ -13,7 +13,8 @@ internal sealed class ObjectDescriptionBuilder(IDescriptionComponentFactory fact
     {
         EnsureMutable();
         ValidateName(name);
-        IDescriptionValueComponent valueComponent = factory.CreateValue(value, hints: []);
+        // property hints apply to the property itself and the value component
+        IDescriptionValueComponent valueComponent = factory.CreateValue(value, hints);
         AddPropertyComponent(name, valueComponent, hints);
     }
 

@@ -1,5 +1,10 @@
 ﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Aspects;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
+using Cyborg.Core.Aot.Modules.Validation.Models;
+using Cyborg.Core.Aot.Modules.Validation.Rendering;
+using Cyborg.Core.Aot.Modules.Validation.Rendering.Collections;
+using Cyborg.Shared.Text;
 using Microsoft.CodeAnalysis;
 using System.Globalization;
 
@@ -11,7 +16,7 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValid
     {
         aspect = null;
 
-        LengthTargetKind targetKind = GetTargetKind(target.Type, out INamedTypeSymbol? collectionInterface);
+        LengthTargetKind targetKind = GetTargetKind(target.Type, in context, out CollectionShape? collectionShape);
         if (targetKind == LengthTargetKind.None)
         {
             context.Report(
@@ -63,62 +68,30 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValid
 
         aspect = new LengthValidationAspect(
             targetKind,
-            collectionInterface,
+            collectionShape,
             minExpression: min?.ToString(CultureInfo.InvariantCulture),
-            maxExpression: max?.ToString(CultureInfo.InvariantCulture),
-            requiresNullGuard: RequiresNullGuard(target.Type));
+            maxExpression: max?.ToString(CultureInfo.InvariantCulture));
 
         return true;
     }
 
     protected abstract bool TryGetBounds(AttributeData attribute, ref readonly PropertyProcessingContext context, out int? min, out int? max);
 
-    private static bool RequiresNullGuard(ITypeSymbol propertyType) =>
-        propertyType.IsReferenceType || propertyType.NullableAnnotation == NullableAnnotation.Annotated;
-
-    private static LengthTargetKind GetTargetKind(ITypeSymbol propertyType, out INamedTypeSymbol? collectionInterface)
+    private static LengthTargetKind GetTargetKind(ITypeSymbol targetType, ref readonly PropertyProcessingContext context, out CollectionShape? collectionShape)
     {
-        collectionInterface = null;
-        if (propertyType.SpecialType == SpecialType.System_String)
+        collectionShape = null;
+        if (targetType.IsStringLike(context.ContractInfo.TaggedString))
         {
             return LengthTargetKind.String;
         }
 
-        if (ImplementsIReadOnlyCollection(propertyType, out collectionInterface))
+        if (CollectionTypeInspector.TryDescribe(context.Compilation, targetType, out collectionShape) && collectionShape.SupportsCount)
         {
             return LengthTargetKind.Collection;
         }
 
         return LengthTargetKind.None;
     }
-
-    private static bool ImplementsIReadOnlyCollection(ITypeSymbol type, out INamedTypeSymbol? collectionInterface)
-    {
-        collectionInterface = null;
-        if (type is not INamedTypeSymbol namedType)
-        {
-            return false;
-        }
-
-        if (IsReadOnlyCollection(namedType))
-        {
-            return true;
-        }
-
-        foreach (INamedTypeSymbol iface in namedType.AllInterfaces)
-        {
-            if (IsReadOnlyCollection(iface))
-            {
-                collectionInterface = iface;
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool IsReadOnlyCollection(INamedTypeSymbol type) =>
-        type.OriginalDefinition.SpecialType is SpecialType.System_Collections_Generic_IReadOnlyCollection_T;
 
     private enum LengthTargetKind
     {
@@ -130,52 +103,74 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValid
     private sealed class LengthValidationAspect
     (
         LengthTargetKind targetKind,
-        INamedTypeSymbol? collectionInterface,
+        CollectionShape? collectionShape,
         string? minExpression,
-        string? maxExpression,
-        bool requiresNullGuard
+        string? maxExpression
     ) : PropertyValidationAspect
     {
-        protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
+        public override void EmitValidation(IndentedStringBuilder builder, PropertyValidationModel model)
         {
-            if (requiresNullGuard)
+            if (targetKind == LengthTargetKind.Collection)
             {
-                builder.AppendLine($"if ({model.AccessExpression} is not null)");
-                builder.AppendLine("{");
-                EmitLengthValidation(builder.IncreaseIndent(), model);
+                CollectionShape shape = collectionShape
+                    ?? throw new InvalidOperationException("Collection length validation is missing collection shape metadata.");
+                ValueAccess access = shape.Renderer.Access(model.AccessExpression);
+                if (access.RequiresGuard)
+                {
+                    builder.AppendBlock(
+                        $$"""
+                        if ({{access.GuardExpression}})
+                        {
+                        """);
+                    EmitLengthValidation(builder.IncreaseIndent(), model, shape.Renderer.CountExpression(access.ValueExpression));
+                    builder.AppendLine("}");
+                    return;
+                }
+
+                EmitLengthValidation(builder, model, shape.Renderer.CountExpression(access.ValueExpression));
+                return;
+            }
+
+            if (model.TargetType.CanEverBeNull)
+            {
+                builder.AppendBlock(
+                    $$"""
+                    if ({{model.AccessExpression}} is not null)
+                    {
+                    """);
+                EmitLengthValidation(builder.IncreaseIndent(), model, CreateStringLengthExpression(model));
                 builder.AppendLine("}");
                 return;
             }
 
-            EmitLengthValidation(builder, model);
+            EmitLengthValidation(builder, model, CreateStringLengthExpression(model));
         }
 
-        private void EmitLengthValidation(IndentedStringBuilder builder, ModulePropertyModel model)
+        private static string CreateStringLengthExpression(PropertyValidationModel model)
         {
-            string accessExpression;
-            if (collectionInterface is null)
+            if (!model.IsTaggedString)
             {
-                accessExpression = model.AccessExpression;
+                return $"{model.AccessExpression}.Length";
             }
-            else
-            {
-                accessExpression = $"{model.AccessExpression.Replace('.', '_')}__collection";
-                builder.AppendLine($"{collectionInterface.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Included))} {accessExpression} = {model.AccessExpression};");
-            }
-            string sizeExpression = targetKind switch
-            {
-                LengthTargetKind.String => $"{accessExpression}.Length",
-                LengthTargetKind.Collection => $"{accessExpression}.Count",
-                _ => throw new InvalidOperationException("Unsupported length target kind.")
-            };
 
+            string contentExpression = model.TargetType is INamedTypeSymbol
+            {
+                OriginalDefinition.SpecialType: SpecialType.System_Nullable_T
+            }
+                ? $"{model.AccessExpression}.Value.Value"
+                : $"{model.AccessExpression}.Value";
+            return $"{contentExpression}.Length";
+        }
+
+        private void EmitLengthValidation(IndentedStringBuilder builder, PropertyValidationModel model, string sizeExpression)
+        {
             if (minExpression is not null)
             {
                 builder.AppendBlock(
                 $$"""
                 if ({{sizeExpression}} < {{minExpression}})
                 {
-                    errors.Add({{CreateValidationError(model, "length", $"{model.TargetDescription} '{{{model.PropertyNameExpression}}}' must have a length/count not smaller than configured minimum '{minExpression}', was '{{{sizeExpression}}}'.")}});
+                    {{model.Variables.Errors}}.Add({{CreateValidationError(model, "length", $"{model.TargetDescription} must have a length/count not smaller than configured minimum '{minExpression}', was '{{{sizeExpression}}}'.")}});
                 }
                 """);
             }
@@ -186,7 +181,7 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValid
                 $$"""
                 if ({{sizeExpression}} > {{maxExpression}})
                 {
-                    errors.Add({{CreateValidationError(model, "length", $"{model.TargetDescription} '{{{model.PropertyNameExpression}}}' must have a length/count not greater than configured maximum '{maxExpression}', was '{{{sizeExpression}}}'.")}});
+                    {{model.Variables.Errors}}.Add({{CreateValidationError(model, "length", $"{model.TargetDescription} must have a length/count not greater than configured maximum '{maxExpression}', was '{{{sizeExpression}}}'.")}});
                 }
                 """);
             }

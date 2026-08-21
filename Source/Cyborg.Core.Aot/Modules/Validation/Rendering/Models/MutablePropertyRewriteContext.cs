@@ -1,6 +1,6 @@
 ﻿using Cyborg.Core.Aot.Modules.Validation.Models;
 
-namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
+namespace Cyborg.Core.Aot.Modules.Validation.Rendering.Models;
 
 internal sealed record MutablePropertyRewriteContext
 (

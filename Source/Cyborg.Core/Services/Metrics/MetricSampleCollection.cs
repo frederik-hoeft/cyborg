@@ -1,8 +1,9 @@
 ﻿using Cyborg.Core.Metrics;
+using Cyborg.Core.Text.Rendering;
 
 namespace Cyborg.Core.Services.Metrics;
 
-internal sealed class MetricSampleCollection(PrometheusMetricBuilder builder) : IMetricSampleCollection
+internal sealed class MetricSampleCollection(PrometheusMetricBuilder builder, ITaggedStringRenderer taggedStringRenderer) : IMetricSampleCollection
 {
     public IMetricSampleCollection Add(bool sample, Action<IMetricsLabelCollection> buildLabels) =>
         Add(sample, MaterializeLabels(buildLabels));
@@ -58,9 +59,9 @@ internal sealed class MetricSampleCollection(PrometheusMetricBuilder builder) : 
         return this;
     }
 
-    private static MetricsLabelCollection MaterializeLabels(Action<IMetricsLabelCollection> buildLabels)
+    private MetricsLabelCollection MaterializeLabels(Action<IMetricsLabelCollection> buildLabels)
     {
-        MetricsLabelCollection labels = new();
+        MetricsLabelCollection labels = new(taggedStringRenderer);
         buildLabels(labels);
         return labels;
     }

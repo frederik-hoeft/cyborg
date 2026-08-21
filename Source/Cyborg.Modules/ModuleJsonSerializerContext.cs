@@ -1,4 +1,5 @@
-﻿using Cyborg.Modules.Assert;
+﻿using Cyborg.Core.Text;
+using Cyborg.Modules.Assert;
 using Cyborg.Modules.Conditions.And;
 using Cyborg.Modules.Conditions.DirectoryExists;
 using Cyborg.Modules.Conditions.FileExists;
@@ -58,4 +59,5 @@ namespace Cyborg.Modules;
 [JsonSerializable(typeof(TemplateModule))]
 [JsonSerializable(typeof(GuardModule))]
 [JsonSerializable(typeof(EmptyModule))]
+[JsonSerializable(typeof(TaggedString))]
 public sealed partial class ModuleJsonSerializerContext : JsonSerializerContext;

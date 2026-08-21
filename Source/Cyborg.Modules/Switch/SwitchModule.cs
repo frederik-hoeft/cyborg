@@ -7,7 +7,7 @@ namespace Cyborg.Modules.Switch;
 [GeneratedModuleValidation]
 public sealed partial record SwitchModule
 (
-    [property: Required] string Variable,
+    [property: Required][property: Untagged] string Variable,
     [property: Required][property: MinLength(1)] IReadOnlyCollection<SwitchReference> Cases
 ) : ModuleBase, IModule
 {
@@ -17,6 +17,6 @@ public sealed partial record SwitchModule
 [Validatable]
 public sealed record SwitchReference
 (
-    [property: Required] string Name,
-    [property: Required] string Path
+    [property: Required][property: Untagged] string Name,
+    [property: Required][property: Untagged] string Path
 );

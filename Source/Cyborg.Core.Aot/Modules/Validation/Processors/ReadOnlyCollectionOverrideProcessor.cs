@@ -1,10 +1,11 @@
-﻿using Microsoft.CodeAnalysis;
+﻿using Cyborg.Core.Aot.Modules.Validation.Aspects;
+using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
 internal sealed class ReadOnlyCollectionOverrideProcessor : IDynamicPropertyProcessor
 {
-    public bool TryProcess(ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
+    public bool TryProcess(ref readonly PropertyProcessingContext context, out IPropertyAspect? aspect)
     {
         aspect = null;
         if (context.Property.Type is INamedTypeSymbol { IsGenericType: true } propertyType && propertyType.ConstructedFrom.SpecialType == SpecialType.System_Collections_Generic_IReadOnlyCollection_T)
@@ -15,9 +16,9 @@ internal sealed class ReadOnlyCollectionOverrideProcessor : IDynamicPropertyProc
         return true;
     }
 
-    private sealed class ReadOnlyCollectionOverridesAspect : PropertyAspect
+    private sealed class ReadOnlyCollectionOverridesAspect : IPropertyOverrideAspect
     {
-        public override string RewriteOverrideResolutionExpression(PropertyRewriteContext context, string currentExpression, string rootPathExpression) =>
+        public string RewriteOverrideResolutionExpression(PropertyRewriteContext context, string currentExpression, string rootPathExpression) =>
             $"{context.ContextVariable}.ResolveCollectionOverride({context.ModuleVariable}, {context.PropertyAccessExpression}, moduleExpression: \"{context.ModuleVariable}\", valueExpression: \"{rootPathExpression}\")";
     }
 }

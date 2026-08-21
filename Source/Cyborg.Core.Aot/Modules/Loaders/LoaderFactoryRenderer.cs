@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Aot.Extensions;
+﻿using Cyborg.Shared.Text;
 using Microsoft.CodeAnalysis;
 using System.Text;
 
@@ -50,7 +50,7 @@ internal static class LoaderFactoryRenderer
             }
             else
             {
-                builder.Raw.AppendLine();
+                builder.AppendLine();
             }
 
             if (SymbolEqualityComparer.Default.Equals(parameter.Type, model.ModuleType))

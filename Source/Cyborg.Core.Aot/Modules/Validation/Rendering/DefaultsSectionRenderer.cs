@@ -1,5 +1,6 @@
 ﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
+using Cyborg.Shared.Text;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
 
@@ -21,7 +22,7 @@ internal sealed class DefaultsSectionRenderer(ValidationContractInfo contractInf
             """);
 
         builder = builder.IncreaseIndent();
-        DefaultApplicationRenderer.AppendDefaultApplicationForObject(builder, model.Properties, RootModuleVariable, diagnosticsPhase: "defaults");
+        PropertyPreparationRenderer.AppendPreparationForObject(builder, model.Properties, RootModuleVariable, diagnosticsPhase: "defaults");
         builder = builder.DecreaseIndent();
         builder.AppendBlock(
             $$"""

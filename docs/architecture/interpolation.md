@@ -86,10 +86,11 @@ Properties marked `[IgnoreInterpolation]` skip this phase. Their effective value
 Module workers and other handwritten consumers use one interpolation API:
 
 ```csharp
-string result = runtime.Environment.Interpolate(value);
+TaggedString result = runtime.Environment.Interpolate(value);
+string raw = result.Value; // execution-facing raw string
 ```
 
-`Interpolate(...)` and `TryResolveVariable(...)` are complete evaluation boundaries. They resolve ordinary expressions recursively and remove one escape layer in string results.
+`Interpolate(...)` and `TryResolveVariable(...)` are complete evaluation boundaries. They resolve ordinary expressions recursively and remove one escape layer in string results. Interpolation returns a `TaggedString` whose tags are the union of the template's tags and the tags of every successfully resolved interpolation operand. Retrieving a tagged result as `string` still yields the raw value for compatibility, but discards tags; prefer `TryResolveVariable(..., out TaggedString)`.
 
 A worker should manually interpolate only when evaluation was intentionally deferred until worker execution, normally through `[IgnoreInterpolation]`. Eligible properties processed by the generated pipeline are already interpolated before the worker receives the validated module and should not be interpolated again.
 
@@ -105,8 +106,8 @@ Interpolate("${HOME}")   -> resolved HOME value, when defined
 
 The environment API exposed to module authors includes operations that are meaningful during handwritten execution, such as:
 
-- `Interpolate(...)` for intentionally deferred string evaluation;
-- `TryResolveVariable(...)` for typed variable reads;
+- `Interpolate(...)` for intentionally deferred string evaluation (returns `TaggedString` so tags union);
+- `TryResolveVariable(...)` for typed variable reads, preferably as `TaggedString`;
 - `SetVariable(...)` and `TryRemoveVariable(...)` for environment state.
 
 Generated preparation additionally requires raw string override selection, typed scalar and collection override materialization, and access to the runtime and service provider shared by every preparation phase. These operations are grouped on `ModuleValidationContext` rather than exposed as public members of `IRuntimeEnvironment`. The context must be public because generated code is compiled into consuming assemblies, but it has a private constructor, lives in an `Internal` namespace, and is marked as editor-hidden; it is not a client-code contract.

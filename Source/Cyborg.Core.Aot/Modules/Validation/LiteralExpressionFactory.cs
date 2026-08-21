@@ -1,4 +1,5 @@
-﻿using Microsoft.CodeAnalysis;
+﻿using Cyborg.Core.Aot.Extensions;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
@@ -7,7 +8,7 @@ namespace Cyborg.Core.Aot.Modules.Validation;
 
 internal static class LiteralExpressionFactory
 {
-    public static bool TryGetLiteralExpression(TypedConstant constant, ITypeSymbol targetType, [NotNullWhen(true)] out string? expression)
+    public static bool TryGetLiteralExpression(TypedConstant constant, ITypeSymbol targetType, ValidationContractInfo contractInfo, [NotNullWhen(true)] out string? expression)
     {
         expression = constant switch
         {
@@ -15,6 +16,7 @@ internal static class LiteralExpressionFactory
             { Value: { } value } => targetType switch
             {
                 { SpecialType: SpecialType.System_String } => SymbolDisplay.FormatLiteral((string)value, quote: true),
+                _ when targetType.EqualsIgnoreNullability(contractInfo.TaggedString) => SymbolDisplay.FormatLiteral((string)value, quote: true),
                 { SpecialType: SpecialType.System_Char } => SymbolDisplay.FormatLiteral((char)value, quote: true),
                 { SpecialType: SpecialType.System_Boolean } => (bool)value ? "true" : "false",
                 { SpecialType: SpecialType.System_Byte } => $"(byte){((byte)value).ToString(CultureInfo.InvariantCulture)}",

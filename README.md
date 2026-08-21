@@ -1,19 +1,21 @@
 # Cyborg Workflow Engine
 
-Cyborg is a .NET 10 workflow orchestration engine that composes complex, multi-step workflows from declarative JSON configuration. It compiles to a single native AOT binary with no runtime dependencies, designed for unattended operation on Linux servers. While its core engine is fully domain-agnostic, the current distribution includes a module library for BorgBackup orchestration as its primary use case.
+Cyborg is a .NET 10 workflow engine for declarative, unattended orchestration on Linux. Workflows are immutable JSON module trees that are prepared through source-generated defaults, runtime overrides, interpolation, and validation before execution. The application publishes as a self-contained native AOT binary, and the included Borg module library provides a production-oriented backup orchestration stack on top of the domain-agnostic core.
 
 ## Overview
 
-Cyborg provides a Turing-complete module system where every operation — from executing subprocesses to orchestrating multi-host backup workflows — is expressed as a composable module in JSON. Modules can be nested, parameterized, and reused through templates, enabling complex workflows without writing code. All core APIs (module composition, environment scoping, variable resolution, validation, artifact publishing) are domain-agnostic and designed to be extended with custom module libraries for any orchestration task.
+Cyborg treats orchestration as composition rather than scripting. Built-in modules provide sequencing, conditionals, loops, subprocess execution, environment manipulation, external configuration, and reusable templates; domain-specific libraries can add further modules without changing the runtime model. Scoped environments provide late-bound variables and overrides between modules, while artifacts publish structured results back into the workflow.
 
 Key capabilities:
 
-- **Declarative workflows** — Jobs are defined as JSON configuration files that compose built-in modules for sequencing, conditionals, loops, subprocess execution, and domain-specific operations.
-- **Template system** — Reusable workflow templates with parameterized overrides, enabling shared patterns across services (e.g., a common Docker or systemd backup template applied to different containers or services).
-- **Borg module library** — Built-in support for borg archive creation, pruning, and compaction across multiple remote repositories, with Wake-on-LAN for cold backup targets.
-- **Prometheus metrics** — Automatic export of operational statistics in Prometheus exposition format.
-- **Native AOT binary** — Compiles to a self-contained executable with no .NET runtime dependency, minimal startup time, and low memory footprint.
-- **Configuration trust** — File ownership and permission auditing on configuration files to prevent privilege escalation through tampered workflows.
+- **Composable declarative workflows** — Build nested execution trees from versioned JSON modules instead of procedural glue scripts, using built-in sequencing, conditionals, loops, subprocess execution, and environment manipulation as reusable building blocks.
+- **Reusable templates and late binding** — Parameterize common workflow structures, inject typed data or modules, and resolve scoped variables, artifacts, interpolation expressions, and per-module overrides at execution time.
+- **Predictable preparation and validation** — Defaults, overrides, interpolation, and recursive validation are applied before execution; source-generated code keeps this pipeline AOT-compatible without runtime reflection.
+- **Built-in diagnostics stack** — Structured logging, Prometheus metrics, prepared-module inspection, breakpoints, and the interactive debugger provide a consistent operational view across unattended workflows.
+- **Secret-aware textual data flow** — `TaggedString` metadata propagates through Cyborg-managed text flow so diagnostics and other presentation surfaces can redact `cyborg.secret.v1` values while explicit execution boundaries retain access to the raw value.
+- **Native AOT and configuration trust** — Publish as a self-contained binary without a .NET runtime dependency and audit configuration ownership/permissions before deserializing executable workflow definitions.
+- **Production-oriented Borg orchestration** — The included Borg module library and reference deployment coordinate create/prune/compact workflows, remote-host lifecycle, retention, diagnostics, and metrics on top of the same domain-agnostic engine.
+- **First-class module extensibility** — Every unit of work is a module, from subprocess calls and control flow to domain-specific orchestration. Custom module libraries compose with the built-ins and participate in the same environment, preparation, validation, diagnostics, and execution model without changing the core engine.
 
 ## Use Cases
 
@@ -66,7 +68,7 @@ Build artifacts are output to `Source/artifacts/`.
 
 ### Configuration
 
-Cyborg is configured through jconf files, which are JSON with support for comments. Host configuration is stored as dot-delimited hierarchical leaf keys and composed in three precedence layers: CLI-defined built-in defaults, the options file, then explicit `--config` command-line overrides. Structured source values are decomposed before storage, so later layers replace earlier values at the same leaf without retaining stale parent objects.
+Cyborg is configured through jconf files, which are JSON with support for comments. Host configuration is stored as dot-delimited hierarchical leaf keys and composed in three precedence layers: CLI-defined built-in defaults, the options file, then explicit `--config` command-line overrides. Structured source values are decomposed before storage, so later layers replace earlier values at the same leaf without retaining stale parent objects. Typed dynamic values use the same `key[:type]=value` model in configuration and CLI inputs; `cyborg.types.secret.v1` produces a secret-tagged textual value whose metadata is preserved through Cyborg-managed interpolation and diagnostics.
 
 Cyborg expects its configuration in `/etc/cyborg/` by default. The `samples/` directory provides a complete reference configuration:
 
@@ -139,9 +141,11 @@ For details on the configuration model and all available modules, see the [Modul
 
 ## Security
 
-Cyborg workflows can execute subprocesses with elevated privileges. To prevent privilege escalation through tampered configuration files, the trust subsystem audits file ownership and permissions before any configuration file is deserialized. The default policy requires configuration files to be owned by root and not writable by group or other users.
+Cyborg treats configuration integrity and secret presentation as separate boundaries. The trust subsystem audits file ownership and permissions before executable configuration is deserialized; the default policy requires configuration files to be owned by root and not writable by group or other users. Trust enforcement is configurable in `cyborg.options.jconf` as `enforce`, `log_only`, or `disabled`.
 
-Trust enforcement is configurable in `cyborg.options.jconf` and supports three modes: `enforce` (block untrusted files), `log_only` (warn but continue), and `disabled`. See the [Security Design Principles](docs/architecture/architecture-overview.md#security-design-principles) section of the architecture documentation for details.
+Sensitive textual values should enter the runtime as `TaggedString` values, normally through `cyborg.types.secret.v1` or a `[Secret]` module property. Secret tags survive interpolation and override selection, and Cyborg-controlled diagnostics, debugger output, and tagged metric labels render them through the shared redaction policy. Raw values are exposed only at explicit execution or compatibility boundaries such as child-process dispatch.
+
+See [Security Design Principles](docs/architecture/architecture-overview.md#security-design-principles) and [Tagged Textual Values](docs/architecture/architecture-overview.md#tagged-textual-values) for the runtime contracts.
 
 ## Documentation
 
@@ -149,24 +153,30 @@ Trust enforcement is configurable in `cyborg.options.jconf` and supports three m
 |----------|-------------|
 | [Architecture Overview](docs/architecture/architecture-overview.md) | System architecture: module system, runtime, environment scoping, parsing, security |
 | [Module Reference](docs/architecture/modules-reference.md) | Complete documentation of all built-in modules |
-| [Dynamic Values Reference](docs/architecture/dynamic-values-reference.md) | Dynamic value providers and typed configuration |
+| [Dynamic Values Reference](docs/architecture/dynamic-values-reference.md) | Dynamic value providers, typed configuration, tagged strings, and secret values |
+| [Interpolation and Overrides](docs/architecture/interpolation.md) | Expression syntax, evaluation phases, override selection, and deferred interpolation |
 | [Templates Reference](docs/architecture/templates-reference.md) | Template module usage and patterns |
 | [Source Generators](docs/architecture/source-generators.md) | Roslyn source generators for AOT-compatible code generation |
-| [Validation Attributes Reference](docs/architecture/validation-attributes-reference.md) | Validation, defaulting, and override control attributes |
-| [Workflow Debugging](docs/architecture/debugging.md) | Breakpoints, interactive REPL, and module inspection |
+| [Validation Attributes Reference](docs/architecture/validation-attributes-reference.md) | Validation, defaulting, override, interpolation, and secret-tag attributes |
+| [Workflow Debugging](docs/architecture/debugging.md) | Breakpoints, interactive REPL, module descriptions, and inspection |
+| [Module Testing](docs/architecture/module-testing.md) | Production-backed module test infrastructure and generator fixtures |
+| [Metrics](docs/metrics.md) | Global and module metric output |
 
 ## Project Structure
 
 ```
 Source/
-  Cyborg.Cli/           Application entry point and CLI routing
-  Cyborg.Cli.Debugging/ Console debugger frontend and isolated REPL routing
-  Cyborg.Core/           Core abstractions: modules, runtime, parsing, services
-  Cyborg.Core.Aot/       Roslyn source generators for AOT compatibility
-  Cyborg.Modules/        Built-in modules (sequence, subprocess, template, etc.)
-  Cyborg.Modules.Borg/   Borg-specific modules (create, prune, compact)
-samples/                 Reference configuration files and templates
-docs/                    Architecture and reference documentation
+  Cyborg.Cli/             Application entry point and CLI composition
+  Cyborg.Cli.Debugging/   Console debugger frontend and isolated REPL routing
+  Cyborg.Core/            Runtime, modules, environments, configuration, and services
+  Cyborg.Core.Aot/        Roslyn source generators for AOT-compatible generated code
+  Cyborg.Shared/          Source-shared utilities used by both runtime and analyzer projects
+  Cyborg.Core.TestAdapter/ Production-backed module test harness
+  Cyborg.TestModules/     Source-generator fixture models
+  Cyborg.Modules/         Built-in domain-agnostic modules
+  Cyborg.Modules.Borg/    Borg-specific modules and parsers
+samples/                   Reference deployment, configuration, and templates
+docs/                      Architecture and reference documentation
 ```
 
 ## Extending Cyborg

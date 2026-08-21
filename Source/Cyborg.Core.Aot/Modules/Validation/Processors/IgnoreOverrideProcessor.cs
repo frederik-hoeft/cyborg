@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Aspects;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Microsoft.CodeAnalysis;
 
@@ -6,7 +7,7 @@ namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
 internal sealed class IgnoreOverrideProcessor : AttributeProcessorBase<IgnoreOverrideAttribute>
 {
-    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
+    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out IPropertyAspect? aspect)
     {
         if (!TryGetConstructorArgumentValue(attribute, argumentIndex: 0, in context, out bool recurse))
         {
@@ -17,7 +18,7 @@ internal sealed class IgnoreOverrideProcessor : AttributeProcessorBase<IgnoreOve
     }
 }
 
-internal sealed class IgnoreOverrideAspect(bool recurse) : PropertyAspect
+internal sealed class IgnoreOverrideAspect(bool recurse) : IPropertyAspect
 {
     public bool Recurse => recurse;
 }

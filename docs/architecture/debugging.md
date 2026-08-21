@@ -164,7 +164,9 @@ Description services are registered independently from debugger services. Applic
 
 ### Hints
 
-Description properties and values may carry `ImmutableArray<string>` hints. Hints are arbitrary metadata keys with no mandatory semantics in the description tree. Generator aspects can contribute hints, the tree preserves them, and serializers decide which keys they understand. Unknown hints remain available to downstream consumers rather than being interpreted by the core model.
+Description properties and values may carry `ImmutableArray<string>` hints. Hints are arbitrary metadata keys with no mandatory semantics in the description tree. The tree preserves them for custom serializers and other downstream consumers. Built-in serializers do not reinterpret hints as tagged-value metadata, keeping presentation hints separate from taint state.
+
+`TaggedString` values are first-class atoms. Built-in text and JSON serializers render their runtime tags through `ITaggedStringRenderer`; a value carrying `cyborg.secret.v1` is therefore written as `[REDACTED]` rather than the raw secret. `[Secret]` establishes that tag during generated preparation, so debugger and validation inspection of prepared modules relies on the same tagged value state used by every other Cyborg presentation surface.
 
 ### Source-generated traversal
 

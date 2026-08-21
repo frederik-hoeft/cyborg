@@ -7,8 +7,8 @@ namespace Cyborg.Modules.Glob;
 [GeneratedModuleValidation]
 public sealed partial record GlobModule
 (
-    [property: Required] string Pattern,
-    [property: Required][property: DirectoryExists] string Root,
+    [property: Required][property: Untagged] string Pattern,
+    [property: Required][property: Untagged][property: DirectoryExists] string Root,
     [property: DefaultValue<bool>(false)] bool Recurse
 ) : ModuleBase, IModule
 {

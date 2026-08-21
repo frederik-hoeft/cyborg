@@ -1,8 +1,10 @@
-﻿using System.Diagnostics;
-
-namespace Cyborg.Core.Services.Dispatch;
+﻿namespace Cyborg.Core.Services.Dispatch;
 
 public interface IChildProcessDispatcher
 {
-    Task<ChildProcessResult> ExecuteAsync(ProcessStartInfo processStartInfo, CancellationToken cancellationToken);
+    /// <summary>
+    /// Executes a metadata-aware invocation. Implementations preserve tagged values until the raw
+    /// process execution boundary and render diagnostics safely.
+    /// </summary>
+    Task<ChildProcessResult> ExecuteAsync(ChildProcessInvocation invocation, CancellationToken cancellationToken);
 }
