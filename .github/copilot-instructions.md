@@ -1,6 +1,6 @@
 # Cyborg Repository Instructions
 
-Cyborg is a .NET 10 application for modular, JSON-configured backup orchestration with native AOT compilation support. Workflows are immutable module trees that are loaded through source-generated JSON metadata, prepared through generated validation code, and executed inside hierarchical runtime environments.
+Cyborg is a .NET 10 application for modular, JSON-configured workflow orchestration with native AOT compilation support. Workflows are immutable module trees that are loaded through source-generated JSON metadata, prepared through generated validation code, and executed inside hierarchical runtime environments.
 
 ## Start Here
 
@@ -32,6 +32,7 @@ The solution is under `Source/Cyborg.slnx`.
 |---------|----------------|
 | `Cyborg.Core` | Runtime abstractions, module execution, environment scoping, configuration, parsing, process execution, metrics, security, and shared services. It must not contain module-specific behavior. |
 | `Cyborg.Core.Aot` | Roslyn incremental generators for module validation, loader factories, decomposition, and generator-contract bootstrapping. Targets `netstandard2.0` for analyzer hosting. |
+| `Cyborg.Shared` | Source-shared utility code imported by both `Cyborg.Core` and `Cyborg.Core.Aot` without creating a runtime/analyzer project dependency. |
 | `Cyborg.Core.TestAdapter` | Reusable production-backed module test runtime and higher-order test APIs. |
 | `Cyborg.TestModules` | Minimal analyzer-consuming assembly for source-generator fixture models. |
 | `Cyborg.Core.Tests` | Core runtime and infrastructure tests. |
@@ -62,12 +63,12 @@ The generated module pipeline has a fixed order:
 1. Apply defaults.
 2. Resolve or select overrides.
 3. Reapply defaults.
-4. Interpolate eligible strings.
+4. Interpolate eligible textual values (`string` and `TaggedString`).
 5. Validate constraints.
 
 Each phase returns transformed records through `with` expressions. Do not mutate the deserialized module instance.
 
-String overrides are selected as stored values without evaluating their contents. Non-string overrides use full typed resolution. This distinction is required so `[IgnoreInterpolation]` applies equally to JSON values, defaults, and overrides, and so generated preparation does not accidentally perform an extra interpolation pass.
+`string` and `TaggedString` overrides are selected as stored values without evaluating their contents. Non-textual overrides use full typed resolution. This distinction is required so `[IgnoreInterpolation]` applies equally to JSON values, defaults, and overrides, and so generated preparation does not accidentally perform an extra interpolation pass.
 
 The worker receives the validated module. Do not repeat generated interpolation in worker code. Manually call `runtime.Environment.Interpolate(...)` only for values whose evaluation was intentionally deferred, normally through `[IgnoreInterpolation]`.
 
@@ -111,7 +112,7 @@ Generator targets have structural requirements:
 - `[GeneratedModuleValidation]`: partial record.
 - `[GeneratedModuleLoaderFactory]`: partial loader with the expected `ModuleLoader<TWorker, TModule>` base.
 - `[GeneratedDecomposition]`: partial record or class.
-- `[Validatable]`: nested record participating recursively in defaults, overrides, interpolation, and constraints.
+- `[Validatable]`: nested record class or record struct participating recursively in defaults, overrides, interpolation, constraints, and generated description traversal.
 
 Generator-emitted references should use fully qualified global type names. Preserve incremental-generator value semantics and avoid carrying mutable or identity-based state through incremental pipelines.
 

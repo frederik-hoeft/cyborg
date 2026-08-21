@@ -77,27 +77,29 @@ For detailed reference material, see:
 
 ## Overview
 
-Cyborg is a .NET 10 application providing modular, JSON-configured backup orchestration with native AOT compilation support. Its architecture is driven by four design goals:
+Cyborg is a .NET 10 application providing modular, JSON-configured workflow orchestration with native AOT compilation support. Its architecture is driven by five design goals:
 
 1. **AOT Compilation** — Native AOT publishing for minimal startup time and memory footprint on Linux servers, and minimal external dependencies (no .NET runtime requirement, no external dynamic libraries).
-2. **Extensibility** — A plugin-like module system allowing backup operations to be composed from JSON configuration without code changes.
+2. **Extensibility** — A plugin-like module system allowing orchestration behavior to be composed from JSON configuration without code changes.
 3. **Type Safety** — Compile-time verification of module registration, dependency injection, and JSON serialization through Roslyn source generators and the Jab DI container.
-4. **Structured Output Parsing** — Grammar-based parser combinators for extracting structured data and metrics from subprocess output.
+4. **Metadata-Preserving Text Flow** — Tagged textual values retain metadata such as secret taint through runtime resolution, interpolation, and generated preparation. Presentation policy consumes those tags centrally, while raw text is exposed only at explicit boundaries.
+5. **Structured Output Parsing** — Grammar-based parser combinators for extracting structured data and metrics from subprocess output.
 
 ## Project Structure
 
-The production solution is organized into six primary projects, each with a specific role in the dependency hierarchy:
+The production solution is organized into seven primary projects, each with a specific role in the dependency hierarchy:
 
 | Layer | Target | Purpose |
 |-------|--------|---------|
 | `Cyborg.Core` | net10.0 | Core abstractions: module interfaces, runtime, environment scoping, configuration, parsing, and cross-cutting services. Contains no module-specific logic. |
 | `Cyborg.Core.Aot` | netstandard2.0 | Roslyn incremental source generators distributed as analyzers. Targets netstandard2.0 as required by the Roslyn analyzer hosting model. |
+| `Cyborg.Shared` | netstandard2.0 | Source-shared utilities compiled into both `Cyborg.Core` and `Cyborg.Core.Aot` where a direct project dependency would cross the runtime/analyzer boundary. |
 | `Cyborg.Modules` | net10.0 | Built-in, domain-agnostic module implementations supplemented by generated code from `Cyborg.Core.Aot`, e.g., for model validation and instance activation. |
 | `Cyborg.Modules.Borg` | net10.0 | Borg-specific modules (create, prune, compact) with JSON output parsing and borg-specific configuration types. |
 | `Cyborg.Cli.Debugging` | net10.0 | Console debugger frontend and its isolated ConsoleAppFramework-generated REPL command surface. |
 | `Cyborg.Cli` | net10.0 | Application entry point using its own ConsoleAppFramework command surface, with Jab for compile-time dependency injection composition. |
 
-`Cyborg.Core` defines the runtime interfaces and abstractions. `Cyborg.Core.Aot` generates code that implements those interfaces for specific module types. `Cyborg.Modules` and `Cyborg.Modules.Borg` provide the built-in module library. `Cyborg.Cli.Debugging` provides the console debugger adapter in a separate CAF compilation, and `Cyborg.Cli` composes everything into the final executable. Each module library exposes a Jab `[ServiceProviderModule]` interface (e.g., `ICyborgModuleServices`, `ICyborgBorgServices`) that the CLI project imports into its composition root.
+`Cyborg.Core` defines the runtime interfaces and abstractions. `Cyborg.Core.Aot` generates code that implements those interfaces for specific module types. `Cyborg.Shared` supplies a small common source surface to both projects without making the analyzer depend on the runtime assembly. `Cyborg.Modules` and `Cyborg.Modules.Borg` provide the built-in module library. `Cyborg.Cli.Debugging` provides the console debugger adapter in a separate CAF compilation, and `Cyborg.Cli` composes everything into the final executable. Each module library exposes a Jab `[ServiceProviderModule]` interface (e.g., `ICyborgModuleServices`, `ICyborgBorgServices`) that the CLI project imports into its composition root.
 
 ### Test Support Projects
 
@@ -162,7 +164,7 @@ Module IDs follow a versioned, dot-separated naming convention (e.g., `cyborg.mo
 
 Configuration modules populate the environment with typed values using the `IDynamicValueProvider` subsystem. Each entry in a configuration map is a key-value pair where the value type is identified by a property name in the JSON object. Providers are registered by type name (e.g., `"int"`, `"string"`, `"bool"`) in the `IDynamicValueProviderRegistry`. Domain-specific types register under versioned type names (e.g., `"cyborg.types.borg.remote.v1.4"`). Typed collections use `collection<T>` syntax to declare arrays of a specific value type.
 
-Custom types implement `IDynamicValueProvider` and register a versioned type name. When annotated with `[GeneratedDecomposition]`, they gain `IDecomposable` support for hierarchical property access via the variable resolution subsystem. Dynamic key-value entries must contain a non-null `key` and exactly one non-null typed value; malformed entries fail immediately with `JsonException`, including when they are parsed outside a module-validation context. See the [Dynamic Values Reference](dynamic-values-reference.md) for a complete listing of available value providers.
+Custom types implement `IDynamicValueProvider` and register a versioned type name. When annotated with `[GeneratedDecomposition]`, they gain `IDecomposable` support for hierarchical property access via the variable resolution subsystem. The core textual providers include `cyborg.types.taggedstring.v1` and `cyborg.types.secret.v1`, allowing configuration to introduce metadata-bearing text without flattening it to a raw string. Dynamic key-value entries must contain a non-null `key` and exactly one non-null typed value; malformed entries fail immediately with `JsonException`, including when they are parsed outside a module-validation context. See the [Dynamic Values Reference](dynamic-values-reference.md) for a complete listing of available value providers.
 
 ### Module Identity and Descriptions
 
@@ -190,13 +192,13 @@ Before a worker's `ExecuteAsync` method is invoked, `ModuleWorker<TModule>` call
 
 3. **Reapply Defaults / Preparation Invariants** — Runs the same preparation pass again so values introduced by overrides receive declared defaults and destination-level invariants are re-established.
 
-4. **Interpolate Strings** — Recursively applies `runtime.Environment.Interpolate(...)` to eligible strings on the module, nested `[Validatable]` records, and supported collection elements. `[IgnoreInterpolation]` preserves strings that require later context-specific interpolation. `ModuleBase.Name` and `ModuleBase.Group` opt out because they establish structural identity before validation; `AssertModule.Message` is interpolated by its worker after the assertion child has executed so it can reference child artifacts.
+4. **Interpolate Textual Values** — Recursively applies `runtime.Environment.Interpolate(...)` to eligible `string` and `TaggedString` values on the module, nested `[Validatable]` records, and supported collection elements. `[IgnoreInterpolation]` preserves textual values that require later context-specific interpolation. `ModuleBase.Name` and `ModuleBase.Group` opt out because they establish structural identity before validation; `AssertModule.Message` is interpolated by its worker after the assertion child has executed so it can reference child artifacts.
 
 5. **Validate Constraints** — Checks constraints declared through `[Required]`, `[VariableIdentifier]`, `[Range<T>]`, length, filesystem, path-shape, regex, grammar, enum, and related validation attributes. Produces an `IValidationResult<TModule>` that retains the transformed module and carries any validation errors.
 
 Each transformation uses `with` expressions, so the original deserialized module is never mutated. The generator emits private async `ApplyDefaultsAsync`, `ResolveOverridesAsync`, and `ApplyInterpolationAsync` instance helpers plus the public `ValidateAsync` orchestrator required by `IModule<TModule>`. `ValidateAsync` creates one editor-hidden `ModuleValidationContext` containing the runtime and service provider and passes it through all generated preparation phases.
 
-Recursive value access is classified once and reused across generated phases. `[Validatable]` record classes and record structs use a shared object-access model, so reference/null guards and nullable-value unwrapping are identical in preparation, overrides, interpolation, validation, and descriptor traversal. Collection behavior is likewise derived once from the generated collection shape. Null reference collections and absent nullable value-type collections are skipped; a default `ImmutableArray<T>` is treated as absent and remains distinct from an initialized empty array. Rewrite-capable shapes carry one materialization strategy, so defaults and interpolation reconstruct collections consistently instead of duplicating shape-specific conversion logic. Selected validation attributes can set `TargetsElements = true` to validate each immediate collection element through the same guarded traversal. Element-targeted errors retain the parent property name and include the zero-based element index in their message.
+Recursive value access is classified once and reused across generated phases. `[Validatable]` record classes and record structs use a shared object-access model, so reference/null guards and nullable-value unwrapping are identical in preparation, overrides, interpolation, validation, and descriptor traversal. Collection behavior is likewise derived once from the generated collection shape. Null reference collections and absent nullable value-type collections are skipped; a default `ImmutableArray<T>` is treated as absent and remains distinct from an initialized empty array. Rewrite-capable shapes carry one materialization strategy, so defaults and interpolation reconstruct collections consistently instead of duplicating shape-specific conversion logic. Selected validation attributes can set `TargetsElements = true` to validate each immediate collection element through the same guarded traversal. Validation carries a user-facing path independently from generated access expressions, so both `ValidationError.PropertyName` and generated messages identify the concrete recursive target, including paths such as `Tags[2]`, `Items[1].Value`, and deeper object/collection combinations.
 
 Generated validation returns `IValidationResult<TModule>`, which always carries the prepared module together with its errors and validity state. This means invalid results remain inspectable without reconstructing or mutating the module. Before the result is enforced, the worker can refine it through the protected `OnValidationAsync` extension point and the ordered validation-hook pipeline described below.
 
@@ -285,7 +287,7 @@ When `TryResolveVariable<T>(name)` is called, the runtime captures the environme
 
 `TaggedString` is the native representation for textual values that must retain metadata while flowing through the runtime. It carries a raw string plus an opaque set of string tags. Environment storage and resolution do not interpret those tags; interpolation and indirection only preserve/union them. This keeps taint propagation independent from the policy attached to any particular tag.
 
-`cyborg.secret.v1` is the first globally interpreted tag. Safe presentation is centralized in `ITaggedStringRenderer`, whose tag handlers are supplied through dependency injection. Debugger serializers, generated validation diagnostics, tagged metrics labels, subprocess argument diagnostics, and other tag-aware presentation paths use that renderer rather than formatting raw values directly. Unknown tags remain attached even when no handler is registered.
+`cyborg.secret.v1` is the first globally interpreted tag. It can enter the system explicitly through the `cyborg.types.secret.v1` dynamic value or be imposed as a destination invariant by `[Secret]` on a module property. Safe presentation is centralized in `ITaggedStringRenderer`, whose tag handlers are supplied through dependency injection. Debugger serializers, generated validation diagnostics, CLI argument diagnostics, tagged metrics labels, subprocess argument diagnostics, and other tag-aware presentation paths use that renderer rather than formatting raw values directly. Unknown tags remain attached even when no handler is registered.
 
 Raw-value access is intentionally separate from safe rendering. `TaggedString.Value` and compatibility retrieval as `string` expose the actual text for execution consumers; this discards the ability to enforce tag-aware presentation after that boundary. Child-process dispatch therefore retains tagged arguments/environment values in `ChildProcessInvocation` until the dispatcher renders diagnostics and materializes `ProcessStartInfo` immediately before execution.
 
@@ -526,7 +528,7 @@ The `SubprocessModule` built-in module provides the JSON-configurable interface 
 
 Cyborg includes a Prometheus-compatible metrics collection subsystem. The `IMetricsCollector` interface supports creating labeled metrics in three standard types: counters, gauges, and untyped metrics. Each metric is registered with a name, description, and a builder callback that populates samples with label sets and values.
 
-Modules contribute metrics during execution. The CLI entry point writes collected metrics to a file in Prometheus exposition format after module execution completes. Metric names follow the `cyborg_` prefix convention. Label collections are reusable across multiple metric samples.
+Modules contribute metrics during execution. The CLI entry point writes collected metrics to a file in Prometheus exposition format after module execution completes. Metric names follow the `cyborg_` prefix convention. Label collections are reusable across multiple metric samples, and labels supplied as `TaggedString` values are rendered through `ITaggedStringRenderer` before entering the exposition data.
 
 ## Cross-Cutting Concerns
 
@@ -534,7 +536,7 @@ The following architectural constraints and design principles apply across all s
 
 ### Security Design Principles
 
-Cyborg executes backup workflows defined in JSON configuration files that may reference external templates, module definitions, and dynamically discovered paths. Because these workflows can invoke subprocesses with elevated privileges, the security model must address both the integrity of configuration inputs and the safety of subprocess execution. The following principles govern how the system defends against injection, privilege escalation, and unauthorized configuration.
+Cyborg executes workflows defined in JSON configuration files that may reference external templates, module definitions, and dynamically discovered paths. Because these workflows can invoke subprocesses with elevated privileges, the security model must address both the integrity of configuration inputs and the safety of subprocess execution. The following principles govern how the system defends against injection, privilege escalation, and unauthorized configuration.
 
 #### Configuration File Trust
 

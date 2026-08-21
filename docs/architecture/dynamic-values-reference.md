@@ -17,6 +17,7 @@ For runtime semantics such as scoping, interpolation, decomposition, and overrid
   - [Entry Shape](#entry-shape)
   - [Type Name Syntax](#type-name-syntax)
 - [Scalar Types](#scalar-types)
+  - [Tagged strings and secrets](#tagged-strings-and-secrets)
   - [Configuration Enum Types](#configuration-enum-types)
 - [Runtime Composition Types](#runtime-composition-types)
   - [`cyborg.types.module.reference.v1`](#cyborgtypesmodulereferencev1)
@@ -115,7 +116,7 @@ The following scalar types are registered by the core runtime:
 }
 ```
 
-DI-aware Cyborg presentation surfaces render secret-tagged values through `ITaggedStringRenderer`; the built-in secret policy produces `[REDACTED]`. The raw string remains available through `TaggedString.Value` for subprocess execution and other explicit execution boundaries. Converting to raw `string` intentionally leaves the tagged-value model, so arbitrary code operating on that string is responsible for how it is subsequently exposed.
+DI-aware Cyborg presentation surfaces render secret-tagged values through `ITaggedStringRenderer`; the built-in secret policy produces `[REDACTED]`. Interpolation and exact-reference resolution preserve or union tags, so a secret introduced through a dynamic value remains secret when composed into another tagged value. The raw string remains available through `TaggedString.Value` for subprocess execution and other explicit execution boundaries. Converting to raw `string` intentionally leaves the tagged-value model, so arbitrary code operating on that string is responsible for how it is subsequently exposed.
 
 ### Configuration Enum Types
 

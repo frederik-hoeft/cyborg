@@ -119,7 +119,7 @@ For more details on artifact lifecycle and exposure patterns, see [Runtime Infra
 
 Executes a list of child modules in order.
 
-**Properties:**
+**Properties:***
 
 | Property | Type | Required | Default | Constraints | Description |
 |----------|------|----------|---------|-------------|-------------|
@@ -243,7 +243,7 @@ Validates a condition and fails with a diagnostic message if the assertion is fa
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
 | `assertion` | module reference | Yes | -- | A condition module that produces a boolean result. |
-| `message` | string | Yes | -- | Failure message. Supports `${...}` interpolation after the assertion child has executed, so the message may reference variables or artifacts produced by that child. |
+| `message` | TaggedString | Yes | -- | Failure message. Accepts a JSON string or tagged-string object. Interpolation runs after the assertion child has executed, so child variables/artifacts and their tags propagate into the result. |
 
 **Behavior:**
 
@@ -741,9 +741,7 @@ Both variables are optional. They can be injected at any level of the environmen
 
 ### Borg v1.4.X Modules
 
-These modules are designed for Borg v1.4.X, which is the latest stable release series as of this writing. They leverage features and improvements introduced in the 1.4 release, such as enhanced JSON output and new pruning options. Support for older versions of Borg may be added in the future if needed, but v1.4 is recommended for its performance and reliability benefits.
-
-Borg v2.X compatibility will be added in a future release once the 2.0 API stabilizes and we can define a clear set of properties and behaviors for the new version.
+These modules target Borg v1.4.X and use the JSON output and command-line behavior of that release series. Other Borg major/minor series are outside this module contract.
 
 **Shared Borg Properties:**
 

@@ -60,7 +60,7 @@ Each generator declares a contract enum whose members correspond to the runtime 
 
 | Contract | Members | Used By |
 |----------|---------|---------|
-| `ModuleValidationGeneratorContract` | `IModuleRuntime`, `IModuleT`, `ModuleValidationContext`, `ValidationResult`, `IValidationResultT`, `ValidationError`, `IDefaultValueT`, `IParser`, `IModuleDescriptor`, `IObjectDescriptionBuilder`, `ModuleIdentity` | Validation and descriptor generation |
+| `ModuleValidationGeneratorContract` | `IModuleRuntime`, `IModuleT`, `ModuleValidationContext`, `ValidationResult`, `IValidationResultT`, `ValidationError`, `IDefaultValueT`, `IParser`, `IModuleDescriptor`, `IObjectDescriptionBuilder`, `ModuleIdentity`, `TaggedString`, `WellKnownTags` | Validation and descriptor generation |
 | `ModuleLoaderFactoryGeneratorContract` | `IModuleWorker`, `ModuleLoaderT`, `IModuleWorkerContextT`, `ModuleWorkerContextImplementationT` | Loader factory generator |
 | `ModelDecompositionGeneratorContract` | `IDecomposable`, `DynamicKeyValuePair` | Decomposition generator |
 
@@ -130,7 +130,7 @@ The following attributes are recognized by the validation generator:
 | **Override suppression** | `[IgnoreOverride]` |
 | **Interpolation suppression** | `[IgnoreInterpolation]` |
 | **Tagged strings** | `[Secret]`, `[Untagged]` |
-| **Nested validation** | `[Validatable]` (on nested record types) |
+| **Nested validation** | `[Validatable]` (on nested record classes and record structs) |
 
 All attributes are defined in `Cyborg.Core.Aot` and emitted into the consuming compilation, see [Validation Attributes Reference](validation-attributes-reference.md) for a complete reference of their parameters and behavior.
 
@@ -142,7 +142,7 @@ The validation generator renders one partial module declaration from a shared pr
 |------------------|----------------|
 | `ApplyDefaultsAsync` | Apply declared defaults and preparation invariants recursively |
 | `ResolveOverridesAsync` | Resolve eligible runtime overrides recursively |
-| `ApplyInterpolationAsync` | Interpolate eligible strings recursively |
+| `ApplyInterpolationAsync` | Interpolate eligible textual values recursively while preserving tags |
 | `ValidateAsync` | Orchestrate preparation and emit constraint checks |
 | `GetDescriptor` / `DescribeAsync` | Expose format-neutral identity and structural description |
 
