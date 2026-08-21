@@ -179,7 +179,7 @@ Cyborg.Core.Aot --analyzer--> Cyborg.TestModules --project reference--> Cyborg.M
 
 This separation is intentional. `Cyborg.Modules.Tests` is a friend assembly of `Cyborg.Core`, so it can see the internal framework attributes and contract types emitted into `Cyborg.Core`. Running the same bootstrap generator in that friend compilation would emit another set of identically named internal framework types, producing ambiguous or conflicting source-generated members. `Cyborg.TestModules` is not an `InternalsVisibleTo` target, so only its own generated framework types participate in its compilation.
 
-The fixture assembly is used for generator-specific shapes that are difficult to express through production modules, such as a default `ImmutableArray<T>`, a nullable immutable array whose underlying value is default, nested validatable collection elements, and explicit interpolation opt-outs. Runtime/deserialization regressions that already have a production module shape remain in the normal module test project.
+The fixture assembly is used for generator-specific shapes that are difficult to express through production modules, such as a default `ImmutableArray<T>`, a nullable immutable array whose underlying value is default, nullable and non-nullable `[Validatable]` record structs, nested validatable collection elements, and explicit interpolation opt-outs. Runtime/deserialization regressions that already have a production module shape remain in the normal module test project.
 
 ## Higher-Order Function API
 

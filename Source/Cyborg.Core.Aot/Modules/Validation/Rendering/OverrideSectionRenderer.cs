@@ -1,6 +1,7 @@
 ﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using Cyborg.Core.Aot.Modules.Validation.Processors;
+using Cyborg.Core.Aot.Modules.Validation.Rendering.Objects;
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
 
@@ -43,7 +44,8 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
             string propertyAccessExpression = $"{targetVariable}.{property.Name}";
             string rootPathExpression = $"{rootPathPrefix}.{property.Name}";
             PropertyRewriteContext rewriteContext = new(property, ContractInfo, DiagnosticsReporter, RootModuleVariable, ContextVariable, propertyAccessExpression);
-            bool hasChildAssignments = property.IsValidatableType && property.Children.Any(child => HasOverrideWork(child, rewriteContext));
+            bool hasChildAssignments = property.Object is { HasChildren: true } objectModel
+                && objectModel.Children.Any(child => HasOverrideWork(child, rewriteContext));
             bool hasCollectionElementAssignments = property.Collection is { Shape.SupportsElementRewrite: true } collection
                 && property.HasCollectionElementChildren
                 && PropertyPreparationRenderer.HasCollectionPreparationWork(collection, rewriteContext);
@@ -96,34 +98,15 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
 
     private void AppendNestedOverrideResolutionForProperty(IndentedStringBuilder builder, PropertyRewriteContext rewriteContext, string localName, string rootPathExpression)
     {
+        ObjectModel objectModel = rewriteContext.Property.Object
+            ?? throw new InvalidOperationException($"Nested override resolution requires object metadata for property '{rewriteContext.Property.Name}'.");
         string nestedVariable = $"{localName}Current";
 
-        PropertyModel property = rewriteContext.Property;
-        if (property.IsNullable || !property.HasDefault)
-        {
-            builder.AppendBlock(
-                $$"""
-                if ({{localName}} is not null)
-                {
-                    {{property.NonNullableTypeName}} {{nestedVariable}} = {{localName}};
-                """);
-            AppendOverrideResolutionForObject(builder.IncreaseIndent(), property.Children, nestedVariable, rootPathExpression);
-            builder.AppendBlock(
-                $$"""
-                    {{localName}} = {{nestedVariable}};
-                }
-                """);
-            if (!property.IsNullable)
-            {
-                // relax nullability since we added the null check even if there weren't any annotations
-                builder.AppendLine($"{ModuleValidationRenderer.Helpers}.{ModuleValidationRenderer.HelperMembers.NullableRelax}({localName});");
-            }
-            return;
-        }
-
-        builder.AppendLine($"{property.NonNullableTypeName} {nestedVariable} = {localName};");
-        AppendOverrideResolutionForObject(builder, property.Children, nestedVariable, rootPathExpression);
-        builder.AppendLine($"{localName} = {nestedVariable};");
+        objectModel.Renderer.AppendRewrite(
+            builder,
+            localName,
+            nestedVariable,
+            (nestedBuilder, currentVariable) => AppendOverrideResolutionForObject(nestedBuilder, objectModel.Children, currentVariable, rootPathExpression));
     }
 
     private static bool HasOverrideWork(PropertyModel property, PropertyRewriteContext rewriteContext)
@@ -145,9 +128,9 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
         }
         // this property is marked to ignore overrides (don't resolve this exact node), but child properties may still be valid targets
         PropertyModel property = rewriteContext.Property;
-        if (property.IsValidatableType)
+        if (property.Object is { } objectModel)
         {
-            foreach (PropertyModel child in property.Children)
+            foreach (PropertyModel child in objectModel.Children)
             {
                 rewriteContext.SetProperty(child);
                 if (HasOverrideWork(rewriteContext))

@@ -9,7 +9,7 @@ internal sealed record CollectionShape
 (
     ITypeSymbol ElementType,
     CollectionAccessKind AccessKind,
-    CollectionElementAccessKind ElementAccessKind,
+    ValueAccessKind ElementAccessKind,
     CollectionCountKind CountKind,
     INamedTypeSymbol? CountInterface,
     CollectionMaterializationKind MaterializationKind,
@@ -31,16 +31,6 @@ internal enum CollectionAccessKind
     NullableValue,
     ImmutableArray,
     NullableImmutableArray,
-}
-
-/// <summary>
-/// Describes how generated collection loops obtain a usable element value.
-/// </summary>
-internal enum CollectionElementAccessKind
-{
-    Direct = 0,
-    NullGuard,
-    NullableValue,
 }
 
 internal enum CollectionCountKind

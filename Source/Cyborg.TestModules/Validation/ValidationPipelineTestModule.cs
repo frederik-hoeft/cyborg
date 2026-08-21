@@ -39,6 +39,14 @@ public sealed partial record ValidationPipelineTestModule
     [ExactLength(1)]
     public string[] ArrayLengthCheckedItems { get; init; } = ["value"];
 
+    public ValidationPipelineTestItem ReferenceItem { get; init; } = new("literal");
+
+    public ValidationPipelineTestItem? NullableReferenceItem { get; init; }
+
+    public ValidationPipelineValueItem ValueItem { get; init; } = new("literal");
+
+    public ValidationPipelineValueItem? NullableValueItem { get; init; }
+
     public ImmutableArray<ValidationPipelineTestItem?> NullableElementItems { get; init; } = [];
 
     public ImmutableArray<ValidationPipelineValueItem?> NullableValueElementItems { get; init; } = [];

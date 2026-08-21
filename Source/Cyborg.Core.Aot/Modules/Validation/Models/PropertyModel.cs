@@ -12,9 +12,8 @@ internal sealed record PropertyModel
     string NullableTypeName,
     string NonNullableTypeName,
     bool IsNullable,
-    bool IsValidatableType,
     ImmutableArray<PropertyAspect> Aspects,
-    ImmutableArray<PropertyModel> Children,
+    ObjectModel? Object,
     CollectionModel? Collection
 )
 {
@@ -33,7 +32,6 @@ internal sealed record PropertyModel
         },
         resultSelector: static dict => dict.ToFrozenDictionary(static kvp => kvp.Key, static kvp => kvp.Value.ToImmutable()));
 
-    public bool HasDefault => Aspects.Any(static aspect => aspect.EnsuresDefault);
 
     public bool HasAspect<TAspect>() where TAspect : PropertyAspect => _aspectMap.ContainsKey(typeof(TAspect));
 
@@ -64,11 +62,9 @@ internal sealed record PropertyModel
         return false;
     }
 
-    public bool HasValidatableChildren => IsValidatableType && !Children.IsDefaultOrEmpty;
+    public bool HasValidatableChildren => Object is { HasChildren: true };
 
-    public bool HasCollectionElementChildren => Collection is not null
-        && Collection.IsElementValidatableType
-        && !Collection.ElementChildren.IsDefaultOrEmpty;
+    public bool HasCollectionElementChildren => Collection is { ElementObject.HasChildren: true };
 
     public bool HasCollectionElementValidationAspects => HasAspect<CollectionElementValidationAspect>();
 

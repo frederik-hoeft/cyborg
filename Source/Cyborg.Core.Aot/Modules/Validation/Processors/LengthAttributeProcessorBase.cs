@@ -1,6 +1,7 @@
 ﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Cyborg.Core.Aot.Modules.Validation.Models;
+using Cyborg.Core.Aot.Modules.Validation.Rendering;
 using Cyborg.Core.Aot.Modules.Validation.Rendering.Collections;
 using Microsoft.CodeAnalysis;
 using System.Globalization;
@@ -111,7 +112,7 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValid
             {
                 CollectionShape shape = collectionShape
                     ?? throw new InvalidOperationException("Collection length validation is missing collection shape metadata.");
-                CollectionValueAccess access = shape.Renderer.Access(model.AccessExpression);
+                ValueAccess access = shape.Renderer.Access(model.AccessExpression);
                 if (access.RequiresGuard)
                 {
                     builder.AppendBlock(

@@ -1,6 +1,7 @@
 ﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Cyborg.Core.Aot.Modules.Validation.Models;
+using Cyborg.Core.Aot.Modules.Validation.Rendering;
 using Cyborg.Core.Aot.Modules.Validation.Rendering.Collections;
 using Microsoft.CodeAnalysis;
 
@@ -26,7 +27,7 @@ internal sealed class RequiredProcessor : PropertyValidationProcessorBase<Requir
             }
             else if (collectionShape is not null)
             {
-                CollectionValueAccess access = collectionShape.Renderer.Access(model.AccessExpression);
+                ValueAccess access = collectionShape.Renderer.Access(model.AccessExpression);
                 condition = access.RequiresGuard
                     ? access.MissingExpression
                     : CreateDefaultValueCondition(model);

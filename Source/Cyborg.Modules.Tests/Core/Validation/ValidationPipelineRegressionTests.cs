@@ -192,6 +192,48 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
     });
 
     [TestMethod]
+    public Task TestValidationAsync_ValidatableObjects_UseSharedObjectAccessSemanticsAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        runtime.Environment.SetVariable("fallback", "resolved-default");
+
+        ValidationPipelineTestModule module = CreateValidModule() with
+        {
+            ReferenceItem = new(Value: null!),
+            NullableReferenceItem = new(Value: null!),
+            ValueItem = default,
+            NullableValueItem = new(Value: null!),
+        };
+
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
+
+        MSAssert.IsTrue(result.IsValid);
+        MSAssert.AreEqual("resolved-default", result.Module.ReferenceItem.Value);
+        MSAssert.AreEqual("resolved-default", result.Module.NullableReferenceItem!.Value);
+        MSAssert.AreEqual("resolved-default", result.Module.ValueItem.Value);
+        MSAssert.AreEqual("resolved-default", result.Module.NullableValueItem!.Value.Value);
+    });
+
+    [TestMethod]
+    public Task TestValidationAsync_AbsentNullableValidatableObjects_RemainAbsentAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        runtime.Environment.SetVariable("fallback", "resolved-default");
+
+        ValidationPipelineTestModule module = CreateValidModule() with
+        {
+            NullableReferenceItem = null,
+            NullableValueItem = null,
+        };
+
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
+
+        MSAssert.IsTrue(result.IsValid);
+        MSAssert.IsNull(result.Module.NullableReferenceItem);
+        MSAssert.IsFalse(result.Module.NullableValueItem.HasValue);
+    });
+
+    [TestMethod]
     public Task TestValidationAsync_NullableValidatableCollectionElements_UseSharedElementAccessSemanticsAsync() => TestWithDIAsync(async services =>
     {
         IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();

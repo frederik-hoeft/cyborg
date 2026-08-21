@@ -1,27 +1,22 @@
 ﻿using Cyborg.Core.Aot.Modules.Validation.Models;
 using Microsoft.CodeAnalysis;
+using Cyborg.Core.Aot.Modules.Validation.Rendering;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Rendering.Collections;
 
 internal readonly record struct CollectionShapeRenderer(CollectionShape Shape)
 {
-    public CollectionValueAccess Access(string accessExpression) => Shape.AccessKind switch
+    public ValueAccess Access(string accessExpression) => Shape.AccessKind switch
     {
-        CollectionAccessKind.Direct => new CollectionValueAccess(null, accessExpression),
-        CollectionAccessKind.NullGuard => new CollectionValueAccess($"{accessExpression} is not null", accessExpression),
-        CollectionAccessKind.NullableValue => new CollectionValueAccess($"{accessExpression} is not null", $"{accessExpression}.Value"),
-        CollectionAccessKind.ImmutableArray => new CollectionValueAccess($"!{accessExpression}.IsDefault", accessExpression),
-        CollectionAccessKind.NullableImmutableArray => new CollectionValueAccess($"{accessExpression} is {{ IsDefault: false }}", $"{accessExpression}.Value"),
+        CollectionAccessKind.Direct => new ValueAccess(null, accessExpression),
+        CollectionAccessKind.NullGuard => new ValueAccess($"{accessExpression} is not null", accessExpression),
+        CollectionAccessKind.NullableValue => new ValueAccess($"{accessExpression} is not null", $"{accessExpression}.Value"),
+        CollectionAccessKind.ImmutableArray => new ValueAccess($"!{accessExpression}.IsDefault", accessExpression),
+        CollectionAccessKind.NullableImmutableArray => new ValueAccess($"{accessExpression} is {{ IsDefault: false }}", $"{accessExpression}.Value"),
         _ => throw new InvalidOperationException($"Unsupported collection access kind '{Shape.AccessKind}'."),
     };
 
-    public CollectionValueAccess ElementAccess(string accessExpression) => Shape.ElementAccessKind switch
-    {
-        CollectionElementAccessKind.Direct => new CollectionValueAccess(null, accessExpression),
-        CollectionElementAccessKind.NullGuard => new CollectionValueAccess($"{accessExpression} is not null", accessExpression),
-        CollectionElementAccessKind.NullableValue => new CollectionValueAccess($"{accessExpression} is not null", $"{accessExpression}.Value"),
-        _ => throw new InvalidOperationException($"Unsupported collection element access kind '{Shape.ElementAccessKind}'."),
-    };
+    public ValueAccess ElementAccess(string accessExpression) => Shape.ElementAccessKind.Renderer.Access(accessExpression);
 
     public string CountExpression(string accessExpression) => Shape.CountKind switch
     {

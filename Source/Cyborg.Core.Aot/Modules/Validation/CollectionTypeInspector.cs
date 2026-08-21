@@ -24,7 +24,7 @@ internal static class CollectionTypeInspector
             shape = new CollectionShape(
                 ElementType: arrayType.ElementType,
                 AccessKind: DetermineAccessKind(type, isImmutableArray: false),
-                ElementAccessKind: DetermineElementAccessKind(arrayType.ElementType),
+                ElementAccessKind: ValueAccessInspector.Describe(arrayType.ElementType),
                 CountKind: CollectionCountKind.ArrayLength,
                 CountInterface: null,
                 MaterializationKind: CollectionMaterializationKind.UseArray,
@@ -53,7 +53,7 @@ internal static class CollectionTypeInspector
         shape = new CollectionShape(
             ElementType: elementType,
             AccessKind: DetermineAccessKind(type, isImmutableArray),
-            ElementAccessKind: DetermineElementAccessKind(elementType),
+            ElementAccessKind: ValueAccessInspector.Describe(elementType),
             CountKind: countKind,
             CountInterface: countInterface,
             MaterializationKind: materializationKind,
@@ -64,38 +64,21 @@ internal static class CollectionTypeInspector
 
     private static CollectionAccessKind DetermineAccessKind(ITypeSymbol declaredType, bool isImmutableArray)
     {
-        bool isNullableValueType = declaredType is INamedTypeSymbol
-        {
-            OriginalDefinition.SpecialType: SpecialType.System_Nullable_T
-        };
-
+        ValueAccessKind valueAccess = ValueAccessInspector.Describe(declaredType);
         if (isImmutableArray)
         {
-            return isNullableValueType
+            return valueAccess == ValueAccessKind.NullableValue
                 ? CollectionAccessKind.NullableImmutableArray
                 : CollectionAccessKind.ImmutableArray;
         }
 
-        if (isNullableValueType)
+        return valueAccess switch
         {
-            return CollectionAccessKind.NullableValue;
-        }
-
-        return declaredType.CanEverBeNull
-            ? CollectionAccessKind.NullGuard
-            : CollectionAccessKind.Direct;
-    }
-
-    private static CollectionElementAccessKind DetermineElementAccessKind(ITypeSymbol elementType)
-    {
-        if (elementType is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T })
-        {
-            return CollectionElementAccessKind.NullableValue;
-        }
-
-        return elementType.CanEverBeNull
-            ? CollectionElementAccessKind.NullGuard
-            : CollectionElementAccessKind.Direct;
+            ValueAccessKind.Direct => CollectionAccessKind.Direct,
+            ValueAccessKind.NullGuard => CollectionAccessKind.NullGuard,
+            ValueAccessKind.NullableValue => CollectionAccessKind.NullableValue,
+            _ => throw new InvalidOperationException($"Unsupported value access kind '{valueAccess}'."),
+        };
     }
 
     private static bool TryGetGenericInterface(INamedTypeSymbol type, SpecialType interfaceSpecialType, [NotNullWhen(true)] out INamedTypeSymbol? interfaceType)

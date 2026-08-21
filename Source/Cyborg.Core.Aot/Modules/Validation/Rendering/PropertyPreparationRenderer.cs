@@ -1,6 +1,7 @@
 ﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using Cyborg.Core.Aot.Modules.Validation.Rendering.Collections;
+using Cyborg.Core.Aot.Modules.Validation.Rendering.Objects;
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
 
@@ -17,7 +18,8 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
             PropertyRewriteContext rewriteContext = new(property, parent, propertyAccessExpression);
             string? directExpression = CreatePreparedValueExpression(rewriteContext);
             bool hasDirectAssignment = !string.IsNullOrEmpty(directExpression);
-            bool hasNestedValidatableAssignments = property.HasValidatableChildren && property.Children.Any(child => HasPreparationWork(child, rewriteContext));
+            bool hasNestedValidatableAssignments = property.Object is { HasChildren: true } objectModel
+                && objectModel.Children.Any(child => HasPreparationWork(child, rewriteContext));
             bool hasCollectionElementAssignments = property.Collection is { Shape.SupportsElementRewrite: true } collection
                 && property.HasCollectionElementChildren
                 && HasCollectionPreparationWork(collection, rewriteContext);
@@ -76,7 +78,7 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
     public void AppendCollectionPreparationForProperty(IndentedStringBuilder builder, PropertyModel property, string localName, string diagnosticsPhase)
     {
         CollectionModel collection = property.Collection!;
-        CollectionValueAccess access = collection.Shape.Renderer.Access(localName);
+        ValueAccess access = collection.Shape.Renderer.Access(localName);
         if (access.RequiresGuard)
         {
             string collectionCurrentVariable = $"{localName}Current";
@@ -111,7 +113,9 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
 
     public bool HasCollectionPreparationWork(CollectionModel collection, PropertyRewriteContext rewriteContext)
     {
-        foreach (PropertyModel child in collection.ElementChildren)
+        ObjectModel elementObject = collection.ElementObject
+            ?? throw new InvalidOperationException("Collection preparation work detection requires validatable object metadata.");
+        foreach (PropertyModel child in elementObject.Children)
         {
             MutablePropertyRewriteContext mutableContext = new(child, rewriteContext.ContractInfo, rewriteContext.DiagnosticsReporter, rewriteContext.ModuleVariable,
                 rewriteContext.ContextVariable, rewriteContext.PropertyAccessExpression);
@@ -126,33 +130,15 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
 
     private void AppendNestedPreparationForProperty(IndentedStringBuilder builder, PropertyRewriteContext rewriteContext, string localName, string diagnosticsPhase)
     {
+        ObjectModel objectModel = rewriteContext.Property.Object
+            ?? throw new InvalidOperationException($"Nested preparation requires object metadata for property '{rewriteContext.Property.Name}'.");
         string nestedVariable = $"{localName}Current";
 
-        PropertyModel property = rewriteContext.Property;
-        if (property.IsNullable || !property.HasDefault)
-        {
-            builder.AppendBlock(
-                $$"""
-                if ({{localName}} is not null)
-                {
-                    {{property.NonNullableTypeName}} {{nestedVariable}} = {{localName}};
-                """);
-            AppendPreparationForObject(builder.IncreaseIndent(), property.Children, nestedVariable, diagnosticsPhase);
-            builder.AppendBlock(
-                $$"""
-                    {{localName}} = {{nestedVariable}};
-                }
-                """);
-            if (!property.IsNullable)
-            {
-                builder.AppendLine($"{ModuleValidationRenderer.Helpers}.{ModuleValidationRenderer.HelperMembers.NullableRelax}({localName});");
-            }
-            return;
-        }
-
-        builder.AppendLine($"{property.NonNullableTypeName} {nestedVariable} = {localName};");
-        AppendPreparationForObject(builder, property.Children, nestedVariable, diagnosticsPhase);
-        builder.AppendLine($"{localName} = {nestedVariable};");
+        objectModel.Renderer.AppendRewrite(
+            builder,
+            localName,
+            nestedVariable,
+            (nestedBuilder, currentVariable) => AppendPreparationForObject(nestedBuilder, objectModel.Children, currentVariable, diagnosticsPhase));
     }
 
     private void AppendCollectionPreparationBody(IndentedStringBuilder builder, CollectionModel collection, string collectionVariable, string diagnosticsPhase)
@@ -171,31 +157,15 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
             """);
 
         IndentedStringBuilder loopBuilder = builder.IncreaseIndent();
-        CollectionValueAccess elementAccess = collection.Shape.Renderer.ElementAccess(elementVariable);
-        if (elementAccess.RequiresGuard)
-        {
-            loopBuilder.AppendLine($"{collection.ElementNullableTypeName} {elementCurrentVariable} = {elementVariable};");
-            loopBuilder.AppendBlock(
-                $$"""
-                if ({{elementAccess.GuardExpression}})
-                {
-                    {{collection.ElementNonNullableTypeName}} {{elementValueVariable}} = {{elementAccess.ValueExpression}};
-                """);
-            AppendPreparationForObject(loopBuilder.IncreaseIndent(), collection.ElementChildren, elementValueVariable, diagnosticsPhase);
-            loopBuilder.AppendBlock(
-                $$"""
-                    {{elementCurrentVariable}} = {{elementValueVariable}};
-                }
-                """);
-            loopBuilder.AppendLine($"{ModuleValidationRenderer.Helpers}.{ModuleValidationRenderer.HelperMembers.NullableRelax}({elementCurrentVariable});");
-            loopBuilder.AppendLine($"{rewrittenItemsVariable}.Add({elementCurrentVariable});");
-        }
-        else
-        {
-            loopBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elementCurrentVariable} = {elementAccess.ValueExpression};");
-            AppendPreparationForObject(loopBuilder, collection.ElementChildren, elementCurrentVariable, diagnosticsPhase);
-            loopBuilder.AppendLine($"{rewrittenItemsVariable}.Add({elementCurrentVariable});");
-        }
+        ObjectModel elementObject = collection.ElementObject
+            ?? throw new InvalidOperationException("Collection element preparation requires validatable object metadata.");
+        loopBuilder.AppendLine($"{collection.ElementNullableTypeName} {elementCurrentVariable} = {elementVariable};");
+        elementObject.Renderer.AppendRewrite(
+            loopBuilder,
+            elementCurrentVariable,
+            elementValueVariable,
+            (elementBuilder, currentVariable) => AppendPreparationForObject(elementBuilder, elementObject.Children, currentVariable, diagnosticsPhase));
+        loopBuilder.AppendLine($"{rewrittenItemsVariable}.Add({elementCurrentVariable});");
 
         builder.AppendLine("}");
         collection.Renderer.AppendMaterialization(builder, collectionVariable, rewrittenItemsVariable);
@@ -210,9 +180,9 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
         }
 
         PropertyModel property = rewriteContext.Property;
-        if (property.IsValidatableType)
+        if (property.Object is { } objectModel)
         {
-            foreach (PropertyModel child in property.Children)
+            foreach (PropertyModel child in objectModel.Children)
             {
                 rewriteContext.SetProperty(child);
                 if (HasPreparationWork(rewriteContext))
@@ -222,9 +192,9 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
             }
         }
 
-        if (property.Collection is { Shape.SupportsElementRewrite: true, IsElementValidatableType: true } collection)
+        if (property.Collection is { Shape.SupportsElementRewrite: true, ElementObject: { } elementObject })
         {
-            foreach (PropertyModel child in collection.ElementChildren)
+            foreach (PropertyModel child in elementObject.Children)
             {
                 rewriteContext.SetProperty(child);
                 if (HasPreparationWork(rewriteContext))

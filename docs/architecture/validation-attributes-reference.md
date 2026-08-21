@@ -61,9 +61,9 @@ Triggers the validation generator on a module record. The target must be a `part
 
 ### Validatable
 
-Marks a nested record type for recursive validation. When a property on a `[GeneratedModuleValidation]` record has a type marked `[Validatable]`, the generated pipeline applies defaults, overrides, interpolation, and validation recursively to that nested record's properties.
+Marks a nested record type for recursive validation. Record classes and record structs are supported. When a property on a `[GeneratedModuleValidation]` record has a type marked `[Validatable]`, the generated pipeline applies defaults, overrides, interpolation, and validation recursively to that nested record's properties. Nullable record values are treated as absent until a value exists; non-nullable record structs are traversed directly.
 
-**Target:** `class` (record)
+**Target:** `class` or `struct` (record)
 
 ### GeneratedModuleLoaderFactory
 

@@ -1,5 +1,6 @@
 ﻿using Cyborg.Core.Modules.Descriptors;
 using Cyborg.TestModules.Description;
+using Cyborg.TestModules.Validation;
 using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Immutable;
 using System.Text.Json;
@@ -65,6 +66,32 @@ public sealed class GeneratedModuleDescriptionTests : CyborgCoreTestBase
         Assert.AreEqual(
             "second",
             root.GetProperty(nameof(module.Children))[1].GetProperty(nameof(DescriptionTestChild.Value)).GetString());
+    });
+
+    [TestMethod]
+    public Task Test_ToJsonAsync_ValidatableRecordStructs_PreservePresenceSemanticsAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleSerializationService serializationService = services.GetRequiredService<IModuleSerializationService>();
+        ValidationPipelineTestModule module = new(
+            RequiredItems: [],
+            OptionalItems: [],
+            NullableItems: null,
+            InterpolatedValue: "value",
+            DeferredValue: "value",
+            Tags: null)
+        {
+            ValueItem = new("present"),
+            NullableValueItem = null,
+        };
+
+        string json = await serializationService.ToJsonAsync(module, TestContext.CancellationToken);
+        using JsonDocument document = JsonDocument.Parse(json);
+
+        JsonElement root = document.RootElement;
+        Assert.AreEqual(
+            "present",
+            root.GetProperty(nameof(module.ValueItem)).GetProperty(nameof(ValidationPipelineValueItem.Value)).GetString());
+        Assert.AreEqual(JsonValueKind.Null, root.GetProperty(nameof(module.NullableValueItem)).ValueKind);
     });
 
     [TestMethod]

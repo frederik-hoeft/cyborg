@@ -1,6 +1,7 @@
 ﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using Cyborg.Core.Aot.Modules.Validation.Rendering.Collections;
+using Cyborg.Core.Aot.Modules.Validation.Rendering.Objects;
 using Microsoft.CodeAnalysis;
 using System.Text;
 
@@ -75,12 +76,16 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
 
     private void AppendNestedValidationForProperty(IndentedStringBuilder builder, PropertyModel property, string propertyAccessExpression)
     {
+        ObjectModel objectModel = property.Object
+            ?? throw new InvalidOperationException($"Nested validation requires object metadata for property '{property.Name}'.");
+        ValueAccess access = objectModel.Shape.Renderer.Access(propertyAccessExpression);
+        int validationIndentLevel = builder.IndentLevel + (access.RequiresGuard ? 1 : 0);
         StringBuilder nestedRawBuilder = new();
-        IndentedStringBuilder nestedBuilder = new(nestedRawBuilder, indentLevel: builder.IndentLevel + 1);
+        IndentedStringBuilder nestedBuilder = new(nestedRawBuilder, indentLevel: validationIndentLevel);
 
-        foreach (PropertyModel child in property.Children)
+        foreach (PropertyModel child in objectModel.Children)
         {
-            AppendValidationForProperty(nestedBuilder, child, $"{propertyAccessExpression}.{child.Name}");
+            AppendValidationForProperty(nestedBuilder, child, $"{access.ValueExpression}.{child.Name}");
         }
 
         if (nestedRawBuilder.Length == 0)
@@ -88,9 +93,15 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
             return;
         }
 
+        if (!access.RequiresGuard)
+        {
+            builder.Raw.Append(nestedRawBuilder.ToString());
+            return;
+        }
+
         builder.AppendBlock(
             $$"""
-            if ({{propertyAccessExpression}} is not null)
+            if ({{access.GuardExpression}})
             {
             """);
         builder.Raw.Append(nestedRawBuilder.ToString());
@@ -103,7 +114,7 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
         string safeIdentifier = CreateSafeIdentifier(propertyAccessExpression);
         string collectionAccessExpression = propertyAccessExpression;
         string elementVariable = $"{safeIdentifier}Element";
-        CollectionValueAccess access = collection.Shape.Renderer.Access(propertyAccessExpression);
+        ValueAccess access = collection.Shape.Renderer.Access(propertyAccessExpression);
 
         if (access.RequiresGuard)
         {
@@ -160,35 +171,36 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
     private void AppendCollectionElementChildValidation(IndentedStringBuilder builder, PropertyModel property, string elementVariable)
     {
         CollectionModel collection = property.Collection!;
-        string elementCurrentVariable = $"{elementVariable}Current";
-        CollectionValueAccess elementAccess = collection.Shape.Renderer.ElementAccess(elementVariable);
-        int validationIndentLevel = builder.IndentLevel + (elementAccess.RequiresGuard ? 1 : 0);
+        ObjectModel elementObject = collection.ElementObject
+            ?? throw new InvalidOperationException("Collection element child validation requires validatable object metadata.");
+        ValueAccess access = elementObject.Shape.Renderer.Access(elementVariable);
+        int validationIndentLevel = builder.IndentLevel + (access.RequiresGuard ? 1 : 0);
         StringBuilder validationRawBuilder = new();
         IndentedStringBuilder validationBuilder = new(validationRawBuilder, validationIndentLevel);
-        foreach (PropertyModel child in collection.ElementChildren)
+
+        foreach (PropertyModel child in elementObject.Children)
         {
-            AppendValidationForProperty(validationBuilder, child, $"{elementCurrentVariable}.{child.Name}");
+            AppendValidationForProperty(validationBuilder, child, $"{access.ValueExpression}.{child.Name}");
         }
+
         if (validationRawBuilder.Length == 0)
         {
             return;
         }
 
-        if (elementAccess.RequiresGuard)
+        if (!access.RequiresGuard)
         {
-            builder.AppendBlock(
-                $$"""
-                if ({{elementAccess.GuardExpression}})
-                {
-                    {{collection.ElementNonNullableTypeName}} {{elementCurrentVariable}} = {{elementAccess.ValueExpression}};
-                """);
             builder.Raw.Append(validationRawBuilder.ToString());
-            builder.AppendLine("}");
             return;
         }
 
-        builder.AppendLine($"{collection.ElementNonNullableTypeName} {elementCurrentVariable} = {elementAccess.ValueExpression};");
+        builder.AppendBlock(
+            $$"""
+            if ({{access.GuardExpression}})
+            {
+            """);
         builder.Raw.Append(validationRawBuilder.ToString());
+        builder.AppendLine("}");
     }
 
     private static string CreateSafeIdentifier(string value) => string.Concat(value.Select(static character => char.IsLetterOrDigit(character) ? character : '_'));
