@@ -129,18 +129,20 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
     private void AppendCollection(IndentedStringBuilder builder, PropertyModel property, string builderVariableName, string nodeAccessExpression, string displayName,
         string symbolPath, string? hintsExpression, bool isProperty)
     {
-        if (!CollectionHelpers.TryConstructEnumerationGuardExpression(property, nodeAccessExpression, out string? guardExpression, out string valueExpression))
+        CollectionModel collection = property.Collection!;
+        CollectionValueAccess access = CollectionCodeGeneration.CreateAccess(collection.Shape, nodeAccessExpression);
+        if (!access.RequiresGuard)
         {
-            AppendCollectionBody(builder, property, builderVariableName, valueExpression, displayName, symbolPath, hintsExpression, isProperty);
+            AppendCollectionBody(builder, property, builderVariableName, access.ValueExpression, displayName, symbolPath, hintsExpression, isProperty);
             return;
         }
 
         builder.AppendBlock(
             $$"""
-            if ({{guardExpression}})
+            if ({{access.GuardExpression}})
             {
             """);
-        AppendCollectionBody(builder.IncreaseIndent(), property, builderVariableName, valueExpression, displayName, symbolPath, hintsExpression, isProperty);
+        AppendCollectionBody(builder.IncreaseIndent(), property, builderVariableName, access.ValueExpression, displayName, symbolPath, hintsExpression, isProperty);
         builder.AppendBlock($$"""
             }
             else
@@ -153,7 +155,6 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
     private void AppendCollectionBody(IndentedStringBuilder builder, PropertyModel property, string builderVariableName, string collectionAccessExpression,
         string displayName, string symbolPath, string? hintsExpression, bool isProperty)
     {
-        CollectionModel collection = property.Collection!;
         string collectionBuilderName = SymbolNameGenerator.MakeCamelCase($"{symbolPath}Builder");
         string elementName = SymbolNameGenerator.MakeCamelCase($"{symbolPath}Element");
 
@@ -191,15 +192,13 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
     private void AppendCollectionObjectElement(IndentedStringBuilder builder, CollectionModel collection, string collectionBuilderName, string elementName, string symbolPath)
     {
         string elementBuilderName = SymbolNameGenerator.MakeCamelCase($"{symbolPath}ElementBuilder");
-        string elementAccessExpression = collection.IsElementNullable && collection.ElementType.IsValueType
-            ? $"{elementName}.Value"
-            : elementName;
+        CollectionValueAccess elementAccess = CollectionCodeGeneration.CreateElementAccess(collection.Shape, elementName);
 
-        if (collection.ElementRequiresNullCheck)
+        if (elementAccess.RequiresGuard)
         {
             builder.AppendBlock(
                 $$"""
-                if ({{elementName}} is null)
+                if ({{elementAccess.MissingExpression}})
                 {
                     {{collectionBuilderName}}.AddItem({{elementName}});
                 }
@@ -209,7 +208,7 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
                     {
                 """);
 
-            AppendCollectionElementProperties(builder.IncreaseIndent(levels: 2), collection, elementBuilderName, elementAccessExpression, symbolPath);
+            AppendCollectionElementProperties(builder.IncreaseIndent(levels: 2), collection, elementBuilderName, elementAccess.ValueExpression, symbolPath);
             builder.AppendBlock(
                 $$"""
                     });
@@ -223,7 +222,7 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
             {{collectionBuilderName}}.AddObjectItem({{elementBuilderName}} =>
             {
             """);
-        AppendCollectionElementProperties(builder.IncreaseIndent(), collection, elementBuilderName, elementAccessExpression, symbolPath);
+        AppendCollectionElementProperties(builder.IncreaseIndent(), collection, elementBuilderName, elementAccess.ValueExpression, symbolPath);
         builder.AppendLine("});");
     }
 

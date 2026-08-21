@@ -52,7 +52,7 @@ internal sealed class PropertyModelBuilder(GenerationCandidateFactory factory, L
             ? BuildValidatableChildren(validatableType!, property, traversalPath)
             : [];
 
-        CollectionModel? collection = TryCreateCollectionModel(containingType, property, nonNullableType, traversalPath);
+        CollectionModel? collection = TryCreateCollectionModel(containingType, property, traversalPath);
 
         propertyModel = new PropertyModel(
             Symbol: property,
@@ -77,38 +77,34 @@ internal sealed class PropertyModelBuilder(GenerationCandidateFactory factory, L
         return true;
     }
 
-    private CollectionModel? TryCreateCollectionModel(INamedTypeSymbol containingType, IPropertySymbol property, ITypeSymbol nonNullableType, ImmutableHashSet<INamedTypeSymbol> traversalPath)
+    private CollectionModel? TryCreateCollectionModel(INamedTypeSymbol containingType, IPropertySymbol property, ImmutableHashSet<INamedTypeSymbol> traversalPath)
     {
-        if (!CollectionTypeInspector.TryDescribe(factory.Compilation, nonNullableType, out CollectionTypeInspector.CollectionTypeDescriptor? descriptor))
+        if (!CollectionTypeInspector.TryDescribe(factory.Compilation, property.Type, out CollectionShape? shape))
         {
             return null;
         }
 
-        bool isElementNullable = descriptor.ElementType.TryUnwrapNullableType(out ITypeSymbol nonNullableElementType);
+        _ = shape.ElementType.TryUnwrapNullableType(out ITypeSymbol nonNullableElementType);
         bool isElementValidatableType = TryGetValidatableType(nonNullableElementType, out INamedTypeSymbol? validatableElementType);
         ImmutableArray<PropertyModel> elementChildren = isElementValidatableType
             ? BuildValidatableChildren(validatableElementType!, property, traversalPath)
             : [];
 
-        if (isElementValidatableType && descriptor.MaterializationKind == CollectionMaterializationKind.None)
+        if (isElementValidatableType && !shape.SupportsElementRewrite)
         {
             AddDiagnostic(
                 ValidationGeneratorDiagnostics.UnsupportedValidatableCollectionShape,
                 property.Locations.FirstOrDefault(),
                 property.Name,
                 containingType.Name,
-                nonNullableType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat));
+                property.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat));
         }
 
         return new CollectionModel(
-            ElementType: descriptor.ElementType,
-            ElementNullableTypeName: descriptor.ElementType.ToDisplayString(KnownSymbolFormats.Nullable),
+            Shape: shape,
+            ElementNullableTypeName: shape.ElementType.ToDisplayString(KnownSymbolFormats.Nullable),
             ElementNonNullableTypeName: nonNullableElementType.ToDisplayString(KnownSymbolFormats.Nullable),
-            IsElementNullable: isElementNullable,
-            ElementRequiresNullCheck: descriptor.ElementType.CanEverBeNull,
             IsElementValidatableType: isElementValidatableType,
-            MaterializationKind: descriptor.MaterializationKind,
-            MaterializationTypeName: descriptor.MaterializationTypeName,
             ElementChildren: elementChildren);
     }
 

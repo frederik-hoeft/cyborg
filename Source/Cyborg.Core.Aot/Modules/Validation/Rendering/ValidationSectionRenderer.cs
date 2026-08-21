@@ -102,21 +102,16 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
         string safeIdentifier = CreateSafeIdentifier(propertyAccessExpression);
         string collectionAccessExpression = propertyAccessExpression;
         string elementVariable = $"{safeIdentifier}Element";
-        bool needsCollectionEnumerationGuard = CollectionHelpers.TryConstructEnumerationGuardExpression(property, propertyAccessExpression, out string? guardCondition, out string valueExpression);
-        if (!needsCollectionEnumerationGuard && property.Symbol.Type.IsReferenceType)
-        {
-            needsCollectionEnumerationGuard = true;
-            guardCondition = $"{propertyAccessExpression} is not null";
-        }
+        CollectionValueAccess access = CollectionCodeGeneration.CreateAccess(collection.Shape, propertyAccessExpression);
 
-        if (needsCollectionEnumerationGuard)
+        if (access.RequiresGuard)
         {
             string collectionCurrentVariable = $"{safeIdentifier}CollectionCurrent";
             builder.AppendBlock(
                 $$"""
-                if ({{guardCondition}})
+                if ({{access.GuardExpression}})
                 {
-                    {{property.NonNullableTypeName}} {{collectionCurrentVariable}} = {{valueExpression}};
+                    {{property.NonNullableTypeName}} {{collectionCurrentVariable}} = {{access.ValueExpression}};
                 """);
             builder = builder.IncreaseIndent();
             collectionAccessExpression = collectionCurrentVariable;
@@ -154,7 +149,7 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
         loopBuilder.AppendLine($"++{indexVariable};");
         builder.AppendLine("}");
 
-        if (needsCollectionEnumerationGuard)
+        if (access.RequiresGuard)
         {
             builder = builder.DecreaseIndent();
             builder.AppendLine("}");
@@ -165,7 +160,8 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
     {
         CollectionModel collection = property.Collection!;
         string elementCurrentVariable = $"{elementVariable}Current";
-        int validationIndentLevel = builder.IndentLevel + (collection.ElementRequiresNullCheck ? 1 : 0);
+        CollectionValueAccess elementAccess = CollectionCodeGeneration.CreateElementAccess(collection.Shape, elementVariable);
+        int validationIndentLevel = builder.IndentLevel + (elementAccess.RequiresGuard ? 1 : 0);
         StringBuilder validationRawBuilder = new();
         IndentedStringBuilder validationBuilder = new(validationRawBuilder, validationIndentLevel);
         foreach (PropertyModel child in collection.ElementChildren)
@@ -177,25 +173,20 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
             return;
         }
 
-        if (collection.ElementRequiresNullCheck)
+        if (elementAccess.RequiresGuard)
         {
-            (string collectionElementCheck, string collectionElementAccessExpression) = collection switch
-            {
-                { ElementType.IsValueType: true, IsElementNullable: true } => ($"{elementVariable}.HasValue", $"{elementVariable}.Value"),
-                _ => ($"{elementVariable} is not null", elementVariable),
-            };
             builder.AppendBlock(
                 $$"""
-                if ({{collectionElementCheck}})
+                if ({{elementAccess.GuardExpression}})
                 {
-                    {{collection.ElementNonNullableTypeName}} {{elementCurrentVariable}} = {{collectionElementAccessExpression}};
+                    {{collection.ElementNonNullableTypeName}} {{elementCurrentVariable}} = {{elementAccess.ValueExpression}};
                 """);
             builder.Raw.Append(validationRawBuilder.ToString());
             builder.AppendLine("}");
             return;
         }
 
-        builder.AppendLine($"{collection.ElementNonNullableTypeName} {elementCurrentVariable} = {elementVariable};");
+        builder.AppendLine($"{collection.ElementNonNullableTypeName} {elementCurrentVariable} = {elementAccess.ValueExpression};");
         builder.Raw.Append(validationRawBuilder.ToString());
     }
 

@@ -44,7 +44,7 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
             string rootPathExpression = $"{rootPathPrefix}.{property.Name}";
             PropertyRewriteContext rewriteContext = new(property, ContractInfo, DiagnosticsReporter, RootModuleVariable, ContextVariable, propertyAccessExpression);
             bool hasChildAssignments = property.IsValidatableType && property.Children.Any(child => HasOverrideWork(child, rewriteContext));
-            bool hasCollectionElementAssignments = property.Collection is { SupportsElementRewrite: true } collection
+            bool hasCollectionElementAssignments = property.Collection is { Shape.SupportsElementRewrite: true } collection
                 && property.HasCollectionElementChildren
                 && PropertyPreparationRenderer.HasCollectionPreparationWork(collection, rewriteContext);
             bool ignoreOverride = property.TryGetAspect(out IgnoreOverrideAspect? ignoreOverrideAspect);

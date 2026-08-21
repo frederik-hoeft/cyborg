@@ -48,7 +48,7 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
             bool ignoreInterpolation = property.HasAspect<IgnoreInterpolationAspect>();
             bool hasNestedWork = property.HasValidatableChildren && HasInterpolationWork(property.Children);
             CollectionModel? collection = property.Collection;
-            bool hasCollectionWork = collection is { SupportsElementRewrite: true }
+            bool hasCollectionWork = collection is { Shape.SupportsElementRewrite: true }
                 && (collection.ElementType.IsStringLike(ContractInfo.TaggedString)
                     || (collection.IsElementValidatableType && HasInterpolationWork(collection.ElementChildren)));
 
@@ -151,14 +151,15 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
 
     private void AppendCollectionInterpolation(IndentedStringBuilder builder, PropertyModel property, CollectionModel collection, string localName)
     {
-        if (CollectionHelpers.TryConstructEnumerationGuardExpression(property, localName, out string? conditionExpression, out string valueExpression))
+        CollectionValueAccess access = CollectionCodeGeneration.CreateAccess(collection.Shape, localName);
+        if (access.RequiresGuard)
         {
             string collectionCurrentVar = $"{localName}Current";
             builder.AppendBlock(
                 $$"""
-                if ({{conditionExpression}})
+                if ({{access.GuardExpression}})
                 {
-                    {{property.NonNullableTypeName}} {{collectionCurrentVar}} = {{valueExpression}};
+                    {{property.NonNullableTypeName}} {{collectionCurrentVar}} = {{access.ValueExpression}};
                 """);
             AppendCollectionInterpolationBody(builder.IncreaseIndent(), collection, collectionCurrentVar);
             builder.AppendBlock(
@@ -193,24 +194,26 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
         IndentedStringBuilder loopBuilder = builder.IncreaseIndent();
 
         bool isStringElem = collection.ElementType.IsStringLike(ContractInfo.TaggedString);
+        CollectionValueAccess elementAccess = CollectionCodeGeneration.CreateElementAccess(collection.Shape, elemVar);
 
-        if (collection.ElementRequiresNullCheck)
+        if (elementAccess.RequiresGuard)
         {
             loopBuilder.AppendLine($"{collection.ElementNullableTypeName} {elemCurrentVar} = {elemVar};");
+            elementAccess = CollectionCodeGeneration.CreateElementAccess(collection.Shape, elemCurrentVar);
             loopBuilder.AppendBlock(
                 $$"""
-                if ({{elemCurrentVar}} is not null)
+                if ({{elementAccess.GuardExpression}})
                 {
                 """);
             IndentedStringBuilder ifBuilder = loopBuilder.IncreaseIndent();
             if (isStringElem)
             {
-                ifBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elemValueVar} = {CreateElementInterpolationExpression(collection.ElementType, $"{elemCurrentVar}!")};");
+                ifBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elemValueVar} = {CreateElementInterpolationExpression(collection.ElementType, elementAccess.ValueExpression)};");
                 ifBuilder.AppendLine($"{elemCurrentVar} = {elemValueVar};");
             }
             else
             {
-                ifBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elemValueVar} = {elemCurrentVar}!;");
+                ifBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elemValueVar} = {elementAccess.ValueExpression};");
                 AppendInterpolationForObject(ifBuilder, collection.ElementChildren, elemValueVar);
                 ifBuilder.AppendLine($"{elemCurrentVar} = {elemValueVar};");
             }
@@ -225,53 +228,18 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
         {
             if (isStringElem)
             {
-                loopBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elemCurrentVar} = {CreateElementInterpolationExpression(collection.ElementType, elemVar)};");
+                loopBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elemCurrentVar} = {CreateElementInterpolationExpression(collection.ElementType, elementAccess.ValueExpression)};");
             }
             else
             {
-                loopBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elemCurrentVar} = {elemVar};");
+                loopBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elemCurrentVar} = {elementAccess.ValueExpression};");
                 AppendInterpolationForObject(loopBuilder, collection.ElementChildren, elemCurrentVar);
             }
             loopBuilder.AppendLine($"{rewrittenItemsVar}.Add({elemCurrentVar});");
         }
 
         builder.AppendLine("}");
-        AppendCollectionMaterialization(builder, collection, collectionVar, rewrittenItemsVar);
-    }
-
-    private static void AppendCollectionMaterialization(IndentedStringBuilder builder, CollectionModel collection, string targetVariable, string rewrittenItemsVariable)
-    {
-        switch (collection.MaterializationKind)
-        {
-            case CollectionMaterializationKind.UseList:
-                builder.AppendLine($"{targetVariable} = {rewrittenItemsVariable};");
-                break;
-            case CollectionMaterializationKind.UseArray:
-                builder.AppendLine($"{targetVariable} = {KnownTypes.Enumerable}.ToArray({rewrittenItemsVariable});");
-                break;
-            case CollectionMaterializationKind.UseImmutableArray:
-                builder.AppendLine($"{targetVariable} = {KnownTypes.ImmutableArray}.CreateRange({rewrittenItemsVariable});");
-                break;
-            case CollectionMaterializationKind.ConstructFromList:
-                builder.AppendLine($"{targetVariable} = new {collection.MaterializationTypeName}({rewrittenItemsVariable});");
-                break;
-            case CollectionMaterializationKind.ParameterlessAdd:
-                string safeId = CreateSafeIdentifier(targetVariable);
-                string rewrittenCollectionVar = $"{safeId}Collection";
-                string rewrittenCollectionItemsVar = $"{safeId}CollectionItems";
-                string rewrittenItemVar = $"{safeId}Item";
-                builder.AppendBlock(
-                    $$"""
-                    {{collection.MaterializationTypeName}} {{rewrittenCollectionVar}} = new();
-                    {{KnownTypes.ICollectionOfT(collection.ElementNullableTypeName)}} {{rewrittenCollectionItemsVar}} = {{rewrittenCollectionVar}};
-                    foreach ({{collection.ElementNullableTypeName}} {{rewrittenItemVar}} in {{rewrittenItemsVariable}})
-                    {
-                        {{rewrittenCollectionItemsVar}}.Add({{rewrittenItemVar}});
-                    }
-                    {{targetVariable}} = {{rewrittenCollectionVar}};
-                    """);
-                break;
-        }
+        CollectionCodeGeneration.AppendMaterialization(builder, collection, collectionVar, rewrittenItemsVar);
     }
 
     private bool HasInterpolationWork(ImmutableArray<PropertyModel> properties)
@@ -286,7 +254,7 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
             {
                 return true;
             }
-            if (property.Collection is { SupportsElementRewrite: true } collection)
+            if (property.Collection is { Shape.SupportsElementRewrite: true } collection)
             {
                 if (collection.ElementType.IsStringLike(ContractInfo.TaggedString))
                 {

@@ -1,5 +1,6 @@
 using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
+using Cyborg.Core.Aot.Modules.Validation.Models;
 using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
@@ -94,11 +95,10 @@ internal abstract class PropertyValidationProcessorBase<TAttribute> : AttributeP
 
     private bool TryCreateCollectionElementTarget(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyValidationTarget target)
     {
-        _ = context.Property.Type.TryUnwrapNullableType(out ITypeSymbol nonNullableType);
         if (!CollectionTypeInspector.TryDescribe(
             context.Compilation,
-            nonNullableType,
-            out CollectionTypeInspector.CollectionTypeDescriptor? descriptor))
+            context.Property.Type,
+            out CollectionShape? shape))
         {
             context.Report(
                 ValidationGeneratorDiagnostics.CollectionApplicationRequiresCollection,
@@ -110,7 +110,7 @@ internal abstract class PropertyValidationProcessorBase<TAttribute> : AttributeP
             return false;
         }
 
-        target = new PropertyValidationTarget(descriptor.ElementType, IsCollectionElement: true);
+        target = new PropertyValidationTarget(shape.ElementType, IsCollectionElement: true);
         return true;
     }
 }

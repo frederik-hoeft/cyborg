@@ -17,7 +17,7 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
             string? directExpression = CreatePreparedValueExpression(rewriteContext);
             bool hasDirectAssignment = !string.IsNullOrEmpty(directExpression);
             bool hasNestedValidatableAssignments = property.HasValidatableChildren && property.Children.Any(child => HasPreparationWork(child, rewriteContext));
-            bool hasCollectionElementAssignments = property.Collection is { SupportsElementRewrite: true } collection
+            bool hasCollectionElementAssignments = property.Collection is { Shape.SupportsElementRewrite: true } collection
                 && property.HasCollectionElementChildren
                 && HasCollectionPreparationWork(collection, rewriteContext);
 
@@ -75,14 +75,15 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
     public void AppendCollectionPreparationForProperty(IndentedStringBuilder builder, PropertyModel property, string localName, string diagnosticsPhase)
     {
         CollectionModel collection = property.Collection!;
-        if (CollectionHelpers.TryConstructEnumerationGuardExpression(property, localName, out string? conditionExpression, out string valueExpression))
+        CollectionValueAccess access = CollectionCodeGeneration.CreateAccess(collection.Shape, localName);
+        if (access.RequiresGuard)
         {
             string collectionCurrentVariable = $"{localName}Current";
             builder.AppendBlock(
                 $$"""
-                if ({{conditionExpression}})
+                if ({{access.GuardExpression}})
                 {
-                    {{property.NonNullableTypeName}} {{collectionCurrentVariable}} = {{valueExpression}};
+                    {{property.NonNullableTypeName}} {{collectionCurrentVariable}} = {{access.ValueExpression}};
                 """);
             AppendCollectionPreparationBody(builder.IncreaseIndent(), collection, collectionCurrentVariable, diagnosticsPhase);
             builder.AppendBlock(
@@ -169,14 +170,15 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
             """);
 
         IndentedStringBuilder loopBuilder = builder.IncreaseIndent();
-        if (collection.ElementRequiresNullCheck)
+        CollectionValueAccess elementAccess = CollectionCodeGeneration.CreateElementAccess(collection.Shape, elementVariable);
+        if (elementAccess.RequiresGuard)
         {
             loopBuilder.AppendLine($"{collection.ElementNullableTypeName} {elementCurrentVariable} = {elementVariable};");
             loopBuilder.AppendBlock(
                 $$"""
-                if ({{elementCurrentVariable}} is not null)
+                if ({{elementAccess.GuardExpression}})
                 {
-                    {{collection.ElementNonNullableTypeName}} {{elementValueVariable}} = {{elementCurrentVariable}};
+                    {{collection.ElementNonNullableTypeName}} {{elementValueVariable}} = {{elementAccess.ValueExpression}};
                 """);
             AppendPreparationForObject(loopBuilder.IncreaseIndent(), collection.ElementChildren, elementValueVariable, diagnosticsPhase);
             loopBuilder.AppendBlock(
@@ -189,13 +191,13 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
         }
         else
         {
-            loopBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elementCurrentVariable} = {elementVariable};");
+            loopBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elementCurrentVariable} = {elementAccess.ValueExpression};");
             AppendPreparationForObject(loopBuilder, collection.ElementChildren, elementCurrentVariable, diagnosticsPhase);
             loopBuilder.AppendLine($"{rewrittenItemsVariable}.Add({elementCurrentVariable});");
         }
 
         builder.AppendLine("}");
-        AppendCollectionMaterialization(builder, collection, collectionVariable, rewrittenItemsVariable);
+        CollectionCodeGeneration.AppendMaterialization(builder, collection, collectionVariable, rewrittenItemsVariable);
     }
 
     private bool HasPreparationWork(MutablePropertyRewriteContext rewriteContext)
@@ -219,7 +221,7 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
             }
         }
 
-        if (property.Collection is { SupportsElementRewrite: true, IsElementValidatableType: true } collection)
+        if (property.Collection is { Shape.SupportsElementRewrite: true, IsElementValidatableType: true } collection)
         {
             foreach (PropertyModel child in collection.ElementChildren)
             {
@@ -232,43 +234,6 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
         }
 
         return false;
-    }
-
-    private static void AppendCollectionMaterialization(IndentedStringBuilder builder, CollectionModel collection, string targetVariable, string rewrittenItemsVariable)
-    {
-        switch (collection.MaterializationKind)
-        {
-            case CollectionMaterializationKind.UseList:
-                builder.AppendLine($"{targetVariable} = {rewrittenItemsVariable};");
-                break;
-            case CollectionMaterializationKind.UseArray:
-                builder.AppendLine($"{targetVariable} = {KnownTypes.Enumerable}.ToArray({rewrittenItemsVariable});");
-                break;
-            case CollectionMaterializationKind.UseImmutableArray:
-                builder.AppendLine($"{targetVariable} = {KnownTypes.ImmutableArray}.CreateRange({rewrittenItemsVariable});");
-                break;
-            case CollectionMaterializationKind.ConstructFromList:
-                builder.AppendLine($"{targetVariable} = new {collection.MaterializationTypeName}({rewrittenItemsVariable});");
-                break;
-            case CollectionMaterializationKind.ParameterlessAdd:
-                string safeIdentifier = CreateSafeIdentifier(targetVariable);
-                string rewrittenCollectionVariable = $"{safeIdentifier}Collection";
-                string rewrittenCollectionItemsVariable = $"{safeIdentifier}CollectionItems";
-                string rewrittenItemVariable = $"{safeIdentifier}Item";
-                builder.AppendBlock(
-                    $$"""
-                    {{collection.MaterializationTypeName}} {{rewrittenCollectionVariable}} = new();
-                    {{KnownTypes.ICollectionOfT(collection.ElementNullableTypeName)}} {{rewrittenCollectionItemsVariable}} = {{rewrittenCollectionVariable}};
-                    foreach ({{collection.ElementNullableTypeName}} {{rewrittenItemVariable}} in {{rewrittenItemsVariable}})
-                    {
-                        {{rewrittenCollectionItemsVariable}}.Add({{rewrittenItemVariable}});
-                    }
-                    {{targetVariable}} = {{rewrittenCollectionVariable}};
-                    """);
-                break;
-            default:
-                throw new InvalidOperationException("Unsupported collection materialization kind.");
-        }
     }
 
     private static string? CreatePreparedValueExpression(PropertyRewriteContext context)

@@ -1,5 +1,7 @@
 ﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
+using Cyborg.Core.Aot.Modules.Validation.Models;
+using Cyborg.Core.Aot.Modules.Validation.Rendering;
 using Microsoft.CodeAnalysis;
 using System.Globalization;
 
@@ -11,7 +13,7 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValid
     {
         aspect = null;
 
-        LengthTargetKind targetKind = GetTargetKind(target.Type, context.ContractInfo, out INamedTypeSymbol? collectionInterface);
+        LengthTargetKind targetKind = GetTargetKind(context.Compilation, target.Type, context.ContractInfo, out CollectionShape? collectionShape);
         if (targetKind == LengthTargetKind.None)
         {
             context.Report(
@@ -63,59 +65,30 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValid
 
         aspect = new LengthValidationAspect(
             targetKind,
-            collectionInterface,
+            collectionShape,
             minExpression: min?.ToString(CultureInfo.InvariantCulture),
-            maxExpression: max?.ToString(CultureInfo.InvariantCulture),
-            requiresNullGuard: target.Type.CanEverBeNull);
+            maxExpression: max?.ToString(CultureInfo.InvariantCulture));
 
         return true;
     }
 
     protected abstract bool TryGetBounds(AttributeData attribute, ref readonly PropertyProcessingContext context, out int? min, out int? max);
 
-    private static LengthTargetKind GetTargetKind(ITypeSymbol propertyType, ValidationContractInfo contractInfo, out INamedTypeSymbol? collectionInterface)
+    private static LengthTargetKind GetTargetKind(Compilation compilation, ITypeSymbol targetType, ValidationContractInfo contractInfo, out CollectionShape? collectionShape)
     {
-        collectionInterface = null;
-        if (propertyType.SpecialType == SpecialType.System_String || propertyType.EqualsIgnoreNullability(contractInfo.TaggedString))
+        collectionShape = null;
+        if (targetType.IsStringLike(contractInfo.TaggedString))
         {
             return LengthTargetKind.String;
         }
 
-        if (ImplementsIReadOnlyCollection(propertyType, out collectionInterface))
+        if (CollectionTypeInspector.TryDescribe(compilation, targetType, out collectionShape) && collectionShape.SupportsCount)
         {
             return LengthTargetKind.Collection;
         }
 
         return LengthTargetKind.None;
     }
-
-    private static bool ImplementsIReadOnlyCollection(ITypeSymbol type, out INamedTypeSymbol? collectionInterface)
-    {
-        collectionInterface = null;
-        if (type is not INamedTypeSymbol namedType)
-        {
-            return false;
-        }
-
-        if (IsReadOnlyCollection(namedType))
-        {
-            return true;
-        }
-
-        foreach (INamedTypeSymbol iface in namedType.AllInterfaces)
-        {
-            if (IsReadOnlyCollection(iface))
-            {
-                collectionInterface = iface;
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool IsReadOnlyCollection(INamedTypeSymbol type) =>
-        type.OriginalDefinition.SpecialType is SpecialType.System_Collections_Generic_IReadOnlyCollection_T;
 
     private enum LengthTargetKind
     {
@@ -127,45 +100,67 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValid
     private sealed class LengthValidationAspect
     (
         LengthTargetKind targetKind,
-        INamedTypeSymbol? collectionInterface,
+        CollectionShape? collectionShape,
         string? minExpression,
-        string? maxExpression,
-        bool requiresNullGuard
+        string? maxExpression
     ) : PropertyValidationAspect
     {
         protected override void EmitValidation(IndentedStringBuilder builder, PropertyValidationModel model)
         {
-            if (requiresNullGuard)
+            if (targetKind == LengthTargetKind.Collection)
             {
-                builder.AppendLine($"if ({model.AccessExpression} is not null)");
-                builder.AppendLine("{");
-                EmitLengthValidation(builder.IncreaseIndent(), model);
+                CollectionShape shape = collectionShape
+                    ?? throw new InvalidOperationException("Collection length validation is missing collection shape metadata.");
+                CollectionValueAccess access = CollectionCodeGeneration.CreateAccess(shape, model.AccessExpression);
+                if (access.RequiresGuard)
+                {
+                    builder.AppendBlock(
+                        $$"""
+                        if ({{access.GuardExpression}})
+                        {
+                        """);
+                    EmitLengthValidation(builder.IncreaseIndent(), model, CollectionCodeGeneration.CreateCountExpression(shape, access.ValueExpression));
+                    builder.AppendLine("}");
+                    return;
+                }
+
+                EmitLengthValidation(builder, model, CollectionCodeGeneration.CreateCountExpression(shape, access.ValueExpression));
+                return;
+            }
+
+            if (model.TargetType.CanEverBeNull)
+            {
+                builder.AppendBlock(
+                    $$"""
+                    if ({{model.AccessExpression}} is not null)
+                    {
+                    """);
+                EmitLengthValidation(builder.IncreaseIndent(), model, CreateStringLengthExpression(model));
                 builder.AppendLine("}");
                 return;
             }
 
-            EmitLengthValidation(builder, model);
+            EmitLengthValidation(builder, model, CreateStringLengthExpression(model));
         }
 
-        private void EmitLengthValidation(IndentedStringBuilder builder, PropertyValidationModel model)
+        private static string CreateStringLengthExpression(PropertyValidationModel model)
         {
-            string accessExpression;
-            if (collectionInterface is null)
+            if (!model.IsTaggedString)
             {
-                accessExpression = model.AccessExpression;
+                return $"{model.AccessExpression}.Length";
             }
-            else
-            {
-                accessExpression = $"{model.AccessExpression.Replace('.', '_')}__collection";
-                builder.AppendLine($"{collectionInterface.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Included))} {accessExpression} = {model.AccessExpression};");
-            }
-            string sizeExpression = targetKind switch
-            {
-                LengthTargetKind.String => $"{model.StringContentExpression}.Length",
-                LengthTargetKind.Collection => $"{accessExpression}.Count",
-                _ => throw new InvalidOperationException("Unsupported length target kind.")
-            };
 
+            string contentExpression = model.TargetType is INamedTypeSymbol
+            {
+                OriginalDefinition.SpecialType: SpecialType.System_Nullable_T
+            }
+                ? $"{model.AccessExpression}.Value.Value"
+                : $"{model.AccessExpression}.Value";
+            return $"{contentExpression}.Length";
+        }
+
+        private void EmitLengthValidation(IndentedStringBuilder builder, PropertyValidationModel model, string sizeExpression)
+        {
             if (minExpression is not null)
             {
                 builder.AppendBlock(

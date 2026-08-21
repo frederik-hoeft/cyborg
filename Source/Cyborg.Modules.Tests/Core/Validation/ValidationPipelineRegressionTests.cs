@@ -74,6 +74,179 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
     });
 
     [TestMethod]
+    public Task TestValidationAsync_DefaultImmutableArray_SkipsLengthValidationWithoutEnumeratingAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+
+        ValidationPipelineTestModule module = CreateValidModule() with
+        {
+            LengthCheckedItems = default,
+        };
+
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
+
+        MSAssert.IsTrue(result.IsValid);
+        MSAssert.IsTrue(result.Module.LengthCheckedItems.IsDefault);
+    });
+
+    [TestMethod]
+    public Task TestValidationAsync_EmptyImmutableArray_RunsLengthValidationAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+
+        ValidationPipelineTestModule module = CreateValidModule() with
+        {
+            LengthCheckedItems = [],
+        };
+
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
+
+        MSAssert.IsFalse(result.IsValid);
+        MSAssert.Contains(
+            error => error.Rule == "length"
+                && error.PropertyName.EndsWith(nameof(ValidationPipelineTestModule.LengthCheckedItems), StringComparison.Ordinal),
+            result.Errors);
+    });
+
+    [TestMethod]
+    public Task TestValidationAsync_NullableImmutableArrayContainingDefault_SkipsLengthValidationWithoutEnumeratingAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+
+        ValidationPipelineTestModule module = CreateValidModule() with
+        {
+            NullableLengthCheckedItems = (ImmutableArray<string>?)default(ImmutableArray<string>),
+        };
+
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
+
+        MSAssert.IsTrue(result.IsValid);
+        MSAssert.IsTrue(result.Module.NullableLengthCheckedItems.HasValue);
+        MSAssert.IsTrue(result.Module.NullableLengthCheckedItems.Value.IsDefault);
+    });
+
+    [TestMethod]
+    public Task TestValidationAsync_NullableImmutableArrayContainingDefault_FailsRequiredAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+
+        ValidationPipelineTestModule module = CreateValidModule() with
+        {
+            RequiredNullableImmutableItems = (ImmutableArray<string>?)default(ImmutableArray<string>),
+        };
+
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
+
+        MSAssert.IsFalse(result.IsValid);
+        MSAssert.Contains(
+            error => error.Rule == "required"
+                && error.PropertyName.EndsWith(nameof(ValidationPipelineTestModule.RequiredNullableImmutableItems), StringComparison.Ordinal),
+            result.Errors);
+    });
+
+    [TestMethod]
+    public Task TestValidationAsync_ArrayLengthValidation_UsesSupportedCollectionShapeAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+
+        ValidationPipelineTestModule module = CreateValidModule() with
+        {
+            ArrayLengthCheckedItems = [],
+        };
+
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
+
+        MSAssert.IsFalse(result.IsValid);
+        MSAssert.Contains(
+            error => error.Rule == "length"
+                && error.PropertyName.EndsWith(nameof(ValidationPipelineTestModule.ArrayLengthCheckedItems), StringComparison.Ordinal),
+            result.Errors);
+    });
+
+    [TestMethod]
+    public Task TestValidationAsync_NestedNullableImmutableArrayLength_UsesSharedCollectionAccessSemanticsAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+
+        ValidationPipelineTestModule module = CreateValidModule() with
+        {
+            NestedLengthItems =
+            [
+                (ImmutableArray<string>?)default(ImmutableArray<string>),
+                [],
+                ["value"],
+                null,
+            ],
+        };
+
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
+
+        MSAssert.IsFalse(result.IsValid);
+        MSAssert.AreEqual(1, result.Errors.Count(error =>
+            error.Rule == "length"
+            && error.PropertyName.EndsWith(nameof(ValidationPipelineTestModule.NestedLengthItems), StringComparison.Ordinal)));
+        MSAssert.Contains(
+            error => error.Rule == "length"
+                && error.Message.StartsWith("Collection element 1 of property", StringComparison.Ordinal),
+            result.Errors);
+    });
+
+    [TestMethod]
+    public Task TestValidationAsync_NullableValidatableCollectionElements_UseSharedElementAccessSemanticsAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        runtime.Environment.SetVariable("fallback", "resolved-default");
+
+        ValidationPipelineTestModule module = CreateValidModule() with
+        {
+            NullableElementItems = [null, new(Value: null!)],
+        };
+
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
+
+        MSAssert.IsTrue(result.IsValid);
+        MSAssert.IsNull(result.Module.NullableElementItems[0]);
+        MSAssert.AreEqual("resolved-default", result.Module.NullableElementItems[1]!.Value);
+    });
+
+    [TestMethod]
+    public Task TestValidationAsync_NullableValueTypeCollectionElements_UseSharedElementAccessSemanticsAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        runtime.Environment.SetVariable("fallback", "resolved-default");
+
+        ValidationPipelineTestModule module = CreateValidModule() with
+        {
+            NullableValueElementItems = [null, new(Value: null!)],
+        };
+
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
+
+        MSAssert.IsTrue(result.IsValid);
+        MSAssert.IsFalse(result.Module.NullableValueElementItems[0].HasValue);
+        MSAssert.AreEqual("resolved-default", result.Module.NullableValueElementItems[1]!.Value.Value);
+    });
+
+    [TestMethod]
+    public Task TestValidationAsync_ValueTypeCollectionMaterialization_PreservesRewrittenElementsAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        runtime.Environment.SetVariable("fallback", "resolved-default");
+
+        ValidationPipelineStructCollection<ValidationPipelineTestItem> items = new();
+        items.Add(new(Value: null!));
+        ValidationPipelineTestModule module = CreateValidModule() with
+        {
+            StructCollectionItems = items,
+        };
+
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
+
+        MSAssert.IsTrue(result.IsValid);
+        MSAssert.AreEqual("resolved-default", result.Module.StructCollectionItems.Single().Value);
+    });
+
+    [TestMethod]
     public Task TestValidationAsync_CollectionElementDefaultsAreAppliedBeforeInterpolationAsync() => TestWithDIAsync(async services =>
     {
         IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
@@ -309,4 +482,12 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
         MSAssert.IsTrue(result.IsValid);
         MSAssert.AreEqual("resolved-tag", result.Module!.Tags!.Single());
     });
+
+    private static ValidationPipelineTestModule CreateValidModule() => new(
+        RequiredItems: [],
+        OptionalItems: [],
+        NullableItems: null,
+        InterpolatedValue: "literal",
+        DeferredValue: "literal",
+        Tags: null);
 }

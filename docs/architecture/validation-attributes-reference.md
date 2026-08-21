@@ -109,7 +109,7 @@ In this example, the first attribute rejects a null collection while the second 
 
 ### Required
 
-Validates that the property has a meaningful value. For strings, checks that the value is not null or whitespace. For other types, checks that the value is not equal to its type's default (e.g., `0` for integers, `null` for reference types, or a default `ImmutableArray<T>`). An initialized empty collection is distinct from a default immutable array and requires a length constraint when emptiness itself is invalid.
+Validates that the property has a meaningful value. For strings, checks that the value is not null or whitespace. Collection presence follows the same collection-shape semantics used by traversal: null references, absent nullable value types, and default `ImmutableArray<T>` values are missing. Other values are compared with their type default (for example, `0` for integers). An initialized empty collection is distinct from a default immutable array and requires a length constraint when emptiness itself is invalid.
 
 ### Range
 
@@ -148,7 +148,7 @@ Validates that a string or collection property has exactly the specified number 
 
 ### Length
 
-Validates that a string or collection property length falls within a range. Combines the behavior of `[MinLength]` and `[MaxLength]` into a single attribute.
+Validates that a string or supported countable collection property length falls within a range. Combines the behavior of `[MinLength]` and `[MaxLength]` into a single attribute. Arrays use their native length; other countable collection shapes use their `IReadOnlyCollection<T>` count contract. Collection absence is guarded before count access, so null collections and default `ImmutableArray<T>` values are skipped rather than treated as empty or dereferenced.
 
 **Parameters:**
 

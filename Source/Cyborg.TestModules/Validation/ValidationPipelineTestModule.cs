@@ -27,5 +27,26 @@ public sealed partial record ValidationPipelineTestModule
     [Required(TargetsElements = true)]
     public IReadOnlyCollection<string?>? RequiredTags { get; init; } = [];
 
+    [MinLength(1)]
+    public ImmutableArray<string> LengthCheckedItems { get; init; } = ["value"];
+
+    [MinLength(1)]
+    public ImmutableArray<string>? NullableLengthCheckedItems { get; init; }
+
+    [Required]
+    public ImmutableArray<string>? RequiredNullableImmutableItems { get; init; } = [];
+
+    [ExactLength(1)]
+    public string[] ArrayLengthCheckedItems { get; init; } = ["value"];
+
+    public ImmutableArray<ValidationPipelineTestItem?> NullableElementItems { get; init; } = [];
+
+    public ImmutableArray<ValidationPipelineValueItem?> NullableValueElementItems { get; init; } = [];
+
+    public ValidationPipelineStructCollection<ValidationPipelineTestItem> StructCollectionItems { get; init; } = new();
+
+    [MinLength(1, TargetsElements = true)]
+    public IReadOnlyCollection<ImmutableArray<string>?> NestedLengthItems { get; init; } = [];
+
     public static string ModuleId => "cyborg.test-modules.validation-pipeline.v1";
 }
