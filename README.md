@@ -8,14 +8,14 @@ Cyborg treats orchestration as composition rather than scripting. Built-in modul
 
 Key capabilities:
 
-- **Composable declarative workflows** — Build nested execution trees from versioned JSON modules instead of procedural glue scripts.
-- **Scoped environments and late binding** — Resolve typed variables, hierarchical artifacts, interpolation expressions, and per-module overrides at execution time.
-- **Reusable templates** — Parameterize common workflow structures and inject typed data or modules into them.
-- **Generated preparation and validation** — Roslyn generators apply defaults, overrides, interpolation, recursive validation, and inspection metadata without runtime reflection.
-- **Tagged secrets** — `TaggedString` metadata propagates through interpolation and other Cyborg-managed text flow; built-in presentation surfaces redact values carrying `cyborg.secret.v1` while execution boundaries retain access to the raw value.
-- **Workflow debugging** — Break before module execution, inspect the fully prepared module, manage breakpoints, and step through execution from the console REPL.
-- **Borg orchestration and metrics** — Coordinate Borg create/prune/compact workflows, remote-host lifecycle, and Prometheus metrics through the included module library and sample deployment.
-- **Native AOT and configuration trust** — Publish without a .NET runtime dependency and audit configuration ownership/permissions before deserializing executable workflow definitions.
+- **Composable declarative workflows** — Build nested execution trees from versioned JSON modules instead of procedural glue scripts, using built-in sequencing, conditionals, loops, subprocess execution, and environment manipulation as reusable building blocks.
+- **Reusable templates and late binding** — Parameterize common workflow structures, inject typed data or modules, and resolve scoped variables, artifacts, interpolation expressions, and per-module overrides at execution time.
+- **Predictable preparation and validation** — Defaults, overrides, interpolation, and recursive validation are applied before execution; source-generated code keeps this pipeline AOT-compatible without runtime reflection.
+- **Built-in diagnostics stack** — Structured logging, Prometheus metrics, prepared-module inspection, breakpoints, and the interactive debugger provide a consistent operational view across unattended workflows.
+- **Secret-aware textual data flow** — `TaggedString` metadata propagates through Cyborg-managed text flow so diagnostics and other presentation surfaces can redact `cyborg.secret.v1` values while explicit execution boundaries retain access to the raw value.
+- **Native AOT and configuration trust** — Publish as a self-contained binary without a .NET runtime dependency and audit configuration ownership/permissions before deserializing executable workflow definitions.
+- **Production-oriented Borg orchestration** — The included Borg module library and reference deployment coordinate create/prune/compact workflows, remote-host lifecycle, retention, diagnostics, and metrics on top of the same domain-agnostic engine.
+- **First-class module extensibility** — Every unit of work is a module, from subprocess calls and control flow to domain-specific orchestration. Custom module libraries compose with the built-ins and participate in the same environment, preparation, validation, diagnostics, and execution model without changing the core engine.
 
 ## Use Cases
 
