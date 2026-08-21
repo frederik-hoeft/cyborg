@@ -67,7 +67,7 @@ internal sealed class DefinedEnumValueProcessor : AttributeProcessorBase<Defined
                 $$"""
                 if ({{model.AccessExpression}} is not null && !{{KnownTypes.Enum}}.IsDefined<{{enumTypeName}}>({{model.AccessExpression}}.Value))
                 {
-                    {{model.Variables.Errors}}.Add({{CreateValidationError(model, "enum", $"Property '{{nameof({model.AccessExpression})}}' must be a defined enum value.")}});
+                    {{model.Variables.Errors}}.Add({{CreateValidationError(model, "enum", $"{model.TargetDescription} must be a defined enum value.")}});
                 }
                 """);
 
@@ -78,7 +78,7 @@ internal sealed class DefinedEnumValueProcessor : AttributeProcessorBase<Defined
             $$"""
             if (!{{KnownTypes.Enum}}.IsDefined<{{enumTypeName}}>({{model.AccessExpression}}))
             {
-                {{model.Variables.Errors}}.Add({{CreateValidationError(model, "enum", $"Property '{{nameof({model.AccessExpression})}}' must be a defined enum value.")}});
+                {{model.Variables.Errors}}.Add({{CreateValidationError(model, "enum", $"{model.TargetDescription} must be a defined enum value.")}});
             }
             """);
         }

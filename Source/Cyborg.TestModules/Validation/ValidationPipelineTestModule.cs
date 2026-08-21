@@ -53,6 +53,10 @@ public sealed partial record ValidationPipelineTestModule
 
     public ValidationPipelineStructCollection<ValidationPipelineTestItem> StructCollectionItems { get; init; } = [];
 
+    public ImmutableArray<ValidationPathTestItem> ValidationPathItems { get; init; } = [];
+
+    public ImmutableArray<ValidationPathContainerItem> RecursiveValidationPathItems { get; init; } = [];
+
     [MinLength(1, TargetsElements = true)]
     public IReadOnlyCollection<ImmutableArray<string>?> NestedLengthItems { get; init; } = [];
 

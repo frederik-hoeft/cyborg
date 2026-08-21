@@ -27,7 +27,7 @@ internal sealed class UnrootedPathProcessor : AttributeProcessorBase<UnrootedPat
             $$"""
             if ({{model.NullAwareCondition($"{KnownTypes.Path}.IsPathRooted({model.StringContentExpression})")}})
             {
-                {{model.Variables.Errors}}.Add({{CreateValidationError(model, rule: "unrooted_path", $"Property '{{nameof({model.AccessExpression})}}' must be an unrooted path, but was '{{{model.DisplayExpression}}}'")}});
+                {{model.Variables.Errors}}.Add({{CreateValidationError(model, rule: "unrooted_path", $"{model.TargetDescription} must be an unrooted path, but was '{{{model.DisplayExpression}}}'")}});
             }
             """);
         }

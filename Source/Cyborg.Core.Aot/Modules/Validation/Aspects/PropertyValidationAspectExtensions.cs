@@ -8,7 +8,12 @@ internal static class PropertyValidationAspectExtensions
 {
     extension(IPropertyValidationAspect self)
     {
-        public void EmitValidation(ValidationSectionRenderer renderer, IndentedStringBuilder builder, PropertyModel property, string propertyAccessExpression)
+        public void EmitValidation(
+            ValidationSectionRenderer renderer,
+            IndentedStringBuilder builder,
+            PropertyModel property,
+            string propertyAccessExpression,
+            ValidationPath path)
         {
             PropertyValidationModel model = new(
                 Property: property,
@@ -16,10 +21,9 @@ internal static class PropertyValidationAspectExtensions
                 DiagnosticsReporter: renderer.DiagnosticsReporter,
                 Variables: renderer.Variables,
                 AccessExpression: propertyAccessExpression,
-                ErrorPropertyAccessExpression: propertyAccessExpression,
+                Path: path,
                 TargetType: property.Symbol.Type,
-                TargetNullableTypeName: property.NullableTypeName,
-                IsCollectionElement: false);
+                TargetNullableTypeName: property.NullableTypeName);
             self.EmitValidation(builder, model);
         }
 
@@ -27,9 +31,8 @@ internal static class PropertyValidationAspectExtensions
             ValidationSectionRenderer renderer,
             IndentedStringBuilder builder,
             PropertyModel property,
-            string propertyAccessExpression,
             string elementAccessExpression,
-            string indexVariable)
+            ValidationPath path)
         {
             CollectionModel collection = property.Collection
                 ?? throw new InvalidOperationException($"Property '{property.Name}' does not describe a collection.");
@@ -39,11 +42,9 @@ internal static class PropertyValidationAspectExtensions
                 DiagnosticsReporter: renderer.DiagnosticsReporter,
                 Variables: renderer.Variables,
                 AccessExpression: elementAccessExpression,
-                ErrorPropertyAccessExpression: propertyAccessExpression,
+                Path: path,
                 TargetType: collection.ElementType,
-                TargetNullableTypeName: collection.ElementNullableTypeName,
-                IsCollectionElement: true,
-                TargetDescription: $$"""Collection element {{{indexVariable}}} of property""");
+                TargetNullableTypeName: collection.ElementNullableTypeName);
             self.EmitValidation(builder, model);
         }
     }

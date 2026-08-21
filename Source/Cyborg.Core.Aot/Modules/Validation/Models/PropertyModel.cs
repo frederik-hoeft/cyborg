@@ -68,6 +68,16 @@ internal sealed record PropertyModel
 
     public bool HasCollectionElementValidationAspects => HasAspect<CollectionElementValidationAspect>();
 
+    public bool HasNestedValidationWork => Object is { Children: { } children }
+        && children.Any(static child => child.HasValidationWork);
+
+    public bool HasCollectionElementChildValidationWork => Collection is { ElementObject.Children: { } children }
+        && children.Any(static child => child.HasValidationWork);
+
     public bool HasCollectionValidationWork => Collection is not null
-        && (HasCollectionElementChildren || HasCollectionElementValidationAspects);
+        && (HasCollectionElementValidationAspects || HasCollectionElementChildValidationWork);
+
+    public bool HasValidationWork => Aspects<IPropertyValidationAspect>().Any()
+        || HasNestedValidationWork
+        || HasCollectionValidationWork;
 }

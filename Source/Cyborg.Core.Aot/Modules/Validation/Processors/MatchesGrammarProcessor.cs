@@ -49,7 +49,7 @@ internal sealed class MatchesGrammarProcessor : AttributeProcessorBase<MatchesGr
             $$"""
             if ({{model.NullAwareCondition($"!{valueExpression}.TryParse({model.StringContentExpression}, out _, out _)")}})
             {
-                {{model.Variables.Errors}}.Add({{CreateValidationError(model, "match_grammar", $"Property '{{nameof({model.AccessExpression})}}' does not match the required grammar.")}});
+                {{model.Variables.Errors}}.Add({{CreateValidationError(model, "match_grammar", $"{model.TargetDescription} does not match the required grammar.")}});
             }
             """);
         }

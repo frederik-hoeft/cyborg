@@ -27,7 +27,7 @@ internal sealed class NormalizedPathProcessor : AttributeProcessorBase<Normalize
             $$"""
             if ({{model.NullAwareCondition($"!{KnownTypes.ValidationRuntimeHelpers}.IsNormalizedPath({model.StringContentExpression})")}})
             {
-                {{model.Variables.Errors}}.Add({{CreateValidationError(model, rule: "normalized_path", $"Property '{{nameof({model.AccessExpression})}}' must be a normalized path, but was '{{{model.DisplayExpression}}}'")}});
+                {{model.Variables.Errors}}.Add({{CreateValidationError(model, rule: "normalized_path", $"{model.TargetDescription} must be a normalized path, but was '{{{model.DisplayExpression}}}'")}});
             }
             """);
         }

@@ -27,7 +27,7 @@ internal sealed class RootedPathProcessor : AttributeProcessorBase<RootedPathAtt
             $$"""
             if ({{model.NullAwareCondition($"!{KnownTypes.Path}.IsPathRooted({model.StringContentExpression})")}})
             {
-                {{model.Variables.Errors}}.Add({{CreateValidationError(model, rule: "rooted_path", $"Property '{{nameof({model.AccessExpression})}}' must be a rooted path, but was '{{{model.DisplayExpression}}}'")}});
+                {{model.Variables.Errors}}.Add({{CreateValidationError(model, rule: "rooted_path", $"{model.TargetDescription} must be a rooted path, but was '{{{model.DisplayExpression}}}'")}});
             }
             """);
         }

@@ -182,12 +182,10 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
         IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
 
         MSAssert.IsFalse(result.IsValid);
-        MSAssert.ContainsSingle(error =>
-            error.Rule == "length"
-            && error.PropertyName.EndsWith(nameof(ValidationPipelineTestModule.NestedLengthItems), StringComparison.Ordinal), result.Errors);
-        MSAssert.Contains(
+        MSAssert.ContainsSingle(
             error => error.Rule == "length"
-                && error.Message.StartsWith("Collection element 1 of property", StringComparison.Ordinal),
+                && error.PropertyName.Equals("NestedLengthItems[1]", StringComparison.Ordinal)
+                && error.Message.StartsWith("Property 'NestedLengthItems[1]'", StringComparison.Ordinal),
             result.Errors);
     });
 
@@ -488,19 +486,70 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
         MSAssert.HasCount(4, result.Errors);
         MSAssert.Contains(
             error => error.Rule == "required"
-                && error.PropertyName.EndsWith(nameof(ValidationPipelineTestModule.Tags), StringComparison.Ordinal),
+                && error.PropertyName.Equals("Tags[0]", StringComparison.Ordinal)
+                && error.Message.Equals("Property 'Tags[0]' is required.", StringComparison.Ordinal),
             result.Errors);
         MSAssert.Contains(
             error => error.Rule == "valid_identifier"
-                && error.PropertyName.EndsWith(nameof(ValidationPipelineTestModule.Tags), StringComparison.Ordinal),
+                && error.PropertyName.Equals("Tags[2]", StringComparison.Ordinal)
+                && error.Message.Equals("Property 'Tags[2]' must be a valid variable identifier, but was 'invalid tag'.", StringComparison.Ordinal),
+            result.Errors);
+    });
+
+    [TestMethod]
+    public Task TestValidationAsync_NestedValidationErrorsExposeRecursivePathsAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+
+        ValidationPipelineTestModule module = CreateValidModule() with
+        {
+            ValidationPathItems =
+            [
+                new ValidationPathTestItem(
+                    Value: null,
+                    Values: ["valid", null]),
+            ],
+        };
+
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
+
+        MSAssert.IsFalse(result.IsValid);
+        MSAssert.HasCount(2, result.Errors);
+        MSAssert.Contains(
+            error => error.Rule == "required"
+                && error.PropertyName.Equals("ValidationPathItems[0].Value", StringComparison.Ordinal)
+                && error.Message.Equals("Property 'ValidationPathItems[0].Value' is required.", StringComparison.Ordinal),
             result.Errors);
         MSAssert.Contains(
             error => error.Rule == "required"
-                && error.Message.Equals("Collection element 0 of property 'Tags' is required.", StringComparison.Ordinal),
+                && error.PropertyName.Equals("ValidationPathItems[0].Values[1]", StringComparison.Ordinal)
+                && error.Message.Equals("Property 'ValidationPathItems[0].Values[1]' is required.", StringComparison.Ordinal),
             result.Errors);
-        MSAssert.Contains(
-            error => error.Rule == "valid_identifier"
-                && error.Message.Equals("Collection element 2 of property 'Tags' must be a valid variable identifier, but was 'invalid tag'.", StringComparison.Ordinal),
+    });
+
+    [TestMethod]
+    public Task TestValidationAsync_DeepNestedValidationWorkIsNotPrunedAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+
+        ValidationPipelineTestModule module = CreateValidModule() with
+        {
+            RecursiveValidationPathItems =
+            [
+                new ValidationPathContainerItem(
+                    new ValidationPathTestItem(
+                        Value: null,
+                        Values: [])),
+            ],
+        };
+
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
+
+        MSAssert.IsFalse(result.IsValid);
+        MSAssert.ContainsSingle(
+            error => error.Rule == "required"
+                && error.PropertyName.Equals("RecursiveValidationPathItems[0].Child.Value", StringComparison.Ordinal)
+                && error.Message.Equals("Property 'RecursiveValidationPathItems[0].Child.Value' is required.", StringComparison.Ordinal),
             result.Errors);
     });
 

@@ -23,7 +23,7 @@ public sealed class RepeatedCollectionValidationTests : ModuleTestBase
         MSAssert.HasCount(1, result.Errors);
         MSAssert.Contains(
             error => error.Rule == "required"
-                && error.PropertyName.EndsWith(nameof(ValidationPipelineTestModule.RequiredTags), StringComparison.Ordinal),
+                && error.PropertyName.Equals(nameof(ValidationPipelineTestModule.RequiredTags), StringComparison.Ordinal),
             result.Errors);
     });
 
@@ -42,7 +42,7 @@ public sealed class RepeatedCollectionValidationTests : ModuleTestBase
         MSAssert.HasCount(1, result.Errors);
         MSAssert.Contains(
             error => error.Rule == "required"
-                && error.PropertyName.EndsWith(nameof(ValidationPipelineTestModule.RequiredTags), StringComparison.Ordinal),
+                && error.PropertyName.Equals("RequiredTags[0]", StringComparison.Ordinal),
             result.Errors);
     });
 

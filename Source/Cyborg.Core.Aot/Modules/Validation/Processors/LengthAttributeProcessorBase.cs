@@ -170,7 +170,7 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValid
                 $$"""
                 if ({{sizeExpression}} < {{minExpression}})
                 {
-                    {{model.Variables.Errors}}.Add({{CreateValidationError(model, "length", $"{model.TargetDescription} '{{{model.PropertyNameExpression}}}' must have a length/count not smaller than configured minimum '{minExpression}', was '{{{sizeExpression}}}'.")}});
+                    {{model.Variables.Errors}}.Add({{CreateValidationError(model, "length", $"{model.TargetDescription} must have a length/count not smaller than configured minimum '{minExpression}', was '{{{sizeExpression}}}'.")}});
                 }
                 """);
             }
@@ -181,7 +181,7 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValid
                 $$"""
                 if ({{sizeExpression}} > {{maxExpression}})
                 {
-                    {{model.Variables.Errors}}.Add({{CreateValidationError(model, "length", $"{model.TargetDescription} '{{{model.PropertyNameExpression}}}' must have a length/count not greater than configured maximum '{maxExpression}', was '{{{sizeExpression}}}'.")}});
+                    {{model.Variables.Errors}}.Add({{CreateValidationError(model, "length", $"{model.TargetDescription} must have a length/count not greater than configured maximum '{maxExpression}', was '{{{sizeExpression}}}'.")}});
                 }
                 """);
             }

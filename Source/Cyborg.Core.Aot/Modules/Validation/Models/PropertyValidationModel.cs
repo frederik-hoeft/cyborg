@@ -11,14 +11,14 @@ internal sealed record PropertyValidationModel
     DiagnosticsReporter DiagnosticsReporter,
     ValidationSectionRenderer.ValidationVariables Variables,
     string AccessExpression,
-    string ErrorPropertyAccessExpression,
+    ValidationPath Path,
     ITypeSymbol TargetType,
-    string TargetNullableTypeName,
-    bool IsCollectionElement,
-    string TargetDescription = "Property"
+    string TargetNullableTypeName
 )
 {
-    public string PropertyNameExpression => $"nameof({ErrorPropertyAccessExpression})";
+    public string PathExpression => Path.Expression;
+
+    public string TargetDescription => Path.Description;
 
     public bool IsTaggedString => TargetType.EqualsIgnoreNullability(ContractInfo.TaggedString);
 

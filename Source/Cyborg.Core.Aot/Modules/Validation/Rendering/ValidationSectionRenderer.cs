@@ -5,7 +5,6 @@ using Cyborg.Core.Aot.Modules.Validation.Rendering.Collections;
 using Cyborg.Core.Aot.Modules.Validation.Rendering.Objects;
 using Cyborg.Shared.Text;
 using Microsoft.CodeAnalysis;
-using System.Text;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
 
@@ -43,7 +42,11 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
         builder = builder.IncreaseIndent();
         foreach (PropertyModel property in model.Properties)
         {
-            AppendValidationForProperty(builder, property, $"{Variables.Module}.{property.Name}");
+            AppendValidationForProperty(
+                builder,
+                property,
+                $"{Variables.Module}.{property.Name}",
+                ValidationPath.ForProperty(property.Name));
         }
         builder = builder.DecreaseIndent();
         builder.AppendBlock(
@@ -55,36 +58,39 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
             """);
     }
 
-    private void AppendValidationForProperty(IndentedStringBuilder builder, PropertyModel property, string propertyAccessExpression)
+    private void AppendValidationForProperty(
+        IndentedStringBuilder builder,
+        PropertyModel property,
+        string propertyAccessExpression,
+        ValidationPath path)
     {
         foreach (IPropertyValidationAspect aspect in property.Aspects<IPropertyValidationAspect>())
         {
             if (aspect is not CollectionElementValidationAspect)
             {
-                aspect.EmitValidation(this, builder, property, propertyAccessExpression);
+                aspect.EmitValidation(this, builder, property, propertyAccessExpression, path);
             }
         }
 
-        if (property.HasValidatableChildren)
+        if (property.HasNestedValidationWork)
         {
-            AppendNestedValidationForProperty(builder, property, propertyAccessExpression);
+            AppendNestedValidationForProperty(builder, property, propertyAccessExpression, path);
         }
 
         if (property.HasCollectionValidationWork)
         {
-            AppendCollectionValidationForProperty(builder, property, propertyAccessExpression);
+            AppendCollectionValidationForProperty(builder, property, propertyAccessExpression, path);
         }
     }
 
-    private void AppendNestedValidationForProperty(IndentedStringBuilder builder, PropertyModel property, string propertyAccessExpression)
+    private void AppendNestedValidationForProperty(
+        IndentedStringBuilder builder,
+        PropertyModel property,
+        string propertyAccessExpression,
+        ValidationPath path)
     {
         ObjectModel objectModel = property.Object
             ?? throw new InvalidOperationException($"Nested validation requires object metadata for property '{property.Name}'.");
-        if (!objectModel.Children.Any(static child => child.Aspects<IPropertyValidationAspect>().Any()))
-        {
-            return;
-        }
-
         ValueAccess access = objectModel.Shape.Renderer.Access(propertyAccessExpression);
         if (access.RequiresGuard)
         {
@@ -98,7 +104,7 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
 
         foreach (PropertyModel child in objectModel.Children)
         {
-            AppendValidationForProperty(builder, child, $"{access.ValueExpression}.{child.Name}");
+            AppendValidationForProperty(builder, child, $"{access.ValueExpression}.{child.Name}", path.AppendProperty(child.Name));
         }
 
         if (access.RequiresGuard)
@@ -108,7 +114,11 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
         }
     }
 
-    private void AppendCollectionValidationForProperty(IndentedStringBuilder builder, PropertyModel property, string propertyAccessExpression)
+    private void AppendCollectionValidationForProperty(
+        IndentedStringBuilder builder,
+        PropertyModel property,
+        string propertyAccessExpression,
+        ValidationPath path)
     {
         CollectionModel collection = property.Collection!;
         string safeIdentifier = CreateSafeIdentifier(propertyAccessExpression);
@@ -137,6 +147,7 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
             {
             """);
         IndentedStringBuilder loopBuilder = builder.IncreaseIndent();
+        ValidationPath elementPath = path.AppendElement(indexVariable);
 
         if (property.TryGetAspects(out List<CollectionElementValidationAspect>? elementValidationAspects))
         {
@@ -146,15 +157,14 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
                     this,
                     loopBuilder,
                     property,
-                    propertyAccessExpression,
                     elementVariable,
-                    indexVariable);
+                    elementPath);
             }
         }
 
-        if (property.HasCollectionElementChildren)
+        if (property.HasCollectionElementChildValidationWork)
         {
-            AppendCollectionElementChildValidation(loopBuilder, property, elementVariable);
+            AppendCollectionElementChildValidation(loopBuilder, property, elementVariable, elementPath);
         }
         loopBuilder.AppendLine($"++{indexVariable};");
         builder.AppendLine("}");
@@ -166,17 +176,16 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
         }
     }
 
-    private void AppendCollectionElementChildValidation(IndentedStringBuilder builder, PropertyModel property, string elementVariable)
+    private void AppendCollectionElementChildValidation(
+        IndentedStringBuilder builder,
+        PropertyModel property,
+        string elementVariable,
+        ValidationPath elementPath)
     {
         if (property is not { Collection.ElementObject: { } elementObject })
         {
             throw new InvalidOperationException("Collection element child validation requires validatable object metadata.");
         }
-        if (!elementObject.Children.Any(static child => child.Aspects<IPropertyValidationAspect>().Any()))
-        {
-            return;
-        }
-
         ValueAccess access = elementObject.Shape.Renderer.Access(elementVariable);
         if (access.RequiresGuard)
         {
@@ -190,7 +199,7 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
 
         foreach (PropertyModel child in elementObject.Children)
         {
-            AppendValidationForProperty(builder, child, $"{access.ValueExpression}.{child.Name}");
+            AppendValidationForProperty(builder, child, $"{access.ValueExpression}.{child.Name}", elementPath.AppendProperty(child.Name));
         }
         if (access.RequiresGuard)
         {

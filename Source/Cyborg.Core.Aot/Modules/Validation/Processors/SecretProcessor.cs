@@ -64,7 +64,7 @@ internal sealed class SecretProcessor : AttributeProcessorBase<SecretAttribute>
             $$"""
             if ({{condition}})
             {
-                {{model.Variables.Errors}}.Add({{CreateValidationError(model, "secret", $"{model.TargetDescription} '{{{model.PropertyNameExpression}}}' must carry the '{model.ContractInfo.SecretTag}' tag.")}});
+                {{model.Variables.Errors}}.Add({{CreateValidationError(model, "secret", $"{model.TargetDescription} must carry the '{model.ContractInfo.SecretTag}' tag.")}});
             }
             """);
         }

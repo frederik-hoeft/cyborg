@@ -27,7 +27,7 @@ internal sealed class VariableIdentifierProcessor : PropertyValidationProcessorB
             $$"""
             if ({{model.NullAwareCondition($"!runtime.Environment.SyntaxFactory.IsValidIdentifier({model.StringContentExpression})")}})
             {
-                {{model.Variables.Errors}}.Add({{CreateValidationError(model, rule: "valid_identifier", $"{model.TargetDescription} '{{{model.PropertyNameExpression}}}' must be a valid variable identifier, but was '{{{model.DisplayExpression}}}'.")}});
+                {{model.Variables.Errors}}.Add({{CreateValidationError(model, rule: "valid_identifier", $"{model.TargetDescription} must be a valid variable identifier, but was '{{{model.DisplayExpression}}}'.")}});
             }
             """);
         }

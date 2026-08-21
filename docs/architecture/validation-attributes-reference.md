@@ -87,7 +87,7 @@ Triggers the decomposition generator on a record or class. The generator emits a
 
 ## Validation Attributes
 
-These attributes declare constraints that are checked during the `ValidateAsync` stage of the generated pipeline. If a constraint is violated, a `ValidationError` is added to the result. All validation attributes are applied to properties; selected attributes can redirect their constraint to each immediate element of a collection property.
+These attributes declare constraints that are checked during the `ValidateAsync` stage of the generated pipeline. If a constraint is violated, a `ValidationError` is added to the result. Generated errors carry a user-facing recursive property path (for example, `Options.Path`, `Tags[2]`, or `Items[1].Value`) so nested and collection failures remain attributable to the concrete input location. All validation attributes are applied to properties; selected attributes can redirect their constraint to each immediate element of a collection property.
 
 ### Collection Element Targeting
 

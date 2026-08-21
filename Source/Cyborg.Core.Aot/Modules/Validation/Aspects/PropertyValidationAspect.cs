@@ -8,7 +8,7 @@ internal abstract class PropertyValidationAspect : IPropertyValidationAspect
 {
     protected static string CreateValidationError(PropertyValidationModel model, string rule, string message) =>
         $"""
-        new {model.ContractInfo.ValidationError.RenderGlobal()}({model.PropertyNameExpression}, "{rule}", $"{message}")
+        new {model.ContractInfo.ValidationError.RenderGlobal()}({model.PathExpression}, "{rule}", $"{message}")
         """;
 
     public abstract void EmitValidation(IndentedStringBuilder builder, PropertyValidationModel model);

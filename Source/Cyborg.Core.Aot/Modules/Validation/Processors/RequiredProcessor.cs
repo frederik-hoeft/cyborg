@@ -43,7 +43,7 @@ internal sealed class RequiredProcessor : PropertyValidationProcessorBase<Requir
             $$"""
             if ({{condition}})
             {
-                {{model.Variables.Errors}}.Add({{CreateValidationError(model, "required", $"{model.TargetDescription} '{{{model.PropertyNameExpression}}}' is required.")}});
+                {{model.Variables.Errors}}.Add({{CreateValidationError(model, "required", $"{model.TargetDescription} is required.")}});
             }
             """);
         }

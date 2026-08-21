@@ -41,7 +41,7 @@ internal sealed class RangeProcessor : AttributeProcessorBase
                 $$"""
                 if ({{model.AccessExpression}} < {{minExpression}})
                 {
-                    {{model.Variables.Errors}}.Add({{CreateValidationError(model, "range", $"Property '{{nameof({model.AccessExpression})}}' must not be greater than the configured minimum '{minExpression}', was '{{{model.AccessExpression}}}'.")}});
+                    {{model.Variables.Errors}}.Add({{CreateValidationError(model, "range", $"{model.TargetDescription} must not be greater than the configured minimum '{minExpression}', was '{{{model.AccessExpression}}}'.")}});
                 }
                 """);
             }
@@ -52,7 +52,7 @@ internal sealed class RangeProcessor : AttributeProcessorBase
                 $$"""
                 if ({{model.AccessExpression}} > {{maxExpression}})
                 {
-                    {{model.Variables.Errors}}.Add({{CreateValidationError(model, "range", $"Property '{{nameof({model.AccessExpression})}}' must not be greater than the configured maximum '{maxExpression}', was '{{{model.AccessExpression}}}'.")}});
+                    {{model.Variables.Errors}}.Add({{CreateValidationError(model, "range", $"{model.TargetDescription} must not be greater than the configured maximum '{maxExpression}', was '{{{model.AccessExpression}}}'.")}});
                 }
                 """);
             }
