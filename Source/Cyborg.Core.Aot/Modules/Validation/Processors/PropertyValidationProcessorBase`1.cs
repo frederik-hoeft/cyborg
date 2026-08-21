@@ -1,4 +1,5 @@
-using Cyborg.Core.Aot.Extensions;
+﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Aspects;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using Microsoft.CodeAnalysis;
@@ -7,7 +8,7 @@ namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
 internal abstract class PropertyValidationProcessorBase<TAttribute> : AttributeProcessorBase<TAttribute> where TAttribute : PropertyValidationAttribute
 {
-    public sealed override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
+    public sealed override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out IPropertyAspect? aspect)
     {
         bool targetsElements = false;
         if (TryGetNamedArgument(attribute, nameof(PropertyValidationAttribute.TargetsElements), out TypedConstant? targetsElementsArgument))

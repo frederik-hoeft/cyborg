@@ -1,8 +1,10 @@
 ﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Aspects;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using Cyborg.Core.Aot.Modules.Validation.Rendering;
 using Cyborg.Core.Aot.Modules.Validation.Rendering.Collections;
+using Cyborg.Shared.Text;
 using Microsoft.CodeAnalysis;
 using System.Globalization;
 
@@ -106,7 +108,7 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValid
         string? maxExpression
     ) : PropertyValidationAspect
     {
-        protected override void EmitValidation(IndentedStringBuilder builder, PropertyValidationModel model)
+        public override void EmitValidation(IndentedStringBuilder builder, PropertyValidationModel model)
         {
             if (targetKind == LengthTargetKind.Collection)
             {

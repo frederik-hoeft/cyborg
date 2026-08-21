@@ -1,7 +1,9 @@
-﻿using Cyborg.Core.Aot.Extensions;
+﻿using Cyborg.Core.Aot.Modules.Validation.Aspects;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using Cyborg.Core.Aot.Modules.Validation.Rendering.Collections;
+using Cyborg.Core.Aot.Modules.Validation.Rendering.Models;
 using Cyborg.Core.Aot.Modules.Validation.Rendering.Objects;
+using Cyborg.Shared.Text;
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
 
@@ -210,14 +212,14 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
     private static string? CreatePreparedValueExpression(PropertyRewriteContext context)
     {
         string? defaultExpression = null;
-        foreach (PropertyAspect aspect in context.Property.Aspects)
+        foreach (IPropertyDefaultAspect aspect in context.Property.Aspects<IPropertyDefaultAspect>())
         {
             defaultExpression = aspect.RewriteDefaultAssignmentExpression(context, defaultExpression);
         }
 
         string expression = defaultExpression ?? context.PropertyAccessExpression;
         bool hasInvariantRewrite = false;
-        foreach (PropertyAspect aspect in context.Property.Aspects)
+        foreach (IPropertyPreparationAspect aspect in context.Property.Aspects<IPropertyPreparationAspect>())
         {
             string rewritten = aspect.RewritePreparedValueExpression(context, expression);
             hasInvariantRewrite |= !string.Equals(rewritten, expression, StringComparison.Ordinal);

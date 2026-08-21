@@ -1,4 +1,5 @@
-using Cyborg.Core.Aot.Extensions;
+﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Aspects;
 using Microsoft.CodeAnalysis;
 using System.Diagnostics.CodeAnalysis;
 
@@ -12,7 +13,7 @@ internal abstract class AttributeProcessorBase : IPropertyAttributeProcessor
 
     protected virtual string GetAttributeFriendlyName(AttributeData attribute) => attribute.AttributeClass?.Name ?? "Unknown";
 
-    public abstract bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect);
+    public abstract bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out IPropertyAspect? aspect);
 
     protected bool ValidateTypeArguments(AttributeData attribute, ref readonly PropertyProcessingContext context, params ReadOnlySpan<ITypeSymbol> expectedTypeArguments)
     {

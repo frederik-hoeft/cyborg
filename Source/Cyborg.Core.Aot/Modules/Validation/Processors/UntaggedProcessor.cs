@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Aspects;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Microsoft.CodeAnalysis;
 
@@ -6,7 +7,7 @@ namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
 internal sealed class UntaggedProcessor : AttributeProcessorBase<UntaggedAttribute>
 {
-    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
+    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out IPropertyAspect? aspect)
     {
         if (context.Property.HasAttribute<SecretAttribute>())
         {
@@ -30,4 +31,4 @@ internal sealed class UntaggedProcessor : AttributeProcessorBase<UntaggedAttribu
     }
 }
 
-internal sealed class UntaggedAspect : PropertyAspect;
+internal sealed class UntaggedAspect : IPropertyAspect;

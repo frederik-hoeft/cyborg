@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Aspects;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
@@ -39,7 +40,7 @@ internal sealed class PropertyModelBuilder(GenerationCandidateFactory factory, L
     private bool TryCreatePropertyModel(INamedTypeSymbol containingType, IPropertySymbol property, ImmutableHashSet<INamedTypeSymbol> traversalPath, [NotNullWhen(true)] out PropertyModel? propertyModel)
     {
         PropertyProcessingContext processingContext = new(factory.Compilation, containingType, property, factory.ContractInfo, diagnostics);
-        if (!ValidationProcessorRegistry.TryProcess(in processingContext, out ImmutableArray<PropertyAspect> aspects))
+        if (!ValidationProcessorRegistry.TryProcess(in processingContext, out ImmutableArray<IPropertyAspect> aspects))
         {
             propertyModel = null;
             return false;
@@ -147,5 +148,4 @@ internal sealed class PropertyModelBuilder(GenerationCandidateFactory factory, L
 
         return childBuilder.ToImmutable();
     }
-
 }

@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Aspects;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
@@ -9,7 +10,7 @@ internal sealed class DefaultValueProcessor : AttributeProcessorBase
 {
     public override string AttributeMetadataName => typeof(DefaultValueAttribute<>).FullName;
 
-    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
+    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out IPropertyAspect? aspect)
     {
         ITypeSymbol expectedTypeArgument = context.Property.Type.EqualsIgnoreNullability(context.ContractInfo.TaggedString)
             ? context.Compilation.GetSpecialType(SpecialType.System_String)
@@ -39,9 +40,9 @@ internal sealed class DefaultValueProcessor : AttributeProcessorBase
         return true;
     }
 
-    private sealed class DefaultValueValidationAspect(string valueExpression, ImmutableArray<string> whenPresentExpressions) : PropertyAspect(ensuresDefault: true)
+    private sealed class DefaultValueValidationAspect(string valueExpression, ImmutableArray<string> whenPresentExpressions) : IPropertyDefaultAspect
     {
-        public override string? RewriteDefaultAssignmentExpression(PropertyRewriteContext rewriteContext, string? currentExpression)
+        public string? RewriteDefaultAssignmentExpression(PropertyRewriteContext rewriteContext, string? currentExpression)
         {
             string propertyAccessExpression = rewriteContext.PropertyAccessExpression;
             string equalityComparer = KnownTypes.DefaultEqualityComparerOfT(rewriteContext.Property.NullableTypeName);

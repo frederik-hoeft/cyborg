@@ -4,6 +4,8 @@ using Cyborg.Core.Aot.Modules.Validation.Rendering.Objects;
 using Cyborg.Core.Aot.Modules.Validation.Rendering.Collections;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Cyborg.Shared.Text;
+using Cyborg.Core.Aot.Modules.Validation.Aspects;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
 
@@ -248,7 +250,7 @@ internal sealed class InspectionSectionRenderer(ValidationContractInfo contractI
     private string? CreateHintsExpression(PropertyModel property)
     {
         List<string> hints = [];
-        foreach (PropertyAspect aspect in property.Aspects)
+        foreach (IPropertyDescriptionAspect aspect in property.Aspects.OfType<IPropertyDescriptionAspect>())
         {
             aspect.RegisterDescriptorHints(hints, ContractInfo, DiagnosticsReporter, property);
         }

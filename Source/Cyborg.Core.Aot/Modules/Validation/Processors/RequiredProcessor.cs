@@ -1,8 +1,10 @@
 ﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Aspects;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using Cyborg.Core.Aot.Modules.Validation.Rendering;
 using Cyborg.Core.Aot.Modules.Validation.Rendering.Collections;
+using Cyborg.Shared.Text;
 using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
@@ -18,7 +20,7 @@ internal sealed class RequiredProcessor : PropertyValidationProcessorBase<Requir
 
     private sealed class RequiredValidationAspect(CollectionShape? collectionShape) : PropertyValidationAspect
     {
-        protected override void EmitValidation(IndentedStringBuilder builder, PropertyValidationModel model)
+        public override void EmitValidation(IndentedStringBuilder builder, PropertyValidationModel model)
         {
             string condition;
             if (model.TargetType.IsStringLike(model.ContractInfo.TaggedString))

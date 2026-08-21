@@ -1,12 +1,15 @@
 ﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Aspects;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
+using Cyborg.Core.Aot.Modules.Validation.Models;
+using Cyborg.Shared.Text;
 using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
 internal sealed class NormalizedPathProcessor : AttributeProcessorBase<NormalizedPathAttribute>
 {
-    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
+    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out IPropertyAspect? aspect)
     {
         if (!ValidateStringLikePropertyType(attribute, in context))
         {
@@ -16,9 +19,9 @@ internal sealed class NormalizedPathProcessor : AttributeProcessorBase<Normalize
         return true;
     }
 
-    private sealed class NormalizedPathValidationAspect : PropertyAspect
+    private sealed class NormalizedPathValidationAspect : PropertyValidationAspect
     {
-        protected override void EmitValidation(IndentedStringBuilder builder, PropertyValidationModel model)
+        public override void EmitValidation(IndentedStringBuilder builder, PropertyValidationModel model)
         {
             builder.AppendBlock(
             $$"""

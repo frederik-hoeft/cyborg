@@ -1,7 +1,10 @@
 ﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Aspects;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using Cyborg.Core.Aot.Modules.Validation.Processors;
+using Cyborg.Core.Aot.Modules.Validation.Rendering.Models;
 using Cyborg.Core.Aot.Modules.Validation.Rendering.Objects;
+using Cyborg.Shared.Text;
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
 
@@ -151,7 +154,7 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
             : context.Property.Symbol.Type.EqualsIgnoreNullability(ContractInfo.TaggedString)
                 ? $"{ContextVariable}.SelectRawTaggedStringOverride({arguments})"
                 : $"{ContextVariable}.ResolveOverride({arguments})";
-        foreach (PropertyAspect aspect in context.Property.Aspects)
+        foreach (IPropertyOverrideAspect aspect in context.Property.Aspects<IPropertyOverrideAspect>())
         {
             expression = aspect.RewriteOverrideResolutionExpression(context, expression, rootPathExpression);
         }

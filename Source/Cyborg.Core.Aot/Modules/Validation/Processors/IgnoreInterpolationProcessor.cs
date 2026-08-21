@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Aspects;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Microsoft.CodeAnalysis;
 
@@ -6,7 +7,7 @@ namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
 internal sealed class IgnoreInterpolationProcessor : AttributeProcessorBase<IgnoreInterpolationAttribute>
 {
-    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
+    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out IPropertyAspect? aspect)
     {
         if (!ValidateStringLikePropertyType(attribute, in context))
         {
@@ -17,4 +18,4 @@ internal sealed class IgnoreInterpolationProcessor : AttributeProcessorBase<Igno
     }
 }
 
-internal sealed class IgnoreInterpolationAspect : PropertyAspect;
+internal sealed class IgnoreInterpolationAspect : IPropertyAspect;

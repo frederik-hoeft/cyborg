@@ -1,5 +1,8 @@
 ﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Aspects;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
+using Cyborg.Core.Aot.Modules.Validation.Models;
+using Cyborg.Shared.Text;
 using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
@@ -18,7 +21,7 @@ internal sealed class VariableIdentifierProcessor : PropertyValidationProcessorB
 
     private sealed class VariableIdentifierAspect : PropertyValidationAspect
     {
-        protected override void EmitValidation(IndentedStringBuilder builder, PropertyValidationModel model)
+        public override void EmitValidation(IndentedStringBuilder builder, PropertyValidationModel model)
         {
             builder.AppendBlock(
             $$"""

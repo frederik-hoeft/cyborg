@@ -1,5 +1,8 @@
 ﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Aspects;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
+using Cyborg.Core.Aot.Modules.Validation.Models;
+using Cyborg.Shared.Text;
 using Microsoft.CodeAnalysis;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Processors;
@@ -8,7 +11,7 @@ internal sealed class RangeProcessor : AttributeProcessorBase
 {
     public override string AttributeMetadataName => typeof(RangeAttribute<>).FullName;
 
-    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
+    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out IPropertyAspect? aspect)
     {
         if (!ValidateTypeArguments(attribute, in context, context.Property.Type)
             || !TryGetNamedArgumentExpressions(attribute, in context, out Dictionary<string, string?> namedArgumentExpressions))
@@ -28,9 +31,9 @@ internal sealed class RangeProcessor : AttributeProcessorBase
         return true;
     }
 
-    private sealed class RangeValidationAspect(string? minExpression, string? maxExpression) : PropertyAspect
+    private sealed class RangeValidationAspect(string? minExpression, string? maxExpression) : PropertyValidationAspect
     {
-        protected override void EmitValidation(IndentedStringBuilder builder, PropertyValidationModel model)
+        public override void EmitValidation(IndentedStringBuilder builder, PropertyValidationModel model)
         {
             if (minExpression is not null)
             {

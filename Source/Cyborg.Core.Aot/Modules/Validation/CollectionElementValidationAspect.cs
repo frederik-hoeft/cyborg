@@ -1,6 +1,10 @@
-﻿namespace Cyborg.Core.Aot.Modules.Validation;
+﻿using Cyborg.Core.Aot.Modules.Validation.Aspects;
+using Cyborg.Core.Aot.Modules.Validation.Models;
+using Cyborg.Shared.Text;
 
-internal sealed class CollectionElementValidationAspect(PropertyValidationAspect validationAspect) : PropertyAspect
+namespace Cyborg.Core.Aot.Modules.Validation;
+
+internal sealed record CollectionElementValidationAspect(PropertyValidationAspect ValidationAspect) : IPropertyValidationAspect
 {
-    public PropertyValidationAspect ValidationAspect { get; } = validationAspect ?? throw new ArgumentNullException(nameof(validationAspect));
+    public void EmitValidation(IndentedStringBuilder builder, PropertyValidationModel model) => ValidationAspect.EmitValidation(builder, model);
 }

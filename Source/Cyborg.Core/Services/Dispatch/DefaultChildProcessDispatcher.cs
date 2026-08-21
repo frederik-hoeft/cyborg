@@ -1,5 +1,4 @@
-﻿using Cyborg.Core.Text;
-using Cyborg.Core.Text.Rendering;
+﻿using Cyborg.Core.Text.Rendering;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 

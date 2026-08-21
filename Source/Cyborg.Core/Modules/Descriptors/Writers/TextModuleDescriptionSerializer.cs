@@ -1,6 +1,6 @@
-﻿using Cyborg.Core.Common.Text;
-using Cyborg.Core.Modules.Descriptors.Model;
+﻿using Cyborg.Core.Modules.Descriptors.Model;
 using Cyborg.Core.Text.Rendering;
+using Cyborg.Shared.Text;
 using System.Text;
 
 namespace Cyborg.Core.Modules.Descriptors.Writers;

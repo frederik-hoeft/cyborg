@@ -1,12 +1,10 @@
-using Cyborg.Core.Common.Text;
-using Cyborg.Core.Modules.Configuration.Model;
+﻿using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Descriptors.Model;
 using Cyborg.Core.Text;
 using Cyborg.Core.Text.Rendering;
-using System.Collections;
+using Cyborg.Shared.Text;
 using System.Collections.Immutable;
 using System.Globalization;
-using System.Text;
 
 namespace Cyborg.Core.Modules.Descriptors.Writers;
 
@@ -54,13 +52,13 @@ internal sealed class TextModuleDescriptionComponentWriter(IndentedStringBuilder
 
             if (item is IDescriptionObjectComponent or IDescriptionCollectionComponent)
             {
-                builder.GetInnerBuilder().AppendLine();
+                builder.AppendLine();
                 TextModuleDescriptionComponentWriter nestedWriter = new(builder.IncreaseIndent(), taggedStringRenderer);
                 await item.AcceptAsync(nestedWriter, cancellationToken).ConfigureAwait(false);
             }
             else
             {
-                builder.GetInnerBuilder().Append(' ');
+                builder.Append(' ');
                 await item.AcceptAsync(this, cancellationToken).ConfigureAwait(false);
             }
         }
@@ -75,13 +73,13 @@ internal sealed class TextModuleDescriptionComponentWriter(IndentedStringBuilder
 
         if (propertyComponent.Value is IDescriptionObjectComponent or IDescriptionCollectionComponent)
         {
-            builder.GetInnerBuilder().AppendLine();
+            builder.AppendLine();
             TextModuleDescriptionComponentWriter nestedWriter = new(builder.IncreaseIndent(), taggedStringRenderer);
             await propertyComponent.Value.AcceptAsync(nestedWriter, cancellationToken).ConfigureAwait(false);
         }
         else
         {
-            builder.GetInnerBuilder().Append(' ');
+            builder.Append(' ');
             await propertyComponent.Value.AcceptAsync(this, cancellationToken).ConfigureAwait(false);
         }
     }

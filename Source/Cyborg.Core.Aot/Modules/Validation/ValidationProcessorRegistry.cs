@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Aspects;
 using Cyborg.Core.Aot.Modules.Validation.Processors;
 using Microsoft.CodeAnalysis;
 using System.Collections.Frozen;
@@ -56,9 +57,9 @@ internal static class ValidationProcessorRegistry
         return ByMetadataName.TryGetValue(metadataName, out processor);
     }
 
-    public static bool TryProcess(ref readonly PropertyProcessingContext context, out ImmutableArray<PropertyAspect> aspects)
+    public static bool TryProcess(ref readonly PropertyProcessingContext context, out ImmutableArray<IPropertyAspect> aspects)
     {
-        ImmutableArray<PropertyAspect>.Builder aspectBuilder = ImmutableArray.CreateBuilder<PropertyAspect>();
+        ImmutableArray<IPropertyAspect>.Builder aspectBuilder = ImmutableArray.CreateBuilder<IPropertyAspect>();
 
         foreach (AttributeData attribute in context.Property.GetAttributes())
         {
@@ -66,7 +67,7 @@ internal static class ValidationProcessorRegistry
             {
                 continue;
             }
-            if (!processor.TryProcess(attribute, in context, out PropertyAspect? aspect))
+            if (!processor.TryProcess(attribute, in context, out IPropertyAspect? aspect))
             {
                 return false;
             }
@@ -77,7 +78,7 @@ internal static class ValidationProcessorRegistry
         }
         foreach (IDynamicPropertyProcessor processor in DynamicProcessors)
         {
-            if (!processor.TryProcess(in context, out PropertyAspect? aspect))
+            if (!processor.TryProcess(in context, out IPropertyAspect? aspect))
             {
                 return false;
             }

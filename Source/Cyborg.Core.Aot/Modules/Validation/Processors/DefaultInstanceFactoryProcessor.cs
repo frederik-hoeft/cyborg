@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Modules.Validation.Aspects;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -7,7 +8,7 @@ namespace Cyborg.Core.Aot.Modules.Validation.Processors;
 
 internal sealed class DefaultInstanceFactoryProcessor : AttributeProcessorBase<DefaultInstanceFactoryAttribute>
 {
-    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
+    public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out IPropertyAspect? aspect)
     {
         if (!TryGetConstructorArgumentValue(attribute, argumentIndex: 0, in context, out string? valueExpression))
         {
@@ -47,9 +48,9 @@ internal sealed class DefaultInstanceFactoryProcessor : AttributeProcessorBase<D
             || compilation.ClassifyConversion(returnType, propertyType).IsImplicit;
     }
 
-    private sealed class DefaultInstanceFactoryAspect(string factoryMember) : PropertyAspect(ensuresDefault: true)
+    private sealed class DefaultInstanceFactoryAspect(string factoryMember) : IPropertyDefaultAspect
     {
-        public override string? RewriteDefaultAssignmentExpression(PropertyRewriteContext context, string? currentExpression)
+        public string? RewriteDefaultAssignmentExpression(PropertyRewriteContext context, string? currentExpression)
         {
             _ = currentExpression;
             return $"{context.PropertyAccessExpression} is null ? {factoryMember}() : {context.PropertyAccessExpression}";
