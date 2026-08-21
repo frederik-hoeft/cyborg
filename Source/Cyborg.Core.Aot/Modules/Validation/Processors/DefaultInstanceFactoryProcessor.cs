@@ -16,8 +16,8 @@ internal sealed class DefaultInstanceFactoryProcessor : AttributeProcessorBase<D
         IEnumerable<IMethodSymbol> candidateMethods = context.ContainingType
             .GetMembers(valueExpression)
             .OfType<IMethodSymbol>();
-        (Compilation compilation, _, IPropertySymbol? property, _) = context;
-        IMethodSymbol? factoryMethod = candidateMethods.FirstOrDefault(method => IsCompatibleFactoryMethod(property.Type, compilation, method));
+        IMethodSymbol? factoryMethod = candidateMethods.FirstOrDefault(method =>
+            IsCompatibleFactoryMethod(context.Property.Type, context.Compilation, method));
         if (factoryMethod is null)
         {
             context.Report(

@@ -105,13 +105,17 @@ internal abstract class PropertyAspect(bool ensuresDefault = false)
     {
         public string PropertyNameExpression => $"nameof({ErrorPropertyAccessExpression})";
 
-        public string StringContentExpression => TypeSymbolHelpers.CreateStringContentExpression(TargetType, ContractInfo, AccessExpression);
+        public bool IsTaggedString => TargetType.IsOrNullableOf(ContractInfo.TaggedString);
 
-        public string DisplayExpression => TypeSymbolHelpers.IsTaggedString(TargetType, ContractInfo)
-            ? $"{ValidationContextVariable}.Render({AccessExpression})"
+        public bool RequiresNullGuard => TargetType.RequiresNullCheck();
+
+        public string StringContentExpression => IsTaggedString
+            ? RequiresNullGuard ? $"{AccessExpression}?.Value" : $"{AccessExpression}.Value"
             : AccessExpression;
 
-        public bool RequiresNullGuard => TypeSymbolHelpers.RequiresNullGuard(TargetType);
+        public string DisplayExpression => IsTaggedString
+            ? $"{ValidationContextVariable}.Render({AccessExpression})"
+            : AccessExpression;
 
         public string NullAwareCondition(string condition) =>
             RequiresNullGuard ? $"{AccessExpression} is not null && {condition}" : condition;

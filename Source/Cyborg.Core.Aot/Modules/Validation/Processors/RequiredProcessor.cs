@@ -16,7 +16,7 @@ internal sealed class RequiredProcessor : PropertyValidationProcessorBase<Requir
     {
         protected override void EmitValidation(IndentedStringBuilder builder, ModulePropertyModel model)
         {
-            if (TypeSymbolHelpers.IsStringLikeType(model.TargetType, model.ContractInfo))
+            if (model.TargetType.IsStringLike(model.ContractInfo.TaggedString))
             {
                 builder.AppendLine($"if (string.{nameof(string.IsNullOrWhiteSpace)}({model.StringContentExpression}))");
             }

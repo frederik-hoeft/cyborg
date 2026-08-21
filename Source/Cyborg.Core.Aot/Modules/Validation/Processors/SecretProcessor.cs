@@ -17,7 +17,7 @@ internal sealed class SecretProcessor : AttributeProcessorBase<SecretAttribute>
                 context.ContainingType.Name);
             return false.WithDefaults(out aspect);
         }
-        if (!TypeSymbolHelpers.IsTaggedString(context.Property.Type, context.ContractInfo))
+        if (!context.Property.Type.IsOrNullableOf(context.ContractInfo.TaggedString))
         {
             context.Report(
                 ValidationGeneratorDiagnostics.SecretRequiresTaggedString,

@@ -159,7 +159,7 @@ internal abstract class AttributeProcessorBase : IPropertyAttributeProcessor
 
     protected bool ValidateStringLikePropertyType(AttributeData attribute, ref readonly PropertyProcessingContext context)
     {
-        if (TypeSymbolHelpers.IsStringLikeType(context.Property.Type, context.ContractInfo))
+        if (context.Property.Type.IsStringLike(context.ContractInfo.TaggedString))
         {
             return true;
         }

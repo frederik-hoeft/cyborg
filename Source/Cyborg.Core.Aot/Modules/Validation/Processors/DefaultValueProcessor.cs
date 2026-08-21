@@ -11,7 +11,7 @@ internal sealed class DefaultValueProcessor : AttributeProcessorBase
 
     public override bool TryProcess(AttributeData attribute, ref readonly PropertyProcessingContext context, out PropertyAspect? aspect)
     {
-        ITypeSymbol expectedTypeArgument = TypeSymbolHelpers.IsTaggedString(context.Property.Type, context.ContractInfo)
+        ITypeSymbol expectedTypeArgument = context.Property.Type.IsOrNullableOf(context.ContractInfo.TaggedString)
             ? context.Compilation.GetSpecialType(SpecialType.System_String)
             : context.Property.Type;
         if (!ValidateTypeArguments(attribute, in context, expectedTypeArgument)

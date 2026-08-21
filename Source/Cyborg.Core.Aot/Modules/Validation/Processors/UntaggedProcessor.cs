@@ -16,7 +16,7 @@ internal sealed class UntaggedProcessor : AttributeProcessorBase<UntaggedAttribu
                 context.ContainingType.Name);
             return false.WithDefaults(out aspect);
         }
-        if (!TypeSymbolHelpers.IsStringType(context.Property.Type))
+        if (!context.Property.Type.IsStringType())
         {
             context.Report(
                 ValidationGeneratorDiagnostics.UntaggedRequiresString,

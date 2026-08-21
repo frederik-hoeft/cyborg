@@ -66,20 +66,18 @@ internal abstract class LengthAttributeProcessorBase<TAttribute> : PropertyValid
             collectionInterface,
             minExpression: min?.ToString(CultureInfo.InvariantCulture),
             maxExpression: max?.ToString(CultureInfo.InvariantCulture),
-            requiresNullGuard: RequiresNullGuard(target.Type));
+            requiresNullGuard: target.Type.RequiresNullCheck());
 
         return true;
     }
 
     protected abstract bool TryGetBounds(AttributeData attribute, ref readonly PropertyProcessingContext context, out int? min, out int? max);
 
-    private static bool RequiresNullGuard(ITypeSymbol propertyType) =>
-        propertyType.IsReferenceType || propertyType.NullableAnnotation == NullableAnnotation.Annotated;
 
     private static LengthTargetKind GetTargetKind(ITypeSymbol propertyType, ValidationContractInfo contractInfo, out INamedTypeSymbol? collectionInterface)
     {
         collectionInterface = null;
-        if (propertyType.SpecialType == SpecialType.System_String || TypeSymbolHelpers.IsTaggedString(propertyType, contractInfo))
+        if (propertyType.SpecialType == SpecialType.System_String || propertyType.IsOrNullableOf(contractInfo.TaggedString))
         {
             return LengthTargetKind.String;
         }

@@ -78,7 +78,7 @@ internal abstract class PropertyValidationProcessorBase<TAttribute> : AttributeP
         {
             return ValidateStringLikePropertyType(attribute, in context);
         }
-        if (TypeSymbolHelpers.IsStringLikeType(target.Type, context.ContractInfo))
+        if (target.Type.IsStringLike(context.ContractInfo.TaggedString))
         {
             return true;
         }

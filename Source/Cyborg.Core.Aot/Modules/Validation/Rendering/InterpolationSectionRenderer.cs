@@ -44,12 +44,12 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
             string propertyAccess = $"{targetVariable}.{property.Name}";
             string localName = $"{targetVariable}_{property.Name}";
 
-            bool isStringLike = TypeSymbolHelpers.IsStringLikeType(property.Symbol.Type, ContractInfo);
+            bool isStringLike = property.Symbol.Type.IsStringLike(ContractInfo.TaggedString);
             bool ignoreInterpolation = property.HasAspect<IgnoreInterpolationAspect>();
             bool hasNestedWork = property.HasValidatableChildren && HasInterpolationWork(property.Children);
             CollectionModel? collection = property.Collection;
             bool hasCollectionWork = collection is { SupportsElementRewrite: true }
-                && (TypeSymbolHelpers.IsStringLikeType(collection.ElementType, ContractInfo)
+                && (collection.ElementType.IsStringLike(ContractInfo.TaggedString)
                     || (collection.IsElementValidatableType && HasInterpolationWork(collection.ElementChildren)));
 
             if (!hasNestedWork && (!isStringLike && !hasCollectionWork || ignoreInterpolation))
@@ -94,14 +94,14 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
 
     private void EmitStringInterpolation(IndentedStringBuilder builder, PropertyModel property, string localName, string propertyAccess)
     {
-        bool isTaggedString = TypeSymbolHelpers.IsTaggedString(property.Symbol.Type, ContractInfo);
+        bool isTaggedString = property.Symbol.Type.IsOrNullableOf(ContractInfo.TaggedString);
         string interpolatedExpression = $"{ContextVariable}.Interpolate({propertyAccess})";
         if (!isTaggedString)
         {
             interpolatedExpression = $"{interpolatedExpression}.Value";
         }
 
-        if (!TypeSymbolHelpers.RequiresNullGuard(property.Symbol.Type))
+        if (!property.Symbol.Type.RequiresNullCheck())
         {
             builder.AppendLine($"{property.NullableTypeName} {localName} = {interpolatedExpression};");
             return;
@@ -192,7 +192,7 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
             """);
         IndentedStringBuilder loopBuilder = builder.IncreaseIndent();
 
-        bool isStringElem = TypeSymbolHelpers.IsStringLikeType(collection.ElementType, ContractInfo);
+        bool isStringElem = collection.ElementType.IsStringLike(ContractInfo.TaggedString);
 
         if (collection.ElementRequiresNullCheck)
         {
@@ -274,11 +274,11 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
         }
     }
 
-    internal static bool HasInterpolationWork(ImmutableArray<PropertyModel> properties)
+    private bool HasInterpolationWork(ImmutableArray<PropertyModel> properties)
     {
         foreach (PropertyModel property in properties)
         {
-            if (TypeSymbolHelpers.IsStringLikeType(property.Symbol.Type, ContractInfo))
+            if (property.Symbol.Type.IsStringLike(ContractInfo.TaggedString))
             {
                 return true;
             }
@@ -288,7 +288,7 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
             }
             if (property.Collection is { SupportsElementRewrite: true } collection)
             {
-                if (TypeSymbolHelpers.IsStringLikeType(collection.ElementType, ContractInfo))
+                if (collection.ElementType.IsStringLike(ContractInfo.TaggedString))
                 {
                     return true;
                 }
@@ -304,7 +304,7 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
     private string CreateElementInterpolationExpression(ITypeSymbol elementType, string accessExpression)
     {
         string interpolated = $"{ContextVariable}.Interpolate({accessExpression})";
-        return TypeSymbolHelpers.IsTaggedString(elementType, ContractInfo) ? interpolated : $"{interpolated}.Value";
+        return elementType.IsOrNullableOf(ContractInfo.TaggedString) ? interpolated : $"{interpolated}.Value";
     }
 
     private static string CreateSafeIdentifier(string value) =>

@@ -65,7 +65,7 @@ internal sealed class PropertyModelBuilder(GenerationCandidateFactory factory, L
             Children: children,
             Collection: collection);
 
-        if (TypeSymbolHelpers.IsStringType(property.Type) && !propertyModel.HasAspect<Processors.UntaggedAspect>())
+        if (property.Type.IsStringType() && !propertyModel.HasAspect<Processors.UntaggedAspect>())
         {
             AddDiagnostic(
                 ValidationGeneratorDiagnostics.PreferTaggedString,
@@ -105,7 +105,7 @@ internal sealed class PropertyModelBuilder(GenerationCandidateFactory factory, L
             ElementNullableTypeName: descriptor.ElementType.ToDisplayString(KnownSymbolFormats.Nullable),
             ElementNonNullableTypeName: nonNullableElementType.ToDisplayString(KnownSymbolFormats.Nullable),
             IsElementNullable: isElementNullable,
-            ElementRequiresNullCheck: descriptor.ElementType.IsReferenceType || isElementNullable,
+            ElementRequiresNullCheck: descriptor.ElementType.RequiresNullCheck(),
             IsElementValidatableType: isElementValidatableType,
             MaterializationKind: descriptor.MaterializationKind,
             MaterializationTypeName: descriptor.MaterializationTypeName,
