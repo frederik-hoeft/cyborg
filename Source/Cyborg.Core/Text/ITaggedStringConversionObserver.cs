@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Text;
+﻿namespace Cyborg.Core.Text;
 
 /// <summary>
 /// Observes implicit <see cref="TaggedString"/> to <see cref="string"/> conversions during environment retrieval.

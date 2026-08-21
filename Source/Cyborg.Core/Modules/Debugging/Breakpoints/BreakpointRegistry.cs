@@ -93,5 +93,4 @@ public sealed class BreakpointRegistry : IBreakpointRegistry
         }
         return BreakpointEvaluationResult.NoMatch;
     }
-
 }

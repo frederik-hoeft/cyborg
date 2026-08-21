@@ -1,6 +1,4 @@
-using Cyborg.Core.Text;
-using Cyborg.Core.Text.Rendering;
-using ConsoleAppFramework;
+﻿using ConsoleAppFramework;
 using Cyborg.Cli.Arguments;
 using Cyborg.Cli.Configuration;
 using Cyborg.Cli.Debugging;
@@ -14,6 +12,8 @@ using Cyborg.Core.Modules.Extensions;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Services.Metrics;
+using Cyborg.Core.Text;
+using Cyborg.Core.Text.Rendering;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics.CodeAnalysis;

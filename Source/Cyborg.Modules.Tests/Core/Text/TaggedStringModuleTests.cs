@@ -30,14 +30,14 @@ public sealed class TaggedStringModuleTests : ModuleTestBase
         MSAssert.AreEqual("visible", result.Module.Plain.Value);
         MSAssert.IsFalse(result.Module.Plain.HasTags);
         MSAssert.AreEqual("s3cret", result.Module.Secret.Value);
-        MSAssert.IsTrue(result.Module.Secret.HasTag(WellKnownTags.Secret));
+        MSAssert.IsTrue(result.Module.Secret.HasTag(WellKnownTags.SECRET));
     });
 
     [TestMethod]
     public Task TestValidationAsync_InterpolationUnionsSecretIntoTaggedStringPropertyAsync() => TestWithDIAsync(async services =>
     {
         IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
-        runtime.Environment.SetVariable("token", new TaggedString("abc", [WellKnownTags.Secret]));
+        runtime.Environment.SetVariable("token", new TaggedString("abc", [WellKnownTags.SECRET]));
         TaggedStringTestModule module = new(
             Plain: "pre-${token}-post",
             Secret: "static",
@@ -49,7 +49,7 @@ public sealed class TaggedStringModuleTests : ModuleTestBase
 
         MSAssert.IsTrue(result.IsValid);
         MSAssert.AreEqual("pre-abc-post", result.Module.Plain.Value);
-        MSAssert.IsTrue(result.Module.Plain.HasTag(WellKnownTags.Secret));
+        MSAssert.IsTrue(result.Module.Plain.HasTag(WellKnownTags.SECRET));
     });
 
     [TestMethod]
@@ -75,7 +75,7 @@ public sealed class TaggedStringModuleTests : ModuleTestBase
                 MSAssert.AreEqual("plain", arguments[0].Value);
                 MSAssert.IsFalse(arguments[0].HasTags);
                 MSAssert.AreEqual("s3cret", arguments[1].Value);
-                MSAssert.IsTrue(arguments[1].HasTag(WellKnownTags.Secret));
+                MSAssert.IsTrue(arguments[1].HasTag(WellKnownTags.SECRET));
             });
 
     [TestMethod]
@@ -108,7 +108,7 @@ public sealed class TaggedStringModuleTests : ModuleTestBase
 
                 MSAssert.IsTrue(environment.TryResolveVariable("secret", out TaggedString secret));
                 MSAssert.AreEqual("s3cret", secret.Value);
-                MSAssert.IsTrue(secret.HasTag(WellKnownTags.Secret));
+                MSAssert.IsTrue(secret.HasTag(WellKnownTags.SECRET));
 
                 MSAssert.IsTrue(environment.TryResolveVariable("tagged", out TaggedString tagged));
                 MSAssert.AreEqual("payload", tagged.Value);
@@ -147,7 +147,7 @@ public sealed class TaggedStringModuleTests : ModuleTestBase
         MSAssert.IsTrue(result.IsValid);
         MSAssert.IsTrue(result.Module.OptionalSecret.HasValue);
         MSAssert.AreEqual("deferred-${not-resolved}", result.Module.OptionalSecret.Value.Value);
-        MSAssert.IsTrue(result.Module.OptionalSecret.Value.HasTag(WellKnownTags.Secret));
+        MSAssert.IsTrue(result.Module.OptionalSecret.Value.HasTag(WellKnownTags.SECRET));
     });
 
     [TestMethod]

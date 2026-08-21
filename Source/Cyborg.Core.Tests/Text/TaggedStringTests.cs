@@ -14,13 +14,13 @@ public sealed class TaggedStringTests
 
         Assert.AreEqual("hello", tagged.Value);
         Assert.IsFalse(tagged.HasTags);
-        Assert.IsFalse(tagged.HasTag(WellKnownTags.Secret));
+        Assert.IsFalse(tagged.HasTag(WellKnownTags.SECRET));
     }
 
     [TestMethod]
     public void ExplicitConversion_ToString_ReturnsRawValue()
     {
-        TaggedString tagged = new("secret-value", [WellKnownTags.Secret]);
+        TaggedString tagged = new("secret-value", [WellKnownTags.SECRET]);
 
         string raw = (string)tagged;
 
@@ -30,7 +30,7 @@ public sealed class TaggedStringTests
     [TestMethod]
     public void ToString_SecretTag_IsRedacted()
     {
-        TaggedString tagged = new("secret-value", [WellKnownTags.Secret]);
+        TaggedString tagged = new("secret-value", [WellKnownTags.SECRET]);
 
         Assert.AreEqual(SecretTagHandler.RedactedDisplay, tagged.ToString());
     }
@@ -48,11 +48,11 @@ public sealed class TaggedStringTests
     {
         TaggedString tagged = new("value", ["alpha"]);
 
-        TaggedString withSecret = tagged.WithTag(WellKnownTags.Secret).WithTag("alpha");
+        TaggedString withSecret = tagged.WithTag(WellKnownTags.SECRET).WithTag("alpha");
 
         Assert.AreEqual("value", withSecret.Value);
         Assert.IsTrue(withSecret.HasTag("alpha"));
-        Assert.IsTrue(withSecret.HasTag(WellKnownTags.Secret));
+        Assert.IsTrue(withSecret.HasTag(WellKnownTags.SECRET));
         Assert.HasCount(2, withSecret.Tags);
     }
 
@@ -60,13 +60,13 @@ public sealed class TaggedStringTests
     public void Concat_UnionsTagsAndJoinsValues()
     {
         TaggedString left = new("hello ", ["greeting"]);
-        TaggedString right = new("world", [WellKnownTags.Secret]);
+        TaggedString right = new("world", [WellKnownTags.SECRET]);
 
         TaggedString combined = TaggedString.Concat(left, right);
 
         Assert.AreEqual("hello world", combined.Value);
         Assert.IsTrue(combined.HasTag("greeting"));
-        Assert.IsTrue(combined.HasTag(WellKnownTags.Secret));
+        Assert.IsTrue(combined.HasTag(WellKnownTags.SECRET));
         Assert.AreEqual(SecretTagHandler.RedactedDisplay, combined.ToString());
     }
 
@@ -85,10 +85,7 @@ public sealed class TaggedStringTests
     }
 
     [TestMethod]
-    public void Constructor_RejectsEmptyTags()
-    {
-        Assert.ThrowsExactly<ArgumentException>(() => new TaggedString("value", new[] { string.Empty }));
-    }
+    public void Constructor_RejectsEmptyTags() => Assert.ThrowsExactly<ArgumentException>(() => new TaggedString("value", new[] { string.Empty }));
 
     [TestMethod]
     public void Empty_DefaultInstance_HasEmptyValueAndNoTags()
@@ -98,14 +95,14 @@ public sealed class TaggedStringTests
         Assert.AreEqual(string.Empty, tagged.Value);
         Assert.IsFalse(tagged.HasTags);
         Assert.IsTrue(tagged.IsEmpty);
-        CollectionAssert.AreEqual(ImmutableHashSet<string>.Empty.ToArray(), tagged.Tags.ToArray());
+        Assert.AreSequenceEqual(ImmutableHashSet<string>.Empty.ToArray(), tagged.Tags.ToArray());
     }
 
     [TestMethod]
     public void Renderer_HandlerAfterSecret_CannotRecoverRawValue()
     {
         DefaultTaggedStringRenderer renderer = new([new SecretTagHandler(), new DecoratingTagHandler()]);
-        TaggedString tagged = new("secret-value", [WellKnownTags.Secret, DecoratingTagHandler.TagName]);
+        TaggedString tagged = new("secret-value", [WellKnownTags.SECRET, DecoratingTagHandler.TAG_NAME]);
 
         string rendered = renderer.Render(tagged);
 
@@ -117,7 +114,7 @@ public sealed class TaggedStringTests
     public void Renderer_HandlerBeforeSecret_IsUltimatelyRedacted()
     {
         DefaultTaggedStringRenderer renderer = new([new SecretTagHandler(), new LeadingDecoratingTagHandler()]);
-        TaggedString tagged = new("secret-value", [WellKnownTags.Secret, LeadingDecoratingTagHandler.TagName]);
+        TaggedString tagged = new("secret-value", [WellKnownTags.SECRET, LeadingDecoratingTagHandler.TAG_NAME]);
 
         string rendered = renderer.Render(tagged);
 
@@ -145,18 +142,18 @@ public sealed class TaggedStringTests
 
     private sealed class LeadingDecoratingTagHandler : ITaggedStringTagHandler
     {
-        public const string TagName = "aaa.test.decorate";
+        public const string TAG_NAME = "aaa.test.decorate";
 
-        public string Tag => TagName;
+        public string Tag => TAG_NAME;
 
         public string Render(string current) => $"decorated({current})";
     }
 
     private sealed class DecoratingTagHandler : ITaggedStringTagHandler
     {
-        public const string TagName = "zzz.test.decorate";
+        public const string TAG_NAME = "zzz.test.decorate";
 
-        public string Tag => TagName;
+        public string Tag => TAG_NAME;
 
         public string Render(string current) => $"decorated({current})";
     }

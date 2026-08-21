@@ -1,4 +1,4 @@
-using Cyborg.Core.Modules.Runtime;
+﻿using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Text;
 using Cyborg.Core.Text.Rendering;
@@ -13,12 +13,12 @@ public sealed class EnvironmentTaggedStringTests : CyborgCoreTestBase
     public Task Test_Interpolate_UnionsTagsFromReferencedVariablesAsync() => TestWithDIAsync(services =>
     {
         IRuntimeEnvironment environment = services.GetRequiredService<IModuleRuntime>().Environment;
-        environment.SetVariable("secret", new TaggedString("s3cret", [WellKnownTags.Secret]));
+        environment.SetVariable("secret", new TaggedString("s3cret", [WellKnownTags.SECRET]));
 
         TaggedString actual = environment.Interpolate("hello ${secret}");
 
         Assert.AreEqual("hello s3cret", actual.Value);
-        Assert.IsTrue(actual.HasTag(WellKnownTags.Secret));
+        Assert.IsTrue(actual.HasTag(WellKnownTags.SECRET));
         Assert.AreEqual(SecretTagHandler.RedactedDisplay, actual.ToString());
     });
 
@@ -40,18 +40,18 @@ public sealed class EnvironmentTaggedStringTests : CyborgCoreTestBase
     public Task Test_TryResolveVariable_TaggedString_PreservesTagsAsync() => TestWithDIAsync(services =>
     {
         IRuntimeEnvironment environment = services.GetRequiredService<IModuleRuntime>().Environment;
-        environment.SetVariable("token", new TaggedString("abc", [WellKnownTags.Secret]));
+        environment.SetVariable("token", new TaggedString("abc", [WellKnownTags.SECRET]));
 
         Assert.IsTrue(environment.TryResolveVariable("token", out TaggedString tagged));
         Assert.AreEqual("abc", tagged.Value);
-        Assert.IsTrue(tagged.HasTag(WellKnownTags.Secret));
+        Assert.IsTrue(tagged.HasTag(WellKnownTags.SECRET));
     });
 
     [TestMethod]
     public Task Test_TryResolveVariable_String_StillReturnsRawValueAsync() => TestWithDIAsync(services =>
     {
         IRuntimeEnvironment environment = services.GetRequiredService<IModuleRuntime>().Environment;
-        environment.SetVariable("token", new TaggedString("abc", [WellKnownTags.Secret]));
+        environment.SetVariable("token", new TaggedString("abc", [WellKnownTags.SECRET]));
 
         Assert.IsTrue(environment.TryResolveVariable("token", out string? raw));
         Assert.AreEqual("abc", raw);
@@ -72,24 +72,24 @@ public sealed class EnvironmentTaggedStringTests : CyborgCoreTestBase
     public Task Test_TryResolveVariable_InterpolationIntoStoredString_PromotesTagsAsync() => TestWithDIAsync(services =>
     {
         IRuntimeEnvironment environment = services.GetRequiredService<IModuleRuntime>().Environment;
-        environment.SetVariable("secret", new TaggedString("s3cret", [WellKnownTags.Secret]));
+        environment.SetVariable("secret", new TaggedString("s3cret", [WellKnownTags.SECRET]));
         environment.SetVariable("greeting", "hello ${secret}");
 
         Assert.IsTrue(environment.TryResolveVariable("greeting", out TaggedString tagged));
         Assert.AreEqual("hello s3cret", tagged.Value);
-        Assert.IsTrue(tagged.HasTag(WellKnownTags.Secret));
+        Assert.IsTrue(tagged.HasTag(WellKnownTags.SECRET));
     });
 
     [TestMethod]
     public Task Test_Indirection_UnionsWrapperAndTargetTagsAsync() => TestWithDIAsync(services =>
     {
         IRuntimeEnvironment environment = services.GetRequiredService<IModuleRuntime>().Environment;
-        environment.SetVariable("secret", new TaggedString("s3cret", [WellKnownTags.Secret]));
+        environment.SetVariable("secret", new TaggedString("s3cret", [WellKnownTags.SECRET]));
         environment.SetVariable("alias", new TaggedString("${secret}", ["wrapper"]));
 
         Assert.IsTrue(environment.TryResolveVariable("alias", out TaggedString tagged));
         Assert.AreEqual("s3cret", tagged.Value);
-        Assert.IsTrue(tagged.HasTag(WellKnownTags.Secret));
+        Assert.IsTrue(tagged.HasTag(WellKnownTags.SECRET));
         Assert.IsTrue(tagged.HasTag("wrapper"));
     });
 

@@ -1,4 +1,4 @@
-using Cyborg.Core.Text;
+﻿using Cyborg.Core.Text;
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Serialization;

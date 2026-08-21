@@ -1,4 +1,4 @@
-using Cyborg.Core.Metrics;
+﻿using Cyborg.Core.Metrics;
 using Cyborg.Core.Metrics.Factory;
 using Cyborg.Core.Text.Rendering;
 

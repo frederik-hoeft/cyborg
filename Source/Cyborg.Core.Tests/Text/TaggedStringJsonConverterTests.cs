@@ -1,4 +1,4 @@
-using Cyborg.Core.Configuration.Serialization;
+﻿using Cyborg.Core.Configuration.Serialization;
 using Cyborg.Core.Text;
 using System.Text.Json;
 
@@ -30,7 +30,7 @@ public sealed class TaggedStringJsonConverterTests
         TaggedString tagged = JsonSerializer.Deserialize<TaggedString>(JSON, s_options);
 
         Assert.AreEqual("payload", tagged.Value);
-        Assert.IsTrue(tagged.HasTag(WellKnownTags.Secret));
+        Assert.IsTrue(tagged.HasTag(WellKnownTags.SECRET));
         Assert.IsTrue(tagged.HasTag("custom"));
     }
 
@@ -45,13 +45,13 @@ public sealed class TaggedStringJsonConverterTests
     [TestMethod]
     public void Write_Tagged_IsStructuralObject()
     {
-        TaggedString tagged = new("payload", [WellKnownTags.Secret]);
+        TaggedString tagged = new("payload", [WellKnownTags.SECRET]);
 
         string json = JsonSerializer.Serialize(tagged, s_options);
         using JsonDocument document = JsonDocument.Parse(json);
 
         Assert.AreEqual("payload", document.RootElement.GetProperty("value").GetString());
-        Assert.AreEqual(WellKnownTags.Secret, document.RootElement.GetProperty("tags")[0].GetString());
+        Assert.AreEqual(WellKnownTags.SECRET, document.RootElement.GetProperty("tags")[0].GetString());
     }
 
     [TestMethod]

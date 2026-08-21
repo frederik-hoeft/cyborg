@@ -1,4 +1,4 @@
-using Cyborg.Core.Modules.Descriptors.Model;
+﻿using Cyborg.Core.Modules.Descriptors.Model;
 using Cyborg.Core.Text;
 using Cyborg.Core.Text.Rendering;
 using System.Collections.Immutable;

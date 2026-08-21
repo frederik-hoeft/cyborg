@@ -1,4 +1,4 @@
-using Cyborg.Core.Aot.Contracts;
+﻿using Cyborg.Core.Aot.Contracts;
 using Cyborg.Core.Configuration.Serialization;
 using Cyborg.Core.Text.Rendering;
 using System.Collections.Immutable;
@@ -8,7 +8,7 @@ namespace Cyborg.Core.Text;
 
 /// <summary>
 /// A string value together with arbitrary metadata tags. Tags union across interpolation and
-/// indirection so taint such as <see cref="WellKnownTags.Secret"/> cannot be stripped by composition.
+/// indirection so taint such as <see cref="WellKnownTags.SECRET"/> cannot be stripped by composition.
 /// </summary>
 /// <remarks>
 /// Use <see cref="Value"/> to read the raw string at an execution boundary. Cyborg-controlled

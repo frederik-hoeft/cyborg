@@ -1,4 +1,4 @@
-using Cyborg.Core.Text.Rendering;
+﻿using Cyborg.Core.Text.Rendering;
 using Jab;
 
 namespace Cyborg.Core.Text;

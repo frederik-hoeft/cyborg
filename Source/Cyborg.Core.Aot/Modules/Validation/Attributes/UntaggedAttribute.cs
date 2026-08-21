@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Aot.Modules.Validation.Attributes;
+﻿namespace Cyborg.Core.Aot.Modules.Validation.Attributes;
 
 /// <summary>
 /// Marks a string property as intentionally untagged. Suppresses the diagnostic that suggests

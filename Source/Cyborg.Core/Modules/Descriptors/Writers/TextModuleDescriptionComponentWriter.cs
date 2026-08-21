@@ -13,7 +13,7 @@ internal sealed class TextModuleDescriptionComponentWriter(IndentedStringBuilder
     public ValueTask WriteAtomAsync<T>(T value, ImmutableArray<string> hints, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        WriteAtom(builder, taggedStringRenderer, value, hints);
+        WriteAtom(builder, taggedStringRenderer, value);
         return ValueTask.CompletedTask;
     }
 
@@ -84,7 +84,7 @@ internal sealed class TextModuleDescriptionComponentWriter(IndentedStringBuilder
         }
     }
 
-    private static IndentedStringBuilder WriteAtom<T>(IndentedStringBuilder builder, ITaggedStringRenderer taggedStringRenderer, T value, ImmutableArray<string> hints) => value switch
+    private static IndentedStringBuilder WriteAtom<T>(IndentedStringBuilder builder, ITaggedStringRenderer taggedStringRenderer, T value) => value switch
     {
         null => builder.AppendLine("null"),
         TaggedString tagged => AppendQuotedString(builder, taggedStringRenderer.Render(tagged), '"'),

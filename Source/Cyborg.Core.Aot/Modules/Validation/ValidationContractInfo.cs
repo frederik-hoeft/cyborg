@@ -1,4 +1,4 @@
-using Cyborg.Core.Aot.Contracts;
+﻿using Cyborg.Core.Aot.Contracts;
 using Cyborg.Core.Aot.Extensions;
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
@@ -51,10 +51,10 @@ internal sealed class ValidationContractInfo(Dictionary<ModuleValidationGenerato
 
     public INamedTypeSymbol WellKnownTags => ContractTypes[ModuleValidationGeneratorContract.WellKnownTags];
 
-    public string SecretTagExpression => $"{WellKnownTags.RenderGlobal()}.{GetRequiredConstantField(WellKnownTags, "Secret").Name}";
+    public string SecretTagExpression => $"{WellKnownTags.RenderGlobal()}.{GetRequiredConstantField(WellKnownTags, "SECRET").Name}";
 
-    public string SecretTag => (string)(GetRequiredConstantField(WellKnownTags, "Secret").ConstantValue
-        ?? throw new InvalidOperationException("The registered WellKnownTags.Secret member is not a compile-time constant."));
+    public string SecretTag => (string)(GetRequiredConstantField(WellKnownTags, "SECRET").ConstantValue
+        ?? throw new InvalidOperationException("The registered WellKnownTags.SECRET member is not a compile-time constant."));
 
     public static ValidationContractInfo? Create(ContractExplorer contractExplorer, SourceProductionContext context)
     {

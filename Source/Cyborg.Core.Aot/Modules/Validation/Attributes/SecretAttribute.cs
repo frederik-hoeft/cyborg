@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Aot.Modules.Validation.Attributes;
+﻿namespace Cyborg.Core.Aot.Modules.Validation.Attributes;
 
 /// <summary>
 /// Injects and asserts the <c>cyborg.secret.v1</c> tag on a <c>TaggedString</c> property.

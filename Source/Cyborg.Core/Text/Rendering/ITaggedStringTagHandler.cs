@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Text.Rendering;
+﻿namespace Cyborg.Core.Text.Rendering;
 
 /// <summary>
 /// Applies display policy for one well-known or application-defined tag.

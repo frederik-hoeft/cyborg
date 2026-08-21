@@ -1,4 +1,4 @@
-using Cyborg.Core.Aot.Contracts;
+﻿using Cyborg.Core.Aot.Contracts;
 
 namespace Cyborg.Core.Text;
 
@@ -11,5 +11,5 @@ public static class WellKnownTags
     /// <summary>
     /// Marks a string as a secret. Renderers redact values carrying this tag.
     /// </summary>
-    public const string Secret = "cyborg.secret.v1";
+    public const string SECRET = "cyborg.secret.v1";
 }

@@ -4,7 +4,7 @@ public sealed class SecretTagHandler : ITaggedStringTagHandler
 {
     public static string RedactedDisplay => "[REDACTED]";
 
-    public string Tag => WellKnownTags.Secret;
+    public string Tag => WellKnownTags.SECRET;
 
     public string Render(string current)
     {

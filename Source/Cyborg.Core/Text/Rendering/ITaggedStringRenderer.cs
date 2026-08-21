@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Text.Rendering;
+﻿namespace Cyborg.Core.Text.Rendering;
 
 /// <summary>
 /// Renders a <see cref="TaggedString"/> for logs, debugger inspection, and other display surfaces.

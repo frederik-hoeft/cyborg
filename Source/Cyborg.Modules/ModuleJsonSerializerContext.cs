@@ -1,4 +1,5 @@
-﻿using Cyborg.Modules.Assert;
+﻿using Cyborg.Core.Text;
+using Cyborg.Modules.Assert;
 using Cyborg.Modules.Conditions.And;
 using Cyborg.Modules.Conditions.DirectoryExists;
 using Cyborg.Modules.Conditions.FileExists;
@@ -25,7 +26,6 @@ using Cyborg.Modules.Subprocess;
 using Cyborg.Modules.Switch;
 using Cyborg.Modules.Template;
 using Cyborg.Modules.While;
-using Cyborg.Core.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
