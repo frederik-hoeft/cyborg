@@ -25,6 +25,8 @@ Overloads that only choose a default environment or translate `EnvironmentScope`
 
 This distinction becomes more important once every invocation owns a DI scope and transaction node: the public facade can remain stable while its backing execution/session state changes substantially.
 
+Internal runtime collaborators should depend on narrow internal capability interfaces rather than concrete runtime implementations when they need behavior beyond `IModuleRuntime`. Concrete runtime types should only be coupled directly where they form an intentionally inseparable implementation pair, such as a private or internal scope-bound runtime created by the runtime facade itself.
+
 ## Environment Scope and Catalog
 
 The runtime hierarchy currently needs two related but distinct environment concepts:

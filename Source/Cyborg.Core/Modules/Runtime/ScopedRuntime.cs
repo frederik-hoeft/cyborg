@@ -8,18 +8,11 @@ internal sealed class ScopedRuntime(
     IModuleRuntime parent,
     RuntimeEnvironmentContext environmentContext,
     ILoggerFactory loggerFactory,
-    IServiceProvider? serviceProvider)
+    IServiceProvider serviceProvider)
     : ModuleRuntimeBase(environmentContext, loggerFactory, serviceProvider)
 {
-    [NotNull]
-    protected override IModuleRuntime? Parent => parent;
+    private protected override IModuleRuntime Root => root;
 
-    protected override Task<IModuleExecutionResult> ExecuteWorkerAsync(
-        IModuleWorker module,
-        IRuntimeEnvironment environment,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(module);
-        return ExecuteModuleAsync(root, module, environment, cancellationToken);
-    }
+    [NotNull]
+    private protected override IModuleRuntime? Parent => parent;
 }

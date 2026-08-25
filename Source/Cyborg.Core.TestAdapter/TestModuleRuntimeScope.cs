@@ -26,7 +26,7 @@ public sealed class TestModuleRuntimeScope : IAsyncDisposable
     /// <summary>
     /// Gets the root module runtime for this test scope.
     /// </summary>
-    public RootModuleRuntime Runtime { get; }
+    public IModuleRuntime Runtime { get; }
 
     /// <summary>
     /// Gets the global runtime environment where top-level variables are stored.
@@ -38,7 +38,7 @@ public sealed class TestModuleRuntimeScope : IAsyncDisposable
     /// </summary>
     public IServiceProvider ServiceProvider => _serviceProvider;
 
-    private TestModuleRuntimeScope(ServiceProvider serviceProvider, RootModuleRuntime runtime, GlobalRuntimeEnvironment globalEnvironment)
+    private TestModuleRuntimeScope(ServiceProvider serviceProvider, IModuleRuntime runtime, GlobalRuntimeEnvironment globalEnvironment)
     {
         _serviceProvider = serviceProvider;
         Runtime = runtime;
@@ -129,7 +129,12 @@ public sealed class TestModuleRuntimeScope : IAsyncDisposable
     public Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker worker, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(worker);
-        return Runtime.ExecuteActivatedWorkerAsync(worker, cancellationToken: cancellationToken);
+        if (Runtime is not IModuleExecutionRuntime executionRuntime)
+        {
+            throw new InvalidOperationException("Runtime does not expose Cyborg's internal module-execution capabilities.");
+        }
+        IRuntimeEnvironment environment = Runtime.PrepareEnvironment(new ModuleEnvironment { Scope = EnvironmentScope.Global });
+        return executionRuntime.ExecuteActivatedWorkerAsync(worker, environment, cancellationToken);
     }
 
     /// <summary>

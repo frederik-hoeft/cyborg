@@ -81,15 +81,22 @@ public abstract class CyborgTestBase
         return new DefaultWorkerContext<TModule>(module, serviceProvider);
     }
 
-    protected Task<IModuleExecutionResult> ExecuteWorkerAsync(IModuleWorker worker, IModuleRuntime runtime)
+    protected Task<IModuleExecutionResult> ExecuteWorkerAsync(IModuleWorker worker, IModuleRuntime runtime) =>
+        ExecuteWorkerAsync(worker, runtime, TestContext.CancellationToken);
+
+    protected Task<IModuleExecutionResult> ExecuteWorkerAsync(
+        IModuleWorker worker,
+        IModuleRuntime runtime,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(worker);
         ArgumentNullException.ThrowIfNull(runtime);
-        if (runtime is not ModuleRuntimeBase moduleRuntime)
+        if (runtime is not IModuleExecutionRuntime executionRuntime)
         {
-            throw new ArgumentException($"Runtime must derive from {nameof(ModuleRuntimeBase)} to execute an already-activated worker.", nameof(runtime));
+            throw new ArgumentException("Runtime does not expose Cyborg's internal module-execution capabilities.", nameof(runtime));
         }
-        return moduleRuntime.ExecuteActivatedWorkerAsync(worker, cancellationToken: TestContext.CancellationToken);
+        IRuntimeEnvironment environment = runtime.PrepareEnvironment(new ModuleEnvironment { Scope = EnvironmentScope.Global });
+        return executionRuntime.ExecuteActivatedWorkerAsync(worker, environment, cancellationToken);
     }
 
     #region DI-based Testing
