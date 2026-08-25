@@ -161,24 +161,6 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         return valuePath;
     }
 
-    public virtual string NamespaceOf<TModule>(TModule module) where TModule : IModuleDefinition
-    {
-        ArgumentNullException.ThrowIfNull(module);
-        return GetEffectiveNamespace(module.Name, module.Group, TModule.ModuleId);
-    }
-
-    public virtual string NamespaceOf(ModuleReference moduleReference)
-    {
-        ArgumentNullException.ThrowIfNull(moduleReference);
-        return GetEffectiveNamespace(moduleReference.Definition.Name, moduleReference.Definition.Group, moduleReference.ModuleId);
-    }
-
-    public virtual string NamespaceOf(IModuleWorker module)
-    {
-        ArgumentNullException.ThrowIfNull(module);
-        return GetEffectiveNamespace(module.Module.Name, module.Module.Group, module.ModuleId);
-    }
-
     private IEnumerable<string> EnumerateOverrideIdentifiers(string? name, string? group, string moduleId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(moduleId);
@@ -198,32 +180,10 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         }
     }
 
-    private static string GetEffectiveNamespace(string? name, string? group, string moduleId) => (name, group) switch
-    {
-        ({ Length: > 0 }, _) => name,
-        (_, { Length: > 0 }) => group,
-        _ => moduleId
-    };
-
     void IRuntimeEnvironment.Publish<TModule, T>(TModule module, string root, T decomposable)
     {
         ArgumentNullException.ThrowIfNull(module);
         Publish(root, decomposable, module.Artifacts.DecompositionStrategy, module.Artifacts.PublishNullValues);
-    }
-
-    public void Publish(IEnvironmentLike other)
-    {
-        ArgumentNullException.ThrowIfNull(other);
-        foreach ((string key, object? value) in other)
-        {
-            SetVariable(key, value);
-        }
-    }
-
-    public IRuntimeEnvironment Bind(IModuleWorker module)
-    {
-        ArgumentNullException.ThrowIfNull(module);
-        return Bind(NamespaceOf(module));
     }
 
     public IRuntimeEnvironment Bind(string ns)

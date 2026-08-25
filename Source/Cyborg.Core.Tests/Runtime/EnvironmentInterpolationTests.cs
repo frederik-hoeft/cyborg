@@ -196,6 +196,22 @@ public sealed class EnvironmentInterpolationTests : CyborgCoreTestBase
     });
 
     [TestMethod]
+    public Task Test_Bind_SharesEnvironmentVariableStoreAsync() => TestWithDIAsync(services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        IRuntimeEnvironment environment = runtime.Environment;
+        environment.SetVariable("value", "before");
+        IRuntimeEnvironment bound = environment.Bind("child");
+
+        bound.SetVariable("value", "after");
+
+        Assert.IsTrue(environment.TryResolveVariable("value", out string? parentValue));
+        Assert.IsTrue(bound.TryResolveVariable("value", out string? childValue));
+        Assert.AreEqual("after", parentValue);
+        Assert.AreEqual("after", childValue);
+    });
+
+    [TestMethod]
     public void Test_PublicEnvironmentSurface_DoesNotExposeGeneratedPreparationOperations()
     {
         string[] methodNames = [.. typeof(IRuntimeEnvironment).GetMethods().Select(static method => method.Name)];

@@ -13,21 +13,9 @@ public interface IModuleRuntime
 
     IRuntimeEnvironment Environment { get; }
 
-    bool TryGetEnvironment(string name, [NotNullWhen(true)] out IRuntimeEnvironment? environment);
-
-    bool TryAddEnvironment(IRuntimeEnvironment environment);
-
-    bool TryRemoveEnvironment(IRuntimeEnvironment environment);
-
-    Task<IModuleExecutionResult> ExecuteAsync(ModuleContext moduleContext, CancellationToken cancellationToken = default);
-
-    Task<IModuleExecutionResult> ExecuteAsync(ModuleReference moduleReference, EnvironmentScope scope = EnvironmentScope.Global, string? name = null, CancellationToken cancellationToken = default);
-
-    Task<IModuleExecutionResult> ExecuteAsync(ModuleReference moduleReference, IRuntimeEnvironment environment, CancellationToken cancellationToken = default);
-
     Task<IModuleExecutionResult> ExecuteAsync(ModuleContext moduleContext, IRuntimeEnvironment environment, CancellationToken cancellationToken = default);
 
-    IRuntimeEnvironment PrepareEnvironment(ModuleContext moduleContext, IReadOnlyCollection<string>? overrideResolutionTags = null);
+    Task<IModuleExecutionResult> ExecuteAsync(ModuleReference moduleReference, IRuntimeEnvironment environment, CancellationToken cancellationToken = default);
 
     IRuntimeEnvironment PrepareEnvironment(ModuleEnvironment moduleEnvironment, IReadOnlyCollection<string>? overrideResolutionTags = null);
 

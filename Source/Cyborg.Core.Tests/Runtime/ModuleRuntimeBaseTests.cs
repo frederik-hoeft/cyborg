@@ -59,6 +59,39 @@ public sealed class ModuleRuntimeBaseTests
         Assert.AreNotSame(workerFactory.Workers[0], workerFactory.Workers[1]);
     }
 
+    [TestMethod]
+    public void PrepareEnvironment_NamedEnvironment_IsResolvedThroughRuntimeCatalog()
+    {
+        GlobalRuntimeEnvironment globalEnvironment = new(JsonNamingPolicy.SnakeCaseLower);
+        using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
+        RootModuleRuntime runtime = new(globalEnvironment, loggerFactory);
+        ModuleEnvironment namedEnvironment = new()
+        {
+            Scope = EnvironmentScope.Isolated,
+            Name = "named"
+        };
+        ModuleEnvironment reference = new()
+        {
+            Scope = EnvironmentScope.Reference,
+            Name = "named"
+        };
+
+        IRuntimeEnvironment created = runtime.PrepareEnvironment(namedEnvironment);
+        IRuntimeEnvironment resolved = runtime.PrepareEnvironment(reference);
+
+        Assert.AreSame(created, resolved);
+    }
+
+    [TestMethod]
+    public void PublicRuntimeSurface_DoesNotExposeEnvironmentCatalogMutation()
+    {
+        string[] methodNames = [.. typeof(IModuleRuntime).GetMethods().Select(static method => method.Name)];
+
+        Assert.DoesNotContain("TryAddEnvironment", methodNames);
+        Assert.DoesNotContain("TryGetEnvironment", methodNames);
+        Assert.DoesNotContain("TryRemoveEnvironment", methodNames);
+    }
+
     private sealed class ProbeModuleWorker : IModuleWorker
     {
         public string ModuleId => ProbeModule.ModuleId;

@@ -12,7 +12,7 @@ namespace Cyborg.Core.Modules.Runtime.Environments;
 
 public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, string Namespace) : IEnvironmentLike
 {
-    protected Dictionary<string, object?> Variables { get; } = [];
+    private protected IEnvironmentVariableStore VariableStore { get; init; } = new MutableEnvironmentVariableStore();
 
     public ITaggedStringConversionObserver? TaggedStringConversionObserver { get; init; }
 
@@ -118,7 +118,7 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
             value = Namespace;
             return true;
         }
-        if (Variables.TryGetValue(context.Name, out object? objValue))
+        if (VariableStore.TryGetValue(context.Name, out object? objValue))
         {
             if (objValue is TaggedString tagged)
             {
@@ -152,7 +152,7 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
     protected virtual bool TryGetStoredVariableInCurrentScopeCore(string name, [NotNullWhen(true)] out object? value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        if (Variables.TryGetValue(name, out value) && value is not null)
+        if (VariableStore.TryGetValue(name, out value) && value is not null)
         {
             return true;
         }
@@ -211,9 +211,9 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         return true;
     }
 
-    public virtual void SetVariable<T>(string name, T value) => Variables[name] = value;
+    public virtual void SetVariable<T>(string name, T value) => VariableStore.SetValue(name, value);
 
-    public virtual bool TryRemoveVariable(string name) => Variables.Remove(name);
+    public virtual bool TryRemoveVariable(string name) => VariableStore.TryRemove(name);
 
     public virtual TaggedString Interpolate(string template)
     {
@@ -257,7 +257,7 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         }
     }
 
-    public IEnumerator<KeyValuePair<string, object?>> GetEnumerator() => Variables.GetEnumerator();
+    public IEnumerator<KeyValuePair<string, object?>> GetEnumerator() => VariableStore.GetEnumerator();
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 

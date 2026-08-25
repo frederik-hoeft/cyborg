@@ -17,6 +17,7 @@ The design covers Cyborg-managed workflow state and state from services that exp
 | Document | Focus |
 |---|---|
 | [Execution and lifetimes](execution-and-lifetimes.md) | Module activation, execution sessions, DI scopes, invocation lifecycle, structured concurrency, and project responsibilities. |
+| [Runtime responsibility boundaries](runtime-responsibilities.md) | Pre-transaction runtime facade cleanup, internal execution/environment responsibilities, and boundaries that remain stable through the migration. |
 | [State and reconciliation](state-and-reconciliation.md) | Transaction tree, baseline/change semantics, persistent state, fork groups, conflict detection, and atomic joins. |
 | [Transactional services](transactional-services.md) | Opt-in state participation for runtime and custom DI services, scoped access, root seeding, and lifetime boundaries. |
 | [Environment and runtime state](environment-and-runtime-state.md) | Transactional environment graph, logical global state, named environments, artifacts, and named-module state. |
@@ -110,6 +111,6 @@ These constraints are architectural rather than implementation-style preferences
 
 ## Relationship to the Current Runtime
 
-The current architecture remains described by [System Architecture](../../architecture/architecture-overview.md), [Source Generators](../../architecture/source-generators.md), and [Module Testing Architecture](../../architecture/module-testing.md). The migration changes several current ownership boundaries: workers are activated during loading, the root runtime/global environment/named-module registry are process-level singletons, and runtime environments own mutable dictionaries directly.
+The current architecture remains described by [System Architecture](../../architecture/architecture-overview.md), [Source Generators](../../architecture/source-generators.md), and [Module Testing Architecture](../../architecture/module-testing.md). The migration changes several current ownership boundaries. Loaded module references are already worker-free and workers are activated immediately before execution, but the root runtime/global environment/named-module registry remain process-level workflow-state owners and runtime environment state is still backed by mutable storage.
 
-Those are migration constraints rather than target concepts. The target architecture keeps immutable configuration and AOT-generated dispatch, but moves invocation state, workflow-semantic state, and transactional ownership behind per-execution boundaries.
+Those remaining boundaries are migration constraints rather than target concepts. The target architecture keeps immutable configuration and AOT-generated dispatch, but moves invocation state, workflow-semantic state, and transactional ownership behind per-execution boundaries.

@@ -1,44 +1,25 @@
 ﻿using Cyborg.Core.Modules.Runtime.Environments;
-using Cyborg.Core.Modules.Runtime.Environments.Syntax;
 using Microsoft.Extensions.Logging;
 
 namespace Cyborg.Core.Modules.Runtime;
 
-internal sealed class ScopedRuntime(IModuleRuntime root, IModuleRuntime parent, IRuntimeEnvironment environment, VariableSyntaxBuilder syntaxFactory, ILoggerFactory loggerFactory,
-    IServiceProvider? serviceProvider) : ModuleRuntimeBase(syntaxFactory, loggerFactory, serviceProvider)
+internal sealed class ScopedRuntime(
+    IModuleRuntime root,
+    IModuleRuntime parent,
+    RuntimeEnvironmentContext environmentContext,
+    ILoggerFactory loggerFactory,
+    IServiceProvider? serviceProvider)
+    : ModuleRuntimeBase(environmentContext, loggerFactory, serviceProvider)
 {
-    public override IRuntimeEnvironment GlobalEnvironment => root.GlobalEnvironment;
-
-    public override IRuntimeEnvironment ParentEnvironment => parent.Environment;
-
-    public override IRuntimeEnvironment Environment => environment;
-
     [NotNull]
     protected override IModuleRuntime? Parent => parent;
 
-    protected override Task<IModuleExecutionResult> ExecuteWorkerAsync(IModuleWorker module, EnvironmentScope scope, string? name, CancellationToken cancellationToken)
-    {
-        IRuntimeEnvironment scopedEnvironment = CreateScopedEnvironment(parent: this, scope, name);
-        return ExecuteWorkerAsync(module, scopedEnvironment, cancellationToken);
-    }
-
-    protected override Task<IModuleExecutionResult> ExecuteWorkerAsync(IModuleWorker module, IRuntimeEnvironment moduleEnvironment, CancellationToken cancellationToken)
+    protected override Task<IModuleExecutionResult> ExecuteWorkerAsync(
+        IModuleWorker module,
+        IRuntimeEnvironment environment,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(module);
-        return ExecuteModuleAsync(root, module, moduleEnvironment, cancellationToken);
+        return ExecuteModuleAsync(root, module, environment, cancellationToken);
     }
-
-    public override bool TryAddEnvironment(IRuntimeEnvironment runtimeEnvironment) => root.TryAddEnvironment(runtimeEnvironment);
-
-    public override bool TryGetEnvironment(string name, [NotNullWhen(true)] out IRuntimeEnvironment? runtimeEnvironment)
-    {
-        if (Environment.Name.Equals(name, StringComparison.Ordinal))
-        {
-            runtimeEnvironment = Environment;
-            return true;
-        }
-        return parent.TryGetEnvironment(name, out runtimeEnvironment);
-    }
-
-    public override bool TryRemoveEnvironment(IRuntimeEnvironment runtimeEnvironment) => root.TryRemoveEnvironment(runtimeEnvironment);
 }

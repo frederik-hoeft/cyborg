@@ -45,16 +45,6 @@ public interface IRuntimeEnvironment : IEnvironmentLike
         where TModule : ModuleBase, IModuleDefinition
         where T : class, IDecomposable;
 
-    string NamespaceOf<TModule>(TModule module) where TModule : IModuleDefinition;
-
-    string NamespaceOf(ModuleReference moduleReference);
-
-    string NamespaceOf(IModuleWorker module);
-
-    void Publish(IEnvironmentLike other);
-
-    internal IRuntimeEnvironment Bind(IModuleWorker module);
-
     internal IRuntimeEnvironment Bind(string ns);
 
     internal IRuntimeEnvironment WithOverrideResolutionTags(IReadOnlyCollection<string> tags);
