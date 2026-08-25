@@ -8,7 +8,7 @@ namespace Cyborg.Core.Modules.Runtime;
 internal sealed class ModuleContextExecutor(VariableSyntaxBuilder syntaxFactory, ILogger logger)
 {
     public async Task<IModuleExecutionResult> ExecuteAsync(
-        ModuleRuntimeBase runtime,
+        IModuleExecutionRuntime runtime,
         ModuleContext moduleContext,
         IRuntimeEnvironment environment,
         CancellationToken cancellationToken)
