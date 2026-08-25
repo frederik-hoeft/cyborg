@@ -5,7 +5,9 @@ namespace Cyborg.Core.Modules.Runtime.Environments;
 
 internal interface ITransactionalRuntimeEnvironment
 {
+    RuntimeEnvironmentId EnvironmentId { get; }
+
     IRuntimeEnvironment BindTransaction(
-        EnvironmentVariableTransactionParticipant participant,
+        RuntimeEnvironmentTransactionParticipant participant,
         ExecutionTransaction transaction);
 }

@@ -5,51 +5,31 @@ using System.Collections;
 namespace Cyborg.Core.Modules.Runtime.Environments;
 
 internal sealed class TransactionalEnvironmentVariableStore(
-    RuntimeEnvironmentId id,
-    EnvironmentVariableTransactionParticipant participant,
+    RuntimeEnvironmentId environmentId,
+    RuntimeEnvironmentTransactionParticipant participant,
     ExecutionTransaction transaction) : IEnvironmentVariableStore
 {
-    public RuntimeEnvironmentId Id => id;
-
     public bool TryGetValue(string name, out object? value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        return GetState().TryGetValue(id, name, out value);
+        return GetState().TryGetValue(environmentId, name, out value);
     }
 
     public void SetValue(string name, object? value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        GetState().SetValue(id, name, value);
+        GetState().SetValue(environmentId, name, value);
     }
 
     public bool TryRemove(string name)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        return GetState().TryRemove(id, name);
+        return GetState().TryRemove(environmentId, name);
     }
 
-    public IEnvironmentVariableStore Bind(
-        EnvironmentVariableTransactionParticipant transactionParticipant,
-        ExecutionTransaction executionTransaction)
-    {
-        ArgumentNullException.ThrowIfNull(transactionParticipant);
-        ArgumentNullException.ThrowIfNull(executionTransaction);
-        if (!ReferenceEquals(participant, transactionParticipant))
-        {
-            throw new InvalidOperationException("An environment variable store cannot be rebound to a different transaction participant descriptor.");
-        }
-        return ReferenceEquals(transaction, executionTransaction)
-            ? this
-            : new TransactionalEnvironmentVariableStore(id, participant, executionTransaction);
-    }
-
-    public EnvironmentVariableStoreSeed CaptureSeed() =>
-        new(id, [.. this]);
-
-    public IEnumerator<KeyValuePair<string, object?>> GetEnumerator() => GetState().Enumerate(id).GetEnumerator();
+    public IEnumerator<KeyValuePair<string, object?>> GetEnumerator() => GetState().EnumerateValues(environmentId).GetEnumerator();
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    private EnvironmentVariableTransactionState GetState() => transaction.GetParticipantState(participant);
+    private RuntimeEnvironmentTransactionState GetState() => transaction.GetParticipantState(participant);
 }

@@ -29,14 +29,26 @@ public sealed class RootModuleRuntime : ModuleRuntimeBase
         ArgumentNullException.ThrowIfNull(defaultEnvironment);
         ArgumentNullException.ThrowIfNull(loggerFactory);
 
-        EnvironmentVariableTransactionParticipant environmentVariables = new();
-        TransactionCoordinator coordinator = new([environmentVariables]);
-        EnvironmentVariableStoreSeed[] environmentSeeds = [defaultEnvironment.CaptureVariableStoreSeed()];
-        TransactionRootSeed seed = new TransactionRootSeed().With(environmentVariables, environmentSeeds);
+        RuntimeEnvironmentTransactionParticipant environments = new();
+        TransactionCoordinator coordinator = new([environments]);
+        RuntimeEnvironmentNode globalNode = new(
+            defaultEnvironment.Name,
+            defaultEnvironment.IsTransient,
+            Parent: null,
+            defaultEnvironment.TaggedStringConversionObserver);
+        RuntimeEnvironmentSeed globalSeed = new(
+            defaultEnvironment.EnvironmentId,
+            globalNode,
+            [.. defaultEnvironment],
+            RegisterName: false);
+        RuntimeEnvironmentTransactionSeed environmentSeed = new(
+            defaultEnvironment.EnvironmentId,
+            [globalSeed]);
+        TransactionRootSeed seed = new TransactionRootSeed().With(environments, environmentSeed);
         ExecutionTransaction transaction = coordinator.CreateRoot(seed);
         RuntimeEnvironmentContext environmentContext = RuntimeEnvironmentContext.CreateRoot(
             defaultEnvironment,
-            environmentVariables,
+            environments,
             transaction,
             loggerFactory);
         return new RootRuntimeState(transaction, environmentContext);

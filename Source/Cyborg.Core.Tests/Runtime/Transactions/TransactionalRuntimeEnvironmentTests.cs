@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Configuration.Model;
+using Cyborg.Core.Configuration.Model;
 using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
@@ -20,21 +20,24 @@ public sealed class TransactionalRuntimeEnvironmentTests
     public TestContext TestContext { get; set; }
 
     [TestMethod]
-    public void EnvironmentVariableParticipant_SiblingsUseStableBindingBaselineAndConflictingWritesFail()
+    public void RuntimeEnvironmentParticipant_SiblingsUseStableBindingBaselineAndConflictingWritesFail()
     {
-        EnvironmentVariableTransactionParticipant participant = new();
+        RuntimeEnvironmentTransactionParticipant participant = new();
         RuntimeEnvironmentId environmentId = RuntimeEnvironmentId.Create();
-        EnvironmentVariableStoreSeed[] seeds =
-        [
-            new(environmentId, [new KeyValuePair<string, object?>("value", 1)])
-        ];
-        TransactionRootSeed seed = new TransactionRootSeed().With(participant, seeds);
+        RuntimeEnvironmentNode node = new("global", IsTransient: false, Parent: null, TaggedStringConversionObserver: null);
+        RuntimeEnvironmentSeed environmentSeed = new(
+            environmentId,
+            node,
+            [new KeyValuePair<string, object?>("value", 1)],
+            RegisterName: false);
+        RuntimeEnvironmentTransactionSeed environmentRootSeed = new(environmentId, [environmentSeed]);
+        TransactionRootSeed seed = new TransactionRootSeed().With(participant, environmentRootSeed);
         ExecutionTransaction root = new TransactionCoordinator([participant]).CreateRoot(seed);
         ExecutionTransactionForkGroup fork = root.Fork();
         ExecutionTransaction first = fork.CreateChild();
         ExecutionTransaction second = fork.CreateChild();
-        EnvironmentVariableTransactionState firstState = first.GetParticipantState(participant);
-        EnvironmentVariableTransactionState secondState = second.GetParticipantState(participant);
+        RuntimeEnvironmentTransactionState firstState = first.GetParticipantState(participant);
+        RuntimeEnvironmentTransactionState secondState = second.GetParticipantState(participant);
 
         Assert.IsTrue(firstState.TryGetValue(environmentId, "value", out object? firstBaseline));
         Assert.AreEqual(1, firstBaseline);
@@ -53,6 +56,118 @@ public sealed class TransactionalRuntimeEnvironmentTests
         Assert.AreEqual(new EnvironmentVariableBinding(environmentId, "value"), conflict.LogicalKey);
         Assert.IsTrue(root.GetParticipantState(participant).TryGetValue(environmentId, "value", out object? rootValue));
         Assert.AreEqual(1, rootValue);
+    }
+
+    [TestMethod]
+    public void RuntimeEnvironmentParticipant_RegistrationCollisionChangesNeitherCatalogNorTopology()
+    {
+        RuntimeEnvironmentTransactionParticipant participant = new();
+        ExecutionTransaction root = CreateEnvironmentRoot(participant, out RuntimeEnvironmentId _);
+        RuntimeEnvironmentTransactionState state = root.GetParticipantState(participant);
+        RuntimeEnvironmentId firstId = RuntimeEnvironmentId.Create();
+        RuntimeEnvironmentId secondId = RuntimeEnvironmentId.Create();
+        RuntimeEnvironmentNode firstNode = new("named", IsTransient: false, Parent: null, TaggedStringConversionObserver: null);
+        RuntimeEnvironmentNode secondNode = new("named", IsTransient: false, Parent: null, TaggedStringConversionObserver: null);
+
+        Assert.IsTrue(state.TryAddNamedEnvironment(firstId, firstNode, values: []));
+        Assert.IsFalse(state.TryAddNamedEnvironment(secondId, secondNode, values: []));
+
+        Assert.IsTrue(state.TryGetRegisteredEnvironment("named", out RuntimeEnvironmentId registeredId));
+        Assert.AreEqual(firstId, registeredId);
+        Assert.IsTrue(state.ContainsEnvironment(firstId));
+        Assert.IsFalse(state.ContainsEnvironment(secondId));
+    }
+
+    [TestMethod]
+    public void RuntimeEnvironmentParticipant_TransientChildEnvironmentIsPrunedOnJoin()
+    {
+        RuntimeEnvironmentTransactionParticipant participant = new();
+        ExecutionTransaction root = CreateEnvironmentRoot(participant, out RuntimeEnvironmentId _);
+        ExecutionTransactionForkGroup fork = root.Fork();
+        ExecutionTransaction child = fork.CreateChild();
+        RuntimeEnvironmentTransactionState childState = child.GetParticipantState(participant);
+        RuntimeEnvironmentId transientId = RuntimeEnvironmentId.Create();
+        RuntimeEnvironmentNode transientNode = new("temporary", IsTransient: true, Parent: null, TaggedStringConversionObserver: null);
+        childState.AddEnvironment(transientId, transientNode, [new KeyValuePair<string, object?>("value", 42)]);
+        childState.SetValue(transientId, "updated", "discarded");
+        fork.Continuation.Complete();
+        child.Complete();
+
+        Assert.IsTrue(fork.TryJoin(out TransactionConflict? conflict));
+        Assert.IsNull(conflict);
+        RuntimeEnvironmentTransactionState rootState = root.GetParticipantState(participant);
+        Assert.IsFalse(rootState.ContainsEnvironment(transientId));
+        Assert.IsFalse(rootState.TryGetValue(transientId, "value", out object? _));
+        Assert.IsFalse(rootState.TryGetValue(transientId, "updated", out object? _));
+    }
+
+    [TestMethod]
+    public void RuntimeEnvironmentParticipant_NamedEnvironmentRetainsTransientAncestorOnJoin()
+    {
+        RuntimeEnvironmentTransactionParticipant participant = new();
+        ExecutionTransaction root = CreateEnvironmentRoot(participant, out RuntimeEnvironmentId _);
+        ExecutionTransactionForkGroup fork = root.Fork();
+        ExecutionTransaction child = fork.CreateChild();
+        RuntimeEnvironmentTransactionState childState = child.GetParticipantState(participant);
+        RuntimeEnvironmentId transientParentId = RuntimeEnvironmentId.Create();
+        RuntimeEnvironmentId namedChildId = RuntimeEnvironmentId.Create();
+        RuntimeEnvironmentNode transientParent = new("temporary-parent", IsTransient: true, Parent: null, TaggedStringConversionObserver: null);
+        RuntimeEnvironmentParent parentReference = new(transientParentId, Namespace: "parent", OverrideResolutionTags: []);
+        RuntimeEnvironmentNode namedChild = new("named-child", IsTransient: false, parentReference, TaggedStringConversionObserver: null);
+        childState.AddEnvironment(
+            transientParentId,
+            transientParent,
+            [new KeyValuePair<string, object?>("inherited", "parent")]);
+        Assert.IsTrue(childState.TryAddNamedEnvironment(
+            namedChildId,
+            namedChild,
+            [new KeyValuePair<string, object?>("local", "child")]));
+        fork.Continuation.Complete();
+        child.Complete();
+
+        Assert.IsTrue(fork.TryJoin(out TransactionConflict? conflict));
+        Assert.IsNull(conflict);
+        RuntimeEnvironmentTransactionState rootState = root.GetParticipantState(participant);
+        Assert.IsTrue(rootState.ContainsEnvironment(transientParentId));
+        Assert.IsTrue(rootState.ContainsEnvironment(namedChildId));
+        Assert.IsTrue(rootState.TryGetRegisteredEnvironment("named-child", out RuntimeEnvironmentId registeredId));
+        Assert.AreEqual(namedChildId, registeredId);
+        Assert.IsTrue(rootState.TryGetValue(transientParentId, "inherited", out object? inherited));
+        Assert.AreEqual("parent", inherited);
+        Assert.IsTrue(rootState.TryGetValue(namedChildId, "local", out object? local));
+        Assert.AreEqual("child", local);
+    }
+
+    [TestMethod]
+    public void RuntimeEnvironmentParticipant_SiblingNamedRegistrationsConflictAtomically()
+    {
+        RuntimeEnvironmentTransactionParticipant participant = new();
+        ExecutionTransaction root = CreateEnvironmentRoot(participant, out RuntimeEnvironmentId _);
+        ExecutionTransactionForkGroup fork = root.Fork();
+        ExecutionTransaction first = fork.CreateChild();
+        ExecutionTransaction second = fork.CreateChild();
+        RuntimeEnvironmentTransactionState firstState = first.GetParticipantState(participant);
+        RuntimeEnvironmentTransactionState secondState = second.GetParticipantState(participant);
+        RuntimeEnvironmentId firstId = RuntimeEnvironmentId.Create();
+        RuntimeEnvironmentId secondId = RuntimeEnvironmentId.Create();
+        RuntimeEnvironmentNode firstNode = new("shared", IsTransient: false, Parent: null, TaggedStringConversionObserver: null);
+        RuntimeEnvironmentNode secondNode = new("shared", IsTransient: false, Parent: null, TaggedStringConversionObserver: null);
+        Assert.IsTrue(firstState.TryAddNamedEnvironment(firstId, firstNode, [new KeyValuePair<string, object?>("value", "first")]));
+        Assert.IsFalse(secondState.TryGetRegisteredEnvironment("shared", out RuntimeEnvironmentId _));
+        RuntimeEnvironmentTransactionState continuationState = fork.Continuation.GetParticipantState(participant);
+        Assert.IsFalse(continuationState.TryGetRegisteredEnvironment("shared", out RuntimeEnvironmentId _));
+        Assert.IsTrue(secondState.TryAddNamedEnvironment(secondId, secondNode, [new KeyValuePair<string, object?>("value", "second")]));
+        fork.Continuation.Complete();
+        first.Complete();
+        second.Complete();
+
+        Assert.IsFalse(fork.TryJoin(out TransactionConflict? conflict));
+        Assert.IsNotNull(conflict);
+        Assert.AreSame(participant, conflict.Participant);
+        RuntimeEnvironmentTransactionState rootState = root.GetParticipantState(participant);
+        Assert.IsFalse(rootState.TryGetRegisteredEnvironment("shared", out RuntimeEnvironmentId _));
+        Assert.IsFalse(rootState.ContainsEnvironment(firstId));
+        Assert.IsFalse(rootState.ContainsEnvironment(secondId));
     }
 
     [TestMethod]
@@ -108,6 +223,31 @@ public sealed class TransactionalRuntimeEnvironmentTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_NestedNamedEnvironmentTopologyReconcilesToCallerAsync()
+    {
+        GlobalRuntimeEnvironment globalEnvironment = new(JsonNamingPolicy.SnakeCaseLower);
+        using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
+        using ServiceProvider serviceProvider = new ServiceCollection()
+            .AddSingleton<IModuleWorkerFactory>(new EnvironmentProbeWorkerFactory())
+            .BuildServiceProvider();
+        RootModuleRuntime runtime = new(globalEnvironment, loggerFactory, serviceProvider);
+        ModuleReference module = new(new EnvironmentProbeModule { Name = "topology-root" }, EnvironmentProbeModule.ModuleId);
+
+        IModuleExecutionResult result = await runtime.ExecuteAsync(module, cancellationToken: TestContext.CancellationToken);
+
+        Assert.AreEqual(ModuleExitStatus.Success, result.Status);
+        IRuntimeEnvironment resolved = runtime.PrepareEnvironment(new ModuleEnvironment
+        {
+            Scope = EnvironmentScope.Reference,
+            Name = "nested-named"
+        });
+        Assert.IsTrue(resolved.TryResolveVariable("local", out string? local));
+        Assert.AreEqual("child", local);
+        Assert.IsTrue(resolved.TryResolveVariable("inherited", out string? inherited));
+        Assert.AreEqual("parent", inherited);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_FailedResultStillReconcilesEnvironmentChangesAsync()
     {
         GlobalRuntimeEnvironment globalEnvironment = new(JsonNamingPolicy.SnakeCaseLower);
@@ -147,6 +287,27 @@ public sealed class TransactionalRuntimeEnvironmentTests
         Assert.AreEqual(ModuleExitStatus.Success, result.Status);
         Assert.IsTrue(runtime.GlobalEnvironment.TryResolveVariable("artifact-value", out int value));
         Assert.AreEqual(42, value);
+    }
+
+    private static ExecutionTransaction CreateEnvironmentRoot(
+        RuntimeEnvironmentTransactionParticipant participant,
+        out RuntimeEnvironmentId globalEnvironmentId)
+    {
+        ArgumentNullException.ThrowIfNull(participant);
+        globalEnvironmentId = RuntimeEnvironmentId.Create();
+        RuntimeEnvironmentNode globalNode = new(
+            "global",
+            IsTransient: false,
+            Parent: null,
+            TaggedStringConversionObserver: null);
+        RuntimeEnvironmentSeed environmentSeed = new(
+            globalEnvironmentId,
+            globalNode,
+            Values: [],
+            RegisterName: false);
+        RuntimeEnvironmentTransactionSeed rootSeed = new(globalEnvironmentId, [environmentSeed]);
+        TransactionRootSeed seed = new TransactionRootSeed().With(participant, rootSeed);
+        return new TransactionCoordinator([participant]).CreateRoot(seed);
     }
 
     private sealed record EnvironmentProbeModule : ModuleBase, IModuleDefinition
@@ -198,6 +359,40 @@ public sealed class TransactionalRuntimeEnvironmentTests
                     Assert.IsTrue(runtime.Environment.TryResolveVariable("value", out string? namedValue));
                     Assert.AreEqual("before", namedValue);
                     runtime.Environment.SetVariable("value", "after");
+                    return new EnvironmentProbeExecutionResult(module, ModuleExitStatus.Success, runtime.Environment.CreateArtifactCollection());
+                case "topology-root":
+                    IRuntimeEnvironment transientParent = runtime.PrepareEnvironment(new ModuleEnvironment
+                    {
+                        Scope = EnvironmentScope.Isolated,
+                        Name = "transient-parent",
+                        Transient = true
+                    });
+                    transientParent.SetVariable("inherited", "parent");
+                    ModuleReference topologyChild = new(
+                        new EnvironmentProbeModule { Name = "topology-child" },
+                        EnvironmentProbeModule.ModuleId);
+                    IModuleExecutionResult topologyResult = await runtime.ExecuteAsync(
+                        topologyChild,
+                        transientParent,
+                        cancellationToken);
+                    Assert.AreEqual(ModuleExitStatus.Success, topologyResult.Status);
+                    IRuntimeEnvironment nestedNamed = runtime.PrepareEnvironment(new ModuleEnvironment
+                    {
+                        Scope = EnvironmentScope.Reference,
+                        Name = "nested-named"
+                    });
+                    Assert.IsTrue(nestedNamed.TryResolveVariable("local", out string? nestedLocal));
+                    Assert.AreEqual("child", nestedLocal);
+                    Assert.IsTrue(nestedNamed.TryResolveVariable("inherited", out string? nestedInherited));
+                    Assert.AreEqual("parent", nestedInherited);
+                    return new EnvironmentProbeExecutionResult(module, ModuleExitStatus.Success, runtime.Environment.CreateArtifactCollection());
+                case "topology-child":
+                    IRuntimeEnvironment namedChild = runtime.PrepareEnvironment(new ModuleEnvironment
+                    {
+                        Scope = EnvironmentScope.InheritParent,
+                        Name = "nested-named"
+                    });
+                    namedChild.SetVariable("local", "child");
                     return new EnvironmentProbeExecutionResult(module, ModuleExitStatus.Success, runtime.Environment.CreateArtifactCollection());
                 case "failed":
                     runtime.GlobalEnvironment.SetVariable("failed-write", "committed");

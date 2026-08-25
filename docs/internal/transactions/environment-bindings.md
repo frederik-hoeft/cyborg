@@ -1,12 +1,12 @@
 # Transactional Environment Bindings
 
-> **Status:** Internal implementation design for the first Stage 4 environment-state slice. Environment catalog/topology migration remains separate.
+> **Status:** Internal implementation design for the binding layer of the Stage 4 transactional environment graph.
 
 ## Responsibility
 
-Environment variable bindings are the first Cyborg-owned workflow state carried by the generic transaction coordinator. The binding layer provides transactional reads, writes, removals, fork isolation, recursive reconciliation, and write-conflict semantics without making `RuntimeEnvironment` objects mutable state owners.
+Environment variable bindings are stored inside the unified runtime-environment transaction participant. The binding layer provides transactional reads, writes, removals, fork isolation, recursive reconciliation, and write-conflict semantics without making `RuntimeEnvironment` objects mutable state owners.
 
-This slice intentionally separates **binding state** from **environment topology**. Existing environment creation and named registration still use the runtime catalog until the topology migration described in [Environment and Runtime State](environment-and-runtime-state.md) is implemented.
+Topology, named registration, and transient lifetime are owned by the same participant and are described in [Transactional Environment Topology](environment-topology.md). Keeping them together allows topology pruning and binding publication to prepare as one coherent environment candidate.
 
 ## Logical Environment Identity
 
@@ -22,12 +22,12 @@ Two branches modifying the same variable name in different logical environments 
 
 The identity is independent of the transaction that currently views the environment. Rebinding an environment into a child transaction retains the identity while changing the participant state through which its variables are resolved.
 
-## Binding Participant
+## Binding State
 
-One transaction participant owns all environment variable bindings for an execution tree. Its state is a transactional dictionary keyed by logical environment identity and variable name.
+The runtime-environment participant contains a transactional dictionary keyed by logical environment identity and variable name.
 
 ```text
-environment-binding participant
+environment participant
   baseline: persistent map<(environment id, name), value>
   changes:  (environment id, name) -> Set(value) | Remove
 ```
@@ -46,7 +46,7 @@ A view retains:
 - resolution/interpolation behavior;
 - namespace and override-tag metadata;
 - inherited-parent relationships;
-- the transaction whose environment-binding participant state is currently authoritative.
+- the transaction whose environment participant state is currently authoritative.
 
 Forking does not copy an environment dictionary. A child runtime rebinds the relevant environment views to the child transaction. All branches then resolve the same logical environment identities through different transaction-local participant states derived from one immutable fork baseline.
 
@@ -75,21 +75,14 @@ Artifact values are ordinary environment writes. Publication must therefore reso
 
 `Parent` artifact scope resolves to the logical parent environment view inside the current transaction. `Current`, `Global`, and named-reference targets likewise resolve through the transaction-bound runtime environment context.
 
-This removes artifact publication as a pre-join visibility escape path for variable bindings. Named-reference **registration/topology** is still pending the next environment-state slice.
+This removes artifact publication as a pre-join visibility escape path for variable bindings. Named-reference resolution uses the transaction-local topology described in [Transactional Environment Topology](environment-topology.md).
 
 ## Root State
 
-A root execution owns a parentless transaction containing the environment-binding participant. Variables supplied before `RootModuleRuntime` construction can seed the root participant baseline. Variables applied to `runtime.GlobalEnvironment` after session creation are ordinary root-local changes.
+A root execution owns a parentless transaction containing the environment participant. Variables supplied before `RootModuleRuntime` construction can seed the root participant baseline. Variables applied to `runtime.GlobalEnvironment` after session creation are ordinary root-local changes.
 
 There is no mutable process-global binding dictionary underneath the transaction tree. The root's effective state is its immutable baseline plus its own durable changes.
 
-## Remaining Environment Migration
+## Environment Graph Integration
 
-The following state is deliberately not solved by this slice:
-
-- named environment registration/removal;
-- environment topology and parent identity;
-- transaction-local environment creation/catalog visibility;
-- transient environment reachability and pruning.
-
-Until those move into the environment transactional component, a child can still affect catalog/topology visibility even though the variables stored in an existing logical environment are transaction-isolated. The next environment-state task should migrate those concerns using the same `RuntimeEnvironmentId` identity rather than adding a second environment identity system.
+Bindings, named registration, topology, and transient reachability reconcile as one participant candidate. See [Transactional Environment Topology](environment-topology.md) for creation, registration conflicts, inheritance edges, and pruning semantics.

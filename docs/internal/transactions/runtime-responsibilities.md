@@ -27,18 +27,13 @@ This distinction becomes more important once every invocation owns a DI scope an
 
 Internal runtime collaborators should depend on narrow internal capability interfaces rather than concrete runtime implementations when they need behavior beyond `IModuleRuntime`. Concrete runtime types should only be coupled directly where they form an intentionally inseparable implementation pair, such as a private or internal scope-bound runtime created by the runtime facade itself.
 
-## Environment Scope and Catalog
+## Environment Context and Graph
 
-The runtime hierarchy currently needs two related but distinct environment concepts:
+The runtime-relative environment context owns current, parent, and logical-global view relationships plus environment creation/reference resolution. Durable workflow state underneath those views belongs to the transaction-owned environment graph rather than to runtime objects.
 
-1. **runtime-relative environment context**: current, parent, and logical-global environment relationships plus environment creation/reference resolution;
-2. **named environment catalog**: registration and lookup of non-transient named environments.
+The environment graph owns logical environment identity, inheritance topology, named registration, transient lifetime, and variable bindings as one transactional component. The runtime context translates module-facing scope operations into graph/view operations; it does not own a separate mutable catalog.
 
-These concerns belong in dedicated runtime environment objects rather than in `RootModuleRuntime`/`ScopedRuntime` implementations. Root and scoped runtimes should differ primarily in execution ancestry, not in duplicated environment bookkeeping.
-
-The runtime environment context is intentionally internal. Modules continue to use `IModuleRuntime` and `IRuntimeEnvironment`; they do not consume a catalog service directly.
-
-This split is transitional in representation but durable in responsibility. The mutable catalog and object-reference hierarchy will later be replaced by the transaction-owned logical environment graph described in [Environment and Runtime State](environment-and-runtime-state.md). The runtime facade should not need another public redesign when that happens.
+The runtime environment context remains intentionally internal. Modules continue to use `IModuleRuntime` and `IRuntimeEnvironment`; they do not consume environment graph or transaction services directly.
 
 ## Module Context Execution
 
@@ -96,7 +91,7 @@ This responsibility split prepares the next implementation stages without predet
 
 - per-invocation DI scope creation can wrap worker activation/dispatch without touching module-context semantics;
 - the runtime environment scope can be replaced by a transaction-bound environment graph view;
-- the named environment catalog becomes component state instead of root-runtime-owned mutable state;
+- named registration, environment topology, and bindings remain transaction-owned component state rather than runtime-owned mutable state;
 - artifact publication can become staged environment changes;
 - `ModuleContext` orchestration can establish the main invocation transaction and reconcile configuration before main activation;
 - `IModuleRuntime` remains a narrow facade even as its backing state becomes execution-session-local.

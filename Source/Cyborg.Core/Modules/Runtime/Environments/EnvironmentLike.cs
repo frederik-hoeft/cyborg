@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Configuration.Model;
+using Cyborg.Core.Configuration.Model;
 using Cyborg.Core.Modules.Runtime.Environments.Artifacts;
 using Cyborg.Core.Modules.Runtime.Environments.Syntax;
 using Cyborg.Core.Text;
@@ -15,8 +15,6 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
     private protected IEnvironmentVariableStore VariableStore { get; init; } = new MutableEnvironmentVariableStore();
 
     public ITaggedStringConversionObserver? TaggedStringConversionObserver { get; init; }
-
-    internal EnvironmentVariableStoreSeed CaptureVariableStoreSeed() => VariableStore.CaptureSeed();
 
     protected JsonNamingPolicy NamingPolicy => SyntaxFactory.NamingPolicy;
 

@@ -16,7 +16,7 @@ The current implementation contains several ownership assumptions that must chan
 |---|---|
 | Deserialization constructs a worker and `ModuleReference` stores it. | Deserialization stores immutable module definition + generated activation identity; execution creates the worker. |
 | Generated loader factory resolves worker dependencies from the load-time provider. | Generated activation resolves all invocation dependencies from the current module scope. |
-| Root runtime and global environment are application-singleton workflow-state owners. | Each resolved root runtime is an independent execution session with its own logical global environment and runtime environment catalog. |
+| Root runtime and global environment are application-singleton workflow-state owners. | Each resolved root runtime is an independent execution session whose logical global environment and environment graph belong to its root transaction. |
 | Named-module registry is a singleton mutable workflow-state owner. | Static loading seeds immutable named-module state; runtime registration becomes transaction-local in Stage 4. |
 | Runtime environment objects own mutable dictionaries and direct parent-object inheritance. | Environment views resolve a persistent transaction-owned environment graph by logical identity. |
 | Nested module calls reuse runtime/provider objects without a mandatory module DI scope. | Every invocation creates and disposes a fresh DI scope tied to one transaction node. |
@@ -156,8 +156,8 @@ Migrate every Cyborg-owned workflow-semantic state path onto the transaction cor
 
 ### Environment subsystem
 
-1. Migrate variable bindings first using the reusable transactional dictionary and stable logical environment identities. Environment views become transaction-bound facades while catalog/topology ownership remains unchanged for this slice. See [Transactional Environment Bindings](environment-bindings.md).
-2. Move named registration, environment topology, and transient reachability into the environment transactional component using the same logical environment identities.
+1. Store variable bindings in the runtime-environment transaction participant using the reusable transactional dictionary and stable logical environment identities. See [Transactional Environment Bindings](environment-bindings.md).
+2. Keep named registration, environment topology, binding state, and transient reachability in that same component so they prepare as one environment candidate. See [Transactional Environment Topology](environment-topology.md).
 3. Remove the remaining mutable runtime catalog as an authoritative workflow-state owner.
 4. Preserve existing resolution, override, interpolation, tagging, and decomposition semantics throughout the migration.
 
