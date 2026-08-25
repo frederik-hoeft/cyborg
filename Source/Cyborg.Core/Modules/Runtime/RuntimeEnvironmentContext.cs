@@ -1,6 +1,8 @@
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Runtime.Environments.Syntax;
+using Cyborg.Core.Modules.Runtime.Transactions;
+using Cyborg.Core.Modules.Runtime.Transactions.Core;
 using Cyborg.Core.Text;
 using Microsoft.Extensions.Logging;
 
@@ -11,8 +13,10 @@ internal sealed class RuntimeEnvironmentContext
     private const string UNBOUND_ENVIRONMENT = "__UNBOUND";
 
     private readonly RuntimeEnvironmentCatalog _catalog;
+    private readonly EnvironmentVariableTransactionParticipant _environmentVariables;
     private readonly ILogger _logger;
     private readonly RuntimeEnvironmentContext? _parent;
+    private readonly ExecutionTransaction _transaction;
 
     public IRuntimeEnvironment GlobalEnvironment { get; }
 
@@ -24,30 +28,78 @@ internal sealed class RuntimeEnvironmentContext
 
     private RuntimeEnvironmentContext(
         RuntimeEnvironmentCatalog catalog,
+        EnvironmentVariableTransactionParticipant environmentVariables,
+        ExecutionTransaction transaction,
         ILogger logger,
         RuntimeEnvironmentContext? parent,
         IRuntimeEnvironment globalEnvironment,
         IRuntimeEnvironment environment)
     {
         _catalog = catalog;
+        _environmentVariables = environmentVariables;
+        _transaction = transaction;
         _logger = logger;
         _parent = parent;
         GlobalEnvironment = globalEnvironment;
         Environment = environment;
     }
 
-    public static RuntimeEnvironmentContext CreateRoot(GlobalRuntimeEnvironment globalEnvironment, ILoggerFactory loggerFactory)
+    public static RuntimeEnvironmentContext CreateRoot(
+        GlobalRuntimeEnvironment globalEnvironment,
+        EnvironmentVariableTransactionParticipant environmentVariables,
+        ExecutionTransaction transaction,
+        ILoggerFactory loggerFactory)
     {
         ArgumentNullException.ThrowIfNull(globalEnvironment);
+        ArgumentNullException.ThrowIfNull(environmentVariables);
+        ArgumentNullException.ThrowIfNull(transaction);
         ArgumentNullException.ThrowIfNull(loggerFactory);
         ILogger logger = loggerFactory.CreateLogger("cyborg.core.runtime");
-        return new RuntimeEnvironmentContext(new RuntimeEnvironmentCatalog(), logger, parent: null, globalEnvironment, globalEnvironment);
+        IRuntimeEnvironment transactionalGlobal = BindEnvironment(globalEnvironment, environmentVariables, transaction);
+        return new RuntimeEnvironmentContext(
+            new RuntimeEnvironmentCatalog(),
+            environmentVariables,
+            transaction,
+            logger,
+            parent: null,
+            transactionalGlobal,
+            transactionalGlobal);
+    }
+
+    public RuntimeEnvironmentContext CreateTransactionView(ExecutionTransaction transaction)
+    {
+        ArgumentNullException.ThrowIfNull(transaction);
+        RuntimeEnvironmentContext? parent = _parent?.CreateTransactionView(transaction);
+        IRuntimeEnvironment globalEnvironment = BindEnvironment(GlobalEnvironment, _environmentVariables, transaction);
+        IRuntimeEnvironment environment = BindEnvironment(Environment, _environmentVariables, transaction);
+        return new RuntimeEnvironmentContext(
+            _catalog,
+            _environmentVariables,
+            transaction,
+            _logger,
+            parent,
+            globalEnvironment,
+            environment);
     }
 
     public RuntimeEnvironmentContext CreateChild(IRuntimeEnvironment environment)
     {
         ArgumentNullException.ThrowIfNull(environment);
-        return new RuntimeEnvironmentContext(_catalog, _logger, this, GlobalEnvironment, environment);
+        IRuntimeEnvironment transactionalEnvironment = BindEnvironment(environment);
+        return new RuntimeEnvironmentContext(
+            _catalog,
+            _environmentVariables,
+            _transaction,
+            _logger,
+            this,
+            GlobalEnvironment,
+            transactionalEnvironment);
+    }
+
+    public IRuntimeEnvironment BindEnvironment(IRuntimeEnvironment environment)
+    {
+        ArgumentNullException.ThrowIfNull(environment);
+        return BindEnvironment(environment, _environmentVariables, _transaction);
     }
 
     public IRuntimeEnvironment PrepareEnvironment(ModuleEnvironment moduleEnvironment, IReadOnlyCollection<string>? overrideResolutionTags = null)
@@ -95,6 +147,18 @@ internal sealed class RuntimeEnvironmentContext
         };
     }
 
+    private static IRuntimeEnvironment BindEnvironment(
+        IRuntimeEnvironment environment,
+        EnvironmentVariableTransactionParticipant environmentVariables,
+        ExecutionTransaction transaction)
+    {
+        if (environment is not ITransactionalRuntimeEnvironment transactionalEnvironment)
+        {
+            throw new InvalidOperationException($"Runtime environment type '{environment.GetType().FullName}' does not support transaction binding.");
+        }
+        return transactionalEnvironment.BindTransaction(environmentVariables, transaction);
+    }
+
     private IRuntimeEnvironment CreateEnvironment(EnvironmentScope scope, string? name, bool transient)
     {
         if (string.IsNullOrEmpty(name))
@@ -120,10 +184,12 @@ internal sealed class RuntimeEnvironmentContext
             {
                 TaggedStringConversionObserver = conversionObserver
             },
-            EnvironmentScope.Parent or EnvironmentScope.Current => Environment.Bind(UNBOUND_ENVIRONMENT),
+            EnvironmentScope.Parent => ParentEnvironment.Bind(UNBOUND_ENVIRONMENT),
+            EnvironmentScope.Current => Environment.Bind(UNBOUND_ENVIRONMENT),
             EnvironmentScope.Reference => throw new ArgumentException("Attempting to create an environment by reference without providing an environment reference.", nameof(scope)),
             _ => throw new ArgumentOutOfRangeException(nameof(scope), scope, "Invalid environment scope.")
         };
+        environment = BindEnvironment(environment);
         _logger.LogEnvironmentCreated(scope.ToString(), environment.Name);
         _catalog.TryAdd(environment);
         return environment;
@@ -136,10 +202,16 @@ internal sealed class RuntimeEnvironmentContext
             environment = Environment;
             return true;
         }
-        if (_parent is not null)
+        if (_parent is not null && _parent.TryGetEnvironment(name, out environment))
         {
-            return _parent.TryGetEnvironment(name, out environment);
+            environment = BindEnvironment(environment);
+            return true;
         }
-        return _catalog.TryGet(name, out environment);
+        if (_catalog.TryGet(name, out environment))
+        {
+            environment = BindEnvironment(environment);
+            return true;
+        }
+        return false;
     }
 }

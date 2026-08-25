@@ -1,5 +1,7 @@
 ﻿using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime.Environments.Syntax;
+using Cyborg.Core.Modules.Runtime.Transactions;
+using Cyborg.Core.Modules.Runtime.Transactions.Core;
 using Cyborg.Core.Text;
 using System.Collections;
 using System.Collections.Immutable;
@@ -7,7 +9,7 @@ using System.Runtime.CompilerServices;
 
 namespace Cyborg.Core.Modules.Runtime.Environments;
 
-public partial record RuntimeEnvironment(string Name, bool IsTransient, VariableSyntaxBuilder SyntaxFactory, string Namespace) : EnvironmentLike(SyntaxFactory, Namespace), IRuntimeEnvironment
+public partial record RuntimeEnvironment(string Name, bool IsTransient, VariableSyntaxBuilder SyntaxFactory, string Namespace) : EnvironmentLike(SyntaxFactory, Namespace), IRuntimeEnvironment, ITransactionalRuntimeEnvironment
 {
     public IReadOnlyCollection<string> OverrideResolutionTags { get; init; } = [];
 
@@ -193,6 +195,26 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         {
             Namespace = ns
         };
+    }
+
+    IRuntimeEnvironment ITransactionalRuntimeEnvironment.BindTransaction(
+        EnvironmentVariableTransactionParticipant participant,
+        ExecutionTransaction transaction) =>
+        BindTransactionCore(participant, transaction);
+
+    private protected virtual IRuntimeEnvironment BindTransactionCore(
+        EnvironmentVariableTransactionParticipant participant,
+        ExecutionTransaction transaction)
+    {
+        ArgumentNullException.ThrowIfNull(participant);
+        ArgumentNullException.ThrowIfNull(transaction);
+        IEnvironmentVariableStore variableStore = VariableStore.Bind(participant, transaction);
+        return ReferenceEquals(variableStore, VariableStore)
+            ? this
+            : this with
+            {
+                VariableStore = variableStore
+            };
     }
 
     public IEnvironmentLike CreateArtifactCollection(ModuleArtifacts artifacts)

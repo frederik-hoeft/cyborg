@@ -22,6 +22,7 @@ The design covers Cyborg-managed workflow state and state from services that exp
 | [Transaction core](transaction-core.md) | Generic participant descriptors/state, root seeds, fork-group lifecycle, conflict strategy, and aggregate publication. |
 | [Transactional services](transactional-services.md) | Opt-in state participation for runtime and custom DI services, scoped access, root seeding, and lifetime boundaries. |
 | [Environment and runtime state](environment-and-runtime-state.md) | Transactional environment graph, logical global state, named environments, artifacts, and named-module state. |
+| [Transactional environment bindings](environment-bindings.md) | Implemented binding-state slice: logical environment identities, transaction-bound variable stores, nested reconciliation, and remaining topology boundary. |
 | [Implementation plan](implementation-plan.md) | Migration sequence, affected subsystems, validation gates, and representative tests. |
 
 ## Target Model
@@ -112,6 +113,6 @@ These constraints are architectural rather than implementation-style preferences
 
 ## Relationship to the Current Runtime
 
-The current architecture remains described by [System Architecture](../../architecture/architecture-overview.md), [Source Generators](../../architecture/source-generators.md), and [Module Testing Architecture](../../architecture/module-testing.md). The migration changes several current ownership boundaries. Loaded module references are worker-free, workers are activated immediately before execution, every invocation owns a DI scope, and independently resolved root runtimes own separate logical-global environments and runtime environment catalogs. The named-module registry remains process-level workflow state, and runtime environment bindings remain backed by mutable storage.
+The current architecture remains described by [System Architecture](../../architecture/architecture-overview.md), [Source Generators](../../architecture/source-generators.md), and [Module Testing Architecture](../../architecture/module-testing.md). The migration changes several current ownership boundaries. Loaded module references are worker-free, workers are activated immediately before execution, every invocation owns a DI scope and child transaction, independently resolved root runtimes own separate logical-global environments, and environment variable bindings resolve through transaction-local participant state. The named-module registry and environment catalog/topology remain process/session-level mutable workflow-state boundaries.
 
-Those remaining boundaries are migration constraints rather than target concepts. The target architecture keeps immutable configuration and AOT-generated dispatch, but moves invocation state, workflow-semantic state, and transactional ownership behind per-execution boundaries.
+Those remaining boundaries are migration constraints rather than target concepts. The target architecture keeps immutable configuration and AOT-generated dispatch, but moves all workflow-semantic state and transactional ownership behind per-execution boundaries.

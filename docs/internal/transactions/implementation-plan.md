@@ -156,11 +156,12 @@ Migrate every Cyborg-owned workflow-semantic state path onto the transaction cor
 
 ### Environment subsystem
 
-- Replace mutable environment backing dictionaries with the logical environment graph described in [Environment and Runtime State](environment-and-runtime-state.md).
-- Seed one logical global environment per root execution.
-- Make named registration, topology, variable bindings, and transient reachability coherent component state.
-- Make environment views transaction-bound rather than storage owners.
-- Preserve existing resolution, override, interpolation, tagging, and decomposition semantics.
+1. Migrate variable bindings first using the reusable transactional dictionary and stable logical environment identities. Environment views become transaction-bound facades while catalog/topology ownership remains unchanged for this slice. See [Transactional Environment Bindings](environment-bindings.md).
+2. Move named registration, environment topology, and transient reachability into the environment transactional component using the same logical environment identities.
+3. Remove the remaining mutable runtime catalog as an authoritative workflow-state owner.
+4. Preserve existing resolution, override, interpolation, tagging, and decomposition semantics throughout the migration.
+
+One logical global environment is seeded per root execution. Binding migration must not introduce a mutable process-global backing dictionary.
 
 ### Artifact publication
 

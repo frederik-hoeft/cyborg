@@ -16,6 +16,8 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
 
     public ITaggedStringConversionObserver? TaggedStringConversionObserver { get; init; }
 
+    internal EnvironmentVariableStoreSeed CaptureVariableStoreSeed() => VariableStore.CaptureSeed();
+
     protected JsonNamingPolicy NamingPolicy => SyntaxFactory.NamingPolicy;
 
     protected virtual TaggedString InterpolateString(ResolutionContext context, TaggedString tagged)

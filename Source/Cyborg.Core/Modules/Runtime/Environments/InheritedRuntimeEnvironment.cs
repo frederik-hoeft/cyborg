@@ -1,4 +1,6 @@
 ﻿using Cyborg.Core.Modules.Runtime.Environments.Syntax;
+using Cyborg.Core.Modules.Runtime.Transactions;
+using Cyborg.Core.Modules.Runtime.Transactions.Core;
 using Cyborg.Core.Text;
 
 namespace Cyborg.Core.Modules.Runtime.Environments;
@@ -6,6 +8,21 @@ namespace Cyborg.Core.Modules.Runtime.Environments;
 internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironment Parent, bool IsTransient, VariableSyntaxBuilder SyntaxFactory, string Namespace)
     : RuntimeEnvironment(Name, IsTransient, SyntaxFactory, Namespace)
 {
+    private protected override IRuntimeEnvironment BindTransactionCore(
+        EnvironmentVariableTransactionParticipant participant,
+        ExecutionTransaction transaction)
+    {
+        ArgumentNullException.ThrowIfNull(participant);
+        ArgumentNullException.ThrowIfNull(transaction);
+        return this with
+        {
+            Parent = Parent is ITransactionalRuntimeEnvironment transactionalParent
+                ? transactionalParent.BindTransaction(participant, transaction)
+                : throw new InvalidOperationException($"Runtime environment type '{Parent.GetType().FullName}' does not support transaction binding."),
+            VariableStore = VariableStore.Bind(participant, transaction)
+        };
+    }
+
     internal protected override bool TryGetStoredVariableRecursiveCore(string name, [NotNullWhen(true)] out object? value)
     {
         if (TryGetStoredVariableInCurrentScopeCore(name, out value))
