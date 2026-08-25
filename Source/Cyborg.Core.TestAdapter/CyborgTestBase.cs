@@ -85,7 +85,11 @@ public abstract class CyborgTestBase
     {
         ArgumentNullException.ThrowIfNull(worker);
         ArgumentNullException.ThrowIfNull(runtime);
-        return worker.ExecuteAsync(runtime, TestContext.CancellationToken);
+        if (runtime is not ModuleRuntimeBase moduleRuntime)
+        {
+            throw new ArgumentException($"Runtime must derive from {nameof(ModuleRuntimeBase)} to execute an already-activated worker.", nameof(runtime));
+        }
+        return moduleRuntime.ExecuteActivatedWorkerAsync(worker, cancellationToken: TestContext.CancellationToken);
     }
 
     #region DI-based Testing
@@ -128,8 +132,8 @@ public abstract class CyborgTestBase
         ArgumentNullException.ThrowIfNull(assertion);
         string resolvedJson = await ResolveModuleJsonAsync(moduleJson);
         await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
-        IModuleWorker worker = scope.DeserializeModule(resolvedJson);
-        TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(worker);
+        ModuleReference moduleReference = scope.DeserializeModule(resolvedJson);
+        TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(moduleReference);
         await assertion(module);
     }
 
@@ -218,8 +222,8 @@ public abstract class CyborgTestBase
         ArgumentNullException.ThrowIfNull(assertion);
         string resolvedJson = await ResolveModuleJsonAsync(moduleJson);
         await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
-        IModuleWorker worker = scope.DeserializeModule(resolvedJson);
-        TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(worker);
+        ModuleReference moduleReference = scope.DeserializeModule(resolvedJson);
+        TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(moduleReference);
         IValidationResult<TModule> validationResult = await module.ValidateAsync(scope.Runtime, scope.ServiceProvider, TestContext.CancellationToken);
         await assertion(validationResult);
     }
@@ -267,8 +271,8 @@ public abstract class CyborgTestBase
         ArgumentNullException.ThrowIfNull(assertion);
         string resolvedJson = await ResolveModuleJsonAsync(moduleJson);
         await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
-        IModuleWorker worker = scope.DeserializeModule(resolvedJson);
-        TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(worker);
+        ModuleReference moduleReference = scope.DeserializeModule(resolvedJson);
+        TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(moduleReference);
         IValidationResult<TModule> validationResult = await module.ValidateAsync(scope.Runtime, scope.ServiceProvider, TestContext.CancellationToken);
         validationResult.EnsureValid();
         await assertion(validationResult.Module, scope);
@@ -303,8 +307,8 @@ public abstract class CyborgTestBase
         string resolvedJson = await ResolveModuleJsonAsync(moduleJson);
         await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
         environmentSetup(scope.GlobalEnvironment);
-        IModuleWorker worker = scope.DeserializeModule(resolvedJson);
-        TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(worker);
+        ModuleReference moduleReference = scope.DeserializeModule(resolvedJson);
+        TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(moduleReference);
         IValidationResult<TModule> validationResult = await module.ValidateAsync(scope.Runtime, scope.ServiceProvider, TestContext.CancellationToken);
         validationResult.EnsureValid();
         await assertion(validationResult.Module);
@@ -364,8 +368,9 @@ public abstract class CyborgTestBase
         string resolvedJson = await ResolveModuleJsonAsync(moduleJson);
         await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
         environmentSetup?.Invoke(scope.GlobalEnvironment);
-        IModuleWorker worker = scope.DeserializeModule(resolvedJson);
-        TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(worker);
+        ModuleReference moduleReference = scope.DeserializeModule(resolvedJson);
+        TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(moduleReference);
+        IModuleWorker worker = scope.ActivateWorker(moduleReference);
         IModuleExecutionResult result = await scope.ExecuteAsync(worker, TestContext.CancellationToken);
         if (worker is not TWorker typedWorker)
         {
@@ -425,8 +430,8 @@ public abstract class CyborgTestBase
         string resolvedJson = await ResolveModuleJsonAsync(moduleJson);
         await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
         environmentSetup?.Invoke(scope.GlobalEnvironment);
-        IModuleWorker worker = scope.DeserializeModule(resolvedJson);
-        IModuleExecutionResult result = await scope.ExecuteAsync(worker, TestContext.CancellationToken);
+        ModuleReference moduleReference = scope.DeserializeModule(resolvedJson);
+        IModuleExecutionResult result = await scope.ExecuteAsync(moduleReference, TestContext.CancellationToken);
         await assertion(result);
     }
 
@@ -471,9 +476,9 @@ public abstract class CyborgTestBase
         string resolvedJson = await ResolveModuleJsonAsync(moduleJson);
         await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
         environmentSetup?.Invoke(scope.GlobalEnvironment);
-        IModuleWorker worker = scope.DeserializeModule(resolvedJson);
+        ModuleReference moduleReference = scope.DeserializeModule(resolvedJson);
         TException exception = await Assert.ThrowsExactlyAsync<TException>(
-            () => scope.ExecuteAsync(worker, TestContext.CancellationToken));
+            () => scope.ExecuteAsync(moduleReference, TestContext.CancellationToken));
         if (assertion is not null)
         {
             await assertion(exception);

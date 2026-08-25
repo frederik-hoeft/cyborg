@@ -4,4 +4,4 @@ using Cyborg.Core.Modules.Configuration;
 namespace Cyborg.Modules.Dynamic;
 
 [GeneratedModuleLoaderFactory]
-public sealed partial class DynamicModuleLoader(IServiceProvider serviceProvider) : ModuleLoader<DynamicModuleWorker, DynamicModule>(serviceProvider);
+public sealed partial class DynamicModuleLoader : ModuleLoader<DynamicModuleWorker, DynamicModule>;

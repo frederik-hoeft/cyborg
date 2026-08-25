@@ -1,5 +1,6 @@
 ﻿using Cyborg.Core.Configuration.Serialization;
 using Cyborg.Core.Modules;
+using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
@@ -61,18 +62,18 @@ public sealed class TestModuleRuntimeScope : IAsyncDisposable
     }
 
     /// <summary>
-    /// Deserializes a module JSON string into an <see cref="IModuleWorker"/> by running it through
+    /// Deserializes a module JSON string into a <see cref="ModuleReference"/> by running it through
     /// the registry-based deserialization pipeline (the same path used in production).
     /// </summary>
     /// <param name="moduleJson">The JSON string representing a module reference (e.g., <c>{ "cyborg.modules.subprocess.v1": { ... } }</c>).</param>
-    /// <returns>The deserialized module worker, ready for execution.</returns>
-    public IModuleWorker DeserializeModule(string moduleJson)
+    /// <returns>The deserialized immutable module reference.</returns>
+    public ModuleReference DeserializeModule(string moduleJson)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(moduleJson);
         IJsonLoaderContext loaderContext = _serviceProvider.GetRequiredService<IJsonLoaderContext>();
         ModuleReference moduleReference = JsonSerializer.Deserialize<ModuleReference>(moduleJson, loaderContext.JsonSerializerOptions)
             ?? throw new InvalidOperationException("Deserialization of the module JSON returned null. Verify the JSON is a valid module reference.");
-        return moduleReference.Module;
+        return moduleReference;
     }
 
     /// <summary>
@@ -92,20 +93,31 @@ public sealed class TestModuleRuntimeScope : IAsyncDisposable
 
     /// <summary>
     /// Extracts the concrete module record of type <typeparamref name="TModule"/> from a deserialized
-    /// <see cref="IModuleWorker"/> by downcasting through the module worker's <see cref="IModule"/> reference.
+    /// <see cref="ModuleReference"/>.
     /// </summary>
     /// <typeparam name="TModule">The expected concrete module record type.</typeparam>
-    /// <param name="worker">The deserialized module worker.</param>
+    /// <param name="moduleReference">The deserialized module reference.</param>
     /// <returns>The typed module record.</returns>
-    public static TModule ExtractModule<TModule>(IModuleWorker worker) where TModule : ModuleBase, IModule
+    public static TModule ExtractModule<TModule>(ModuleReference moduleReference) where TModule : ModuleBase, IModule
     {
-        ArgumentNullException.ThrowIfNull(worker);
-        if (worker.Module is TModule typedModule)
+        ArgumentNullException.ThrowIfNull(moduleReference);
+        if (moduleReference.Definition is TModule typedModule)
         {
             return typedModule;
         }
         throw new InvalidOperationException(
-            $"Expected module of type '{typeof(TModule).Name}' but the worker contains '{worker.Module.GetType().Name}'.");
+            $"Expected module of type '{typeof(TModule).Name}' but the module reference contains '{moduleReference.Definition.GetType().Name}'.");
+    }
+
+    /// <summary>
+    /// Activates a fresh worker from a loaded module reference using this scope's service provider.
+    /// Normal execution should prefer <see cref="ExecuteAsync(ModuleReference,CancellationToken)"/> so the runtime owns activation timing.
+    /// </summary>
+    public IModuleWorker ActivateWorker(ModuleReference moduleReference)
+    {
+        ArgumentNullException.ThrowIfNull(moduleReference);
+        IModuleWorkerFactory workerFactory = _serviceProvider.GetRequiredService<IModuleWorkerFactory>();
+        return workerFactory.CreateWorker(moduleReference, _serviceProvider);
     }
 
     /// <summary>
@@ -117,7 +129,16 @@ public sealed class TestModuleRuntimeScope : IAsyncDisposable
     public Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker worker, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(worker);
-        return Runtime.ExecuteAsync(worker, cancellationToken: cancellationToken);
+        return Runtime.ExecuteActivatedWorkerAsync(worker, cancellationToken: cancellationToken);
+    }
+
+    /// <summary>
+    /// Executes a loaded module reference. The runtime activates a fresh worker immediately before execution.
+    /// </summary>
+    public Task<IModuleExecutionResult> ExecuteAsync(ModuleReference moduleReference, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(moduleReference);
+        return Runtime.ExecuteAsync(moduleReference, cancellationToken: cancellationToken);
     }
 
     /// <summary>

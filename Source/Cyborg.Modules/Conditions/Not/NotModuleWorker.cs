@@ -12,8 +12,8 @@ public sealed class NotModuleWorker(IWorkerContext<NotModule> context) : Conditi
     {
         PathSyntax childNamespace = runtime.Environment.SyntaxFactory.Path(runtime.Environment.Namespace);
         IRuntimeEnvironment environment = CreateChildEnvironment(runtime, Module.Condition, childNamespace);
-        string conditionModuleId = Module.Condition.Module.ModuleId;
-        IModuleExecutionResult result = await runtime.ExecuteAsync(Module.Condition.Module, environment, cancellationToken);
+        string conditionModuleId = Module.Condition.ModuleId;
+        IModuleExecutionResult result = await runtime.ExecuteAsync(Module.Condition, environment, cancellationToken);
         if (result.Status is ModuleExitStatus.Canceled)
         {
             return runtime.Exit(WithStatus(ModuleExitStatus.Canceled));

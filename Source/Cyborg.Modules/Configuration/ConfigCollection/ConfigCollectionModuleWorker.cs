@@ -16,11 +16,11 @@ public sealed class ConfigCollectionModuleWorker(IWorkerContext<ConfigCollection
             {
                 return runtime.Exit(Canceled());
             }
-            if (source.Module.Module is not IConfigurationModule)
+            if (source.Definition is not IConfigurationModule)
             {
-                throw new InvalidOperationException($"Module {source.Module.ModuleId} is not a valid configuration source.");
+                throw new InvalidOperationException($"Module {source.ModuleId} is not a valid configuration source.");
             }
-            IModuleExecutionResult result = await runtime.ExecuteAsync(source.Module, runtime.Environment, cancellationToken);
+            IModuleExecutionResult result = await runtime.ExecuteAsync(source, runtime.Environment, cancellationToken);
             if (result.Status is ModuleExitStatus.Canceled or ModuleExitStatus.Failed)
             {
                 return runtime.Exit(WithStatus(result.Status));

@@ -4,4 +4,4 @@ using Cyborg.Core.Modules.Configuration;
 namespace Cyborg.Modules.Guard;
 
 [GeneratedModuleLoaderFactory]
-public sealed partial class GuardModuleLoader(IServiceProvider serviceProvider) : ModuleLoader<GuardModuleWorker, GuardModule>(serviceProvider);
+public sealed partial class GuardModuleLoader : ModuleLoader<GuardModuleWorker, GuardModule>;

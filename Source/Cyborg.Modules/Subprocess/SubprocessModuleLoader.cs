@@ -4,4 +4,4 @@ using Cyborg.Core.Modules.Configuration;
 namespace Cyborg.Modules.Subprocess;
 
 [GeneratedModuleLoaderFactory]
-public sealed partial class SubprocessModuleLoader(IServiceProvider serviceProvider) : ModuleLoader<SubprocessModuleWorker, SubprocessModule>(serviceProvider);
+public sealed partial class SubprocessModuleLoader : ModuleLoader<SubprocessModuleWorker, SubprocessModule>;

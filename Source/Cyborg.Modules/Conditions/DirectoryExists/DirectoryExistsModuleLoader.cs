@@ -4,4 +4,4 @@ using Cyborg.Core.Modules.Configuration;
 namespace Cyborg.Modules.Conditions.DirectoryExists;
 
 [GeneratedModuleLoaderFactory]
-public sealed partial class DirectoryExistsModuleLoader(IServiceProvider serviceProvider) : ModuleLoader<DirectoryExistsModuleWorker, DirectoryExistsModule>(serviceProvider);
+public sealed partial class DirectoryExistsModuleLoader : ModuleLoader<DirectoryExistsModuleWorker, DirectoryExistsModule>;

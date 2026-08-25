@@ -11,7 +11,7 @@ public sealed class ExternalConfigModuleWorker(IWorkerContext<ExternalConfigModu
     protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
         ModuleContext moduleContext = await configurationLoader.LoadModuleAsync(Module.Path, cancellationToken);
-        IModuleExecutionResult executionResult = await runtime.ExecuteAsync(moduleContext.Module.Module, runtime.Environment, cancellationToken);
+        IModuleExecutionResult executionResult = await runtime.ExecuteAsync(moduleContext.Module, runtime.Environment, cancellationToken);
         return runtime.Exit(WithStatus(executionResult.Status));
     }
 }

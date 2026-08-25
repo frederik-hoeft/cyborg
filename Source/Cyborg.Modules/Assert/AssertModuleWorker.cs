@@ -14,7 +14,7 @@ public sealed class AssertModuleWorker(IWorkerContext<AssertModule> context) : C
     {
         PathSyntax childNamespace = runtime.Environment.SyntaxFactory.Path(runtime.Environment.Namespace);
         IRuntimeEnvironment environment = CreateChildEnvironment(runtime, Module.Assertion, childNamespace);
-        IModuleExecutionResult result = await runtime.ExecuteAsync(Module.Assertion.Module, environment, cancellationToken);
+        IModuleExecutionResult result = await runtime.ExecuteAsync(Module.Assertion, environment, cancellationToken);
         if (result.Status is not ModuleExitStatus.Success)
         {
             // this was unexpected

@@ -4,4 +4,4 @@ using Cyborg.Core.Modules.Configuration;
 namespace Cyborg.Modules.Network.SshShutdown;
 
 [GeneratedModuleLoaderFactory]
-public sealed partial class SshShutdownModuleLoader(IServiceProvider serviceProvider) : ModuleLoader<SshShutdownModuleWorker, SshShutdownModule>(serviceProvider);
+public sealed partial class SshShutdownModuleLoader : ModuleLoader<SshShutdownModuleWorker, SshShutdownModule>;

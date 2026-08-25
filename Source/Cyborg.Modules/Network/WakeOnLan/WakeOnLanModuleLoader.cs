@@ -4,4 +4,4 @@ using Cyborg.Core.Modules.Configuration;
 namespace Cyborg.Modules.Network.WakeOnLan;
 
 [GeneratedModuleLoaderFactory]
-public sealed partial class WakeOnLanModuleLoader(IServiceProvider serviceProvider) : ModuleLoader<WakeOnLanModuleWorker, WakeOnLanModule>(serviceProvider);
+public sealed partial class WakeOnLanModuleLoader : ModuleLoader<WakeOnLanModuleWorker, WakeOnLanModule>;

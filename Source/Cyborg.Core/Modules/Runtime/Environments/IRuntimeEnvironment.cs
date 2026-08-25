@@ -47,6 +47,8 @@ public interface IRuntimeEnvironment : IEnvironmentLike
 
     string NamespaceOf<TModule>(TModule module) where TModule : IModuleDefinition;
 
+    string NamespaceOf(ModuleReference moduleReference);
+
     string NamespaceOf(IModuleWorker module);
 
     void Publish(IEnvironmentLike other);

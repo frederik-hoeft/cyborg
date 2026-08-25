@@ -1,9 +1,11 @@
-﻿using Cyborg.Core.Modules.Configuration.Model;
+﻿using Cyborg.Core.Modules.Configuration;
+using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Hooks;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Runtime.Environments.Syntax;
 using Cyborg.Core.Services.Pipelines;
 using Cyborg.Core.Text;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Cyborg.Core.Modules.Runtime;
@@ -113,7 +115,7 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory, ILo
             List<string> errors = [];
             List<(string Argument, object Value)> resolvedArguments = [];
             string argumentNamespace = ns ?? "(none)";
-            Logger.LogTemplateArgumentsResolving(args.Count, moduleContext.Module.Module.ModuleId, argumentNamespace);
+            Logger.LogTemplateArgumentsResolving(args.Count, moduleContext.Module.ModuleId, argumentNamespace);
             if (!string.IsNullOrEmpty(ns) && !SyntaxFactory.IsValidIdentifier(ns))
             {
                 errors.Add($"Template namespaces must be valid identifiers: '{ns}'");
@@ -139,7 +141,7 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory, ILo
             if (errors.Count > 0)
             {
                 string errorMessage = $"Module execution failed due to missing required arguments:{System.Environment.NewLine}    {string.Join($"{System.Environment.NewLine}    ", errors)}";
-                Logger.LogTemplateArgumentResolutionFailed(moduleContext.Module.Module.ModuleId, errorMessage);
+                Logger.LogTemplateArgumentResolutionFailed(moduleContext.Module.ModuleId, errorMessage);
                 throw new InvalidOperationException(errorMessage);
             }
             // normalize resolved arguments to be unqualified by the template namespace, since they are now scoped to the current namespace and should be easily accessible
@@ -150,20 +152,48 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory, ILo
         }
         if (moduleContext.Configuration is { } configuration)
         {
-            Logger.LogConfigurationModuleRunning(configuration.Module.ModuleId, moduleContext.Module.Module.ModuleId);
-            IModuleExecutionResult result = await ExecuteAsync(configuration.Module, environment, cancellationToken);
+            Logger.LogConfigurationModuleRunning(configuration.ModuleId, moduleContext.Module.ModuleId);
+            IModuleExecutionResult result = await ExecuteAsync(configuration, environment, cancellationToken);
             if (result.Status is ModuleExitStatus.Failed or ModuleExitStatus.Canceled)
             {
-                Logger.LogModuleConfigurationFailed(configuration.Module.ModuleId, result.Status.ToString(), moduleContext.Module.Module.ModuleId, environment.Name);
-                return new ModuleExecutionResult(moduleContext.Module.Module.Module, ModuleExitStatus.Failed, environment.CreateArtifactCollection());
+                Logger.LogModuleConfigurationFailed(configuration.ModuleId, result.Status.ToString(), moduleContext.Module.ModuleId, environment.Name);
+                return new ModuleExecutionResult(moduleContext.Module.Definition, ModuleExitStatus.Failed, environment.CreateArtifactCollection());
             }
         }
-        return await ExecuteAsync(moduleContext.Module.Module, environment, cancellationToken);
+        return await ExecuteAsync(moduleContext.Module, environment, cancellationToken);
     }
 
-    public abstract Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker module, EnvironmentScope scope = EnvironmentScope.Global, string? name = null, CancellationToken cancellationToken = default);
+    public virtual Task<IModuleExecutionResult> ExecuteAsync(ModuleReference moduleReference, EnvironmentScope scope = EnvironmentScope.Global, string? name = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(moduleReference);
+        IModuleWorker worker = ActivateWorker(moduleReference);
+        return ExecuteWorkerAsync(worker, scope, name, cancellationToken);
+    }
 
-    public abstract Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken = default);
+    public virtual Task<IModuleExecutionResult> ExecuteAsync(ModuleReference moduleReference, IRuntimeEnvironment environment, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(moduleReference);
+        ArgumentNullException.ThrowIfNull(environment);
+        IModuleWorker worker = ActivateWorker(moduleReference);
+        return ExecuteWorkerAsync(worker, environment, cancellationToken);
+    }
+
+    internal Task<IModuleExecutionResult> ExecuteActivatedWorkerAsync(IModuleWorker module, EnvironmentScope scope = EnvironmentScope.Global, string? name = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(module);
+        return ExecuteWorkerAsync(module, scope, name, cancellationToken);
+    }
+
+    internal Task<IModuleExecutionResult> ExecuteActivatedWorkerAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(module);
+        ArgumentNullException.ThrowIfNull(environment);
+        return ExecuteWorkerAsync(module, environment, cancellationToken);
+    }
+
+    protected abstract Task<IModuleExecutionResult> ExecuteWorkerAsync(IModuleWorker module, EnvironmentScope scope, string? name, CancellationToken cancellationToken);
+
+    protected abstract Task<IModuleExecutionResult> ExecuteWorkerAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken);
 
     protected async Task<IModuleExecutionResult> ExecuteModuleAsync(IModuleRuntime root, IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken)
     {
@@ -238,6 +268,14 @@ public abstract class ModuleRuntimeBase(VariableSyntaxBuilder syntaxFactory, ILo
     public abstract bool TryGetEnvironment(string name, [NotNullWhen(true)] out IRuntimeEnvironment? environment);
 
     public abstract bool TryRemoveEnvironment(IRuntimeEnvironment environment);
+
+    private IModuleWorker ActivateWorker(ModuleReference moduleReference)
+    {
+        IServiceProvider executionServices = ServiceProvider
+            ?? throw new InvalidOperationException($"Cannot activate module '{moduleReference.ModuleId}' because the runtime has no execution service provider.");
+        IModuleWorkerFactory workerFactory = executionServices.GetRequiredService<IModuleWorkerFactory>();
+        return workerFactory.CreateWorker(moduleReference, executionServices);
+    }
 
     public virtual IModuleExecutionResult Exit<TModule>(IModuleExecutionResult<TModule> result) where TModule : ModuleBase, IModuleDefinition
     {

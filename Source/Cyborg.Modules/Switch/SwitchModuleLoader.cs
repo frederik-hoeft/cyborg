@@ -4,4 +4,4 @@ using Cyborg.Core.Modules.Configuration;
 namespace Cyborg.Modules.Switch;
 
 [GeneratedModuleLoaderFactory]
-public sealed partial class SwitchModuleLoader(IServiceProvider serviceProvider) : ModuleLoader<SwitchModuleWorker, SwitchModule>(serviceProvider);
+public sealed partial class SwitchModuleLoader : ModuleLoader<SwitchModuleWorker, SwitchModule>;

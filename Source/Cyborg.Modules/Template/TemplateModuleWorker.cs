@@ -16,7 +16,7 @@ public sealed class TemplateModuleWorker(IWorkerContext<TemplateModule> context,
     {
         Logger.LogTemplateLoading(Module.Path);
         ModuleContext moduleContext = await configurationLoader.LoadModuleAsync(Module.Path, cancellationToken);
-        Logger.LogTemplateLoaded(moduleContext.Module.Module.ModuleId, Module.Path);
+        Logger.LogTemplateLoaded(moduleContext.Module.ModuleId, Module.Path);
         IRuntimeEnvironment environment = runtime.PrepareEnvironment(moduleContext);
         List<string> templateErrors = [];
         foreach (DynamicKeyValuePair entry in Module.Arguments)

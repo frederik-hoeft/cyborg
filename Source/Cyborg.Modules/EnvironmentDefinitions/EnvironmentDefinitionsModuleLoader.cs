@@ -4,4 +4,4 @@ using Cyborg.Core.Modules.Configuration;
 namespace Cyborg.Modules.EnvironmentDefinitions;
 
 [GeneratedModuleLoaderFactory]
-public sealed partial class EnvironmentDefinitionsModuleLoader(IServiceProvider serviceProvider) : ModuleLoader<EnvironmentDefinitionsModuleWorker, EnvironmentDefinitionsModule>(serviceProvider);
+public sealed partial class EnvironmentDefinitionsModuleLoader : ModuleLoader<EnvironmentDefinitionsModuleWorker, EnvironmentDefinitionsModule>;

@@ -9,7 +9,7 @@ public sealed class ModuleContextJsonConverter(IModuleRegistry registry, IJsonLo
     {
         ModuleContextDeserializationDummy result = JsonSerializer.Deserialize<ModuleContextDeserializationDummy>(ref reader, Context)
             ?? throw new JsonException("Failed to deserialize ModuleContext.");
-        if (result.Module.Module.Module.Name is { Length: > 0 } name)
+        if (result.Module.Definition.Name is { Length: > 0 } name)
         {
             _ = registry.TryAddModule(name, result);
         }

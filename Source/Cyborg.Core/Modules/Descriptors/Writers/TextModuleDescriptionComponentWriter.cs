@@ -97,7 +97,7 @@ internal sealed class TextModuleDescriptionComponentWriter(IndentedStringBuilder
         Guid guid => builder.AppendLine(guid.ToString("D")),
         Enum e => builder.AppendLine(e.ToString()),
         // cyborg types
-        ModuleReference moduleReference => builder.AppendLine($"-> {moduleReference.Module.ModuleId}"),
+        ModuleReference moduleReference => builder.AppendLine($"-> {moduleReference.ModuleId}"),
         _ => builder.AppendLine(Convert.ToString(value, CultureInfo.InvariantCulture) ?? value.GetType().Name)
     };
 

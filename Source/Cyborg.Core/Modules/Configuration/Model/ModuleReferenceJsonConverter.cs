@@ -17,14 +17,14 @@ public sealed class ModuleReferenceJsonConverter(IModuleLoaderRegistry registry,
         {
             throw new JsonException($"Module configuration with name '{moduleName}' not found in the registry. Ensure that the module name specified in the JSON configuration matches a registered module configuration.");
         }
-        if (!configuration.TryCreateModule(ref reader, Context, out IModuleWorker? module))
+        if (!configuration.TryLoadModule(ref reader, Context, out IModule? module))
         {
-            throw new JsonException($"Failed to create module instance for module '{moduleName}'. Ensure that the JSON configuration for the module is valid and that the module configuration implementation can handle it.");
+            throw new JsonException($"Failed to load module definition for module '{moduleName}'. Ensure that the JSON configuration for the module is valid and that the module loader can handle it.");
         }
         if (!reader.Read() || reader.TokenType != JsonTokenType.EndObject)
         {
             throw new JsonException($"Expected end of module reference object after reading module configuration, but got {reader.TokenType}. Ensure that the JSON configuration for the module is properly formatted.");
         }
-        return new ModuleReference(module);
+        return new ModuleReference(module, configuration.ModuleId);
     }
 }

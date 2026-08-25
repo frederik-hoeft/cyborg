@@ -4,4 +4,4 @@ using Cyborg.Core.Modules.Configuration;
 namespace Cyborg.Modules.Configuration.ConfigMap;
 
 [GeneratedModuleLoaderFactory]
-public sealed partial class ConfigMapModuleLoader(IServiceProvider serviceProvider) : ModuleLoader<ConfigMapModuleWorker, ConfigMapModule>(serviceProvider);
+public sealed partial class ConfigMapModuleLoader : ModuleLoader<ConfigMapModuleWorker, ConfigMapModule>;

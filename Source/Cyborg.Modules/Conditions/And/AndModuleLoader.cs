@@ -4,4 +4,4 @@ using Cyborg.Core.Modules.Configuration;
 namespace Cyborg.Modules.Conditions.And;
 
 [GeneratedModuleLoaderFactory]
-public sealed partial class AndModuleLoader(IServiceProvider serviceProvider) : ModuleLoader<AndModuleWorker, AndModule>(serviceProvider);
+public sealed partial class AndModuleLoader : ModuleLoader<AndModuleWorker, AndModule>;

@@ -4,4 +4,4 @@ using Cyborg.Core.Modules.Configuration;
 namespace Cyborg.Modules.Sequence;
 
 [GeneratedModuleLoaderFactory]
-public sealed partial class SequenceModuleLoader(IServiceProvider serviceProvider) : ModuleLoader<SequenceModuleWorker, SequenceModule>(serviceProvider);
+public sealed partial class SequenceModuleLoader : ModuleLoader<SequenceModuleWorker, SequenceModule>;

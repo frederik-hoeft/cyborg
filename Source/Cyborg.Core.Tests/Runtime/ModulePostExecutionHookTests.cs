@@ -17,8 +17,8 @@ public sealed class ModulePostExecutionHookTests : CyborgCoreTestBase
 
         await TestWithDIAsync(async services =>
         {
-            IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
-            IModuleExecutionResult result = await runtime.ExecuteAsync(new ProbeModuleWorker(ProbeBehavior.Success), cancellationToken: TestContext.CancellationToken);
+            ModuleRuntimeBase runtime = (ModuleRuntimeBase)services.GetRequiredService<IModuleRuntime>();
+            IModuleExecutionResult result = await runtime.ExecuteActivatedWorkerAsync(new ProbeModuleWorker(ProbeBehavior.Success), cancellationToken: TestContext.CancellationToken);
 
             Assert.AreEqual(ModuleExitStatus.Success, result.Status);
             Assert.AreEqual(1, failingHook.CallCount);
@@ -39,8 +39,8 @@ public sealed class ModulePostExecutionHookTests : CyborgCoreTestBase
 
         await TestWithDIAsync(async services =>
         {
-            IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
-            IModuleExecutionResult result = await runtime.ExecuteAsync(new ProbeModuleWorker(ProbeBehavior.Throw), cancellationToken: TestContext.CancellationToken);
+            ModuleRuntimeBase runtime = (ModuleRuntimeBase)services.GetRequiredService<IModuleRuntime>();
+            IModuleExecutionResult result = await runtime.ExecuteActivatedWorkerAsync(new ProbeModuleWorker(ProbeBehavior.Throw), cancellationToken: TestContext.CancellationToken);
 
             Assert.AreEqual(ModuleExitStatus.Failed, result.Status);
             Assert.AreEqual(1, hook.CallCount);
@@ -57,8 +57,8 @@ public sealed class ModulePostExecutionHookTests : CyborgCoreTestBase
 
         await TestWithDIAsync(async services =>
         {
-            IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
-            IModuleExecutionResult result = await runtime.ExecuteAsync(new ProbeModuleWorker(ProbeBehavior.Cancel), cancellationToken: cancellationSource.Token);
+            ModuleRuntimeBase runtime = (ModuleRuntimeBase)services.GetRequiredService<IModuleRuntime>();
+            IModuleExecutionResult result = await runtime.ExecuteActivatedWorkerAsync(new ProbeModuleWorker(ProbeBehavior.Cancel), cancellationToken: cancellationSource.Token);
 
             Assert.AreEqual(ModuleExitStatus.Canceled, result.Status);
             Assert.AreEqual(1, hook.CallCount);
@@ -74,9 +74,9 @@ public sealed class ModulePostExecutionHookTests : CyborgCoreTestBase
 
         await TestWithDIAsync(async services =>
         {
-            IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
-            await runtime.ExecuteAsync(new ProbeModuleWorker(ProbeBehavior.Success), cancellationToken: TestContext.CancellationToken);
-            await runtime.ExecuteAsync(new ProbeModuleWorker(ProbeBehavior.Success), cancellationToken: TestContext.CancellationToken);
+            ModuleRuntimeBase runtime = (ModuleRuntimeBase)services.GetRequiredService<IModuleRuntime>();
+            await runtime.ExecuteActivatedWorkerAsync(new ProbeModuleWorker(ProbeBehavior.Success), cancellationToken: TestContext.CancellationToken);
+            await runtime.ExecuteActivatedWorkerAsync(new ProbeModuleWorker(ProbeBehavior.Success), cancellationToken: TestContext.CancellationToken);
 
             Assert.AreEqual(2, createdHooks);
         }, services => services.AddTransient<IModulePostExecutionHook>(_ =>
@@ -91,8 +91,8 @@ public sealed class ModulePostExecutionHookTests : CyborgCoreTestBase
     {
         await TestWithDIAsync(async services =>
         {
-            IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
-            IModuleExecutionResult result = await runtime.ExecuteAsync(new ProbeModuleWorker(ProbeBehavior.Success), cancellationToken: TestContext.CancellationToken);
+            ModuleRuntimeBase runtime = (ModuleRuntimeBase)services.GetRequiredService<IModuleRuntime>();
+            IModuleExecutionResult result = await runtime.ExecuteActivatedWorkerAsync(new ProbeModuleWorker(ProbeBehavior.Success), cancellationToken: TestContext.CancellationToken);
 
             Assert.AreEqual(ModuleExitStatus.Success, result.Status);
         }, services => services.AddTransient<IModulePostExecutionHook>(static _ => throw new InvalidOperationException("Synthetic post-hook construction failure.")));

@@ -13,7 +13,7 @@ public sealed class WhileModuleWorker(IWorkerContext<WhileModule> context) : Mod
 {
     protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
-        string conditionModuleId = Module.Condition.Module.ModuleId;
+        string conditionModuleId = Module.Condition.ModuleId;
         ModuleArtifacts childArtifacts = ModuleArtifacts.Default with
         {
             Namespace = runtime.Environment.Namespace,
@@ -31,7 +31,7 @@ public sealed class WhileModuleWorker(IWorkerContext<WhileModule> context) : Mod
             string artifactsOverride = environment.SyntaxFactory.Path(environment.NamespaceOf(Module.Condition)).Property(Module.Artifacts).Override();
             environment.SetVariable(artifactsOverride, childArtifacts);
             Logger.LogWhileConditionEvaluating(conditionModuleId);
-            IModuleExecutionResult result = await runtime.ExecuteAsync(Module.Condition.Module, environment, cancellationToken);
+            IModuleExecutionResult result = await runtime.ExecuteAsync(Module.Condition, environment, cancellationToken);
             if (result.Status is ModuleExitStatus.Canceled)
             {
                 return runtime.Exit(WithStatus(ModuleExitStatus.Canceled));

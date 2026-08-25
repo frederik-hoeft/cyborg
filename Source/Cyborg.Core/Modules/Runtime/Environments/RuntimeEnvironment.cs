@@ -167,6 +167,12 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         return GetEffectiveNamespace(module.Name, module.Group, TModule.ModuleId);
     }
 
+    public virtual string NamespaceOf(ModuleReference moduleReference)
+    {
+        ArgumentNullException.ThrowIfNull(moduleReference);
+        return GetEffectiveNamespace(moduleReference.Definition.Name, moduleReference.Definition.Group, moduleReference.ModuleId);
+    }
+
     public virtual string NamespaceOf(IModuleWorker module)
     {
         ArgumentNullException.ThrowIfNull(module);

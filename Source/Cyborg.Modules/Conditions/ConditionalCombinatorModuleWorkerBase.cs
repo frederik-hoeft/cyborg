@@ -12,8 +12,8 @@ public abstract class ConditionalCombinatorModuleWorkerBase<TModule>(IWorkerCont
     protected async Task<ChildExecutionResult> ExecuteConditionAsync(IModuleRuntime runtime, ModuleReference condition, PathSyntax conditionNamespace, CancellationToken cancellationToken)
     {
         IRuntimeEnvironment environment = CreateChildEnvironment(runtime, condition, conditionNamespace);
-        string conditionModuleId = condition.Module.ModuleId;
-        IModuleExecutionResult result = await runtime.ExecuteAsync(condition.Module, environment, cancellationToken);
+        string conditionModuleId = condition.ModuleId;
+        IModuleExecutionResult result = await runtime.ExecuteAsync(condition, environment, cancellationToken);
         if (result.Status is ModuleExitStatus.Canceled)
         {
             return ChildExecutionResult.NonSuccess(ModuleExitStatus.Canceled);

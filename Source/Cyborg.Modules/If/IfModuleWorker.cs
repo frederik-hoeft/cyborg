@@ -14,9 +14,9 @@ public sealed class IfModuleWorker(IWorkerContext<IfModule> context) : Condition
     {
         PathSyntax childNamespace = runtime.Environment.SyntaxFactory.Path(runtime.Environment.Namespace);
         IRuntimeEnvironment environment = CreateChildEnvironment(runtime, Module.Condition, childNamespace);
-        string conditionModuleId = Module.Condition.Module.ModuleId;
+        string conditionModuleId = Module.Condition.ModuleId;
         Logger.LogConditionEvaluating(conditionModuleId);
-        IModuleExecutionResult result = await runtime.ExecuteAsync(Module.Condition.Module, environment, cancellationToken);
+        IModuleExecutionResult result = await runtime.ExecuteAsync(Module.Condition, environment, cancellationToken);
         if (result.Status is ModuleExitStatus.Canceled)
         {
             return runtime.Exit(WithStatus(ModuleExitStatus.Canceled));

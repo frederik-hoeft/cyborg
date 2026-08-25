@@ -7,7 +7,9 @@ public interface IModuleLoader
 {
     string ModuleId { get; }
 
-    bool TryCreateModule(ref Utf8JsonReader reader, IJsonLoaderContext context, [NotNullWhen(true)] out IModuleWorker? worker);
+    bool TryLoadModule(ref Utf8JsonReader reader, IJsonLoaderContext context, [NotNullWhen(true)] out IModule? module);
+
+    IModuleWorker CreateWorker(IModule module, IServiceProvider serviceProvider);
 }
 
 public interface IModuleLoader<TModule> : IModuleLoader where TModule : class, IModule

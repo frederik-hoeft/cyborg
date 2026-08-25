@@ -43,13 +43,13 @@ public sealed class RootModuleRuntime(GlobalRuntimeEnvironment defaultEnvironmen
         return _environments.Remove(environment.Name);
     }
 
-    public override Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker module, EnvironmentScope scope = EnvironmentScope.Global, string? name = null, CancellationToken cancellationToken = default)
+    protected override Task<IModuleExecutionResult> ExecuteWorkerAsync(IModuleWorker module, EnvironmentScope scope, string? name, CancellationToken cancellationToken)
     {
         IRuntimeEnvironment environment = CreateScopedEnvironment(parent: this, scope, name);
-        return ExecuteAsync(module, environment, cancellationToken);
+        return ExecuteWorkerAsync(module, environment, cancellationToken);
     }
 
-    public override Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken = default)
+    protected override Task<IModuleExecutionResult> ExecuteWorkerAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(module);
         return ExecuteModuleAsync(root: this, module, environment, cancellationToken);
