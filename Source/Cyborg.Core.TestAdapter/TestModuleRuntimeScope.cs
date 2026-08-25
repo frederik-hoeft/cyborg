@@ -5,7 +5,6 @@ using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
 namespace Cyborg.Core.TestAdapter;
@@ -31,23 +30,23 @@ public sealed class TestModuleRuntimeScope : IAsyncDisposable
     /// <summary>
     /// Gets the global runtime environment where top-level variables are stored.
     /// </summary>
-    public GlobalRuntimeEnvironment GlobalEnvironment { get; }
+    public IRuntimeEnvironment GlobalEnvironment { get; }
 
     /// <summary>
     /// Gets the service provider backing this test scope.
     /// </summary>
     public IServiceProvider ServiceProvider => _serviceProvider;
 
-    private TestModuleRuntimeScope(ServiceProvider serviceProvider, IModuleRuntime runtime, GlobalRuntimeEnvironment globalEnvironment)
+    private TestModuleRuntimeScope(ServiceProvider serviceProvider, IModuleRuntime runtime)
     {
         _serviceProvider = serviceProvider;
         Runtime = runtime;
-        GlobalEnvironment = globalEnvironment;
+        GlobalEnvironment = runtime.GlobalEnvironment;
     }
 
     /// <summary>
-    /// Creates a new test scope from the given service collection. Builds the service provider,
-    /// resolves the global environment and logger factory, and constructs a <see cref="RootModuleRuntime"/>.
+    /// Creates a new test scope from the given service collection. Builds the service provider and
+    /// resolves a fresh root runtime execution session from the configured services.
     /// </summary>
     /// <param name="services">The fully configured service collection.</param>
     /// <returns>A ready-to-use test scope.</returns>
@@ -55,10 +54,8 @@ public sealed class TestModuleRuntimeScope : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(services);
         ServiceProvider serviceProvider = services.BuildServiceProvider();
-        GlobalRuntimeEnvironment globalEnvironment = serviceProvider.GetRequiredService<GlobalRuntimeEnvironment>();
-        ILoggerFactory loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
-        RootModuleRuntime runtime = new(globalEnvironment, loggerFactory, serviceProvider);
-        return new TestModuleRuntimeScope(serviceProvider, runtime, globalEnvironment);
+        IModuleRuntime runtime = serviceProvider.GetRequiredService<IModuleRuntime>();
+        return new TestModuleRuntimeScope(serviceProvider, runtime);
     }
 
     /// <summary>

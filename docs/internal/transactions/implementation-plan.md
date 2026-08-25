@@ -16,7 +16,8 @@ The current implementation contains several ownership assumptions that must chan
 |---|---|
 | Deserialization constructs a worker and `ModuleReference` stores it. | Deserialization stores immutable module definition + generated activation identity; execution creates the worker. |
 | Generated loader factory resolves worker dependencies from the load-time provider. | Generated activation resolves all invocation dependencies from the current module scope. |
-| `RootModuleRuntime`, global environment, and named-module registry are singleton workflow-state owners. | Application infrastructure creates independent root execution sessions seeded from immutable state. |
+| Root runtime and global environment are application-singleton workflow-state owners. | Each resolved root runtime is an independent execution session with its own logical global environment and runtime environment catalog. |
+| Named-module registry is a singleton mutable workflow-state owner. | Static loading seeds immutable named-module state; runtime registration becomes transaction-local in Stage 4. |
 | Runtime environment objects own mutable dictionaries and direct parent-object inheritance. | Environment views resolve a persistent transaction-owned environment graph by logical identity. |
 | Nested module calls reuse runtime/provider objects without a mandatory module DI scope. | Every invocation creates and disposes a fresh DI scope tied to one transaction node. |
 | Named-module deserialization mutates a runtime singleton registry. | Static loading builds immutable graph seed state; runtime dynamic registration is transactional. |

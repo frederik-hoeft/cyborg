@@ -21,6 +21,7 @@ using Cyborg.Core.Services.Pipelines;
 using Cyborg.Core.Services.Security.Trust;
 using Cyborg.Core.Text;
 using Jab;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -52,7 +53,7 @@ namespace Cyborg.Core;
 [Singleton<IModuleLoaderRegistry, DefaultModuleLoaderRegistry>]
 [Singleton<IModuleWorkerFactory, DefaultModuleWorkerFactory>]
 [Singleton<IModuleConfigurationLoader, DefaultModuleConfigurationLoader>]
-[Singleton<IModuleRuntime, RootModuleRuntime>]
+[Transient<IModuleRuntime>(Factory = nameof(CreateRootModuleRuntime))]
 [Singleton<IModuleRegistry, DefaultModuleRegistry>]
 [Singleton<IModuleArtifactsFactory, DefaultModuleArtifactsFactory>]
 [Transient<IServicePipeline<IModuleValidationHook>, ServicePipeline<IModuleValidationHook>>]
@@ -65,7 +66,6 @@ namespace Cyborg.Core;
 [Singleton<IModuleResultBuilderFactory, ModuleResultBuilderFactory>]
 [Singleton<MetricsCollectorOptions>]
 [Singleton<IMetricsCollector, MetricsCollector>]
-[Singleton<GlobalRuntimeEnvironment>(Factory = nameof(CreateGlobalRuntimeEnvironment))]
 [Singleton<JsonSerializerContext>(Factory = nameof(GetCoreJsonSerializerContext))]
 public interface ICyborgCoreServices
 {
@@ -75,11 +75,16 @@ public interface ICyborgCoreServices
 
     static JsonConverter CreateDecompositionStrategyConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<DecompositionStrategy>(namingPolicy);
 
-    static GlobalRuntimeEnvironment CreateGlobalRuntimeEnvironment(
+    static IModuleRuntime CreateRootModuleRuntime(
         JsonNamingPolicy namingPolicy,
-        ITaggedStringConversionObserver taggedStringConversionObserver) =>
-        new(namingPolicy)
+        ITaggedStringConversionObserver taggedStringConversionObserver,
+        ILoggerFactory loggerFactory,
+        IServiceProvider serviceProvider)
+    {
+        GlobalRuntimeEnvironment globalEnvironment = new(namingPolicy)
         {
             TaggedStringConversionObserver = taggedStringConversionObserver
         };
+        return new RootModuleRuntime(globalEnvironment, loggerFactory, serviceProvider);
+    }
 }

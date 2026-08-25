@@ -86,7 +86,8 @@ internal sealed class Commands
         services.GetRequiredService<MetricsCollectorOptions>().Namespace = metricsNamespace;
         IMetricsCollector metricsCollector = services.GetRequiredService<IMetricsCollector>();
         string metricsDestinationPath = metrics ?? configuredMetricsPath;
-        GlobalRuntimeEnvironment globalEnvironment = services.GetRequiredService<GlobalRuntimeEnvironment>();
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        IRuntimeEnvironment globalEnvironment = runtime.GlobalEnvironment;
         bool runSucceeded = false;
 
         try
@@ -130,7 +131,6 @@ internal sealed class Commands
             {
                 Environment = module.Environment ?? ModuleEnvironment.Default,
             };
-            IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
             TaggedString target = globalEnvironment.ResolveVariableOrDefault(WellKnownVariables.Target, new TaggedString("<unspecified>"));
             string renderedTarget = services.GetRequiredService<ITaggedStringRenderer>().Render(target);
             logger.LogRunStarted(renderedTarget);
@@ -212,7 +212,7 @@ internal sealed class Commands
         return $"\"{escaped}\"";
     }
 
-    private static void CollectRunMetrics(GlobalRuntimeEnvironment environment, IMetricsCollector metricsCollector, bool runSucceeded)
+    private static void CollectRunMetrics(IEnvironmentLike environment, IMetricsCollector metricsCollector, bool runSucceeded)
     {
         IMetricsLabelCollection labels = metricsCollector.CreateLabels();
         if (environment.TryResolveVariable(WellKnownVariables.Target, out TaggedString target))

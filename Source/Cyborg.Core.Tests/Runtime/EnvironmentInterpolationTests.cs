@@ -2,6 +2,7 @@
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Microsoft.Extensions.DependencyInjection;
+using System.Text.Json;
 
 namespace Cyborg.Core.Tests.Runtime;
 
@@ -115,7 +116,7 @@ public sealed class EnvironmentInterpolationTests : CyborgCoreTestBase
     [TestMethod]
     public Task Test_TryResolveVariable_CurrentAndEntryPointSelfReferences_UseDistinctScopesAsync() => TestWithDIAsync(services =>
     {
-        GlobalRuntimeEnvironment environment = services.GetRequiredService<GlobalRuntimeEnvironment>() with
+        GlobalRuntimeEnvironment environment = new(JsonNamingPolicy.SnakeCaseLower)
         {
             Namespace = "parent"
         };
