@@ -19,6 +19,7 @@ The design covers Cyborg-managed workflow state and state from services that exp
 | [Execution and lifetimes](execution-and-lifetimes.md) | Module activation, execution sessions, DI scopes, invocation lifecycle, structured concurrency, and project responsibilities. |
 | [Runtime responsibility boundaries](runtime-responsibilities.md) | Pre-transaction runtime facade cleanup, internal execution/environment responsibilities, and boundaries that remain stable through the migration. |
 | [State and reconciliation](state-and-reconciliation.md) | Transaction tree, baseline/change semantics, persistent state, fork groups, conflict detection, and atomic joins. |
+| [Transaction core](transaction-core.md) | Generic participant descriptors/state, root seeds, fork-group lifecycle, conflict strategy, and aggregate publication. |
 | [Transactional services](transactional-services.md) | Opt-in state participation for runtime and custom DI services, scoped access, root seeding, and lifetime boundaries. |
 | [Environment and runtime state](environment-and-runtime-state.md) | Transactional environment graph, logical global state, named environments, artifacts, and named-module state. |
 | [Implementation plan](implementation-plan.md) | Migration sequence, affected subsystems, validation gates, and representative tests. |

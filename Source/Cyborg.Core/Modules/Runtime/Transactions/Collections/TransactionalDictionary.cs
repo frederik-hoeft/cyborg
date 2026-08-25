@@ -118,6 +118,8 @@ internal sealed class TransactionalDictionary<TKey, TValue> : IReadOnlyDictionar
     internal bool TryGetChange(TKey key, out TransactionalDictionaryChange<TValue> change) =>
         _changes.TryGetValue(key, out change);
 
+    internal IEnumerable<KeyValuePair<TKey, TransactionalDictionaryChange<TValue>>> EnumerateChanges() => _changes;
+
     internal TransactionalDictionarySnapshot<TKey, TValue> Freeze()
     {
         if (_pendingSnapshotChanges.Count == 0)
@@ -147,7 +149,6 @@ internal sealed class TransactionalDictionary<TKey, TValue> : IReadOnlyDictionar
             throw new InvalidOperationException("The dictionary changed after the fork baseline was captured.");
         }
 
-        Dictionary<TKey, TransactionalDictionaryChange<TValue>> candidateChanges = new(_changes, _baseline.Data.KeyComparer);
         Dictionary<TKey, TransactionalDictionaryChange<TValue>> contributorChanges = new(_baseline.Data.KeyComparer);
         foreach (TransactionalDictionary<TKey, TValue> contributor in contributors)
         {
@@ -164,17 +165,35 @@ internal sealed class TransactionalDictionary<TKey, TValue> : IReadOnlyDictionar
                     conflictKey = key;
                     return false;
                 }
-                candidateChanges[key] = change;
             }
+        }
+
+        candidate = PrepareMergeCandidate(forkBaseline, contributorChanges);
+        conflictKey = default!;
+        return true;
+    }
+
+    internal TransactionalDictionary<TKey, TValue> PrepareMergeCandidate(
+        TransactionalDictionarySnapshot<TKey, TValue> forkBaseline,
+        IReadOnlyDictionary<TKey, TransactionalDictionaryChange<TValue>> contributorChanges)
+    {
+        ArgumentNullException.ThrowIfNull(forkBaseline);
+        ArgumentNullException.ThrowIfNull(contributorChanges);
+        if (!ReferenceEquals(Freeze(), forkBaseline))
+        {
+            throw new InvalidOperationException("The dictionary changed after the fork baseline was captured.");
+        }
+
+        Dictionary<TKey, TransactionalDictionaryChange<TValue>> candidateChanges = new(_changes, _baseline.Data.KeyComparer);
+        foreach ((TKey key, TransactionalDictionaryChange<TValue> change) in contributorChanges)
+        {
+            candidateChanges[key] = change;
         }
 
         ImmutableDictionary<TKey, TValue>.Builder builder = forkBaseline.Data.ToBuilder();
         ApplyChanges(builder, contributorChanges);
-        TransactionalDictionarySnapshot<TKey, TValue> candidateSnapshot =
-            new(builder.ToImmutable());
-        candidate = new TransactionalDictionary<TKey, TValue>(_baseline, candidateChanges, candidateSnapshot);
-        conflictKey = default!;
-        return true;
+        TransactionalDictionarySnapshot<TKey, TValue> candidateSnapshot = new(builder.ToImmutable());
+        return new TransactionalDictionary<TKey, TValue>(_baseline, candidateChanges, candidateSnapshot);
     }
 
     public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator() => Freeze().GetEnumerator();
