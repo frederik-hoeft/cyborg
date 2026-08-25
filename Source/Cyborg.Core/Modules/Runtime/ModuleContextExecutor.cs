@@ -8,7 +8,7 @@ namespace Cyborg.Core.Modules.Runtime;
 internal sealed class ModuleContextExecutor(VariableSyntaxBuilder syntaxFactory, ILogger logger)
 {
     public async Task<IModuleExecutionResult> ExecuteAsync(
-        IModuleRuntime runtime,
+        ModuleRuntimeBase runtime,
         ModuleContext moduleContext,
         IRuntimeEnvironment environment,
         CancellationToken cancellationToken)
@@ -28,7 +28,7 @@ internal sealed class ModuleContextExecutor(VariableSyntaxBuilder syntaxFactory,
                 return new ModuleExecutionResult(moduleContext.Module.Definition, ModuleExitStatus.Failed, environment.CreateArtifactCollection());
             }
         }
-        return await runtime.ExecuteAsync(moduleContext.Module, environment, cancellationToken);
+        return await runtime.ExecuteModuleReferenceInCurrentScopeAsync(moduleContext.Module, environment, cancellationToken);
     }
 
     private void ResolveRequiredArguments(ModuleContext moduleContext, IRuntimeEnvironment environment)

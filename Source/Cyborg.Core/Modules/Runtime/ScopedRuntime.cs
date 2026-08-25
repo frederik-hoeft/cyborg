@@ -4,22 +4,15 @@ using Microsoft.Extensions.Logging;
 namespace Cyborg.Core.Modules.Runtime;
 
 internal sealed class ScopedRuntime(
-    IModuleRuntime root,
-    IModuleRuntime parent,
+    ModuleRuntimeBase root,
+    ModuleRuntimeBase parent,
     RuntimeEnvironmentContext environmentContext,
     ILoggerFactory loggerFactory,
-    IServiceProvider? serviceProvider)
+    IServiceProvider serviceProvider)
     : ModuleRuntimeBase(environmentContext, loggerFactory, serviceProvider)
 {
-    [NotNull]
-    protected override IModuleRuntime? Parent => parent;
+    private protected override ModuleRuntimeBase Root => root;
 
-    protected override Task<IModuleExecutionResult> ExecuteWorkerAsync(
-        IModuleWorker module,
-        IRuntimeEnvironment environment,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(module);
-        return ExecuteModuleAsync(root, module, environment, cancellationToken);
-    }
+    [NotNull]
+    private protected override ModuleRuntimeBase? Parent => parent;
 }
