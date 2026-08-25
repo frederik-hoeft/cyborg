@@ -85,6 +85,10 @@ The implementation may cache a derived effective snapshot and invalidate it on l
 
 A mutable builder/transient facade can be used internally while materializing an immutable snapshot, provided an already-published snapshot can never be modified through that builder. `ImmutableDictionary<TKey, TValue>` and its builder are reasonable initial candidates; a custom persistent trie is justified only by measured need.
 
+The reusable map primitive follows this boundary directly: each branch owns a stable immutable baseline and a small local operation map, while frozen effective snapshots are persistent values shared by descendants. The primitive is single-writer; parallelism is represented by separate branch instances over one frozen baseline rather than concurrent mutation of one dictionary.
+
+Merge preparation composes branch operations into a detached candidate while preserving the owner's parent-relative provenance. It never mutates the live owner as part of preparation. Transaction topology, aggregate cross-component publication, and participant lifecycle remain responsibilities of the transaction coordinator rather than the map itself.
+
 ### Why the change set remains separate
 
 A persistent effective map alone cannot express the required provenance:

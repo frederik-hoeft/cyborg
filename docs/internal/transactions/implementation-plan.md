@@ -85,11 +85,37 @@ Make module invocation lifetime explicit before introducing transactional state 
 - Scope disposal occurs only after nested work owned by the invocation completes.
 - Failure to create a required scope fails the invocation explicitly.
 
-## Stage 3: Transaction Core and Generic Participants
+## Stage 3A: Transactional Key-Value Foundation
 
 ### Goal
 
-Establish transaction topology, persistent baselines, durable local provenance, and aggregate atomic reconciliation independently from environment complexity.
+Establish and independently validate the reusable map semantics used by transactional runtime components before transaction topology is introduced.
+
+### `Cyborg.Core` transactional collections
+
+- Represent one branch as an immutable persistent baseline plus a small mutable map of explicit final operations.
+- Distinguish `Set(value)` from `Remove` so removals act as negative cache entries against the baseline.
+- Preserve explicit modification provenance even when effective state returns to the baseline.
+- Freeze effective state into structurally shared immutable snapshots without copying the complete dictionary at every fork.
+- Allow multiple branches to derive from one exact frozen baseline.
+- Prepare merged candidate state without mutating the owner, with deterministic same-key write conflict detection as the initial map policy.
+- Keep the collection single-writer; concurrency is obtained by giving concurrent branches independent instances over the same immutable baseline.
+
+### Validation gate
+
+- `set -> baseline value` and `add -> remove` remain dirty.
+- Removal hides a baseline value until explicitly set again.
+- Frozen snapshots remain unchanged after later branch writes.
+- Sibling branches share one baseline but cannot observe each other's changes.
+- Non-overlapping branch changes produce a detached merge candidate while the owner remains unchanged.
+- Set/set, set/remove, and remove/remove on one logical key conflict even when final values would compare equal.
+- Repeated fork generations preserve earlier parent-relative provenance.
+
+## Stage 3B: Transaction Core and Generic Participants
+
+### Goal
+
+Establish transaction topology and aggregate atomic reconciliation over the independently validated transactional state primitives.
 
 ### `Cyborg.Core` transaction subsystem
 
