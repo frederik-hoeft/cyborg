@@ -83,7 +83,8 @@ public sealed class TestModuleRuntimeScope : IAsyncDisposable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(moduleContextJson);
         IJsonLoaderContext loaderContext = _serviceProvider.GetRequiredService<IJsonLoaderContext>();
-        ModuleContext moduleContext = JsonSerializer.Deserialize<ModuleContext>(moduleContextJson, loaderContext.JsonSerializerOptions)
+        ModuleConfigurationDeserializer deserializer = new(loaderContext);
+        ModuleContext moduleContext = deserializer.Deserialize(moduleContextJson)
             ?? throw new InvalidOperationException("Deserialization of the module context JSON returned null. Verify the JSON is a valid module context.");
         return moduleContext;
     }

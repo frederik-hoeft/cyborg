@@ -5,6 +5,8 @@ namespace Cyborg.Core.Modules.Runtime;
 
 internal interface IModuleExecutionRuntime : IModuleRuntime
 {
+    void ApplyModuleRegistrySeed(ModuleRegistrySeed seed);
+
     Task<IModuleExecutionResult> ExecuteActivatedWorkerAsync(
         IModuleWorker module,
         IRuntimeEnvironment environment,

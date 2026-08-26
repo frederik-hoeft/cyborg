@@ -17,10 +17,10 @@ The current implementation contains several ownership assumptions that must chan
 | Deserialization constructs a worker and `ModuleReference` stores it. | Deserialization stores immutable module definition + generated activation identity; execution creates the worker. |
 | Generated loader factory resolves worker dependencies from the load-time provider. | Generated activation resolves all invocation dependencies from the current module scope. |
 | Root runtime and global environment are application-singleton workflow-state owners. | Each resolved root runtime is an independent execution session whose logical global environment and environment graph belong to its root transaction. |
-| Named-module registry is a singleton mutable workflow-state owner. | Static loading seeds immutable named-module state; runtime registration becomes transaction-local in Stage 4. |
+| Named-module registry is a singleton mutable workflow-state owner. | Configuration loading produces immutable named-module seeds; execution applies them to a transaction-owned registry component. |
 | Runtime environment objects own mutable dictionaries and direct parent-object inheritance. | Environment views resolve a persistent transaction-owned environment graph by logical identity. |
 | Nested module calls reuse runtime/provider objects without a mandatory module DI scope. | Every invocation creates and disposes a fresh DI scope tied to one transaction node. |
-| Named-module deserialization mutates a runtime singleton registry. | Static loading builds immutable graph seed state; runtime dynamic registration is transactional. |
+| Named-module deserialization mutates a runtime singleton registry. | Deserialization records names in a load-local immutable seed; execution and direct runtime registration are transactional. |
 | Artifact publication can target another runtime/environment object directly. | Artifact targets resolve to logical environment identities inside the current transaction. |
 
 These are architectural migrations, not compatibility shims. Temporary adapters are acceptable only when they preserve the target invariants and can be removed without changing the model.
@@ -170,8 +170,10 @@ One logical global environment is seeded per root execution. Binding migration m
 
 ### Runtime named modules
 
-- Seed root runtime registrations from the immutable loaded graph.
-- Route dynamic registration/removal through a transaction-aware scoped facade.
+- Collect named definitions into a load-local immutable seed without mutating runtime state during deserialization.
+- Attach the seed to the loaded root context and apply it when that context enters its invocation transaction.
+- Route direct dynamic registration/removal through a transaction-bound scoped facade.
+- Keep registry state independent per root execution while preserving successful registrations across later invocations on that root.
 - Preserve immutable loaded module definitions as registry values.
 
 ### Validation gate

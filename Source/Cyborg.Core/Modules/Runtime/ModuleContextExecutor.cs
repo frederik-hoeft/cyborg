@@ -1,4 +1,4 @@
-using Cyborg.Core.Modules.Configuration.Model;
+﻿using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Runtime.Environments.Syntax;
 using Microsoft.Extensions.Logging;
@@ -34,6 +34,7 @@ internal sealed class ModuleContextExecutor : IModuleContextExecutor
         ArgumentNullException.ThrowIfNull(moduleContext);
         ArgumentNullException.ThrowIfNull(environment);
 
+        runtime.ApplyModuleRegistrySeed(moduleContext.NamedModules);
         ResolveRequiredArguments(moduleContext, environment);
         if (moduleContext.Configuration is { } configuration)
         {

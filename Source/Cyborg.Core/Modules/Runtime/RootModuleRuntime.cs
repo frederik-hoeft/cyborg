@@ -25,7 +25,7 @@ public sealed class RootModuleRuntime : ModuleRuntimeBase
         ModuleRuntimeOperations operations,
         ILoggerFactory loggerFactory,
         IServiceProvider serviceProvider)
-        : this(CreateState(defaultEnvironment, environmentFactory, loggerFactory), operations, serviceProvider)
+        : this(CreateState(defaultEnvironment, environmentFactory, operations, loggerFactory), operations, serviceProvider)
     {
     }
 
@@ -51,26 +51,30 @@ public sealed class RootModuleRuntime : ModuleRuntimeBase
         IRuntimeEnvironmentFactory environmentFactory = new DefaultRuntimeEnvironmentFactory(
             defaultEnvironment.SyntaxFactory,
             taggedStringConversionObserver: null);
+        IRuntimeModuleRegistry moduleRegistry = new RuntimeModuleRegistry();
         ModuleRuntimeOperations operations = new(
             new ModuleArtifactPublisher(loggerFactory),
             new ModuleContextExecutor(defaultEnvironment.SyntaxFactory, environmentFactory, loggerFactory),
-            new ModuleExecutionDispatcher(environmentFactory, loggerFactory));
+            new ModuleExecutionDispatcher(environmentFactory, loggerFactory),
+            moduleRegistry);
         return new RootRuntimeComposition(
-            CreateState(defaultEnvironment, environmentFactory, loggerFactory),
+            CreateState(defaultEnvironment, environmentFactory, operations, loggerFactory),
             operations);
     }
 
     private static RootRuntimeState CreateState(
         GlobalRuntimeEnvironment defaultEnvironment,
         IRuntimeEnvironmentFactory environmentFactory,
+        ModuleRuntimeOperations operations,
         ILoggerFactory loggerFactory)
     {
         ArgumentNullException.ThrowIfNull(defaultEnvironment);
         ArgumentNullException.ThrowIfNull(environmentFactory);
+        ArgumentNullException.ThrowIfNull(operations);
         ArgumentNullException.ThrowIfNull(loggerFactory);
 
         RuntimeEnvironmentTransactionParticipant environments = new();
-        TransactionCoordinator coordinator = new([environments]);
+        TransactionCoordinator coordinator = new([environments, operations.ModuleRegistry.Participant]);
         RuntimeEnvironmentNode globalNode = new(
             defaultEnvironment.Name,
             defaultEnvironment.IsTransient,

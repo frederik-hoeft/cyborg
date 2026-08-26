@@ -61,6 +61,12 @@ public abstract class ModuleRuntimeBase : IModuleRuntime, IModuleExecutionRuntim
             environment);
     }
 
+    void IModuleExecutionRuntime.ApplyModuleRegistrySeed(ModuleRegistrySeed seed)
+    {
+        ArgumentNullException.ThrowIfNull(seed);
+        _operations.ModuleRegistry.ApplySeed(_transaction, seed);
+    }
+
     Task<IModuleExecutionResult> IModuleExecutionRuntime.ExecuteActivatedWorkerAsync(
         IModuleWorker module,
         IRuntimeEnvironment environment,
@@ -141,6 +147,7 @@ public abstract class ModuleRuntimeBase : IModuleRuntime, IModuleExecutionRuntim
             IServiceProvider services = RequireExecutionServices();
             IServiceScopeFactory scopeFactory = services.GetRequiredService<IServiceScopeFactory>();
             await using AsyncServiceScope executionScope = scopeFactory.CreateAsyncScope();
+            _operations.ModuleRegistry.BindExecutionScope(executionScope.ServiceProvider, childTransaction);
             RuntimeEnvironmentContext childEnvironmentContext = _environmentContext.CreateTransactionView(childTransaction);
             IModuleExecutionRuntime scopedRuntime = new ScopedRuntime(
                 Root,

@@ -36,7 +36,7 @@ public sealed class DynamicKeyValuePairJsonConverter(IDynamicValueProviderRegist
                 throw new JsonException($"Expected value token for dynamic value type '{propertyName}'.");
             }
 
-            DynamicValue dynamicValue = DynamicValueDeserializer.ReadValue(propertyName, ref reader, registry, Context);
+            DynamicValue dynamicValue = DynamicValueDeserializer.ReadValue(propertyName, ref reader, registry, GetContext(options));
             value = dynamicValue.Value;
         }
 

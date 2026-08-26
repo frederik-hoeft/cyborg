@@ -56,7 +56,7 @@ namespace Cyborg.Core;
 [Singleton<IModuleConfigurationLoader, DefaultModuleConfigurationLoader>]
 [Singleton<VariableSyntaxBuilder>]
 [Transient<IModuleRuntime>(Factory = nameof(CreateRootModuleRuntime))]
-[Singleton<IModuleRegistry, DefaultModuleRegistry>]
+[Scoped<IModuleRegistry, DefaultModuleRegistry>]
 [Singleton<IModuleArtifactsFactory, DefaultModuleArtifactsFactory>]
 [Transient<IServicePipeline<IModuleValidationHook>, ServicePipeline<IModuleValidationHook>>]
 [Transient<IServicePipeline<IModulePreExecutionHook>, ServicePipeline<IModulePreExecutionHook>>]
@@ -84,10 +84,12 @@ public interface ICyborgCoreServices
         IServiceProvider serviceProvider)
     {
         IRuntimeEnvironmentFactory environmentFactory = new DefaultRuntimeEnvironmentFactory(syntaxFactory, taggedStringConversionObserver);
+        IRuntimeModuleRegistry moduleRegistry = new RuntimeModuleRegistry();
         ModuleRuntimeOperations operations = new(
             new ModuleArtifactPublisher(loggerFactory),
             new ModuleContextExecutor(syntaxFactory, environmentFactory, loggerFactory),
-            new ModuleExecutionDispatcher(environmentFactory, loggerFactory));
+            new ModuleExecutionDispatcher(environmentFactory, loggerFactory),
+            moduleRegistry);
         GlobalRuntimeEnvironment globalEnvironment = environmentFactory.CreateGlobalEnvironment();
         return new RootModuleRuntime(globalEnvironment, environmentFactory, operations, loggerFactory, serviceProvider);
     }

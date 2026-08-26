@@ -17,7 +17,7 @@ public sealed class ModuleReferenceJsonConverter(IModuleLoaderRegistry registry,
         {
             throw new JsonException($"Module configuration with name '{moduleName}' not found in the registry. Ensure that the module name specified in the JSON configuration matches a registered module configuration.");
         }
-        if (!configuration.TryLoadModule(ref reader, Context, out IModule? module))
+        if (!configuration.TryLoadModule(ref reader, GetContext(options), out IModule? module))
         {
             throw new JsonException($"Failed to load module definition for module '{moduleName}'. Ensure that the JSON configuration for the module is valid and that the module loader can handle it.");
         }

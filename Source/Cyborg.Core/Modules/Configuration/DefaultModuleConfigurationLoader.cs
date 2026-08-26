@@ -1,7 +1,6 @@
 ﻿using Cyborg.Core.Configuration.Serialization;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Services.Security.Trust;
-using System.Text.Json;
 
 namespace Cyborg.Core.Modules.Configuration;
 
@@ -17,7 +16,8 @@ public sealed class DefaultModuleConfigurationLoader
         ConfigurationTrustDecision trustDecision = await trustMonitor.EvaluateAsync(configurationFilePath, cancellationToken);
         trustService.Enforce(trustDecision);
         await using FileStream stream = File.OpenRead(trustDecision.Path);
-        ModuleContext? moduleReference = await JsonSerializer.DeserializeAsync<ModuleContext>(stream, configurationContext, cancellationToken);
-        return moduleReference ?? throw new InvalidOperationException($"Failed to load module context from configuration file '{trustDecision.Path}'.");
+        ModuleConfigurationDeserializer deserializer = new(configurationContext);
+        ModuleContext? moduleContext = await deserializer.DeserializeAsync(stream, cancellationToken);
+        return moduleContext ?? throw new InvalidOperationException($"Failed to load module context from configuration file '{trustDecision.Path}'.");
     }
 }

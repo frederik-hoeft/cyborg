@@ -161,13 +161,13 @@ Values crossing concurrent execution boundaries should therefore be immutable or
 
 Named module definitions discovered while loading a static workflow belong to the immutable loaded graph/seed, not to a singleton runtime registry.
 
-The load path builds an immutable initial named-module catalog associated with the workflow definition. Starting a root execution seeds the runtime named-module transactional component from that catalog.
+Each configuration load builds an immutable named-module seed associated with the loaded root `ModuleContext`. Entering that context applies the seed to the current transaction before requirements, configuration, or main-module execution. A dynamically loaded configuration therefore seeds its own transaction through the same path without mutating process-global state during deserialization.
 
 A module reference stored in the catalog is an immutable loaded definition plus activation identity, never a preconstructed worker.
 
 ## Runtime Named Modules
 
-Dynamic configuration modules can load/register module definitions during execution. Those operations use a scoped facade over the current transaction's named-module component.
+Dynamic configuration modules can load/register module definitions during execution. Loading produces an immutable seed; entering the loaded context applies that seed transactionally. Direct runtime registration/removal uses a scoped facade over the current transaction's named-module component.
 
 A dynamic registration:
 
