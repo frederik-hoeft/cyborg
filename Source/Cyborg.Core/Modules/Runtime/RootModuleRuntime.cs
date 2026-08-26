@@ -1,6 +1,7 @@
 ﻿using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Runtime.Transactions;
 using Cyborg.Core.Modules.Runtime.Transactions.Core;
+using Cyborg.Core.Modules.Runtime.Transactions.Services;
 using Microsoft.Extensions.Logging;
 
 namespace Cyborg.Core.Modules.Runtime;
@@ -56,7 +57,8 @@ public sealed class RootModuleRuntime : ModuleRuntimeBase
             new ModuleArtifactPublisher(loggerFactory),
             new ModuleContextExecutor(defaultEnvironment.SyntaxFactory, environmentFactory, loggerFactory),
             new ModuleExecutionDispatcher(environmentFactory, loggerFactory),
-            moduleRegistry);
+            moduleRegistry,
+            new RuntimeTransactionalServices([]));
         return new RootRuntimeComposition(
             CreateState(defaultEnvironment, environmentFactory, operations, loggerFactory),
             operations);
@@ -74,7 +76,7 @@ public sealed class RootModuleRuntime : ModuleRuntimeBase
         ArgumentNullException.ThrowIfNull(loggerFactory);
 
         RuntimeEnvironmentTransactionParticipant environments = new();
-        TransactionCoordinator coordinator = new([environments, operations.ModuleRegistry.Participant]);
+        TransactionCoordinator coordinator = new([environments, operations.ModuleRegistry.Participant, .. operations.TransactionalServices.Participants]);
         RuntimeEnvironmentNode globalNode = new(
             defaultEnvironment.Name,
             defaultEnvironment.IsTransient,

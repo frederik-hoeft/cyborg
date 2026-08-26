@@ -176,6 +176,15 @@ One logical global environment is seeded per root execution. Binding migration m
 - Keep registry state independent per root execution while preserving successful registrations across later invocations on that root.
 - Preserve immutable loaded module definitions as registry values.
 
+### Transaction-aware DI services
+
+- Expose a typed participant/fork contract for custom workflow-semantic DI state without exposing the internal transaction tree.
+- Enumerate singleton participant descriptors through the application DI composition and adapt them into each root transaction coordinator.
+- Bind a scoped transactional-service context before worker activation.
+- Give ordinary service facades stable state handles that re-resolve the current component state for each operation, preserving owner-freeze and nested-join semantics.
+- Keep ordinary scoped/transient/singleton services unchanged unless they explicitly register a transactional participant.
+- Route custom participant conflicts through the same coordinator conflict strategy and aggregate atomic publication as built-in participants.
+
 ### Validation gate
 
 - `Current`, `Parent`, `Global`, inherited, and named-reference environment access all obey the same fork isolation.
@@ -183,6 +192,9 @@ One logical global environment is seeded per root execution. Binding migration m
 - Artifact writes are invisible before join and visible after successful join.
 - Child-local transient environments do not accumulate unnecessarily in ancestors.
 - Dynamic named-module changes do not leak between siblings or roots.
+- A custom transactional service inherits state into nested invocations, reconciles child changes into the parent, and remains isolated across independent roots.
+- A retained scoped service state handle observes reconciled child state and cannot mutate frozen owner state while a fork is active.
+- Custom participant conflicts abort reconciliation without partial publication of built-in participant state.
 
 ## Stage 5: Sequential Compatibility
 

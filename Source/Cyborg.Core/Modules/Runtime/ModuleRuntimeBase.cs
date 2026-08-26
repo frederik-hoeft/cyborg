@@ -1,6 +1,7 @@
 ﻿using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Runtime.Transactions.Core;
+using Cyborg.Core.Modules.Runtime.Transactions.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Cyborg.Core.Modules.Runtime;
@@ -148,6 +149,7 @@ public abstract class ModuleRuntimeBase : IModuleRuntime, IModuleExecutionRuntim
             IServiceScopeFactory scopeFactory = services.GetRequiredService<IServiceScopeFactory>();
             await using AsyncServiceScope executionScope = scopeFactory.CreateAsyncScope();
             _operations.ModuleRegistry.BindExecutionScope(executionScope.ServiceProvider, childTransaction);
+            _operations.TransactionalServices.BindExecutionScope(executionScope.ServiceProvider, childTransaction);
             RuntimeEnvironmentContext childEnvironmentContext = _environmentContext.CreateTransactionView(childTransaction);
             IModuleExecutionRuntime scopedRuntime = new ScopedRuntime(
                 Root,

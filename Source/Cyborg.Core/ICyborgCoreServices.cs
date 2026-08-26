@@ -14,6 +14,7 @@ using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Runtime.Environments.Artifacts;
 using Cyborg.Core.Modules.Runtime.Environments.Syntax;
+using Cyborg.Core.Modules.Runtime.Transactions.Services;
 using Cyborg.Core.Services;
 using Cyborg.Core.Services.Dispatch;
 using Cyborg.Core.Services.Metrics;
@@ -57,6 +58,7 @@ namespace Cyborg.Core;
 [Singleton<VariableSyntaxBuilder>]
 [Transient<IModuleRuntime>(Factory = nameof(CreateRootModuleRuntime))]
 [Scoped<IModuleRegistry, DefaultModuleRegistry>]
+[Scoped<ITransactionalServiceContext>(Factory = nameof(CreateTransactionalServiceContext))]
 [Singleton<IModuleArtifactsFactory, DefaultModuleArtifactsFactory>]
 [Transient<IServicePipeline<IModuleValidationHook>, ServicePipeline<IModuleValidationHook>>]
 [Transient<IServicePipeline<IModulePreExecutionHook>, ServicePipeline<IModulePreExecutionHook>>]
@@ -81,16 +83,21 @@ public interface ICyborgCoreServices
         VariableSyntaxBuilder syntaxFactory,
         ITaggedStringConversionObserver taggedStringConversionObserver,
         ILoggerFactory loggerFactory,
-        IServiceProvider serviceProvider)
+        IServiceProvider serviceProvider,
+        IEnumerable<TransactionalServiceParticipant> transactionalServiceParticipants)
     {
         IRuntimeEnvironmentFactory environmentFactory = new DefaultRuntimeEnvironmentFactory(syntaxFactory, taggedStringConversionObserver);
         IRuntimeModuleRegistry moduleRegistry = new RuntimeModuleRegistry();
+        RuntimeTransactionalServices transactionalServices = new(transactionalServiceParticipants);
         ModuleRuntimeOperations operations = new(
             new ModuleArtifactPublisher(loggerFactory),
             new ModuleContextExecutor(syntaxFactory, environmentFactory, loggerFactory),
             new ModuleExecutionDispatcher(environmentFactory, loggerFactory),
-            moduleRegistry);
+            moduleRegistry,
+            transactionalServices);
         GlobalRuntimeEnvironment globalEnvironment = environmentFactory.CreateGlobalEnvironment();
         return new RootModuleRuntime(globalEnvironment, environmentFactory, operations, loggerFactory, serviceProvider);
     }
+
+    static ITransactionalServiceContext CreateTransactionalServiceContext() => new TransactionalServiceContext();
 }
