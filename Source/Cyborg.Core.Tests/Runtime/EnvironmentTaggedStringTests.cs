@@ -1,5 +1,9 @@
-﻿using Cyborg.Core.Modules.Runtime;
+﻿using Cyborg.Core.Modules;
+using Cyborg.Core.Modules.Configuration.Model;
+using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
+using Cyborg.Core.Modules.Runtime.Environments.Artifacts;
+using Cyborg.Core.Modules.Runtime.Environments.Syntax;
 using Cyborg.Core.Text;
 using Cyborg.Core.Text.Rendering;
 using Microsoft.Extensions.DependencyInjection;
@@ -75,6 +79,38 @@ public sealed class EnvironmentTaggedStringTests : CyborgCoreTestBase
     }
 
     [TestMethod]
+    public Task Test_RuntimeEnvironment_UsesVariableSyntaxBuilderFromDIAsync() => TestWithDIAsync(services =>
+    {
+        VariableSyntaxBuilder syntaxFactory = services.GetRequiredService<VariableSyntaxBuilder>();
+        IRuntimeEnvironment environment = services.GetRequiredService<IModuleRuntime>().Environment;
+
+        Assert.AreSame(syntaxFactory, environment.SyntaxFactory);
+    });
+
+    [TestMethod]
+    public Task Test_ModuleArtifacts_UseRuntimeServicesFromDIAsync()
+    {
+        RecordingTaggedStringConversionObserver observer = new();
+        return TestWithDIAsync(services =>
+        {
+            IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+            IModuleArtifactsFactory artifactsFactory = services.GetRequiredService<IModuleArtifactsFactory>();
+            VariableSyntaxBuilder syntaxFactory = services.GetRequiredService<VariableSyntaxBuilder>();
+            ProbeModule module = new() { Artifacts = ModuleArtifacts.Default with { Namespace = "probe" } };
+            IModuleArtifactsBuilder artifacts = artifactsFactory.CreateArtifacts(runtime, module);
+            TaggedString tagged = new("abc", [WellKnownTags.SECRET]);
+
+            Assert.AreSame(syntaxFactory, artifacts.SyntaxFactory);
+            artifacts.Expose("token", tagged);
+            IEnvironmentLike artifactEnvironment = artifacts.Build(ModuleExitStatus.Success);
+            Assert.IsTrue(artifactEnvironment.TryResolveVariable("token", out string? raw));
+            Assert.AreEqual("abc", raw);
+            Assert.AreEqual("token", observer.VariableName);
+            Assert.AreEqual(tagged, observer.Value);
+        }, services => services.AddSingleton<ITaggedStringConversionObserver>(observer));
+    }
+
+    [TestMethod]
     public Task Test_TryResolveVariable_StringVariableAsTaggedString_IsUntaggedAsync() => TestWithDIAsync(services =>
     {
         IRuntimeEnvironment environment = services.GetRequiredService<IModuleRuntime>().Environment;
@@ -121,6 +157,8 @@ public sealed class EnvironmentTaggedStringTests : CyborgCoreTestBase
         Assert.AreEqual("hello world", actual.Value);
         Assert.IsTrue(actual.HasTag("template"));
     });
+
+    private sealed record ProbeModule : ModuleBase, IModule;
 
     private sealed class RecordingTaggedStringConversionObserver : ITaggedStringConversionObserver
     {

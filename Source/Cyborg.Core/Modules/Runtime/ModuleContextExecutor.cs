@@ -5,8 +5,25 @@ using Microsoft.Extensions.Logging;
 
 namespace Cyborg.Core.Modules.Runtime;
 
-internal sealed class ModuleContextExecutor(VariableSyntaxBuilder syntaxFactory, ILogger logger)
+internal sealed class ModuleContextExecutor : IModuleContextExecutor
 {
+    private readonly IRuntimeEnvironmentFactory _environmentFactory;
+    private readonly ILogger _logger;
+    private readonly VariableSyntaxBuilder _syntaxFactory;
+
+    public ModuleContextExecutor(
+        VariableSyntaxBuilder syntaxFactory,
+        IRuntimeEnvironmentFactory environmentFactory,
+        ILoggerFactory loggerFactory)
+    {
+        ArgumentNullException.ThrowIfNull(syntaxFactory);
+        ArgumentNullException.ThrowIfNull(environmentFactory);
+        ArgumentNullException.ThrowIfNull(loggerFactory);
+        _syntaxFactory = syntaxFactory;
+        _environmentFactory = environmentFactory;
+        _logger = loggerFactory.CreateLogger("cyborg.core.runtime");
+    }
+
     public async Task<IModuleExecutionResult> ExecuteAsync(
         IModuleExecutionRuntime runtime,
         ModuleContext moduleContext,
@@ -20,12 +37,12 @@ internal sealed class ModuleContextExecutor(VariableSyntaxBuilder syntaxFactory,
         ResolveRequiredArguments(moduleContext, environment);
         if (moduleContext.Configuration is { } configuration)
         {
-            logger.LogConfigurationModuleRunning(configuration.ModuleId, moduleContext.Module.ModuleId);
+            _logger.LogConfigurationModuleRunning(configuration.ModuleId, moduleContext.Module.ModuleId);
             IModuleExecutionResult result = await runtime.ExecuteAsync(configuration, environment, cancellationToken);
             if (result.Status is ModuleExitStatus.Failed or ModuleExitStatus.Canceled)
             {
-                logger.LogModuleConfigurationFailed(configuration.ModuleId, result.Status.ToString(), moduleContext.Module.ModuleId, environment.Name);
-                return new ModuleExecutionResult(moduleContext.Module.Definition, ModuleExitStatus.Failed, environment.CreateArtifactCollection());
+                _logger.LogModuleConfigurationFailed(configuration.ModuleId, result.Status.ToString(), moduleContext.Module.ModuleId, environment.Name);
+                return new ModuleExecutionResult(moduleContext.Module.Definition, ModuleExitStatus.Failed, _environmentFactory.CreateEnvironmentLike(environment.Namespace));
             }
         }
         return await runtime.ExecuteModuleReferenceInCurrentScopeAsync(moduleContext.Module, environment, cancellationToken);
@@ -44,8 +61,8 @@ internal sealed class ModuleContextExecutor(VariableSyntaxBuilder syntaxFactory,
         List<string> errors = [];
         List<(string Argument, object Value)> resolvedArguments = [];
         string argumentNamespace = argumentNamespaceValue ?? "(none)";
-        logger.LogTemplateArgumentsResolving(arguments.Count, moduleContext.Module.ModuleId, argumentNamespace);
-        if (!string.IsNullOrEmpty(argumentNamespaceValue) && !syntaxFactory.IsValidIdentifier(argumentNamespaceValue))
+        _logger.LogTemplateArgumentsResolving(arguments.Count, moduleContext.Module.ModuleId, argumentNamespace);
+        if (!string.IsNullOrEmpty(argumentNamespaceValue) && !_syntaxFactory.IsValidIdentifier(argumentNamespaceValue))
         {
             errors.Add($"Template namespaces must be valid identifiers: '{argumentNamespaceValue}'");
         }
@@ -53,13 +70,13 @@ internal sealed class ModuleContextExecutor(VariableSyntaxBuilder syntaxFactory,
         foreach (string argument in arguments)
         {
             ++i;
-            if (!syntaxFactory.IsValidIdentifier(argument))
+            if (!_syntaxFactory.IsValidIdentifier(argument))
             {
                 errors.Add($"Template argument names must be valid identifiers: argv[{i}] = '{argument}'");
                 continue;
             }
-            PathSyntax path = syntaxFactory.Path(argument);
-            PathSyntax argumentPath = syntaxFactory.Path(argumentNamespaceValue).Child(path);
+            PathSyntax path = _syntaxFactory.Path(argument);
+            PathSyntax argumentPath = _syntaxFactory.Path(argumentNamespaceValue).Child(path);
             if (environment.TryResolveVariable(argumentPath, out object? value) || environment.TryResolveVariable(path, out value))
             {
                 resolvedArguments.Add((argument, value));
@@ -70,7 +87,7 @@ internal sealed class ModuleContextExecutor(VariableSyntaxBuilder syntaxFactory,
         if (errors.Count > 0)
         {
             string errorMessage = $"Module execution failed due to missing required arguments:{System.Environment.NewLine}    {string.Join($"{System.Environment.NewLine}    ", errors)}";
-            logger.LogTemplateArgumentResolutionFailed(moduleContext.Module.ModuleId, errorMessage);
+            _logger.LogTemplateArgumentResolutionFailed(moduleContext.Module.ModuleId, errorMessage);
             throw new InvalidOperationException(errorMessage);
         }
 

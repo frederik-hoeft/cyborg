@@ -49,7 +49,4 @@ public interface IRuntimeEnvironment : IEnvironmentLike
 
     internal IRuntimeEnvironment WithOverrideResolutionTags(IReadOnlyCollection<string> tags);
 
-    internal IEnvironmentLike CreateArtifactCollection(ModuleArtifacts artifacts);
-
-    internal IEnvironmentLike CreateArtifactCollection();
 }

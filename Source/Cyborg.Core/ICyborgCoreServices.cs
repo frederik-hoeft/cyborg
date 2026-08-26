@@ -13,6 +13,7 @@ using Cyborg.Core.Modules.Hooks;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Runtime.Environments.Artifacts;
+using Cyborg.Core.Modules.Runtime.Environments.Syntax;
 using Cyborg.Core.Services;
 using Cyborg.Core.Services.Dispatch;
 using Cyborg.Core.Services.Metrics;
@@ -53,6 +54,7 @@ namespace Cyborg.Core;
 [Singleton<IModuleLoaderRegistry, DefaultModuleLoaderRegistry>]
 [Singleton<IModuleWorkerFactory, DefaultModuleWorkerFactory>]
 [Singleton<IModuleConfigurationLoader, DefaultModuleConfigurationLoader>]
+[Singleton<VariableSyntaxBuilder>]
 [Transient<IModuleRuntime>(Factory = nameof(CreateRootModuleRuntime))]
 [Singleton<IModuleRegistry, DefaultModuleRegistry>]
 [Singleton<IModuleArtifactsFactory, DefaultModuleArtifactsFactory>]
@@ -76,12 +78,17 @@ public interface ICyborgCoreServices
     static JsonConverter CreateDecompositionStrategyConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<DecompositionStrategy>(namingPolicy);
 
     static IModuleRuntime CreateRootModuleRuntime(
-        JsonNamingPolicy namingPolicy,
+        VariableSyntaxBuilder syntaxFactory,
         ITaggedStringConversionObserver taggedStringConversionObserver,
         ILoggerFactory loggerFactory,
         IServiceProvider serviceProvider)
     {
-        GlobalRuntimeEnvironment globalEnvironment = new(namingPolicy);
-        return new RootModuleRuntime(globalEnvironment, taggedStringConversionObserver, loggerFactory, serviceProvider);
+        IRuntimeEnvironmentFactory environmentFactory = new DefaultRuntimeEnvironmentFactory(syntaxFactory, taggedStringConversionObserver);
+        ModuleRuntimeOperations operations = new(
+            new ModuleArtifactPublisher(loggerFactory),
+            new ModuleContextExecutor(syntaxFactory, environmentFactory, loggerFactory),
+            new ModuleExecutionDispatcher(environmentFactory, loggerFactory));
+        GlobalRuntimeEnvironment globalEnvironment = environmentFactory.CreateGlobalEnvironment();
+        return new RootModuleRuntime(globalEnvironment, environmentFactory, operations, loggerFactory, serviceProvider);
     }
 }

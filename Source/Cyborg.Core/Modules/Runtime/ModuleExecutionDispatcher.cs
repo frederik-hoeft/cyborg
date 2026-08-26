@@ -8,8 +8,21 @@ using Microsoft.Extensions.Logging;
 
 namespace Cyborg.Core.Modules.Runtime;
 
-internal sealed class ModuleExecutionDispatcher(ILogger logger)
+internal sealed class ModuleExecutionDispatcher : IModuleExecutionDispatcher
 {
+    private readonly IRuntimeEnvironmentFactory _environmentFactory;
+    private readonly ILogger _logger;
+
+    public ModuleExecutionDispatcher(
+        IRuntimeEnvironmentFactory environmentFactory,
+        ILoggerFactory loggerFactory)
+    {
+        ArgumentNullException.ThrowIfNull(environmentFactory);
+        ArgumentNullException.ThrowIfNull(loggerFactory);
+        _environmentFactory = environmentFactory;
+        _logger = loggerFactory.CreateLogger("cyborg.core.runtime");
+    }
+
     public IModuleWorker ActivateWorker(ModuleReference moduleReference, IServiceProvider? serviceProvider)
     {
         ArgumentNullException.ThrowIfNull(moduleReference);
@@ -30,29 +43,29 @@ internal sealed class ModuleExecutionDispatcher(ILogger logger)
         ArgumentNullException.ThrowIfNull(runtime);
         ArgumentNullException.ThrowIfNull(environment);
 
-        logger.LogModuleDispatched(module.ModuleId, environment.Name);
+        _logger.LogModuleDispatched(module.ModuleId, environment.Name);
         IModuleExecutionResult result;
         try
         {
             result = await module.ExecuteAsync(runtime, cancellationToken);
             if (result.Status is ModuleExitStatus.Failed or ModuleExitStatus.Canceled)
             {
-                logger.LogModuleExecutionFailed(module.ModuleId, result.Status.ToString(), environment.Name);
+                _logger.LogModuleExecutionFailed(module.ModuleId, result.Status.ToString(), environment.Name);
             }
             else
             {
-                logger.LogModuleCompleted(module.ModuleId, result.Status.ToString(), environment.Name);
+                _logger.LogModuleCompleted(module.ModuleId, result.Status.ToString(), environment.Name);
             }
         }
         catch (OperationCanceledException)
         {
-            logger.LogModuleCanceled(module.ModuleId, environment.Name);
-            result = new ModuleExecutionResult(module.Module, ModuleExitStatus.Canceled, environment.CreateArtifactCollection());
+            _logger.LogModuleCanceled(module.ModuleId, environment.Name);
+            result = new ModuleExecutionResult(module.Module, ModuleExitStatus.Canceled, _environmentFactory.CreateEnvironmentLike(environment.Namespace));
         }
         catch (Exception exception)
         {
-            logger.LogModuleUnhandledException(module.ModuleId, environment.Name, exception);
-            result = new ModuleExecutionResult(module.Module, ModuleExitStatus.Failed, environment.CreateArtifactCollection());
+            _logger.LogModuleUnhandledException(module.ModuleId, environment.Name, exception);
+            result = new ModuleExecutionResult(module.Module, ModuleExitStatus.Failed, _environmentFactory.CreateEnvironmentLike(environment.Namespace));
         }
 
         await RunPostExecutionHooksAsync(module.ModuleId, result, runtime, serviceProvider);
@@ -72,7 +85,7 @@ internal sealed class ModuleExecutionDispatcher(ILogger logger)
         }
         catch (Exception exception)
         {
-            logger.LogPostExecutionHookPipelineFailed(moduleId, exception);
+            _logger.LogPostExecutionHookPipelineFailed(moduleId, exception);
             return;
         }
         if (postExecutionHooks is null)
@@ -89,7 +102,7 @@ internal sealed class ModuleExecutionDispatcher(ILogger logger)
             }
             catch (Exception exception)
             {
-                logger.LogPostExecutionHookFailed(moduleId, postExecutionHook.GetType().FullName ?? postExecutionHook.GetType().Name, exception);
+                _logger.LogPostExecutionHookFailed(moduleId, postExecutionHook.GetType().FullName ?? postExecutionHook.GetType().Name, exception);
             }
         }
     }

@@ -23,7 +23,7 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
         };
     }
 
-    internal static InheritedRuntimeEnvironment CreateTransactionView(
+    internal InheritedRuntimeEnvironment(
         RuntimeEnvironmentId environmentId,
         RuntimeEnvironmentNode node,
         IRuntimeEnvironment parent,
@@ -31,17 +31,15 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
         string ns,
         RuntimeEnvironmentTransactionParticipant participant,
         ExecutionTransaction transaction)
+        : this(node.Name, parent, node.IsTransient, syntaxFactory, ns)
     {
         ArgumentNullException.ThrowIfNull(node);
         ArgumentNullException.ThrowIfNull(parent);
         ArgumentNullException.ThrowIfNull(syntaxFactory);
         ArgumentNullException.ThrowIfNull(participant);
         ArgumentNullException.ThrowIfNull(transaction);
-        return new InheritedRuntimeEnvironment(node.Name, parent, node.IsTransient, syntaxFactory, ns)
-        {
-            EnvironmentId = environmentId,
-            VariableStore = new TransactionalEnvironmentVariableStore(environmentId, participant, transaction)
-        };
+        EnvironmentId = environmentId;
+        VariableStore = new TransactionalEnvironmentVariableStore(environmentId, participant, transaction);
     }
 
     internal protected override bool TryGetStoredVariableRecursiveCore(string name, [NotNullWhen(true)] out object? value)

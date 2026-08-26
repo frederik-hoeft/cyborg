@@ -3,6 +3,7 @@ using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
+using Cyborg.Core.Tests.TestInfrastructure;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Cyborg.Core.Tests.Runtime;
@@ -75,7 +76,7 @@ public sealed class RootExecutionSessionTests : CyborgCoreTestBase
         {
             recorder.Record(singletonProbe);
             return Task.FromResult<IModuleExecutionResult>(
-                new SessionProbeExecutionResult(module, ModuleExitStatus.Success, runtime.Environment.CreateArtifactCollection()));
+                new SessionProbeExecutionResult(module, ModuleExitStatus.Success, runtime.Environment.CreateTestArtifactCollection()));
         }
     }
 

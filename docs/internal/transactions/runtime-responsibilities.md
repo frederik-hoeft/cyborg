@@ -1,12 +1,12 @@
 # Runtime Responsibility Boundaries
 
-> **Status:** Internal pre-transaction refactoring design. This document describes the intended responsibility split used as preparation for the transactional runtime architecture in this directory.
+> **Status:** Internal runtime composition design. This document describes the responsibility split used by the transactional runtime architecture in this directory.
 
 ## Purpose
 
 The runtime is the consumer-facing execution context for module workers. It should remain the single facade through which workers access their current environment, execute nested modules, prepare child environments, and complete execution. Those capabilities do not require the facade itself to own every implementation mechanism.
 
-The pre-transaction runtime has accumulated several independent responsibilities in `ModuleRuntimeBase` and the environment types. Separating those responsibilities before transaction state is introduced reduces the number of concerns that must change simultaneously when execution scopes and persistent state replace the current mutable runtime hierarchy.
+The runtime has several independent responsibilities that meet at `IModuleRuntime` but should not be implemented by one monolithic runtime object. Keeping execution orchestration, environment views, artifact publication, and runtime service composition behind focused internal boundaries lets the public facade remain stable while transaction state and execution scopes evolve independently.
 
 ## Consumer-Facing Runtime
 
@@ -23,7 +23,7 @@ The runtime facade owns the behavioral contract, not the backing mechanisms. Its
 
 Overloads that only choose a default environment or translate `EnvironmentScope`/`ModuleContext` metadata into one of those core operations are convenience syntax and belong in runtime extension methods. Environment catalog mutation is runtime infrastructure and is not part of the consumer contract.
 
-This distinction becomes more important once every invocation owns a DI scope and transaction node: the public facade can remain stable while its backing execution/session state changes substantially.
+Every invocation owns a DI scope and transaction node, while the public facade remains stable over that execution/session state.
 
 Internal runtime collaborators should depend on narrow internal capability interfaces rather than concrete runtime implementations when they need behavior beyond `IModuleRuntime`. Concrete runtime types should only be coupled directly where they form an intentionally inseparable implementation pair, such as a private or internal scope-bound runtime created by the runtime facade itself.
 
@@ -56,15 +56,30 @@ Raw worker dispatch owns execution mechanics after a module definition has alrea
 - emit lifecycle logging;
 - run post-execution hooks without allowing hook failure to replace the module result.
 
-This mechanism is internal runtime infrastructure. It must resolve scope-sensitive services from the current invocation provider when per-invocation DI scopes are introduced, but module consumers do not need direct access to it.
+This mechanism is internal runtime infrastructure. It resolves scope-sensitive services from the current invocation provider; module consumers do not need direct access to it.
 
-Keeping activation/dispatch separate from `ModuleContext` orchestration also makes the future scope boundary explicit: the invocation scope must exist before worker activation and remains valid through post-execution hooks.
+Keeping activation/dispatch separate from `ModuleContext` orchestration also keeps the scope boundary explicit: the invocation scope exists before worker activation and remains valid through post-execution hooks.
 
 ## Artifact Publication
 
 `Exit` is part of the module-facing runtime contract because it converts a worker result into the externally visible completed result and applies configured artifact-publication semantics. The publication mechanics are nevertheless a distinct policy responsibility.
 
-Artifact publication determines the responsible runtime-relative environment target, builds the artifact collection, publishes it, and returns the normalized execution result. Isolating that policy makes the transaction migration straightforward: publication can later resolve logical environment identities and stage writes in the current transaction without changing worker APIs.
+Artifact publication determines the responsible runtime-relative environment target, builds the artifact collection, publishes it, and returns the normalized execution result. Publication resolves transaction-bound environment views, so artifact writes participate in the current transaction without changing worker APIs.
+
+## Runtime Service Composition and Assisted Construction
+
+Runtime objects combine two different kinds of inputs that should not be propagated in the same way:
+
+- context-free services such as syntax policy, diagnostics, logging, and observers belong to dependency injection;
+- execution-specific values such as namespace, logical environment identity, parent view, and transaction belong to the runtime operation that creates the object.
+
+Environment and artifact views therefore use an internal assisted-construction factory. DI supplies the context-free services once, while callers provide only the contextual values needed for the requested view. A runtime environment must not copy DI services from another environment merely because that environment happens to be available as a construction source. This keeps transaction snapshots and logical environment graph state free of service references.
+
+`VariableSyntaxBuilder` is a context-free naming/syntax policy and is shared as a singleton DI service. It has no environment-specific mutable state, so introducing another interface solely to hide its concrete type would add indirection without creating a meaningful extension boundary. Runtime views and artifact collections created through the assisted factory use that DI-owned instance.
+
+Stateless runtime mechanisms such as module-context orchestration, raw worker dispatch, and artifact publication are separated behind narrow internal capability interfaces. Runtime nodes carry an internal operations bundle rather than constructing or depending directly on those concrete mechanisms. `RootModuleRuntime` and `ScopedRuntime` remain intentionally concrete companions because they represent contextual execution nodes whose construction is owned by the runtime implementation itself.
+
+Jab generates imported service-module providers in the consuming assembly. Registering internal Core implementation types directly would therefore expose inaccessible types to generated host code. Internal runtime mechanisms stay internal and are composed at the Core DI factory boundary from DI-provided public services instead of being made public merely to satisfy container generation. This composition step is the only place that should manually connect those context-free services to internal runtime factories and mechanisms.
 
 ## Runtime Environment Internals
 
@@ -73,9 +88,7 @@ Artifact publication determines the responsible runtime-relative environment tar
 - **environment state storage**: bindings and later transaction-local changes;
 - **environment semantics**: resolution, interpolation, indirection, overrides, decomposition, namespaces, and inherited lookup.
 
-The mutable binding dictionary is therefore hidden behind a small storage boundary. The current implementation remains mutable and preserves existing shared-binding behavior for bound environment views, but resolution logic no longer depends directly on `Dictionary<string, object?>` as its storage contract.
-
-The transaction migration should replace that storage boundary with transaction-owned persistent baseline/change state rather than attempting to make the current dictionary concurrent.
+Bindings are backed by transaction-owned persistent baseline/change state rather than by a mutable canonical dictionary. Runtime environment instances are behavioral views over logical environment identity and transaction state, so multiple CLR objects may represent the same logical environment without duplicating its state.
 
 Module namespace calculation and bulk publication are convenience operations rather than intrinsic mutable environment state. They can remain extension-level behavior while the core `IRuntimeEnvironment` contract focuses on resolution, binding, override state, and artifact/decomposition semantics.
 
@@ -85,15 +98,15 @@ The refactor deliberately does **not** introduce module-facing services such as 
 
 Low-level runtime mechanisms may later be represented as internal DI services where lifetime or testability benefits from it, but ordinary modules should continue to receive one `IModuleRuntime` execution facade. Explicit transactional participation for custom DI services is a separate opt-in extension point described in [Transactional Services](transactional-services.md); it is not the basic runtime API.
 
-## Transaction Migration Consequences
+## Transaction Integration
 
-This responsibility split prepares the next implementation stages without predetermining concrete transaction types:
+The responsibility split aligns directly with the transactional runtime:
 
-- per-invocation DI scope creation can wrap worker activation/dispatch without touching module-context semantics;
-- the runtime environment scope can be replaced by a transaction-bound environment graph view;
+- per-invocation DI scope creation wraps worker activation/dispatch without changing module-context semantics;
+- runtime environment contexts materialize views over transaction-owned environment graph state;
 - named registration, environment topology, and bindings remain transaction-owned component state rather than runtime-owned mutable state;
-- artifact publication can become staged environment changes;
-- `ModuleContext` orchestration can establish the main invocation transaction and reconcile configuration before main activation;
-- `IModuleRuntime` remains a narrow facade even as its backing state becomes execution-session-local.
+- artifact publication produces ordinary transactional environment changes;
+- `ModuleContext` orchestration owns the main invocation transaction while configuration executes as a nested invocation;
+- `IModuleRuntime` remains a narrow facade over execution-session-local state.
 
-The refactor should preserve current sequential behavior. It is preparation for the transaction model, not an opportunity to introduce transaction semantics early.
+Future transactional participants should follow the same pattern: state and reconciliation remain subsystem-owned, while runtime orchestration depends only on narrow capabilities required to coordinate execution.

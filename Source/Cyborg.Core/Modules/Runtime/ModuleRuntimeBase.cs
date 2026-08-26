@@ -2,17 +2,13 @@
 using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Runtime.Transactions.Core;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace Cyborg.Core.Modules.Runtime;
 
 public abstract class ModuleRuntimeBase : IModuleRuntime, IModuleExecutionRuntime
 {
-    private readonly ModuleArtifactPublisher _artifactPublisher;
-    private readonly ModuleContextExecutor _contextExecutor;
-    private readonly ModuleExecutionDispatcher _executionDispatcher;
     private readonly RuntimeEnvironmentContext _environmentContext;
-    private readonly ILoggerFactory _loggerFactory;
+    private readonly ModuleRuntimeOperations _operations;
     private readonly IServiceProvider? _serviceProvider;
     private readonly ExecutionTransaction _transaction;
 
@@ -28,21 +24,17 @@ public abstract class ModuleRuntimeBase : IModuleRuntime, IModuleExecutionRuntim
 
     private protected ModuleRuntimeBase(
         RuntimeEnvironmentContext environmentContext,
-        ILoggerFactory loggerFactory,
+        ModuleRuntimeOperations operations,
         ExecutionTransaction transaction,
         IServiceProvider? serviceProvider = null)
     {
         ArgumentNullException.ThrowIfNull(environmentContext);
-        ArgumentNullException.ThrowIfNull(loggerFactory);
+        ArgumentNullException.ThrowIfNull(operations);
         ArgumentNullException.ThrowIfNull(transaction);
         _environmentContext = environmentContext;
-        _loggerFactory = loggerFactory;
+        _operations = operations;
         _transaction = transaction;
         _serviceProvider = serviceProvider;
-        ILogger logger = loggerFactory.CreateLogger("cyborg.core.runtime");
-        _artifactPublisher = new ModuleArtifactPublisher(logger);
-        _contextExecutor = new ModuleContextExecutor(environmentContext.SyntaxFactory, logger);
-        _executionDispatcher = new ModuleExecutionDispatcher(logger);
     }
 
     public Task<IModuleExecutionResult> ExecuteAsync(
@@ -89,7 +81,7 @@ public abstract class ModuleRuntimeBase : IModuleRuntime, IModuleExecutionRuntim
         ArgumentNullException.ThrowIfNull(moduleContext);
         ArgumentNullException.ThrowIfNull(environment);
         IRuntimeEnvironment scopedEnvironment = _environmentContext.BindEnvironment(environment);
-        return _contextExecutor.ExecuteAsync(this, moduleContext, scopedEnvironment, cancellationToken);
+        return _operations.ContextExecutor.ExecuteAsync(this, moduleContext, scopedEnvironment, cancellationToken);
     }
 
     Task<IModuleExecutionResult> IModuleExecutionRuntime.ExecuteModuleReferenceInCurrentScopeAsync(
@@ -100,7 +92,7 @@ public abstract class ModuleRuntimeBase : IModuleRuntime, IModuleExecutionRuntim
         ArgumentNullException.ThrowIfNull(moduleReference);
         ArgumentNullException.ThrowIfNull(environment);
         IRuntimeEnvironment scopedEnvironment = _environmentContext.BindEnvironment(environment);
-        IModuleWorker worker = _executionDispatcher.ActivateWorker(moduleReference, RequireExecutionServices());
+        IModuleWorker worker = _operations.ExecutionDispatcher.ActivateWorker(moduleReference, RequireExecutionServices());
         return ExecuteActivatedWorkerInCurrentScopeAsync(worker, scopedEnvironment, cancellationToken);
     }
 
@@ -111,7 +103,7 @@ public abstract class ModuleRuntimeBase : IModuleRuntime, IModuleExecutionRuntim
         _environmentContext.ResolveEnvironmentReference(environmentReference);
 
     public IModuleExecutionResult Exit<TModule>(IModuleExecutionResult<TModule> result) where TModule : ModuleBase, IModuleDefinition =>
-        _artifactPublisher.Publish(result, this, Environment);
+        _operations.ArtifactPublisher.Publish(result, this, Environment);
 
     Task<IModuleExecutionResult> IModuleExecutionRuntime.ExecuteActivatedWorkerInCurrentScopeAsync(
         IModuleWorker module,
@@ -131,10 +123,10 @@ public abstract class ModuleRuntimeBase : IModuleRuntime, IModuleExecutionRuntim
             Root,
             parent: this,
             childEnvironmentContext,
-            _loggerFactory,
+            _operations,
             _transaction,
             executionServices);
-        return _executionDispatcher.ExecuteAsync(module, runtime, boundEnvironment, executionServices, cancellationToken);
+        return _operations.ExecutionDispatcher.ExecuteAsync(module, runtime, boundEnvironment, executionServices, cancellationToken);
     }
 
     private async Task<IModuleExecutionResult> ExecuteInNewScopeAsync(
@@ -154,7 +146,7 @@ public abstract class ModuleRuntimeBase : IModuleRuntime, IModuleExecutionRuntim
                 Root,
                 parent: this,
                 childEnvironmentContext,
-                _loggerFactory,
+                _operations,
                 childTransaction,
                 executionScope.ServiceProvider);
             IRuntimeEnvironment scopedEnvironment = childEnvironmentContext.BindEnvironment(environment);

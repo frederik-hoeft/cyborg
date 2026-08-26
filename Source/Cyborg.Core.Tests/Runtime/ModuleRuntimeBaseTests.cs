@@ -1,8 +1,9 @@
-using Cyborg.Core.Modules;
+﻿using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
+using Cyborg.Core.Tests.TestInfrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
@@ -229,7 +230,7 @@ public sealed class ModuleRuntimeBaseTests
         {
             SawContainerName = runtime.Environment.TryResolveVariable("container_name", out string? containerName);
             ContainerName = containerName;
-            return Task.FromResult<IModuleExecutionResult>(new ProbeExecutionResult((ProbeModule)Module, ModuleExitStatus.Success, runtime.Environment.CreateArtifactCollection()));
+            return Task.FromResult<IModuleExecutionResult>(new ProbeExecutionResult((ProbeModule)Module, ModuleExitStatus.Success, runtime.Environment.CreateTestArtifactCollection()));
         }
     }
 
@@ -352,7 +353,7 @@ public sealed class ModuleRuntimeBaseTests
                 await runtime.ExecuteAsync(grandchild, runtime.Environment, cancellationToken);
             }
             recorder.Record($"{name}:after", scopedProbe, singletonProbe);
-            return new ProbeExecutionResult(module, ModuleExitStatus.Success, runtime.Environment.CreateArtifactCollection());
+            return new ProbeExecutionResult(module, ModuleExitStatus.Success, runtime.Environment.CreateTestArtifactCollection());
         }
     }
 

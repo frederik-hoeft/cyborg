@@ -2,6 +2,7 @@
 using Cyborg.Core.Modules.Hooks;
 using Cyborg.Core.Modules.Runtime;
 using Cyborg.Core.Modules.Runtime.Environments;
+using Cyborg.Core.Tests.TestInfrastructure;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Cyborg.Core.Tests.Runtime;
@@ -131,7 +132,7 @@ public sealed class ModulePostExecutionHookTests : CyborgCoreTestBase
         {
             return behavior switch
             {
-                ProbeBehavior.Success => Task.FromResult<IModuleExecutionResult>(new ProbeExecutionResult(Module, ModuleExitStatus.Success, runtime.Environment.CreateArtifactCollection())),
+                ProbeBehavior.Success => Task.FromResult<IModuleExecutionResult>(new ProbeExecutionResult(Module, ModuleExitStatus.Success, runtime.Environment.CreateTestArtifactCollection())),
                 ProbeBehavior.Throw => Task.FromException<IModuleExecutionResult>(new InvalidOperationException("Synthetic module failure.")),
                 ProbeBehavior.Cancel => Task.FromException<IModuleExecutionResult>(new OperationCanceledException("Synthetic module cancellation.", cancellationToken)),
                 _ => throw new ArgumentOutOfRangeException(nameof(behavior), behavior, "Unknown probe behavior.")

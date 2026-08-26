@@ -1,7 +1,6 @@
 ﻿using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Runtime.Transactions;
 using Cyborg.Core.Modules.Runtime.Transactions.Core;
-using Cyborg.Core.Text;
 using Microsoft.Extensions.Logging;
 
 namespace Cyborg.Core.Modules.Runtime;
@@ -16,30 +15,58 @@ public sealed class RootModuleRuntime : ModuleRuntimeBase
         GlobalRuntimeEnvironment defaultEnvironment,
         ILoggerFactory loggerFactory,
         IServiceProvider? serviceProvider = null)
-        : this(CreateState(defaultEnvironment, taggedStringConversionObserver: null, loggerFactory), loggerFactory, serviceProvider)
+        : this(CreateStandaloneComposition(defaultEnvironment, loggerFactory), serviceProvider)
     {
     }
 
     internal RootModuleRuntime(
         GlobalRuntimeEnvironment defaultEnvironment,
-        ITaggedStringConversionObserver taggedStringConversionObserver,
+        IRuntimeEnvironmentFactory environmentFactory,
+        ModuleRuntimeOperations operations,
         ILoggerFactory loggerFactory,
         IServiceProvider serviceProvider)
-        : this(CreateState(defaultEnvironment, taggedStringConversionObserver, loggerFactory), loggerFactory, serviceProvider)
+        : this(CreateState(defaultEnvironment, environmentFactory, loggerFactory), operations, serviceProvider)
     {
     }
 
-    private RootModuleRuntime(RootRuntimeState state, ILoggerFactory loggerFactory, IServiceProvider? serviceProvider)
-        : base(state.EnvironmentContext, loggerFactory, state.Transaction, serviceProvider)
+    private RootModuleRuntime(RootRuntimeComposition composition, IServiceProvider? serviceProvider)
+        : this(composition.State, composition.Operations, serviceProvider)
     {
+    }
+
+    private RootModuleRuntime(
+        RootRuntimeState state,
+        ModuleRuntimeOperations operations,
+        IServiceProvider? serviceProvider)
+        : base(state.EnvironmentContext, operations, state.Transaction, serviceProvider)
+    {
+    }
+
+    private static RootRuntimeComposition CreateStandaloneComposition(
+        GlobalRuntimeEnvironment defaultEnvironment,
+        ILoggerFactory loggerFactory)
+    {
+        ArgumentNullException.ThrowIfNull(defaultEnvironment);
+        ArgumentNullException.ThrowIfNull(loggerFactory);
+        IRuntimeEnvironmentFactory environmentFactory = new DefaultRuntimeEnvironmentFactory(
+            defaultEnvironment.SyntaxFactory,
+            taggedStringConversionObserver: null);
+        ModuleRuntimeOperations operations = new(
+            new ModuleArtifactPublisher(loggerFactory),
+            new ModuleContextExecutor(defaultEnvironment.SyntaxFactory, environmentFactory, loggerFactory),
+            new ModuleExecutionDispatcher(environmentFactory, loggerFactory));
+        return new RootRuntimeComposition(
+            CreateState(defaultEnvironment, environmentFactory, loggerFactory),
+            operations);
     }
 
     private static RootRuntimeState CreateState(
         GlobalRuntimeEnvironment defaultEnvironment,
-        ITaggedStringConversionObserver? taggedStringConversionObserver,
+        IRuntimeEnvironmentFactory environmentFactory,
         ILoggerFactory loggerFactory)
     {
         ArgumentNullException.ThrowIfNull(defaultEnvironment);
+        ArgumentNullException.ThrowIfNull(environmentFactory);
         ArgumentNullException.ThrowIfNull(loggerFactory);
 
         RuntimeEnvironmentTransactionParticipant environments = new();
@@ -60,12 +87,16 @@ public sealed class RootModuleRuntime : ModuleRuntimeBase
         ExecutionTransaction transaction = coordinator.CreateRoot(seed);
         RuntimeEnvironmentContext environmentContext = RuntimeEnvironmentContext.CreateRoot(
             defaultEnvironment,
+            environmentFactory,
             environments,
             transaction,
-            taggedStringConversionObserver,
             loggerFactory);
         return new RootRuntimeState(transaction, environmentContext);
     }
+
+    private sealed record RootRuntimeComposition(
+        RootRuntimeState State,
+        ModuleRuntimeOperations Operations);
 
     private sealed record RootRuntimeState(
         ExecutionTransaction Transaction,

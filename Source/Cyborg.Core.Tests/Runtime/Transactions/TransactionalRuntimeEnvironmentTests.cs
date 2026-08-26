@@ -1,4 +1,4 @@
-using Cyborg.Core.Configuration.Model;
+﻿using Cyborg.Core.Configuration.Model;
 using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
@@ -8,6 +8,7 @@ using Cyborg.Core.Modules.Runtime.Environments.Artifacts;
 using Cyborg.Core.Modules.Runtime.Environments.Syntax;
 using Cyborg.Core.Modules.Runtime.Transactions;
 using Cyborg.Core.Modules.Runtime.Transactions.Core;
+using Cyborg.Core.Tests.TestInfrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
@@ -347,18 +348,18 @@ public sealed class TransactionalRuntimeEnvironmentTests
                     Assert.IsTrue(runtime.GlobalEnvironment.TryResolveVariable("child", out string? childValue));
                     Assert.AreEqual("visible", childValue);
                     runtime.GlobalEnvironment.SetVariable("after-child", 2);
-                    return new EnvironmentProbeExecutionResult(module, ModuleExitStatus.Success, runtime.Environment.CreateArtifactCollection());
+                    return new EnvironmentProbeExecutionResult(module, ModuleExitStatus.Success, runtime.Environment.CreateTestArtifactCollection());
                 case "child":
                     Assert.IsTrue(runtime.GlobalEnvironment.TryResolveVariable("temporary", out int temporary));
                     Assert.AreEqual(1, temporary);
                     Assert.IsTrue(runtime.GlobalEnvironment.TryRemoveVariable("temporary"));
                     runtime.GlobalEnvironment.SetVariable("child", "visible");
-                    return new EnvironmentProbeExecutionResult(module, ModuleExitStatus.Success, runtime.Environment.CreateArtifactCollection());
+                    return new EnvironmentProbeExecutionResult(module, ModuleExitStatus.Success, runtime.Environment.CreateTestArtifactCollection());
                 case "named":
                     Assert.IsTrue(runtime.Environment.TryResolveVariable("value", out string? namedValue));
                     Assert.AreEqual("before", namedValue);
                     runtime.Environment.SetVariable("value", "after");
-                    return new EnvironmentProbeExecutionResult(module, ModuleExitStatus.Success, runtime.Environment.CreateArtifactCollection());
+                    return new EnvironmentProbeExecutionResult(module, ModuleExitStatus.Success, runtime.Environment.CreateTestArtifactCollection());
                 case "topology-root":
                     IRuntimeEnvironment transientParent = runtime.PrepareEnvironment(new ModuleEnvironment
                     {
@@ -384,7 +385,7 @@ public sealed class TransactionalRuntimeEnvironmentTests
                     Assert.AreEqual("child", nestedLocal);
                     Assert.IsTrue(nestedNamed.TryResolveVariable("inherited", out string? nestedInherited));
                     Assert.AreEqual("parent", nestedInherited);
-                    return new EnvironmentProbeExecutionResult(module, ModuleExitStatus.Success, runtime.Environment.CreateArtifactCollection());
+                    return new EnvironmentProbeExecutionResult(module, ModuleExitStatus.Success, runtime.Environment.CreateTestArtifactCollection());
                 case "topology-child":
                     IRuntimeEnvironment namedChild = runtime.PrepareEnvironment(new ModuleEnvironment
                     {
@@ -392,12 +393,12 @@ public sealed class TransactionalRuntimeEnvironmentTests
                         Name = "nested-named"
                     });
                     namedChild.SetVariable("local", "child");
-                    return new EnvironmentProbeExecutionResult(module, ModuleExitStatus.Success, runtime.Environment.CreateArtifactCollection());
+                    return new EnvironmentProbeExecutionResult(module, ModuleExitStatus.Success, runtime.Environment.CreateTestArtifactCollection());
                 case "failed":
                     runtime.GlobalEnvironment.SetVariable("failed-write", "committed");
-                    return new EnvironmentProbeExecutionResult(module, ModuleExitStatus.Failed, runtime.Environment.CreateArtifactCollection());
+                    return new EnvironmentProbeExecutionResult(module, ModuleExitStatus.Failed, runtime.Environment.CreateTestArtifactCollection());
                 case "artifact":
-                    IEnvironmentLike artifactValues = runtime.Environment.CreateArtifactCollection();
+                    IEnvironmentLike artifactValues = runtime.Environment.CreateTestArtifactCollection();
                     artifactValues.SetVariable("artifact-value", 42);
                     ProbeArtifactsBuilder artifactBuilder = new(artifactValues);
                     return runtime.Exit(new TypedEnvironmentProbeExecutionResult(module, ModuleExitStatus.Success, artifactBuilder));

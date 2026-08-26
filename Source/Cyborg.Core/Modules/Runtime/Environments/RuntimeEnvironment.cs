@@ -218,38 +218,22 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         };
     }
 
-    internal static RuntimeEnvironment CreateTransactionView(
+    internal RuntimeEnvironment(
         RuntimeEnvironmentId environmentId,
         RuntimeEnvironmentNode node,
         VariableSyntaxBuilder syntaxFactory,
         string ns,
         RuntimeEnvironmentTransactionParticipant participant,
         ExecutionTransaction transaction)
+        : this(node.Name, node.IsTransient, syntaxFactory, ns)
     {
         ArgumentNullException.ThrowIfNull(node);
         ArgumentNullException.ThrowIfNull(syntaxFactory);
         ArgumentNullException.ThrowIfNull(participant);
         ArgumentNullException.ThrowIfNull(transaction);
-        return new RuntimeEnvironment(node.Name, node.IsTransient, syntaxFactory, ns)
-        {
-            EnvironmentId = environmentId,
-            VariableStore = new TransactionalEnvironmentVariableStore(environmentId, participant, transaction)
-        };
+        EnvironmentId = environmentId;
+        VariableStore = new TransactionalEnvironmentVariableStore(environmentId, participant, transaction);
     }
-
-    public IEnvironmentLike CreateArtifactCollection(ModuleArtifacts artifacts)
-    {
-        ArgumentNullException.ThrowIfNull(artifacts);
-        return new EnvironmentLike(SyntaxFactory, artifacts.Namespace ?? Namespace)
-        {
-            TaggedStringConversionObserver = TaggedStringConversionObserver
-        };
-    }
-
-    public IEnvironmentLike CreateArtifactCollection() => new EnvironmentLike(SyntaxFactory, Namespace)
-    {
-        TaggedStringConversionObserver = TaggedStringConversionObserver
-    };
 
     public IRuntimeEnvironment WithOverrideResolutionTags(IReadOnlyCollection<string> tags) => this with
     {
