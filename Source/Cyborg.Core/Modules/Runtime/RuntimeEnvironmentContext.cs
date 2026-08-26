@@ -12,10 +12,11 @@ internal sealed class RuntimeEnvironmentContext
 {
     private const string UNBOUND_ENVIRONMENT = "__UNBOUND";
 
-    private readonly RuntimeEnvironmentCatalog _catalog;
-    private readonly EnvironmentVariableTransactionParticipant _environmentVariables;
+    private readonly RuntimeEnvironmentTransactionParticipant _environments;
     private readonly ILogger _logger;
     private readonly RuntimeEnvironmentContext? _parent;
+    private readonly VariableSyntaxBuilder _syntaxFactory;
+    private readonly ITaggedStringConversionObserver? _taggedStringConversionObserver;
     private readonly ExecutionTransaction _transaction;
 
     public IRuntimeEnvironment GlobalEnvironment { get; }
@@ -24,20 +25,22 @@ internal sealed class RuntimeEnvironmentContext
 
     public IRuntimeEnvironment Environment { get; }
 
-    public VariableSyntaxBuilder SyntaxFactory => GlobalEnvironment.SyntaxFactory;
+    public VariableSyntaxBuilder SyntaxFactory => _syntaxFactory;
 
     private RuntimeEnvironmentContext(
-        RuntimeEnvironmentCatalog catalog,
-        EnvironmentVariableTransactionParticipant environmentVariables,
+        RuntimeEnvironmentTransactionParticipant environments,
         ExecutionTransaction transaction,
+        VariableSyntaxBuilder syntaxFactory,
+        ITaggedStringConversionObserver? taggedStringConversionObserver,
         ILogger logger,
         RuntimeEnvironmentContext? parent,
         IRuntimeEnvironment globalEnvironment,
         IRuntimeEnvironment environment)
     {
-        _catalog = catalog;
-        _environmentVariables = environmentVariables;
+        _environments = environments;
         _transaction = transaction;
+        _syntaxFactory = syntaxFactory;
+        _taggedStringConversionObserver = taggedStringConversionObserver;
         _logger = logger;
         _parent = parent;
         GlobalEnvironment = globalEnvironment;
@@ -46,20 +49,29 @@ internal sealed class RuntimeEnvironmentContext
 
     public static RuntimeEnvironmentContext CreateRoot(
         GlobalRuntimeEnvironment globalEnvironment,
-        EnvironmentVariableTransactionParticipant environmentVariables,
+        RuntimeEnvironmentTransactionParticipant environments,
         ExecutionTransaction transaction,
+        ITaggedStringConversionObserver? taggedStringConversionObserver,
         ILoggerFactory loggerFactory)
     {
         ArgumentNullException.ThrowIfNull(globalEnvironment);
-        ArgumentNullException.ThrowIfNull(environmentVariables);
+        ArgumentNullException.ThrowIfNull(environments);
         ArgumentNullException.ThrowIfNull(transaction);
         ArgumentNullException.ThrowIfNull(loggerFactory);
         ILogger logger = loggerFactory.CreateLogger("cyborg.core.runtime");
-        IRuntimeEnvironment transactionalGlobal = BindEnvironment(globalEnvironment, environmentVariables, transaction);
+        RuntimeEnvironmentTransactionState state = transaction.GetParticipantState(environments);
+        if (state.GlobalEnvironmentId != ((ITransactionalRuntimeEnvironment)globalEnvironment).EnvironmentId)
+        {
+            throw new InvalidOperationException("The runtime environment transaction seed does not match the supplied logical global environment.");
+        }
+        IRuntimeEnvironment transactionalGlobal = AttachRuntimeServices(
+            ((ITransactionalRuntimeEnvironment)globalEnvironment).BindTransaction(environments, transaction),
+            taggedStringConversionObserver);
         return new RuntimeEnvironmentContext(
-            new RuntimeEnvironmentCatalog(),
-            environmentVariables,
+            environments,
             transaction,
+            globalEnvironment.SyntaxFactory,
+            taggedStringConversionObserver,
             logger,
             parent: null,
             transactionalGlobal,
@@ -70,12 +82,13 @@ internal sealed class RuntimeEnvironmentContext
     {
         ArgumentNullException.ThrowIfNull(transaction);
         RuntimeEnvironmentContext? parent = _parent?.CreateTransactionView(transaction);
-        IRuntimeEnvironment globalEnvironment = BindEnvironment(GlobalEnvironment, _environmentVariables, transaction);
-        IRuntimeEnvironment environment = BindEnvironment(Environment, _environmentVariables, transaction);
+        IRuntimeEnvironment globalEnvironment = BindEnvironment(GlobalEnvironment, transaction);
+        IRuntimeEnvironment environment = BindEnvironment(Environment, transaction);
         return new RuntimeEnvironmentContext(
-            _catalog,
-            _environmentVariables,
+            _environments,
             transaction,
+            _syntaxFactory,
+            _taggedStringConversionObserver,
             _logger,
             parent,
             globalEnvironment,
@@ -87,9 +100,10 @@ internal sealed class RuntimeEnvironmentContext
         ArgumentNullException.ThrowIfNull(environment);
         IRuntimeEnvironment transactionalEnvironment = BindEnvironment(environment);
         return new RuntimeEnvironmentContext(
-            _catalog,
-            _environmentVariables,
+            _environments,
             _transaction,
+            _syntaxFactory,
+            _taggedStringConversionObserver,
             _logger,
             this,
             GlobalEnvironment,
@@ -99,7 +113,7 @@ internal sealed class RuntimeEnvironmentContext
     public IRuntimeEnvironment BindEnvironment(IRuntimeEnvironment environment)
     {
         ArgumentNullException.ThrowIfNull(environment);
-        return BindEnvironment(environment, _environmentVariables, _transaction);
+        return BindEnvironment(environment, _transaction);
     }
 
     public IRuntimeEnvironment PrepareEnvironment(ModuleEnvironment moduleEnvironment, IReadOnlyCollection<string>? overrideResolutionTags = null)
@@ -147,16 +161,16 @@ internal sealed class RuntimeEnvironmentContext
         };
     }
 
-    private static IRuntimeEnvironment BindEnvironment(
-        IRuntimeEnvironment environment,
-        EnvironmentVariableTransactionParticipant environmentVariables,
-        ExecutionTransaction transaction)
+    private IRuntimeEnvironment BindEnvironment(IRuntimeEnvironment environment, ExecutionTransaction transaction)
     {
         if (environment is not ITransactionalRuntimeEnvironment transactionalEnvironment)
         {
-            throw new InvalidOperationException($"Runtime environment type '{environment.GetType().FullName}' does not support transaction binding.");
+            throw new InvalidOperationException($"Runtime environment type '{environment.GetType().FullName}' does not expose transactional environment identity.");
         }
-        return transactionalEnvironment.BindTransaction(environmentVariables, transaction);
+        EnsureEnvironmentExists(environment, transaction);
+        return AttachRuntimeServices(
+            transactionalEnvironment.BindTransaction(_environments, transaction),
+            _taggedStringConversionObserver);
     }
 
     private IRuntimeEnvironment CreateEnvironment(EnvironmentScope scope, string? name, bool transient)
@@ -166,33 +180,147 @@ internal sealed class RuntimeEnvironmentContext
             transient = true;
             name = Guid.CreateVersion7().ToString();
         }
-        ITaggedStringConversionObserver? conversionObserver = Environment is EnvironmentLike environmentLike
-            ? environmentLike.TaggedStringConversionObserver
-            : null;
-        IRuntimeEnvironment environment = scope switch
+        IRuntimeEnvironment environment;
+        switch (scope)
         {
-            EnvironmentScope.Isolated => new RuntimeEnvironment(name, transient, SyntaxFactory, UNBOUND_ENVIRONMENT)
-            {
-                TaggedStringConversionObserver = conversionObserver
-            },
-            EnvironmentScope.Global => GlobalEnvironment,
-            EnvironmentScope.InheritParent => new InheritedRuntimeEnvironment(name, Environment, transient, SyntaxFactory, UNBOUND_ENVIRONMENT)
-            {
-                TaggedStringConversionObserver = conversionObserver
-            },
-            EnvironmentScope.InheritGlobal => new InheritedRuntimeEnvironment(name, GlobalEnvironment, transient, SyntaxFactory, UNBOUND_ENVIRONMENT)
-            {
-                TaggedStringConversionObserver = conversionObserver
-            },
-            EnvironmentScope.Parent => ParentEnvironment.Bind(UNBOUND_ENVIRONMENT),
-            EnvironmentScope.Current => Environment.Bind(UNBOUND_ENVIRONMENT),
-            EnvironmentScope.Reference => throw new ArgumentException("Attempting to create an environment by reference without providing an environment reference.", nameof(scope)),
-            _ => throw new ArgumentOutOfRangeException(nameof(scope), scope, "Invalid environment scope.")
-        };
-        environment = BindEnvironment(environment);
+            case EnvironmentScope.Isolated:
+                environment = CreateEnvironmentNode(name, transient, parent: null);
+                break;
+            case EnvironmentScope.Global:
+                environment = GlobalEnvironment;
+                break;
+            case EnvironmentScope.InheritParent:
+                environment = CreateEnvironmentNode(name, transient, CreateParentReference(Environment));
+                break;
+            case EnvironmentScope.InheritGlobal:
+                environment = CreateEnvironmentNode(name, transient, CreateParentReference(GlobalEnvironment));
+                break;
+            case EnvironmentScope.Parent:
+                environment = ParentEnvironment.Bind(UNBOUND_ENVIRONMENT);
+                break;
+            case EnvironmentScope.Current:
+                environment = Environment.Bind(UNBOUND_ENVIRONMENT);
+                break;
+            case EnvironmentScope.Reference:
+                throw new ArgumentException("Attempting to create an environment by reference without providing an environment reference.", nameof(scope));
+            default:
+                throw new ArgumentOutOfRangeException(nameof(scope), scope, "Invalid environment scope.");
+        }
         _logger.LogEnvironmentCreated(scope.ToString(), environment.Name);
-        _catalog.TryAdd(environment);
         return environment;
+    }
+
+    private IRuntimeEnvironment CreateEnvironmentNode(
+        string name,
+        bool transient,
+        RuntimeEnvironmentParent? parent)
+    {
+        RuntimeEnvironmentId environmentId = RuntimeEnvironmentId.Create();
+        RuntimeEnvironmentNode node = new(name, transient, parent);
+        RuntimeEnvironmentTransactionState state = GetState(_transaction);
+        if (transient)
+        {
+            state.AddEnvironment(environmentId, node, values: []);
+        }
+        else if (!state.TryAddNamedEnvironment(environmentId, node, values: []))
+        {
+            throw new InvalidOperationException($"Attempting to create a named environment that already exists: {name}");
+        }
+        return CreateEnvironmentView(environmentId, UNBOUND_ENVIRONMENT, overrideResolutionTags: [], _transaction);
+    }
+
+    private IRuntimeEnvironment CreateEnvironmentView(
+        RuntimeEnvironmentId environmentId,
+        string ns,
+        IReadOnlyCollection<string> overrideResolutionTags,
+        ExecutionTransaction? transaction = null)
+    {
+        transaction ??= _transaction;
+        RuntimeEnvironmentTransactionState state = GetState(transaction);
+        IRuntimeEnvironment environment = CreateEnvironmentViewCore(
+            environmentId,
+            ns,
+            transaction,
+            state,
+            visited: []);
+        return overrideResolutionTags.Count == 0
+            ? environment
+            : environment.WithOverrideResolutionTags(overrideResolutionTags);
+    }
+
+    private IRuntimeEnvironment CreateEnvironmentViewCore(
+        RuntimeEnvironmentId environmentId,
+        string ns,
+        ExecutionTransaction transaction,
+        RuntimeEnvironmentTransactionState state,
+        HashSet<RuntimeEnvironmentId> visited)
+    {
+        if (!visited.Add(environmentId))
+        {
+            throw new InvalidOperationException("Runtime environment topology contains an inheritance cycle.");
+        }
+        if (!state.TryGetEnvironment(environmentId, out RuntimeEnvironmentNode? node))
+        {
+            throw new InvalidOperationException($"Runtime environment '{environmentId}' does not exist in the current transaction.");
+        }
+
+        IRuntimeEnvironment environment;
+        if (node.Parent is RuntimeEnvironmentParent parentReference)
+        {
+            IRuntimeEnvironment parent = CreateEnvironmentViewCore(
+                parentReference.EnvironmentId,
+                parentReference.Namespace,
+                transaction,
+                state,
+                visited);
+            if (parentReference.OverrideResolutionTags.Count > 0)
+            {
+                parent = parent.WithOverrideResolutionTags(parentReference.OverrideResolutionTags);
+            }
+            environment = InheritedRuntimeEnvironment.CreateTransactionView(
+                environmentId,
+                node,
+                parent,
+                _syntaxFactory,
+                ns,
+                _environments,
+                transaction);
+        }
+        else
+        {
+            environment = RuntimeEnvironment.CreateTransactionView(
+                environmentId,
+                node,
+                _syntaxFactory,
+                ns,
+                _environments,
+                transaction);
+        }
+        environment = AttachRuntimeServices(environment, _taggedStringConversionObserver);
+        visited.Remove(environmentId);
+        return environment;
+    }
+
+    private void EnsureEnvironmentExists(IRuntimeEnvironment environment, ExecutionTransaction transaction)
+    {
+        RuntimeEnvironmentId environmentId = GetEnvironmentId(environment);
+        RuntimeEnvironmentTransactionState state = GetState(transaction);
+        if (state.ContainsEnvironment(environmentId))
+        {
+            return;
+        }
+
+        RuntimeEnvironmentParent? parent = null;
+        if (environment is InheritedRuntimeEnvironment inheritedEnvironment)
+        {
+            EnsureEnvironmentExists(inheritedEnvironment.Parent, transaction);
+            parent = CreateParentReference(inheritedEnvironment.Parent);
+        }
+        RuntimeEnvironmentNode node = new(
+            environment.Name,
+            environment.IsTransient,
+            parent);
+        state.AddEnvironment(environmentId, node, environment);
     }
 
     private bool TryGetEnvironment(string name, [NotNullWhen(true)] out IRuntimeEnvironment? environment)
@@ -207,11 +335,42 @@ internal sealed class RuntimeEnvironmentContext
             environment = BindEnvironment(environment);
             return true;
         }
-        if (_catalog.TryGet(name, out environment))
+        RuntimeEnvironmentTransactionState state = GetState(_transaction);
+        if (state.TryGetRegisteredEnvironment(name, out RuntimeEnvironmentId environmentId))
         {
-            environment = BindEnvironment(environment);
+            environment = CreateEnvironmentView(environmentId, UNBOUND_ENVIRONMENT, overrideResolutionTags: []);
             return true;
         }
+        environment = null;
         return false;
+    }
+
+    private RuntimeEnvironmentTransactionState GetState(ExecutionTransaction transaction) =>
+        transaction.GetParticipantState(_environments);
+
+    private static RuntimeEnvironmentParent CreateParentReference(IRuntimeEnvironment environment) =>
+        new(GetEnvironmentId(environment), environment.Namespace, environment.OverrideResolutionTags);
+
+    private static RuntimeEnvironmentId GetEnvironmentId(IRuntimeEnvironment environment)
+    {
+        if (environment is not ITransactionalRuntimeEnvironment transactionalEnvironment)
+        {
+            throw new InvalidOperationException($"Runtime environment type '{environment.GetType().FullName}' does not expose transactional environment identity.");
+        }
+        return transactionalEnvironment.EnvironmentId;
+    }
+
+    private static IRuntimeEnvironment AttachRuntimeServices(
+        IRuntimeEnvironment environment,
+        ITaggedStringConversionObserver? taggedStringConversionObserver)
+    {
+        if (environment is not RuntimeEnvironment runtimeEnvironment)
+        {
+            throw new InvalidOperationException($"Runtime environment type '{environment.GetType().FullName}' cannot receive Cyborg runtime services.");
+        }
+        return runtimeEnvironment with
+        {
+            TaggedStringConversionObserver = taggedStringConversionObserver
+        };
     }
 }

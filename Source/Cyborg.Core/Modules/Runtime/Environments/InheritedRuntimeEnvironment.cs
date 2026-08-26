@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Modules.Runtime.Environments.Syntax;
+using Cyborg.Core.Modules.Runtime.Environments.Syntax;
 using Cyborg.Core.Modules.Runtime.Transactions;
 using Cyborg.Core.Modules.Runtime.Transactions.Core;
 using Cyborg.Core.Text;
@@ -9,7 +9,7 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
     : RuntimeEnvironment(Name, IsTransient, SyntaxFactory, Namespace)
 {
     private protected override IRuntimeEnvironment BindTransactionCore(
-        EnvironmentVariableTransactionParticipant participant,
+        RuntimeEnvironmentTransactionParticipant participant,
         ExecutionTransaction transaction)
     {
         ArgumentNullException.ThrowIfNull(participant);
@@ -18,8 +18,29 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
         {
             Parent = Parent is ITransactionalRuntimeEnvironment transactionalParent
                 ? transactionalParent.BindTransaction(participant, transaction)
-                : throw new InvalidOperationException($"Runtime environment type '{Parent.GetType().FullName}' does not support transaction binding."),
-            VariableStore = VariableStore.Bind(participant, transaction)
+                : throw new InvalidOperationException($"Runtime environment type '{Parent.GetType().FullName}' does not expose transactional environment identity."),
+            VariableStore = new TransactionalEnvironmentVariableStore(EnvironmentId, participant, transaction)
+        };
+    }
+
+    internal static InheritedRuntimeEnvironment CreateTransactionView(
+        RuntimeEnvironmentId environmentId,
+        RuntimeEnvironmentNode node,
+        IRuntimeEnvironment parent,
+        VariableSyntaxBuilder syntaxFactory,
+        string ns,
+        RuntimeEnvironmentTransactionParticipant participant,
+        ExecutionTransaction transaction)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+        ArgumentNullException.ThrowIfNull(parent);
+        ArgumentNullException.ThrowIfNull(syntaxFactory);
+        ArgumentNullException.ThrowIfNull(participant);
+        ArgumentNullException.ThrowIfNull(transaction);
+        return new InheritedRuntimeEnvironment(node.Name, parent, node.IsTransient, syntaxFactory, ns)
+        {
+            EnvironmentId = environmentId,
+            VariableStore = new TransactionalEnvironmentVariableStore(environmentId, participant, transaction)
         };
     }
 

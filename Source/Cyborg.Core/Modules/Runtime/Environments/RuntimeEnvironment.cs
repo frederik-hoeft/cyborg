@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Modules.Configuration.Model;
+using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime.Environments.Syntax;
 using Cyborg.Core.Modules.Runtime.Transactions;
 using Cyborg.Core.Modules.Runtime.Transactions.Core;
@@ -11,7 +11,11 @@ namespace Cyborg.Core.Modules.Runtime.Environments;
 
 public partial record RuntimeEnvironment(string Name, bool IsTransient, VariableSyntaxBuilder SyntaxFactory, string Namespace) : EnvironmentLike(SyntaxFactory, Namespace), IRuntimeEnvironment, ITransactionalRuntimeEnvironment
 {
+    internal RuntimeEnvironmentId EnvironmentId { get; init; } = RuntimeEnvironmentId.Create();
+
     public IReadOnlyCollection<string> OverrideResolutionTags { get; init; } = [];
+
+    RuntimeEnvironmentId ITransactionalRuntimeEnvironment.EnvironmentId => EnvironmentId;
 
     [return: NotNullIfNotNull(nameof(value))]
     IReadOnlyCollection<T>? IRuntimeEnvironment.ResolveCollection<TModule, T>(TModule module, IReadOnlyCollection<T>? value, string moduleExpression, string valueExpression) =>
@@ -198,23 +202,39 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
     }
 
     IRuntimeEnvironment ITransactionalRuntimeEnvironment.BindTransaction(
-        EnvironmentVariableTransactionParticipant participant,
+        RuntimeEnvironmentTransactionParticipant participant,
         ExecutionTransaction transaction) =>
         BindTransactionCore(participant, transaction);
 
     private protected virtual IRuntimeEnvironment BindTransactionCore(
-        EnvironmentVariableTransactionParticipant participant,
+        RuntimeEnvironmentTransactionParticipant participant,
         ExecutionTransaction transaction)
     {
         ArgumentNullException.ThrowIfNull(participant);
         ArgumentNullException.ThrowIfNull(transaction);
-        IEnvironmentVariableStore variableStore = VariableStore.Bind(participant, transaction);
-        return ReferenceEquals(variableStore, VariableStore)
-            ? this
-            : this with
-            {
-                VariableStore = variableStore
-            };
+        return this with
+        {
+            VariableStore = new TransactionalEnvironmentVariableStore(EnvironmentId, participant, transaction)
+        };
+    }
+
+    internal static RuntimeEnvironment CreateTransactionView(
+        RuntimeEnvironmentId environmentId,
+        RuntimeEnvironmentNode node,
+        VariableSyntaxBuilder syntaxFactory,
+        string ns,
+        RuntimeEnvironmentTransactionParticipant participant,
+        ExecutionTransaction transaction)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+        ArgumentNullException.ThrowIfNull(syntaxFactory);
+        ArgumentNullException.ThrowIfNull(participant);
+        ArgumentNullException.ThrowIfNull(transaction);
+        return new RuntimeEnvironment(node.Name, node.IsTransient, syntaxFactory, ns)
+        {
+            EnvironmentId = environmentId,
+            VariableStore = new TransactionalEnvironmentVariableStore(environmentId, participant, transaction)
+        };
     }
 
     public IEnvironmentLike CreateArtifactCollection(ModuleArtifacts artifacts)

@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Cyborg.Core.Modules.Runtime.Transactions.Collections;
 using Cyborg.Core.Modules.Runtime.Transactions.Core;
@@ -431,29 +430,24 @@ public sealed class ExecutionTransactionTests
         public bool TryRemove(string key) => _values.TryRemove(key);
 
         public ITransactionParticipantFork CreateFork() =>
-            new DictionaryParticipantFork(this, _values.Freeze(), _failPreparation);
+            new DictionaryParticipantFork(this, _failPreparation);
 
         internal TransactionalDictionary<string, int> Values => _values;
     }
 
     private sealed class DictionaryParticipantFork : ITransactionParticipantFork
     {
-        private readonly TransactionalDictionarySnapshot<string, int> _baseline;
         private readonly bool _failPreparation;
-        private readonly DictionaryParticipantState _owner;
+        private readonly TransactionalDictionaryFork<string, int> _values;
 
-        public DictionaryParticipantFork(
-            DictionaryParticipantState owner,
-            TransactionalDictionarySnapshot<string, int> baseline,
-            bool failPreparation)
+        public DictionaryParticipantFork(DictionaryParticipantState owner, bool failPreparation)
         {
-            _owner = owner;
-            _baseline = baseline;
             _failPreparation = failPreparation;
+            _values = new TransactionalDictionaryFork<string, int>(owner.Values);
         }
 
         public ITransactionParticipantState CreateBranch() =>
-            new DictionaryParticipantState(_owner.Values.Fork(), _failPreparation);
+            new DictionaryParticipantState(_values.CreateBranch(), _failPreparation);
 
         public bool TryPrepareMerge(
             ITransactionParticipant participant,
@@ -467,63 +461,25 @@ public sealed class ExecutionTransactionTests
                 throw new InvalidOperationException("Synthetic preparation failure.");
             }
 
-            Dictionary<string, List<(int ContributorIndex, TransactionalDictionaryChange<int> Change)>> changes =
-                new(StringComparer.Ordinal);
-            for (int contributorIndex = 0; contributorIndex < contributors.Count; contributorIndex++)
+            TransactionalDictionary<string, int>[] contributorValues = new TransactionalDictionary<string, int>[contributors.Count];
+            for (int i = 0; i < contributors.Count; i++)
             {
-                DictionaryParticipantState contributor = (DictionaryParticipantState)contributors[contributorIndex];
-                foreach ((string key, TransactionalDictionaryChange<int> change) in contributor.Values.EnumerateChanges())
-                {
-                    if (!changes.TryGetValue(key, out List<(int, TransactionalDictionaryChange<int>)>? keyChanges))
-                    {
-                        keyChanges = [];
-                        changes.Add(key, keyChanges);
-                    }
-                    keyChanges.Add((contributorIndex, change));
-                }
+                contributorValues[i] = ((DictionaryParticipantState)contributors[i]).Values;
             }
 
-            Dictionary<string, TransactionalDictionaryChange<int>> selectedChanges = new(StringComparer.Ordinal);
-            foreach ((string key, List<(int ContributorIndex, TransactionalDictionaryChange<int> Change)> keyChanges) in changes)
+            if (!_values.TrySelectChanges(
+                participant,
+                contributorValues,
+                static key => key,
+                conflictStrategy,
+                out Dictionary<string, TransactionalDictionaryChange<int>>? selectedChanges,
+                out conflict))
             {
-                if (keyChanges.Count == 1)
-                {
-                    selectedChanges.Add(key, keyChanges[0].Change);
-                    continue;
-                }
-
-                ImmutableArray<int> contributorIndices = [.. keyChanges.Select(static change => change.ContributorIndex)];
-                TransactionConflict detectedConflict = new(participant, key, contributorIndices);
-                TransactionConflictResolution resolution = conflictStrategy.Resolve(detectedConflict);
-                switch (resolution.Kind)
-                {
-                    case TransactionConflictResolutionKind.Fail:
-                        candidate = null;
-                        conflict = detectedConflict;
-                        return false;
-                    case TransactionConflictResolutionKind.UseContributor:
-                        bool foundSelectedContributor = false;
-                        foreach ((int contributorIndex, TransactionalDictionaryChange<int> change) in keyChanges)
-                        {
-                            if (contributorIndex != resolution.ContributorIndex)
-                            {
-                                continue;
-                            }
-                            selectedChanges.Add(key, change);
-                            foundSelectedContributor = true;
-                            break;
-                        }
-                        if (!foundSelectedContributor)
-                        {
-                            throw new InvalidOperationException("The conflict strategy selected a contributor that did not modify the conflicting key.");
-                        }
-                        break;
-                    default:
-                        throw new InvalidOperationException($"Unsupported transaction conflict resolution '{resolution.Kind}'.");
-                }
+                candidate = null;
+                return false;
             }
 
-            candidate = new DictionaryParticipantState(_owner.Values.PrepareMergeCandidate(_baseline, selectedChanges));
+            candidate = new DictionaryParticipantState(_values.PrepareCandidate(selectedChanges), _failPreparation);
             conflict = null;
             return true;
         }

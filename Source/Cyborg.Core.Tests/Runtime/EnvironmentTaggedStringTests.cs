@@ -58,6 +58,23 @@ public sealed class EnvironmentTaggedStringTests : CyborgCoreTestBase
     });
 
     [TestMethod]
+    public Task Test_TryResolveVariable_String_UsesConversionObserverFromDIAsync()
+    {
+        RecordingTaggedStringConversionObserver observer = new();
+        return TestWithDIAsync(services =>
+        {
+            IRuntimeEnvironment environment = services.GetRequiredService<IModuleRuntime>().Environment;
+            TaggedString tagged = new("abc", [WellKnownTags.SECRET]);
+            environment.SetVariable("token", tagged);
+
+            Assert.IsTrue(environment.TryResolveVariable("token", out string? raw));
+            Assert.AreEqual("abc", raw);
+            Assert.AreEqual("token", observer.VariableName);
+            Assert.AreEqual(tagged, observer.Value);
+        }, services => services.AddSingleton<ITaggedStringConversionObserver>(observer));
+    }
+
+    [TestMethod]
     public Task Test_TryResolveVariable_StringVariableAsTaggedString_IsUntaggedAsync() => TestWithDIAsync(services =>
     {
         IRuntimeEnvironment environment = services.GetRequiredService<IModuleRuntime>().Environment;
@@ -104,4 +121,17 @@ public sealed class EnvironmentTaggedStringTests : CyborgCoreTestBase
         Assert.AreEqual("hello world", actual.Value);
         Assert.IsTrue(actual.HasTag("template"));
     });
+
+    private sealed class RecordingTaggedStringConversionObserver : ITaggedStringConversionObserver
+    {
+        public string? VariableName { get; private set; }
+
+        public TaggedString? Value { get; private set; }
+
+        public void OnImplicitStringRetrieval(string variableName, TaggedString value)
+        {
+            VariableName = variableName;
+            Value = value;
+        }
+    }
 }

@@ -1,6 +1,7 @@
 ﻿using Cyborg.Core.Modules.Runtime.Environments;
 using Cyborg.Core.Modules.Runtime.Transactions;
 using Cyborg.Core.Modules.Runtime.Transactions.Core;
+using Cyborg.Core.Text;
 using Microsoft.Extensions.Logging;
 
 namespace Cyborg.Core.Modules.Runtime;
@@ -15,7 +16,16 @@ public sealed class RootModuleRuntime : ModuleRuntimeBase
         GlobalRuntimeEnvironment defaultEnvironment,
         ILoggerFactory loggerFactory,
         IServiceProvider? serviceProvider = null)
-        : this(CreateState(defaultEnvironment, loggerFactory), loggerFactory, serviceProvider)
+        : this(CreateState(defaultEnvironment, taggedStringConversionObserver: null, loggerFactory), loggerFactory, serviceProvider)
+    {
+    }
+
+    internal RootModuleRuntime(
+        GlobalRuntimeEnvironment defaultEnvironment,
+        ITaggedStringConversionObserver taggedStringConversionObserver,
+        ILoggerFactory loggerFactory,
+        IServiceProvider serviceProvider)
+        : this(CreateState(defaultEnvironment, taggedStringConversionObserver, loggerFactory), loggerFactory, serviceProvider)
     {
     }
 
@@ -24,20 +34,35 @@ public sealed class RootModuleRuntime : ModuleRuntimeBase
     {
     }
 
-    private static RootRuntimeState CreateState(GlobalRuntimeEnvironment defaultEnvironment, ILoggerFactory loggerFactory)
+    private static RootRuntimeState CreateState(
+        GlobalRuntimeEnvironment defaultEnvironment,
+        ITaggedStringConversionObserver? taggedStringConversionObserver,
+        ILoggerFactory loggerFactory)
     {
         ArgumentNullException.ThrowIfNull(defaultEnvironment);
         ArgumentNullException.ThrowIfNull(loggerFactory);
 
-        EnvironmentVariableTransactionParticipant environmentVariables = new();
-        TransactionCoordinator coordinator = new([environmentVariables]);
-        EnvironmentVariableStoreSeed[] environmentSeeds = [defaultEnvironment.CaptureVariableStoreSeed()];
-        TransactionRootSeed seed = new TransactionRootSeed().With(environmentVariables, environmentSeeds);
+        RuntimeEnvironmentTransactionParticipant environments = new();
+        TransactionCoordinator coordinator = new([environments]);
+        RuntimeEnvironmentNode globalNode = new(
+            defaultEnvironment.Name,
+            defaultEnvironment.IsTransient,
+            Parent: null);
+        RuntimeEnvironmentSeed globalSeed = new(
+            defaultEnvironment.EnvironmentId,
+            globalNode,
+            [.. defaultEnvironment],
+            RegisterName: false);
+        RuntimeEnvironmentTransactionSeed environmentSeed = new(
+            defaultEnvironment.EnvironmentId,
+            [globalSeed]);
+        TransactionRootSeed seed = new TransactionRootSeed().With(environments, environmentSeed);
         ExecutionTransaction transaction = coordinator.CreateRoot(seed);
         RuntimeEnvironmentContext environmentContext = RuntimeEnvironmentContext.CreateRoot(
             defaultEnvironment,
-            environmentVariables,
+            environments,
             transaction,
+            taggedStringConversionObserver,
             loggerFactory);
         return new RootRuntimeState(transaction, environmentContext);
     }

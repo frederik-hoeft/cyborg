@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Modules;
+using Cyborg.Core.Modules;
 using Cyborg.Core.Modules.Configuration;
 using Cyborg.Core.Modules.Configuration.Model;
 using Cyborg.Core.Modules.Runtime;
@@ -151,7 +151,7 @@ public sealed class ModuleRuntimeBaseTests
     }
 
     [TestMethod]
-    public void PrepareEnvironment_NamedEnvironment_IsResolvedThroughRuntimeCatalog()
+    public void PrepareEnvironment_NamedEnvironment_ResolvesSameLogicalEnvironment()
     {
         GlobalRuntimeEnvironment globalEnvironment = new(JsonNamingPolicy.SnakeCaseLower);
         using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
@@ -168,9 +168,41 @@ public sealed class ModuleRuntimeBaseTests
         };
 
         IRuntimeEnvironment created = runtime.PrepareEnvironment(namedEnvironment);
+        created.SetVariable("value", 42);
         IRuntimeEnvironment resolved = runtime.PrepareEnvironment(reference);
 
-        Assert.AreSame(created, resolved);
+        Assert.AreEqual(created.Name, resolved.Name);
+        Assert.IsTrue(resolved.TryResolveVariable("value", out int value));
+        Assert.AreEqual(42, value);
+        resolved.SetVariable("other", "shared");
+        Assert.IsTrue(created.TryResolveVariable("other", out string? other));
+        Assert.AreEqual("shared", other);
+    }
+
+    [TestMethod]
+    public void PrepareEnvironment_DuplicateNamedEnvironmentFailsWithoutReplacingRegistration()
+    {
+        GlobalRuntimeEnvironment globalEnvironment = new(JsonNamingPolicy.SnakeCaseLower);
+        using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
+        RootModuleRuntime runtime = new(globalEnvironment, loggerFactory);
+        ModuleEnvironment namedEnvironment = new()
+        {
+            Scope = EnvironmentScope.Isolated,
+            Name = "named"
+        };
+
+        IRuntimeEnvironment first = runtime.PrepareEnvironment(namedEnvironment);
+        first.SetVariable("value", 42);
+
+        Assert.ThrowsExactly<InvalidOperationException>(() => runtime.PrepareEnvironment(namedEnvironment));
+
+        IRuntimeEnvironment resolved = runtime.PrepareEnvironment(new ModuleEnvironment
+        {
+            Scope = EnvironmentScope.Reference,
+            Name = "named"
+        });
+        Assert.IsTrue(resolved.TryResolveVariable("value", out int value));
+        Assert.AreEqual(42, value);
     }
 
     [TestMethod]

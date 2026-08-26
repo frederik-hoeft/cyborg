@@ -21,12 +21,12 @@ environment graph
   named catalog:      string -> EnvironmentId
 
 environment node state
-  optional parent EnvironmentId
+  optional inherited-parent relationship
   transient/lifetime metadata
   persistent variable bindings
 ```
 
-Topology, registration, and bindings are reconciled coherently. A named registration cannot report failure while independently replacing an environment node, and an inherited relationship cannot point at a mutable environment object owned by another transaction.
+Topology, registration, and bindings are reconciled coherently. A named registration cannot report failure while independently replacing an environment node, and an inherited relationship cannot point at a mutable environment object owned by another transaction. The inheritance edge retains the logical parent identity plus the parent view metadata required by existing resolution semantics, such as its bound namespace and override-resolution tags.
 
 ## Environment Views
 
