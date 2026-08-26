@@ -28,8 +28,7 @@ A node contains durable environment metadata:
 
 - user-visible name;
 - transient/lifetime status;
-- optional inherited-parent relationship;
-- runtime metadata needed to reconstruct the environment view.
+- optional inherited-parent relationship.
 
 The inherited-parent relationship identifies the logical parent and preserves the parent view metadata that affects existing fallback semantics. In particular, the parent's bound namespace and override-resolution tags are captured with the relationship. Reconstructing a named inherited environment therefore does not silently change `@`, override, or inherited-resolution behavior merely because the original environment object no longer exists.
 
@@ -40,6 +39,8 @@ The inherited-parent relationship identifies the logical parent and preserves th
 A view carries the selected logical environment identity plus view-local metadata such as its current namespace and override tags. Variable access delegates to the binding map for that identity. Inherited lookup reconstructs the parent view from the topology stored in the same transaction.
 
 Object identity is not part of the environment contract. Two resolved views of one logical environment may be different objects while observing the same transaction-local state.
+
+Runtime services are not part of environment transaction state. Services needed by environment behavior, such as tagged-string conversion observation, are resolved from DI by the runtime and attached to materialized views. They are not persisted in logical nodes, fork baselines, or transaction change sets.
 
 ## Environment Creation
 

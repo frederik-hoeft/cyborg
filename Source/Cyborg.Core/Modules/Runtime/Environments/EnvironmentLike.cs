@@ -14,7 +14,7 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
 {
     private protected IEnvironmentVariableStore VariableStore { get; init; } = new MutableEnvironmentVariableStore();
 
-    public ITaggedStringConversionObserver? TaggedStringConversionObserver { get; init; }
+    internal ITaggedStringConversionObserver? TaggedStringConversionObserver { get; init; }
 
     protected JsonNamingPolicy NamingPolicy => SyntaxFactory.NamingPolicy;
 

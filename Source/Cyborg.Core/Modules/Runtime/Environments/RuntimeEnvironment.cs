@@ -233,7 +233,6 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         return new RuntimeEnvironment(node.Name, node.IsTransient, syntaxFactory, ns)
         {
             EnvironmentId = environmentId,
-            TaggedStringConversionObserver = node.TaggedStringConversionObserver,
             VariableStore = new TransactionalEnvironmentVariableStore(environmentId, participant, transaction)
         };
     }

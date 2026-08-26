@@ -24,7 +24,7 @@ public sealed class TransactionalRuntimeEnvironmentTests
     {
         RuntimeEnvironmentTransactionParticipant participant = new();
         RuntimeEnvironmentId environmentId = RuntimeEnvironmentId.Create();
-        RuntimeEnvironmentNode node = new("global", IsTransient: false, Parent: null, TaggedStringConversionObserver: null);
+        RuntimeEnvironmentNode node = new("global", IsTransient: false, Parent: null);
         RuntimeEnvironmentSeed environmentSeed = new(
             environmentId,
             node,
@@ -66,8 +66,8 @@ public sealed class TransactionalRuntimeEnvironmentTests
         RuntimeEnvironmentTransactionState state = root.GetParticipantState(participant);
         RuntimeEnvironmentId firstId = RuntimeEnvironmentId.Create();
         RuntimeEnvironmentId secondId = RuntimeEnvironmentId.Create();
-        RuntimeEnvironmentNode firstNode = new("named", IsTransient: false, Parent: null, TaggedStringConversionObserver: null);
-        RuntimeEnvironmentNode secondNode = new("named", IsTransient: false, Parent: null, TaggedStringConversionObserver: null);
+        RuntimeEnvironmentNode firstNode = new("named", IsTransient: false, Parent: null);
+        RuntimeEnvironmentNode secondNode = new("named", IsTransient: false, Parent: null);
 
         Assert.IsTrue(state.TryAddNamedEnvironment(firstId, firstNode, values: []));
         Assert.IsFalse(state.TryAddNamedEnvironment(secondId, secondNode, values: []));
@@ -87,7 +87,7 @@ public sealed class TransactionalRuntimeEnvironmentTests
         ExecutionTransaction child = fork.CreateChild();
         RuntimeEnvironmentTransactionState childState = child.GetParticipantState(participant);
         RuntimeEnvironmentId transientId = RuntimeEnvironmentId.Create();
-        RuntimeEnvironmentNode transientNode = new("temporary", IsTransient: true, Parent: null, TaggedStringConversionObserver: null);
+        RuntimeEnvironmentNode transientNode = new("temporary", IsTransient: true, Parent: null);
         childState.AddEnvironment(transientId, transientNode, [new KeyValuePair<string, object?>("value", 42)]);
         childState.SetValue(transientId, "updated", "discarded");
         fork.Continuation.Complete();
@@ -111,9 +111,9 @@ public sealed class TransactionalRuntimeEnvironmentTests
         RuntimeEnvironmentTransactionState childState = child.GetParticipantState(participant);
         RuntimeEnvironmentId transientParentId = RuntimeEnvironmentId.Create();
         RuntimeEnvironmentId namedChildId = RuntimeEnvironmentId.Create();
-        RuntimeEnvironmentNode transientParent = new("temporary-parent", IsTransient: true, Parent: null, TaggedStringConversionObserver: null);
+        RuntimeEnvironmentNode transientParent = new("temporary-parent", IsTransient: true, Parent: null);
         RuntimeEnvironmentParent parentReference = new(transientParentId, Namespace: "parent", OverrideResolutionTags: []);
-        RuntimeEnvironmentNode namedChild = new("named-child", IsTransient: false, parentReference, TaggedStringConversionObserver: null);
+        RuntimeEnvironmentNode namedChild = new("named-child", IsTransient: false, parentReference);
         childState.AddEnvironment(
             transientParentId,
             transientParent,
@@ -150,8 +150,8 @@ public sealed class TransactionalRuntimeEnvironmentTests
         RuntimeEnvironmentTransactionState secondState = second.GetParticipantState(participant);
         RuntimeEnvironmentId firstId = RuntimeEnvironmentId.Create();
         RuntimeEnvironmentId secondId = RuntimeEnvironmentId.Create();
-        RuntimeEnvironmentNode firstNode = new("shared", IsTransient: false, Parent: null, TaggedStringConversionObserver: null);
-        RuntimeEnvironmentNode secondNode = new("shared", IsTransient: false, Parent: null, TaggedStringConversionObserver: null);
+        RuntimeEnvironmentNode firstNode = new("shared", IsTransient: false, Parent: null);
+        RuntimeEnvironmentNode secondNode = new("shared", IsTransient: false, Parent: null);
         Assert.IsTrue(firstState.TryAddNamedEnvironment(firstId, firstNode, [new KeyValuePair<string, object?>("value", "first")]));
         Assert.IsFalse(secondState.TryGetRegisteredEnvironment("shared", out RuntimeEnvironmentId _));
         RuntimeEnvironmentTransactionState continuationState = fork.Continuation.GetParticipantState(participant);
@@ -298,8 +298,7 @@ public sealed class TransactionalRuntimeEnvironmentTests
         RuntimeEnvironmentNode globalNode = new(
             "global",
             IsTransient: false,
-            Parent: null,
-            TaggedStringConversionObserver: null);
+            Parent: null);
         RuntimeEnvironmentSeed environmentSeed = new(
             globalEnvironmentId,
             globalNode,

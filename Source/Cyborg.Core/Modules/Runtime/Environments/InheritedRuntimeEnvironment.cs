@@ -40,7 +40,6 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
         return new InheritedRuntimeEnvironment(node.Name, parent, node.IsTransient, syntaxFactory, ns)
         {
             EnvironmentId = environmentId,
-            TaggedStringConversionObserver = node.TaggedStringConversionObserver,
             VariableStore = new TransactionalEnvironmentVariableStore(environmentId, participant, transaction)
         };
     }

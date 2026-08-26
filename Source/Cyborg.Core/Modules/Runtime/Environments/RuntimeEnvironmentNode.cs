@@ -1,5 +1,3 @@
-using Cyborg.Core.Text;
-
 namespace Cyborg.Core.Modules.Runtime.Environments;
 
 internal sealed record RuntimeEnvironmentParent(
@@ -10,5 +8,4 @@ internal sealed record RuntimeEnvironmentParent(
 internal sealed record RuntimeEnvironmentNode(
     string Name,
     bool IsTransient,
-    RuntimeEnvironmentParent? Parent,
-    ITaggedStringConversionObserver? TaggedStringConversionObserver);
+    RuntimeEnvironmentParent? Parent);

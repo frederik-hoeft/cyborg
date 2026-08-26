@@ -81,10 +81,7 @@ public interface ICyborgCoreServices
         ILoggerFactory loggerFactory,
         IServiceProvider serviceProvider)
     {
-        GlobalRuntimeEnvironment globalEnvironment = new(namingPolicy)
-        {
-            TaggedStringConversionObserver = taggedStringConversionObserver
-        };
-        return new RootModuleRuntime(globalEnvironment, loggerFactory, serviceProvider);
+        GlobalRuntimeEnvironment globalEnvironment = new(namingPolicy);
+        return new RootModuleRuntime(globalEnvironment, taggedStringConversionObserver, loggerFactory, serviceProvider);
     }
 }
