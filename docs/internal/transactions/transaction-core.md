@@ -143,9 +143,9 @@ The generic transactional dictionary provides the map semantics used by syntheti
 - negative caching for removals;
 - detached merge-candidate construction.
 
-The dictionary deliberately does not own transaction topology. A map-backed participant translates dictionary write conflicts into participant conflict descriptions and applies the coordinator's selected strategy before producing its detached candidate.
+The dictionary deliberately does not own transaction topology. A reusable dictionary-fork companion captures the stable baseline, creates branches, translates dictionary write conflicts into participant conflict descriptions, applies the selected strategy, and prepares detached map candidates. Higher-level participant forks can therefore compose several map forks without duplicating generic conflict-selection machinery.
 
-This separation keeps the collection reusable when one higher-level participant contains several maps or additional non-map topology.
+This separation keeps the collection reusable when one participant contains several focused state components or additional non-map topology.
 
 ## Runtime Integration Boundary
 

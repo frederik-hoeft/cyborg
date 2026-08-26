@@ -36,6 +36,16 @@ The mutable service object is not itself copied between transactions. Transactio
 
 This separation allows a custom service to choose any internal state representation while preserving common transaction topology and atomic publication.
 
+## Participant Granularity
+
+A participant should correspond to one independently transactional subsystem or state component. Unrelated workflow state should remain separate participants so each component owns a narrow root seed, state model, fork semantics, conflict keys, and reconciliation policy. The coordinator already provides aggregate atomic publication across participants, so atomicity alone is not a reason to combine unrelated state.
+
+Some subsystem state has an intrinsic reconciliation dependency. In that case, use one thin composite participant only when preparing a valid candidate for one concern requires the candidate state of another. The composite participant should orchestrate smaller focused state/fork components rather than implement every map and policy itself.
+
+The runtime environment is the primary example: graph reconciliation determines which logical environment identities remain reachable, and binding reconciliation must discard changes for pruned identities. The environment participant therefore composes focused graph and binding components, while the named-module registry remains a separate participant because its merge semantics do not depend on the environment candidate.
+
+Do not create a catch-all runtime participant merely because several components are runtime-owned.
+
 ## Root State
 
 A participant creates root component state from an explicit immutable execution seed. Seed values may come from application configuration, the loaded workflow graph, CLI input, or another execution-host input, but once a root begins, that initial component state belongs to the root execution.

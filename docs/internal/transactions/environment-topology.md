@@ -4,21 +4,21 @@
 
 ## Responsibility
 
-The runtime environment subsystem is one transactional component. It owns the state that determines whether an environment exists, how it inherits, whether it is visible by name, and which variable bindings belong to it.
-
-Keeping these concerns in one participant is required for coherent reconciliation. A named registration cannot become visible without its node, transient pruning cannot retain orphaned variable bindings, and a conflict in registration or topology leaves the complete environment candidate unpublished.
-
-The component state is conceptually:
+The runtime environment subsystem is represented by one thin composite transaction participant because binding lifetime depends on the reconciled environment graph. The participant composes two focused state components rather than treating all environment state as one implementation concern:
 
 ```text
-environment component
+environment participant
   logical global environment id
-  nodes:         EnvironmentId -> EnvironmentNode
-  registrations: name -> EnvironmentId
-  bindings:      (EnvironmentId, variable path) -> value
+  graph component
+    nodes:         EnvironmentId -> EnvironmentNode
+    registrations: name -> EnvironmentId
+  binding component
+    bindings:      (EnvironmentId, variable path) -> value
 ```
 
-All three maps use persistent transaction-local baseline/change semantics.
+Graph state owns existence, inheritance, named visibility, and transient reachability. Binding state owns variable reads, writes, removals, and binding conflict keys. Both use persistent transaction-local baseline/change semantics.
+
+The composite boundary exists because reconciliation is ordered: graph preparation determines the logical environment identities retained by the candidate, and binding preparation must omit changes for identities pruned by that graph candidate. Aggregate transaction atomicity alone would not justify combining the concerns; the transaction coordinator already provides atomic publication across independent participants.
 
 ## Logical Environment Nodes
 
@@ -89,7 +89,7 @@ Reachability is deliberately an environment-component rule rather than a generic
 
 Variable conflicts continue to use `(EnvironmentId, variable path)` as their logical key. Registration conflicts use the user-visible environment name, while topology conflicts use logical environment identity.
 
-The environment participant prepares candidate node, registration, and binding maps before returning one participant candidate to the transaction coordinator. No live environment state is mutated during preparation.
+The graph fork prepares candidate node and registration maps first and computes the retained logical environment identities. The binding fork then prepares its candidate using that retained set. A thin environment fork composes the two detached candidates into one participant state before returning it to the transaction coordinator. No live environment state is mutated during preparation.
 
 This provides two levels of atomicity:
 

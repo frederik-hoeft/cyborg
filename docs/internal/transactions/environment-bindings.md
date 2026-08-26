@@ -4,9 +4,9 @@
 
 ## Responsibility
 
-Environment variable bindings are stored inside the unified runtime-environment transaction participant. The binding layer provides transactional reads, writes, removals, fork isolation, recursive reconciliation, and write-conflict semantics without making `RuntimeEnvironment` objects mutable state owners.
+Environment variable bindings are owned by a focused binding-state component inside the composite runtime-environment transaction participant. The binding component provides transactional reads, writes, removals, fork isolation, recursive reconciliation, and write-conflict semantics without making `RuntimeEnvironment` objects mutable state owners.
 
-Topology, named registration, and transient lifetime are owned by the same participant and are described in [Transactional Environment Topology](environment-topology.md). Keeping them together allows topology pruning and binding publication to prepare as one coherent environment candidate.
+Topology, named registration, and transient lifetime are owned by a separate graph-state component described in [Transactional Environment Topology](environment-topology.md). The environment participant is composite only because the graph candidate determines which logical environment identities the binding candidate may retain.
 
 ## Logical Environment Identity
 
@@ -24,7 +24,7 @@ The identity is independent of the transaction that currently views the environm
 
 ## Binding State
 
-The runtime-environment participant contains a transactional dictionary keyed by logical environment identity and variable name.
+The binding-state component contains a transactional dictionary keyed by logical environment identity and variable name.
 
 ```text
 environment participant
@@ -85,4 +85,4 @@ There is no mutable process-global binding dictionary underneath the transaction
 
 ## Environment Graph Integration
 
-Bindings, named registration, topology, and transient reachability reconcile as one participant candidate. See [Transactional Environment Topology](environment-topology.md) for creation, registration conflicts, inheritance edges, and pruning semantics.
+Bindings and graph state reconcile as focused component candidates and are then composed into one environment participant candidate. See [Transactional Environment Topology](environment-topology.md) for creation, registration conflicts, inheritance edges, pruning semantics, and the graph-before-bindings reconciliation dependency.
