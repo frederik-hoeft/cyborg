@@ -168,6 +168,42 @@ public sealed class WorkflowDebuggerTests : CyborgCoreTestBase
         });
 
     [TestMethod]
+    public Task Test_EvaluatePreExecutionAsync_ConcurrentPausesAreSerializedAndObserveDetachAsync() => TestWithDIAsync(
+        assertion: async services =>
+        {
+            IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
+            IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+            IWorkflowDebugger debugger = services.GetRequiredService<IWorkflowDebugger>();
+            IDebugFrontend debugFrontend = services.GetRequiredService<IDebugFrontend>();
+            Assert.IsInstanceOfType<DetachingBlockingFrontend>(debugFrontend);
+            DetachingBlockingFrontend frontend = (DetachingBlockingFrontend)debugFrontend;
+            breakpoints.Add(".*");
+
+            ValueTask<DebugResumeAction> first = debugger.EvaluatePreExecutionAsync(
+                ProbeModule.ModuleId,
+                ValidationResult.Valid(new ProbeModule { Name = "first" }),
+                runtime,
+                services,
+                TestContext.CancellationToken);
+            await frontend.FirstPauseEntered;
+
+            ValueTask<DebugResumeAction> second = debugger.EvaluatePreExecutionAsync(
+                ProbeModule.ModuleId,
+                ValidationResult.Valid(new ProbeModule { Name = "second" }),
+                runtime,
+                services,
+                TestContext.CancellationToken);
+
+            Assert.AreEqual(1, frontend.PauseCount);
+            frontend.ReleaseFirstPause();
+            Assert.AreEqual(DebugResumeAction.Continue, await first);
+            Assert.AreEqual(DebugResumeAction.Continue, await second);
+            Assert.AreEqual(1, frontend.PauseCount);
+            Assert.AreEqual(0, breakpoints.Count);
+        },
+        configureServices: static services => services.AddSingleton<IDebugFrontend, DetachingBlockingFrontend>());
+
+    [TestMethod]
     public Task Test_EvaluatePreExecutionAsync_WhenSpecifiedFrontendIsNotFound_ThrowsAsync() => TestWithDIAsync(
         assertion: async services =>
         {
@@ -215,6 +251,33 @@ public sealed class WorkflowDebuggerTests : CyborgCoreTestBase
             LastIsValid = context.ValidationResult.IsValid;
             LastValidationErrors = context.ValidationResult.Errors;
             return ValueTask.FromResult(action);
+        }
+    }
+
+    private sealed class DetachingBlockingFrontend : IDebugFrontend
+    {
+        private readonly TaskCompletionSource _firstPauseEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _releaseFirstPause = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _pauseCount;
+
+        public string Key => "test";
+
+        public Task FirstPauseEntered => _firstPauseEntered.Task;
+
+        public int PauseCount => Volatile.Read(ref _pauseCount);
+
+        public void ReleaseFirstPause() => _releaseFirstPause.TrySetResult();
+
+        public async ValueTask<DebugResumeAction> PauseAsync(IDebugPauseContext context, CancellationToken cancellationToken)
+        {
+            int pauseCount = Interlocked.Increment(ref _pauseCount);
+            if (pauseCount == 1)
+            {
+                _firstPauseEntered.TrySetResult();
+                await _releaseFirstPause.Task.WaitAsync(cancellationToken);
+                context.Detach();
+            }
+            return DebugResumeAction.Continue;
         }
     }
 

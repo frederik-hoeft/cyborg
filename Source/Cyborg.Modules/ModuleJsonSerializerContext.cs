@@ -21,6 +21,7 @@ using Cyborg.Modules.If;
 using Cyborg.Modules.Named;
 using Cyborg.Modules.Network.SshShutdown;
 using Cyborg.Modules.Network.WakeOnLan;
+using Cyborg.Modules.Parallel;
 using Cyborg.Modules.Sequence;
 using Cyborg.Modules.Subprocess;
 using Cyborg.Modules.Switch;
@@ -32,6 +33,7 @@ using System.Text.Json.Serialization;
 namespace Cyborg.Modules;
 
 [JsonSourceGenerationOptions(ReadCommentHandling = JsonCommentHandling.Skip, UseStringEnumConverter = true, PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower, IncludeFields = true)]
+[JsonSerializable(typeof(ParallelModule))]
 [JsonSerializable(typeof(SequenceModule))]
 [JsonSerializable(typeof(SubprocessModule))]
 [JsonSerializable(typeof(SwitchModule))]

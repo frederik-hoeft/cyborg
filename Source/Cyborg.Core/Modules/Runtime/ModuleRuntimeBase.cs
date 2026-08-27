@@ -62,6 +62,85 @@ public abstract class ModuleRuntimeBase : IModuleRuntime, IModuleExecutionRuntim
             environment);
     }
 
+    public async Task<IReadOnlyList<IModuleExecutionResult>> ExecuteConcurrentlyAsync(
+        IReadOnlyList<ModuleContext> moduleContexts,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(moduleContexts);
+        if (moduleContexts.Count == 0)
+        {
+            return [];
+        }
+
+        ExecutionTransactionForkGroup fork = _transaction.Fork();
+        fork.Continuation.Complete();
+        List<ConcurrentExecutionBranch> branches = new(moduleContexts.Count);
+        try
+        {
+            IServiceProvider services = RequireExecutionServices();
+            IServiceScopeFactory scopeFactory = services.GetRequiredService<IServiceScopeFactory>();
+            for (int i = 0; i < moduleContexts.Count; i++)
+            {
+                ModuleContext moduleContext = moduleContexts[i]
+                    ?? throw new ArgumentException("Concurrent module contexts cannot contain null entries.", nameof(moduleContexts));
+                ExecutionTransaction childTransaction = fork.CreateChild();
+                AsyncServiceScope executionScope = scopeFactory.CreateAsyncScope();
+                try
+                {
+                    _operations.ModuleRegistry.BindExecutionScope(executionScope.ServiceProvider, childTransaction);
+                    _operations.TransactionalServices.BindExecutionScope(executionScope.ServiceProvider, childTransaction);
+                    RuntimeEnvironmentContext childEnvironmentContext = _environmentContext.CreateTransactionView(childTransaction);
+                    IModuleExecutionRuntime scopedRuntime = new ScopedRuntime(
+                        Root,
+                        parent: this,
+                        childEnvironmentContext,
+                        _operations,
+                        childTransaction,
+                        executionScope.ServiceProvider);
+                    IRuntimeEnvironment environment = scopedRuntime.PrepareEnvironment(moduleContext.Environment ?? ModuleEnvironment.Default);
+                    branches.Add(new ConcurrentExecutionBranch(childTransaction, executionScope, scopedRuntime, environment, moduleContext));
+                }
+                catch
+                {
+                    await executionScope.DisposeAsync();
+                    throw;
+                }
+            }
+
+            Task<IModuleExecutionResult>[] executions = new Task<IModuleExecutionResult>[branches.Count];
+            for (int i = 0; i < branches.Count; i++)
+            {
+                executions[i] = ExecuteConcurrentBranchAsync(branches[i], cancellationToken);
+            }
+            IModuleExecutionResult[] results = await Task.WhenAll(executions);
+
+            foreach (ConcurrentExecutionBranch branch in branches)
+            {
+                branch.Transaction.Complete();
+            }
+            if (!fork.TryJoin(out TransactionConflict? conflict))
+            {
+                throw CreateReconciliationException(conflict!);
+            }
+            return results;
+        }
+        catch
+        {
+            if (fork.Lifecycle == ExecutionTransactionForkLifecycle.Active)
+            {
+                fork.Discard();
+            }
+            throw;
+        }
+        finally
+        {
+            for (int i = branches.Count - 1; i >= 0; i--)
+            {
+                await branches[i].Scope.DisposeAsync();
+            }
+        }
+    }
+
     void IModuleExecutionRuntime.ApplyModuleRegistrySeed(ModuleRegistrySeed seed)
     {
         ArgumentNullException.ThrowIfNull(seed);
@@ -163,8 +242,7 @@ public abstract class ModuleRuntimeBase : IModuleRuntime, IModuleExecutionRuntim
             childTransaction.Complete();
             if (!fork.TryJoin(out TransactionConflict? conflict))
             {
-                throw new InvalidOperationException(
-                    $"Module transaction reconciliation failed due to a conflict in participant '{conflict!.Participant.GetType().Name}' for logical key '{conflict.LogicalKey}'.");
+                throw CreateReconciliationException(conflict!);
             }
             return result;
         }
@@ -178,6 +256,32 @@ public abstract class ModuleRuntimeBase : IModuleRuntime, IModuleExecutionRuntim
         }
     }
 
+    private static async Task<IModuleExecutionResult> ExecuteConcurrentBranchAsync(
+        ConcurrentExecutionBranch branch,
+        CancellationToken cancellationToken) =>
+        await branch.Runtime.ExecuteModuleContextInCurrentScopeAsync(branch.ModuleContext, branch.Environment, cancellationToken);
+
+    private static InvalidOperationException CreateReconciliationException(TransactionConflict conflict) =>
+        new($"Module transaction reconciliation failed due to a conflict in participant '{conflict.Participant.GetType().Name}' for logical key '{conflict.LogicalKey}'.");
+
     private IServiceProvider RequireExecutionServices() =>
         _serviceProvider ?? throw new InvalidOperationException("Module execution requires a service provider capable of creating execution scopes.");
+
+    private sealed class ConcurrentExecutionBranch(
+        ExecutionTransaction transaction,
+        AsyncServiceScope scope,
+        IModuleExecutionRuntime runtime,
+        IRuntimeEnvironment environment,
+        ModuleContext moduleContext)
+    {
+        public ExecutionTransaction Transaction { get; } = transaction;
+
+        public AsyncServiceScope Scope { get; } = scope;
+
+        public IModuleExecutionRuntime Runtime { get; } = runtime;
+
+        public IRuntimeEnvironment Environment { get; } = environment;
+
+        public ModuleContext ModuleContext { get; } = moduleContext;
+    }
 }

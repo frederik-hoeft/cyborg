@@ -17,6 +17,10 @@ public interface IModuleRuntime
 
     Task<IModuleExecutionResult> ExecuteAsync(ModuleReference moduleReference, IRuntimeEnvironment environment, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<IModuleExecutionResult>> ExecuteConcurrentlyAsync(
+        IReadOnlyList<ModuleContext> moduleContexts,
+        CancellationToken cancellationToken = default);
+
     IRuntimeEnvironment PrepareEnvironment(ModuleEnvironment moduleEnvironment, IReadOnlyCollection<string>? overrideResolutionTags = null);
 
     IRuntimeEnvironment? ResolveEnvironmentReference(ModuleEnvironmentReference environmentReference);
