@@ -1,5 +1,5 @@
-﻿using System.Collections.Frozen;
-using Cyborg.Core.Runtime.Model;
+﻿using Cyborg.Core.Runtime.Model;
+using System.Collections.Frozen;
 
 namespace Cyborg.Core.Runtime.Configuration;
 

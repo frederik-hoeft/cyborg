@@ -24,7 +24,7 @@ public sealed class ModuleRegistryLoadingTests
         options.Converters.Add(new TestModuleReferenceConverter());
         TestJsonLoaderContext context = new(options);
         ModuleConfigurationDeserializer deserializer = new(context);
-        const string json = """
+        const string JSON = """
             {
               "module": {
                 "kind": "container",
@@ -43,7 +43,7 @@ public sealed class ModuleRegistryLoadingTests
             }
             """;
 
-        ModuleContext root = deserializer.Deserialize(json)
+        ModuleContext root = deserializer.Deserialize(JSON)
             ?? throw new AssertFailedException("Expected a loaded module context.");
         Dictionary<string, ModuleContext> namedModules = root.NamedModules.Modules.ToDictionary(StringComparer.Ordinal);
 

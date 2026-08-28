@@ -1,4 +1,4 @@
-namespace Cyborg.TestModules.Activation;
+﻿namespace Cyborg.TestModules.Activation;
 
 public sealed class ActivationProbeDependency(string identity)
 {

@@ -10,7 +10,7 @@ public sealed class MetricsCollector(MetricsCollectorOptions options, ITaggedStr
     private static readonly Encoding s_utf8NoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
 
     private readonly PrometheusBuilder _builder = new(options.Namespace);
-    private readonly object _syncRoot = new();
+    private readonly Lock _syncRoot = new();
 
     public IMetricsLabelCollection CreateLabels() => new MetricsLabelCollection(taggedStringRenderer);
 

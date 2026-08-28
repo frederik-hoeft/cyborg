@@ -1,6 +1,6 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using Cyborg.Core.Runtime.Engine.Transactions.Collections;
+﻿using Cyborg.Core.Runtime.Engine.Transactions.Collections;
 using Cyborg.Core.Runtime.Engine.Transactions.Internal;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Core.Tests.Runtime.Transactions;
 
