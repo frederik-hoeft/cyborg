@@ -646,7 +646,7 @@ This is useful when multiple modules need to share a named scope that must be cr
 
 ### Named Reference (`cyborg.modules.named.ref.v1`)
 
-Executes a module that was registered in the module registry by name. Any module that declares a `name` in its [base properties](#module-base-properties) is automatically registered during JSON deserialization and becomes referenceable by this module. This supports defining a module once and invoking it from multiple places without duplicating the configuration.
+Executes a module that is visible in the runtime module registry by name. During configuration loading, modules that declare a `name` in their [base properties](#module-base-properties) are collected into immutable load-local seed data rather than mutating runtime state immediately. Entering the loaded `ModuleContext` applies that seed to the current execution transaction, making those definitions referenceable within the normal transactional visibility rules. This supports defining a module once and invoking it from multiple places without duplicating the configuration.
 
 **Properties:**
 

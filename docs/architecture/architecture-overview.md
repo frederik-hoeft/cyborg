@@ -234,6 +234,8 @@ Workers return results via builder methods on `ModuleWorker<TModule>`: `Success(
 
 `IModuleRuntime` is the consumer-facing execution facade for environment access and nested module dispatch. `RootModuleRuntime` establishes one execution session with a parentless transaction and logical global environment. Nested execution uses `ScopedRuntime` views associated with the current invocation transaction, environment context, and service provider.
 
+Workers normally interact with this facade rather than injecting transaction coordinators, environment catalogs, artifact publishers, or worker-dispatch mechanisms directly. Those responsibilities are runtime infrastructure behind the stable module-facing boundary. Explicit transaction-aware state for a custom DI service is a separate opt-in extension point rather than part of ordinary module execution.
+
 The runtime-object hierarchy expresses execution/navigation context, not canonical state ownership. Workflow-semantic environment and named-module state lives in transaction participants, and CLR environment objects are views bound to the transaction that is allowed to observe or mutate that state. Nested runtimes therefore do not discover shared mutable state by walking to a root runtime registry.
 
 When a module calls `runtime.ExecuteAsync(...)`, the runtime creates the structured child invocation described above, binds the selected logical environment to the child transaction, activates the worker from the child DI scope, and reconciles the completed child before returning to the caller.
@@ -274,13 +276,13 @@ Environments form a hierarchical variable store. Each module executes in an envi
 
 The runtime exposes `RuntimeEnvironment` views, with `InheritedRuntimeEnvironment` representing a view that falls back through a logical parent and `GlobalRuntimeEnvironment` defining the global environment shape used to seed a root execution. The mutable workflow state is not owned by those CLR objects: transaction-bound views route variable reads, writes, removals, and topology lookup through the current environment transaction participant.
 
-When a scope is `InheritParent`, the transaction creates a logical environment node whose parent points at the caller's environment identity. Variables set in the child node shadow its parent, while unresolved lookups traverse the logical parent chain. Reconstructing or rebinding an environment view preserves those logical identities inside the current transaction.
+When a scope is `InheritParent`, the transaction creates a logical environment node whose parent points at the caller's environment identity. Variables set in the child node shadow its parent, while unresolved lookups traverse the logical parent chain. The parent relationship also preserves the view metadata needed by inherited resolution, including namespace and override-resolution tags, so reconstructing a view does not depend on retaining the original CLR environment object.
 
 #### Named Environments
 
 Environments declared with an explicit `name` and not marked `transient` are registered in the current transaction's environment graph. A later module can resolve a visible registration through `Reference` scope by name. This enables cross-step state sharing without a process-global mutable environment registry — for example, a guard module's `finally` block can reference the same named environment as the `body` block after the relevant child state has reconciled.
 
-Transient environments receive a generated logical identity but no named registration. Their reachability is transaction-owned and reconciles with the environment graph rather than leaking through a root-runtime object registry.
+Transient environments receive a generated logical identity but no named registration. Reconciliation prunes newly created transient identities that are no longer reachable from surviving environment state, while retaining any unnamed ancestors required by a surviving inheritance chain. This keeps invocation-local environments from accumulating in ancestor state without breaking named environments that inherit through them.
 
 ### Variable Resolution
 
