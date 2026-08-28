@@ -127,7 +127,7 @@ internal sealed class PropertyModelBuilder(GenerationCandidateFactory factory, L
         ImmutableArray<PropertyModel>.Builder childBuilder = ImmutableArray.CreateBuilder<PropertyModel>();
         ImmutableHashSet<INamedTypeSymbol> childPath = traversalPath.Add(validatableType);
 
-        foreach (IPropertySymbol child in validatableType.EnumerateMostDerivedMembers().OfType<IPropertySymbol>())
+        foreach (IPropertySymbol child in validatableType.EnumerateMostDerivedMembers(_visibilityContext).OfType<IPropertySymbol>())
         {
             if (child.IsStatic || child.IsIndexer)
             {
