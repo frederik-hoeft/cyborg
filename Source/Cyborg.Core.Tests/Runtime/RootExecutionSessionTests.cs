@@ -115,8 +115,5 @@ public sealed class RootExecutionSessionTests : CyborgCoreTestBase
 
     private sealed class SessionSingletonProbe;
 
-    private sealed record SessionProbeExecutionResult(
-        IModule Module,
-        ModuleExitStatus Status,
-        IVariableResolverScope Artifacts) : IModuleExecutionResult;
+    private sealed record SessionProbeExecutionResult(IModule Module, ModuleExitStatus Status, IVariableResolverScope Artifacts) : IModuleExecutionResult;
 }

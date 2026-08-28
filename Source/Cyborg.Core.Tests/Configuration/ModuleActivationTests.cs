@@ -49,9 +49,7 @@ public sealed class ModuleActivationTests
         ModuleReference moduleReference = new(new ActivationProbeModule(), loader.ModuleId);
         using ServiceProvider executionServices = CreateActivationServices("execution");
 
-        Task<ActivationProbeModuleWorker>[] activations = Enumerable.Range(0, 16)
-            .Select(_ => Task.Run(() => (ActivationProbeModuleWorker)workerFactory.CreateWorker(moduleReference, executionServices)))
-            .ToArray();
+        Task<ActivationProbeModuleWorker>[] activations = [.. Enumerable.Range(0, 16).Select(_ => Task.Run(() => (ActivationProbeModuleWorker)workerFactory.CreateWorker(moduleReference, executionServices)))];
         ActivationProbeModuleWorker[] workers = await Task.WhenAll(activations);
 
         Assert.HasCount(16, workers.Distinct().ToArray());

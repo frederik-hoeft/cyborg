@@ -74,7 +74,7 @@ public sealed class ExecutionTransactionTests
         ExecutionTransactionForkGroup fork = root.Fork();
 
         Assert.ThrowsExactly<InvalidOperationException>(() => root.GetParticipantState(participant));
-        Assert.ThrowsExactly<InvalidOperationException>(() => root.Fork());
+        Assert.ThrowsExactly<InvalidOperationException>(root.Fork);
         Assert.ThrowsExactly<InvalidOperationException>(root.Complete);
         fork.Discard();
         Assert.AreEqual(ExecutionTransactionLifecycle.Active, root.Lifecycle);
@@ -125,7 +125,7 @@ public sealed class ExecutionTransactionTests
         Assert.IsNotNull(conflict);
         Assert.AreSame(participant, conflict.Participant);
         Assert.AreEqual("value", conflict.LogicalKey);
-        Assert.AreEqual(2, conflict.ContributorIndices.Length);
+        Assert.HasCount(2, conflict.ContributorIndices);
         Assert.AreEqual(1, conflict.ContributorIndices[0]);
         Assert.AreEqual(2, conflict.ContributorIndices[1]);
         Assert.AreEqual(1, root.GetParticipantState(participant)["baseline"]);
@@ -134,7 +134,6 @@ public sealed class ExecutionTransactionTests
         Assert.AreEqual(ExecutionTransactionLifecycle.Discarded, first.Lifecycle);
         Assert.AreEqual(ExecutionTransactionLifecycle.Discarded, second.Lifecycle);
     }
-
 
     [TestMethod]
     public void TryJoin_AddThenRemoveStillParticipatesInConflictDetection()
@@ -176,7 +175,7 @@ public sealed class ExecutionTransactionTests
 
         Assert.IsFalse(joined);
         Assert.IsNotNull(conflict);
-        Assert.AreEqual(2, conflict.ContributorIndices.Length);
+        Assert.HasCount(2, conflict.ContributorIndices);
         Assert.AreEqual(0, conflict.ContributorIndices[0]);
         Assert.AreEqual(1, conflict.ContributorIndices[1]);
         Assert.IsFalse(root.GetParticipantState(participant).ContainsKey("value"));
@@ -243,7 +242,7 @@ public sealed class ExecutionTransactionTests
         InvalidOperationException exception = Assert.ThrowsExactly<InvalidOperationException>(() =>
             fork.TryJoin(out TransactionConflict? _));
 
-        StringAssert.Contains(exception.Message, "Synthetic preparation failure");
+        Assert.Contains("Synthetic preparation failure", exception.Message);
         Assert.AreEqual(ExecutionTransactionForkLifecycle.Failed, fork.Lifecycle);
         Assert.IsFalse(root.GetParticipantState(firstParticipant).ContainsKey("valid"));
         Assert.AreEqual(ExecutionTransactionLifecycle.Discarded, child.Lifecycle);
@@ -374,22 +373,12 @@ public sealed class ExecutionTransactionTests
         Assert.ThrowsExactly<ArgumentException>(() => new TransactionCoordinator([participant, participant]));
     }
 
-    private sealed class DictionaryParticipant : ITransactionParticipant<DictionaryParticipantState>
+    private sealed class DictionaryParticipant(bool failPreparation, params (string Key, int Value)[] seed) : ITransactionParticipant<DictionaryParticipantState>
     {
-        private readonly bool _failPreparation;
-        private readonly KeyValuePair<string, int>[] _seed;
+        private readonly KeyValuePair<string, int>[] _seed = [.. seed.Select(static value => KeyValuePair.Create(value.Key, value.Value))];
 
-        public DictionaryParticipant(params (string Key, int Value)[] seed)
-            : this(failPreparation: false, seed)
+        public DictionaryParticipant(params (string Key, int Value)[] seed) : this(failPreparation: false, seed)
         {
-        }
-
-        public DictionaryParticipant(bool failPreparation, params (string Key, int Value)[] seed)
-        {
-            _failPreparation = failPreparation;
-            _seed = seed
-                .Select(static value => KeyValuePair.Create(value.Key, value.Value))
-                .ToArray();
         }
 
         public DictionaryParticipantState CreateRootState(TransactionRootSeed seed)
@@ -400,52 +389,35 @@ public sealed class ExecutionTransactionTests
             {
                 values = seededValues;
             }
-            return new DictionaryParticipantState(values.ToTransactionalDictionary(StringComparer.Ordinal), _failPreparation);
+            return new DictionaryParticipantState(values.ToTransactionalDictionary(StringComparer.Ordinal), failPreparation);
         }
     }
 
-    private sealed class DictionaryParticipantState : ITransactionParticipantState
+    private sealed class DictionaryParticipantState(TransactionalDictionary<string, int> values, bool failPreparation = false) : ITransactionParticipantState
     {
-        private readonly bool _failPreparation;
-        private readonly TransactionalDictionary<string, int> _values;
+        public int ChangeCount => values.ChangeCount;
 
-        public DictionaryParticipantState(TransactionalDictionary<string, int> values, bool failPreparation = false)
-        {
-            _values = values;
-            _failPreparation = failPreparation;
-        }
+        public TransactionalDictionarySnapshot<string, int> Baseline => values.Baseline;
 
-        public int ChangeCount => _values.ChangeCount;
+        public int this[string key] => values[key];
 
-        public TransactionalDictionarySnapshot<string, int> Baseline => _values.Baseline;
+        public bool ContainsKey(string key) => values.ContainsKey(key);
 
-        public int this[string key] => _values[key];
+        public void Set(string key, int value) => values.Set(key, value);
 
-        public bool ContainsKey(string key) => _values.ContainsKey(key);
-
-        public void Set(string key, int value) => _values.Set(key, value);
-
-        public bool TryRemove(string key) => _values.TryRemove(key);
+        public bool TryRemove(string key) => values.TryRemove(key);
 
         public ITransactionParticipantFork CreateFork() =>
-            new DictionaryParticipantFork(this, _failPreparation);
+            new DictionaryParticipantFork(this, failPreparation);
 
-        internal TransactionalDictionary<string, int> Values => _values;
+        internal TransactionalDictionary<string, int> Values => values;
     }
 
-    private sealed class DictionaryParticipantFork : ITransactionParticipantFork
+    private sealed class DictionaryParticipantFork(ExecutionTransactionTests.DictionaryParticipantState owner, bool failPreparation) : ITransactionParticipantFork
     {
-        private readonly bool _failPreparation;
-        private readonly TransactionalDictionaryFork<string, int> _values;
+        private readonly TransactionalDictionaryFork<string, int> _values = new(owner.Values);
 
-        public DictionaryParticipantFork(DictionaryParticipantState owner, bool failPreparation)
-        {
-            _failPreparation = failPreparation;
-            _values = new TransactionalDictionaryFork<string, int>(owner.Values);
-        }
-
-        public ITransactionParticipantState CreateBranch() =>
-            new DictionaryParticipantState(_values.CreateBranch(), _failPreparation);
+        public ITransactionParticipantState CreateBranch() => new DictionaryParticipantState(_values.CreateBranch(), failPreparation);
 
         public bool TryPrepareMerge(
             ITransactionParticipant participant,
@@ -454,7 +426,7 @@ public sealed class ExecutionTransactionTests
             [NotNullWhen(true)] out ITransactionParticipantState? candidate,
             out TransactionConflict? conflict)
         {
-            if (_failPreparation)
+            if (failPreparation)
             {
                 throw new InvalidOperationException("Synthetic preparation failure.");
             }
@@ -477,7 +449,7 @@ public sealed class ExecutionTransactionTests
                 return false;
             }
 
-            candidate = new DictionaryParticipantState(_values.PrepareCandidate(selectedChanges), _failPreparation);
+            candidate = new DictionaryParticipantState(_values.PrepareCandidate(selectedChanges), failPreparation);
             conflict = null;
             return true;
         }

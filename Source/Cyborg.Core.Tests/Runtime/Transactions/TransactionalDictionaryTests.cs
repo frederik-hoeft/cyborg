@@ -19,7 +19,6 @@ public sealed class TransactionalDictionaryTests
         Assert.AreEqual(1, change.Value);
     }
 
-
     [TestMethod]
     public void Set_NullValue_IsDistinctFromRemoval()
     {
@@ -287,7 +286,7 @@ public sealed class TransactionalDictionaryTests
                 out TransactionalDictionary<string, int>? _,
                 out string _));
 
-        StringAssert.Contains(exception.Message, "changed after the fork baseline");
+        Assert.Contains("changed after the fork baseline", exception.Message);
     }
 
     [TestMethod]

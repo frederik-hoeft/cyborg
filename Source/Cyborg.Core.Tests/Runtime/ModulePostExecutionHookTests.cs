@@ -19,7 +19,7 @@ public sealed class ModulePostExecutionHookTests : CyborgCoreTestBase
         await TestWithDIAsync(async services =>
         {
             IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
-            IModuleExecutionResult result = await ExecuteWorkerAsync(new ProbeModuleWorker(ProbeBehavior.Success), runtime);
+            IModuleExecutionResult result = await ExecuteWorkerAsync(new ProbeModuleWorker(ProbeBehavior.Success), runtime, TestContext.CancellationToken);
 
             Assert.AreEqual(ModuleExitStatus.Success, result.Status);
             Assert.AreEqual(1, failingHook.CallCount);
@@ -41,7 +41,7 @@ public sealed class ModulePostExecutionHookTests : CyborgCoreTestBase
         await TestWithDIAsync(async services =>
         {
             IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
-            IModuleExecutionResult result = await ExecuteWorkerAsync(new ProbeModuleWorker(ProbeBehavior.Throw), runtime);
+            IModuleExecutionResult result = await ExecuteWorkerAsync(new ProbeModuleWorker(ProbeBehavior.Throw), runtime, TestContext.CancellationToken);
 
             Assert.AreEqual(ModuleExitStatus.Failed, result.Status);
             Assert.AreEqual(1, hook.CallCount);
@@ -76,8 +76,8 @@ public sealed class ModulePostExecutionHookTests : CyborgCoreTestBase
         await TestWithDIAsync(async services =>
         {
             IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
-            await ExecuteWorkerAsync(new ProbeModuleWorker(ProbeBehavior.Success), runtime);
-            await ExecuteWorkerAsync(new ProbeModuleWorker(ProbeBehavior.Success), runtime);
+            await ExecuteWorkerAsync(new ProbeModuleWorker(ProbeBehavior.Success), runtime, TestContext.CancellationToken);
+            await ExecuteWorkerAsync(new ProbeModuleWorker(ProbeBehavior.Success), runtime, TestContext.CancellationToken);
 
             Assert.AreEqual(2, createdHooks);
         }, services => services.AddTransient<IModulePostExecutionHook>(_ =>
@@ -93,7 +93,7 @@ public sealed class ModulePostExecutionHookTests : CyborgCoreTestBase
         await TestWithDIAsync(async services =>
         {
             IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
-            IModuleExecutionResult result = await ExecuteWorkerAsync(new ProbeModuleWorker(ProbeBehavior.Success), runtime);
+            IModuleExecutionResult result = await ExecuteWorkerAsync(new ProbeModuleWorker(ProbeBehavior.Success), runtime, TestContext.CancellationToken);
 
             Assert.AreEqual(ModuleExitStatus.Success, result.Status);
         }, services => services.AddTransient<IModulePostExecutionHook>(static _ => throw new InvalidOperationException("Synthetic post-hook construction failure.")));

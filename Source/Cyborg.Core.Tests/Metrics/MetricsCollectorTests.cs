@@ -1,4 +1,4 @@
-using Cyborg.Core.Services.Metrics;
+﻿using Cyborg.Core.Services.Metrics;
 using Cyborg.Core.Text.Rendering;
 using System.Text;
 
@@ -25,7 +25,7 @@ public sealed class MetricsCollectorTests
                 "Parallel metric",
                 samples => samples.Add(
                     sample,
-                    collector.CreateLabels().AddLabel("worker", sample.ToString()))));
+                    collector.CreateLabels().AddLabel("worker", sample.ToString()))), TestContext.CancellationToken);
         }
         await Task.WhenAll(writers);
 
@@ -37,6 +37,6 @@ public sealed class MetricsCollectorTests
             .Where(static line => line.StartsWith("test_parallel_metric{", StringComparison.Ordinal))];
 
         Assert.HasCount(SAMPLE_COUNT, samples);
-        Assert.AreEqual(SAMPLE_COUNT, samples.Distinct(StringComparer.Ordinal).Count());
+        Assert.HasCount(SAMPLE_COUNT, samples.Distinct(StringComparer.Ordinal));
     }
 }

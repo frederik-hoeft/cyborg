@@ -15,7 +15,7 @@ public sealed class DefaultConfigurationTrustOptionsProviderTests : CyborgCoreTe
             IConfigurationTrustOptionsProvider provider = services.GetRequiredService<IConfigurationTrustOptionsProvider>();
 
             Assert.AreEqual(TrustEnforcementMode.LogOnly, provider.Options.EnforcementMode);
-            Assert.AreEqual(0, provider.Options.Policies.Count);
+            Assert.IsEmpty(provider.Options.Policies);
         },
         buildConfiguration: configuration =>
         {

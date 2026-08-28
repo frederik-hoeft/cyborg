@@ -59,7 +59,7 @@ public sealed class ParallelModuleRuntimeTests : CyborgCoreTestBase
                 ],
                 TestContext.CancellationToken));
 
-        StringAssert.Contains(exception.Message, "RuntimeEnvironmentTransactionParticipant");
+        Assert.Contains("RuntimeEnvironmentTransactionParticipant", exception.Message);
         Assert.IsTrue(runtime.GlobalEnvironment.TryResolveVariable("shared", out string? shared));
         Assert.AreEqual("baseline", shared);
         Assert.IsFalse(runtime.GlobalEnvironment.TryResolveVariable("setter_only", out string? _));

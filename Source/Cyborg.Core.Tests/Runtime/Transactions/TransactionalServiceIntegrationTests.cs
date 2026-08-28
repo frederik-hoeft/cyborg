@@ -166,16 +166,13 @@ public sealed class TransactionalServiceIntegrationTests : CyborgCoreTestBase
     }
 
     [TestMethod]
-    public void RuntimeTransactionalServices_DuplicateParticipantType_FailsExplicitly()
-    {
-        Assert.ThrowsExactly<InvalidOperationException>(() =>
-            new RuntimeTransactionalServices([new TransactionalCounterParticipant(), new TransactionalCounterParticipant()]));
-    }
+    public void RuntimeTransactionalServices_DuplicateParticipantType_FailsExplicitly() =>
+        Assert.ThrowsExactly<InvalidOperationException>(() => new RuntimeTransactionalServices([new TransactionalCounterParticipant(), new TransactionalCounterParticipant()]));
 
     [TestMethod]
     public void RuntimeTransactionalServices_EmptyParticipantSet_BindsAvailableExecutionScopeContext()
     {
-        ServiceCollection serviceCollection = new();
+        ServiceCollection serviceCollection = [];
         serviceCollection.AddScoped<ITransactionalServiceContext, TransactionalServiceContext>();
         using ServiceProvider serviceProvider = serviceCollection.BuildServiceProvider();
         using IServiceScope scope = serviceProvider.CreateScope();
@@ -188,7 +185,7 @@ public sealed class TransactionalServiceIntegrationTests : CyborgCoreTestBase
 
         InvalidOperationException exception = Assert.ThrowsExactly<InvalidOperationException>(() => state.Read(static counter => counter.Value));
 
-        StringAssert.Contains(exception.Message, "is not registered with this execution runtime");
+        Assert.Contains("is not registered with this execution runtime", exception.Message);
     }
 
     [TestMethod]
@@ -205,7 +202,7 @@ public sealed class TransactionalServiceIntegrationTests : CyborgCoreTestBase
         InvalidOperationException exception = Assert.ThrowsExactly<InvalidOperationException>(() =>
             fork.TryJoin(out TransactionConflict? _));
 
-        StringAssert.Contains(exception.Message, "without reporting a conflict");
+        Assert.Contains("without reporting a conflict", exception.Message);
         Assert.AreEqual(ExecutionTransactionForkLifecycle.Failed, fork.Lifecycle);
     }
 
