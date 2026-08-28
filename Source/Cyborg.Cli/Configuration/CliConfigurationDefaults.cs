@@ -1,6 +1,6 @@
 ﻿using Cyborg.Cli.Logging;
 using Cyborg.Cli.Metrics;
-using Cyborg.Core.Modules.Debugging.Configuration;
+using Cyborg.Core.Runtime.Services.Debugging.Configuration;
 using Cyborg.Core.Services.Security.Trust.Configuration;
 using Microsoft.Extensions.Logging;
 

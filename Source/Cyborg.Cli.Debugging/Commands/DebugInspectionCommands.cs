@@ -1,7 +1,7 @@
 ﻿using ConsoleAppFramework;
-using Cyborg.Core.Modules;
-using Cyborg.Core.Modules.Descriptors;
-using Cyborg.Core.Modules.Validation;
+using Cyborg.Core.Runtime;
+using Cyborg.Core.Runtime.Services.ModuleDescriptors;
+using Cyborg.Core.Runtime.Services.Validation;
 
 namespace Cyborg.Cli.Debugging.Commands;
 

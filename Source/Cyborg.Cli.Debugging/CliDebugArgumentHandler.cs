@@ -1,5 +1,5 @@
-﻿using Cyborg.Core.Modules.Debugging;
-using Cyborg.Core.Modules.Debugging.Breakpoints;
+﻿using Cyborg.Core.Runtime.Services.Debugging;
+using Cyborg.Core.Runtime.Services.Debugging.Breakpoints;
 using Cyborg.Core.Services.Default;
 using System.Diagnostics.CodeAnalysis;
 

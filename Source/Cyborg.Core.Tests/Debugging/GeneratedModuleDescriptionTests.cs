@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Modules.Descriptors;
+﻿using Cyborg.Core.Runtime.Services.ModuleDescriptors;
 using Cyborg.TestModules.Description;
 using Cyborg.TestModules.Validation;
 using Microsoft.Extensions.DependencyInjection;

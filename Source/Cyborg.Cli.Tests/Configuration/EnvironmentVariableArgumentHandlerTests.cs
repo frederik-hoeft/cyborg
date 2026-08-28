@@ -1,6 +1,6 @@
 ﻿using Cyborg.Cli.Arguments;
-using Cyborg.Core.Modules.Runtime;
-using Cyborg.Core.Modules.Runtime.Environments;
+using Cyborg.Core.Runtime.Engine;
+using Cyborg.Core.Runtime.Engine.Environments;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Cyborg.Cli.Tests.Configuration;

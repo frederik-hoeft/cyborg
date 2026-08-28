@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Modules.Runtime.Environments.Syntax;
+﻿using Cyborg.Core.Runtime.Engine.Environments.Syntax;
 using System.Text.Json;
 
 namespace Cyborg.Core.Tests.Syntax;
@@ -113,6 +113,7 @@ public sealed class VariableSyntaxTests
     [DataRow("${name}\r\n", false, "")]
     public void Test_IndirectionRegex_ReturnsExpectedMatch(string value, bool expected, string expectedExpression)
     {
+        Assert.IsNotNull(value);
         VariableSyntaxBuilder builder = CreateBuilder();
 
         System.Text.RegularExpressions.Match match =

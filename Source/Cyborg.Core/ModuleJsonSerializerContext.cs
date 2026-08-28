@@ -1,6 +1,6 @@
 ﻿using Cyborg.Core.Configuration;
-using Cyborg.Core.Modules.Configuration.Model;
-using Cyborg.Core.Modules.Debugging.Configuration;
+using Cyborg.Core.Runtime.Model;
+using Cyborg.Core.Runtime.Services.Debugging.Configuration;
 using Cyborg.Core.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;

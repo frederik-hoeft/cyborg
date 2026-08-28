@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Modules.Runtime.Environments.Syntax;
+﻿using Cyborg.Core.Runtime.Engine.Environments.Syntax;
 using System.Text.Json;
 
 namespace Cyborg.Core.Tests.Syntax;

@@ -1,5 +1,5 @@
 ﻿using ConsoleAppFramework;
-using Cyborg.Core.Modules.Debugging;
+using Cyborg.Core.Runtime.Services.Debugging;
 
 namespace Cyborg.Cli.Debugging.Commands;
 

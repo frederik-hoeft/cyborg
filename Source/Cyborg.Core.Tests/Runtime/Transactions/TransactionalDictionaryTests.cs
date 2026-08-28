@@ -1,4 +1,4 @@
-using Cyborg.Core.Modules.Runtime.Transactions.Collections;
+﻿using Cyborg.Core.Runtime.Engine.Transactions.Collections;
 
 namespace Cyborg.Core.Tests.Runtime.Transactions;
 
@@ -327,9 +327,7 @@ public sealed class TransactionalDictionaryTests
 
     private static TransactionalDictionary<string, int> Create(params (string Key, int Value)[] values)
     {
-        KeyValuePair<string, int>[] pairs = values
-            .Select(static value => new KeyValuePair<string, int>(value.Key, value.Value))
-            .ToArray();
-        return new TransactionalDictionary<string, int>(pairs, StringComparer.Ordinal);
+        KeyValuePair<string, int>[] pairs = [.. values.Select(static value => KeyValuePair.Create(value.Key, value.Value))];
+        return pairs.ToTransactionalDictionary(StringComparer.Ordinal);
     }
 }

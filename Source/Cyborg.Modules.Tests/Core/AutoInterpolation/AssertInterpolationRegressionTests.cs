@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Modules.Runtime;
+﻿using Cyborg.Core.Runtime.Engine;
 using Cyborg.Modules.Assert;
 
 namespace Cyborg.Modules.Tests.Core.AutoInterpolation;

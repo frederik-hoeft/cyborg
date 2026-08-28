@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Modules.Validation;
+﻿using Cyborg.Core.Runtime.Services.Validation;
 
 namespace Cyborg.Cli.Debugging;
 

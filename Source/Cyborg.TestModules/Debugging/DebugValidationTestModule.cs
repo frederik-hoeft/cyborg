@@ -1,5 +1,5 @@
 ﻿using Cyborg.Core.Aot.Modules.Validation;
-using Cyborg.Core.Modules;
+using Cyborg.Core.Runtime;
 
 namespace Cyborg.TestModules.Debugging;
 

@@ -1,6 +1,6 @@
-using System.Diagnostics.CodeAnalysis;
-using Cyborg.Core.Modules.Runtime.Transactions.Collections;
-using Cyborg.Core.Modules.Runtime.Transactions.Core;
+﻿using System.Diagnostics.CodeAnalysis;
+using Cyborg.Core.Runtime.Engine.Transactions.Collections;
+using Cyborg.Core.Runtime.Engine.Transactions.Internal;
 
 namespace Cyborg.Core.Tests.Runtime.Transactions;
 
@@ -388,7 +388,7 @@ public sealed class ExecutionTransactionTests
         {
             _failPreparation = failPreparation;
             _seed = seed
-                .Select(static value => new KeyValuePair<string, int>(value.Key, value.Value))
+                .Select(static value => KeyValuePair.Create(value.Key, value.Value))
                 .ToArray();
         }
 
@@ -396,13 +396,11 @@ public sealed class ExecutionTransactionTests
         {
             ArgumentNullException.ThrowIfNull(seed);
             KeyValuePair<string, int>[] values = _seed;
-            if (seed.TryGet<KeyValuePair<string, int>[]>(this, out KeyValuePair<string, int>[] seededValues))
+            if (seed.TryGet(this, out KeyValuePair<string, int>[]? seededValues))
             {
                 values = seededValues;
             }
-            return new DictionaryParticipantState(
-                new TransactionalDictionary<string, int>(values, StringComparer.Ordinal),
-                _failPreparation);
+            return new DictionaryParticipantState(values.ToTransactionalDictionary(StringComparer.Ordinal), _failPreparation);
         }
     }
 

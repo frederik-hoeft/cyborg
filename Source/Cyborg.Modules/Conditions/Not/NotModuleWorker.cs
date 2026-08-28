@@ -1,7 +1,7 @@
-﻿using Cyborg.Core.Modules;
-using Cyborg.Core.Modules.Runtime;
-using Cyborg.Core.Modules.Runtime.Environments;
-using Cyborg.Core.Modules.Runtime.Environments.Syntax;
+﻿using Cyborg.Core.Runtime;
+using Cyborg.Core.Runtime.Engine;
+using Cyborg.Core.Runtime.Engine.Environments;
+using Cyborg.Core.Runtime.Engine.Environments.Syntax;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Modules.Conditions.Not;

@@ -1,16 +1,16 @@
 ﻿using Cyborg.Cli.Debugging;
 using Cyborg.Cli.Tests.Mocks;
 using Cyborg.Core.Configuration.Builders;
-using Cyborg.Core.Modules;
-using Cyborg.Core.Modules.Debugging;
-using Cyborg.Core.Modules.Debugging.Breakpoints;
-using Cyborg.Core.Modules.Runtime;
-using Cyborg.Core.Modules.Validation;
+using Cyborg.Core.Runtime;
+using Cyborg.Core.Runtime.Engine;
+using Cyborg.Core.Runtime.Services.Debugging;
+using Cyborg.Core.Runtime.Services.Debugging.Breakpoints;
+using Cyborg.Core.Runtime.Services.Validation;
 using Cyborg.Core.Services.Default;
 using Cyborg.Core.TestAdapter;
 using Cyborg.TestModules.Cli;
 using Microsoft.Extensions.DependencyInjection;
-using DebugReplResult = (Cyborg.Core.Modules.Debugging.DebugResumeAction Action, string Output);
+using DebugReplResult = (Cyborg.Core.Runtime.Services.Debugging.DebugResumeAction Action, string Output);
 
 namespace Cyborg.Cli.Tests.Debugging;
 

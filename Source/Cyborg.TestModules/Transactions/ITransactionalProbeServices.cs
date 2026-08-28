@@ -1,5 +1,5 @@
 ﻿using Cyborg.Core;
-using Cyborg.Core.Modules.Runtime.Transactions.Services;
+using Cyborg.Core.Runtime.Services.Transactions;
 using Jab;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;

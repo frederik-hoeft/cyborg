@@ -1,6 +1,6 @@
 ﻿using Cyborg.Core.Aot.Modules.Validation;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
-using Cyborg.Core.Modules;
+using Cyborg.Core.Runtime;
 using System.Collections.Immutable;
 
 namespace Cyborg.TestModules.Validation;

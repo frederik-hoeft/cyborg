@@ -1,13 +1,13 @@
 ﻿using Cyborg.Core.Configuration.Model;
-using Cyborg.Core.Modules;
-using Cyborg.Core.Modules.Configuration;
-using Cyborg.Core.Modules.Configuration.Model;
-using Cyborg.Core.Modules.Runtime;
-using Cyborg.Core.Modules.Runtime.Environments;
-using Cyborg.Core.Modules.Runtime.Environments.Artifacts;
-using Cyborg.Core.Modules.Runtime.Environments.Syntax;
-using Cyborg.Core.Modules.Runtime.Transactions;
-using Cyborg.Core.Modules.Runtime.Transactions.Core;
+using Cyborg.Core.Runtime;
+using Cyborg.Core.Runtime.Configuration;
+using Cyborg.Core.Runtime.Engine;
+using Cyborg.Core.Runtime.Engine.Environments;
+using Cyborg.Core.Runtime.Engine.Environments.Artifacts;
+using Cyborg.Core.Runtime.Engine.Environments.Syntax;
+using Cyborg.Core.Runtime.Engine.Transactions;
+using Cyborg.Core.Runtime.Engine.Transactions.Internal;
+using Cyborg.Core.Runtime.Model;
 using Cyborg.Core.Tests.TestInfrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -29,7 +29,7 @@ public sealed class TransactionalRuntimeEnvironmentTests
         RuntimeEnvironmentSeed environmentSeed = new(
             environmentId,
             node,
-            [new KeyValuePair<string, object?>("value", 1)],
+            [KeyValuePair.Create("value", (object?)1)],
             RegisterName: false);
         RuntimeEnvironmentTransactionSeed environmentRootSeed = new(environmentId, [environmentSeed]);
         TransactionRootSeed seed = new TransactionRootSeed().With(participant, environmentRootSeed);

@@ -8,7 +8,5 @@ public interface IDynamicGenericValueProviderFactory
 
     int Arity { get; }
 
-    bool TryCreateProvider(
-        ImmutableArray<IDynamicValueProvider> typeArguments,
-        [NotNullWhen(true)] out IDynamicValueProvider? provider);
+    bool TryCreateProvider(ImmutableArray<IDynamicValueProvider> typeArguments, [NotNullWhen(true)] out IDynamicValueProvider? provider);
 }

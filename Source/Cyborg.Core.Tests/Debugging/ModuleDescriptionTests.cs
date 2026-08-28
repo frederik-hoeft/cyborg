@@ -1,7 +1,7 @@
-﻿using Cyborg.Core.Modules.Descriptors;
-using Cyborg.Core.Modules.Descriptors.Builders;
-using Cyborg.Core.Modules.Descriptors.Model;
-using Cyborg.Core.Modules.Descriptors.Writers;
+﻿using Cyborg.Core.Runtime.Services.ModuleDescriptors;
+using Cyborg.Core.Runtime.Services.ModuleDescriptors.Builders;
+using Cyborg.Core.Runtime.Services.ModuleDescriptors.Model;
+using Cyborg.Core.Runtime.Services.ModuleDescriptors.Writers;
 using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Immutable;
 using System.Text;

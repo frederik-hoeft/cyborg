@@ -1,6 +1,6 @@
 ﻿using Cyborg.Core.Aot.Modules.Composition;
 using Cyborg.Core.Aot.Modules.Validation.Attributes;
-using Cyborg.Core.Modules.Validation;
+using Cyborg.Core.Runtime.Services.Validation;
 
 namespace Cyborg.Modules.Borg.Create.Model;
 

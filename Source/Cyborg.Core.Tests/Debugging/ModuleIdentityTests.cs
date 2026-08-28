@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Modules.Debugging;
+﻿using Cyborg.Core.Runtime.Services.Debugging;
 
 namespace Cyborg.Core.Tests.Debugging;
 

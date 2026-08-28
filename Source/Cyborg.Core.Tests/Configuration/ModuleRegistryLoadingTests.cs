@@ -1,7 +1,7 @@
 ﻿using Cyborg.Core.Configuration.Serialization;
-using Cyborg.Core.Modules;
-using Cyborg.Core.Modules.Configuration;
-using Cyborg.Core.Modules.Configuration.Model;
+using Cyborg.Core.Runtime;
+using Cyborg.Core.Runtime.Configuration;
+using Cyborg.Core.Runtime.Model;
 using Cyborg.TestModules.Activation;
 using System.Text.Json;
 using System.Text.Json.Serialization;

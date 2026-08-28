@@ -1,7 +1,7 @@
 ﻿using Cyborg.Cli.Configuration;
 using Cyborg.Core.Configuration;
 using Cyborg.Core.Configuration.Model;
-using Cyborg.Core.Modules.Debugging;
+using Cyborg.Core.Runtime.Services.Debugging;
 using Cyborg.Core.Services.Default;
 using Cyborg.Core.Services.Security.Trust.Configuration;
 using Microsoft.Extensions.DependencyInjection;

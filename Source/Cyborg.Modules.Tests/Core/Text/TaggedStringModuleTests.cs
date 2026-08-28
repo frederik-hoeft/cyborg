@@ -1,7 +1,7 @@
-﻿using Cyborg.Core.Modules.Descriptors;
-using Cyborg.Core.Modules.Runtime;
-using Cyborg.Core.Modules.Runtime.Environments;
-using Cyborg.Core.Modules.Validation;
+﻿using Cyborg.Core.Runtime.Engine;
+using Cyborg.Core.Runtime.Engine.Environments;
+using Cyborg.Core.Runtime.Services.ModuleDescriptors;
+using Cyborg.Core.Runtime.Services.Validation;
 using Cyborg.Core.Text;
 using Cyborg.Core.Text.Rendering;
 using Cyborg.Modules.Subprocess;
