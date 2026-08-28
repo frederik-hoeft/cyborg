@@ -1,8 +1,8 @@
 # Transactional Execution Design
 
-> **Status:** Internal design proposal
+> **Status:** Internal architecture notes
 >
-> **Scope:** Target architecture for first-class transactional module execution and the initial `cyborg.modules.parallel.v1` consumer. The steady-state production documentation under [`/docs/architecture`](../../architecture.md) remains authoritative for the current implementation until this design is implemented.
+> **Scope:** Detailed design rationale for the implemented transactional execution model. The steady-state production documentation under [`/docs/architecture`](../../architecture.md) is authoritative for supported behavior and extension contracts.
 
 ## Purpose
 
@@ -17,16 +17,15 @@ The design covers Cyborg-managed workflow state and state from services that exp
 | Document | Focus |
 |---|---|
 | [Execution and lifetimes](execution-and-lifetimes.md) | Module activation, execution sessions, DI scopes, invocation lifecycle, structured concurrency, and project responsibilities. |
-| [Runtime responsibility boundaries](runtime-responsibilities.md) | Pre-transaction runtime facade cleanup, internal execution/environment responsibilities, and boundaries that remain stable through the migration. |
+| [Runtime responsibility boundaries](runtime-responsibilities.md) | Internal execution/environment responsibilities and the stable consumer-facing runtime boundary. |
 | [State and reconciliation](state-and-reconciliation.md) | Transaction tree, baseline/change semantics, persistent state, fork groups, conflict detection, and atomic joins. |
 | [Transaction core](transaction-core.md) | Generic participant descriptors/state, root seeds, fork-group lifecycle, conflict strategy, and aggregate publication. |
 | [Transactional services](transactional-services.md) | Opt-in state participation for runtime and custom DI services, scoped access, root seeding, and lifetime boundaries. |
 | [Environment and runtime state](environment-and-runtime-state.md) | Transactional environment graph, logical global state, named environments, artifacts, and named-module state. |
-| [Transactional environment bindings](environment-bindings.md) | Implemented binding-state slice: logical environment identities, transaction-bound variable stores, nested reconciliation, and remaining topology boundary. |
+| [Transactional environment bindings](environment-bindings.md) | Logical environment identities, transaction-bound variable stores, and nested reconciliation. |
 | [Named-module registry](named-module-registry.md) | Immutable configuration-load seeds, scoped registry facade, transactional registration/removal, and root isolation. |
-| [Implementation plan](implementation-plan.md) | Migration sequence, affected subsystems, validation gates, and representative tests. |
 
-## Target Model
+## Execution Model
 
 Four relationships coexist during execution and must remain distinct:
 
@@ -71,9 +70,9 @@ Transactional state is represented recursively as an immutable fork-time baselin
 
 This recursive model means a baseline is itself the effective result of an ancestor baseline plus ancestor changes. The root simply terminates the recursion with an immutable execution seed.
 
-## Design Goals
+## Design Properties
 
-The architecture is intended to provide:
+The architecture provides:
 
 1. first-class transactional execution for every module invocation;
 2. stable snapshot isolation for child and sibling execution;
@@ -86,9 +85,9 @@ The architecture is intended to provide:
 9. compatibility with existing sequential control-flow semantics;
 10. structured concurrency suitable for later retry, background, and commit/rollback consumers.
 
-## Non-Goals for the First Migration
+## Current Boundaries
 
-The first implementation does not provide:
+The transaction model does not provide:
 
 - automatic rollback based on module result status;
 - compensating actions for external side effects;
@@ -112,8 +111,6 @@ Several superficially smaller changes do not establish the required model:
 
 These constraints are architectural rather than implementation-style preferences. Alternative implementations are valid when they preserve the same ownership, snapshot, and publication guarantees.
 
-## Relationship to the Current Runtime
+## Relationship to Production Documentation
 
-The current architecture remains described by [System Architecture](../../architecture/architecture-overview.md), [Source Generators](../../architecture/source-generators.md), and [Module Testing Architecture](../../architecture/module-testing.md). The migration changes several current ownership boundaries. Loaded module references are worker-free, workers are activated immediately before execution, every invocation owns a DI scope and child transaction, independently resolved root runtimes own separate logical-global environments, and the complete runtime environment graph (bindings, named registration, topology, and transient lifetime) resolves through transaction-local participant state. Runtime named-module state is also transaction-owned: configuration loading produces immutable registry seeds, execution applies those seeds to the current transaction, and the scoped registry facade resolves the current participant state.
-
-Remaining migration boundaries are implementation constraints rather than target concepts. The target architecture keeps immutable configuration and AOT-generated dispatch, but moves all workflow-semantic state and transactional ownership behind per-execution boundaries.
+[System Architecture](../../architecture/architecture-overview.md) and [Transactional Execution](../../architecture/transactions.md) describe the supported steady-state runtime. The documents in this directory retain deeper implementation rationale, invariants, and subsystem boundaries that are useful when extending the transaction model without turning the production architecture documentation into an implementation inventory.

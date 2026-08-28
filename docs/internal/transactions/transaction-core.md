@@ -1,6 +1,6 @@
 # Transaction Core
 
-> **Status:** Internal implementation design for the transaction coordinator and generic participant model.
+> **Status:** Internal architecture notes for the transaction coordinator and generic participant model.
 
 ## Responsibility
 
@@ -16,7 +16,7 @@ The core is responsible for:
 - publishing one complete aggregate participant-state bundle only after every participant prepares successfully;
 - applying a common conflict-strategy boundary without embedding component-specific conflict keys in the coordinator.
 
-The core remains independent of DI and module execution in this stage. Runtime integration binds one of these transaction nodes to each invocation scope later.
+The core remains independent of DI and module execution. Runtime integration binds transaction nodes to invocation scopes through separate adapters and scoped context services.
 
 ## Participant Boundary
 
@@ -149,6 +149,6 @@ This separation keeps the collection reusable when one participant contains seve
 
 ## Runtime Integration Boundary
 
-The transaction core is ready to be bound to module invocation scopes once the generic semantics are accepted. That integration should add a scoped transaction-context facade rather than exposing coordinator internals to workers or custom modules.
+Module invocation scopes bind transaction-aware runtime services to the invocation transaction without exposing coordinator internals to workers or custom modules. Runtime-owned state components register as participants, and scoped runtime/service facades resolve their current component state through that binding.
 
-Runtime-owned state components then register as participants and scoped runtime services resolve their current component state through the invocation's transaction context. The coordinator remains the only owner of fork/join lifecycle and aggregate publication.
+The coordinator remains the only owner of fork/join lifecycle and aggregate publication. Consumer-facing runtime and transactional-service APIs expose execution/state capabilities rather than transaction topology objects.

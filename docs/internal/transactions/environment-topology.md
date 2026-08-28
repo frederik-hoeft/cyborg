@@ -1,6 +1,6 @@
 # Transactional Environment Topology
 
-> **Status:** Internal implementation design for the Stage 4 environment graph.
+> **Status:** Internal architecture notes for transactional environment topology.
 
 ## Responsibility
 
@@ -102,7 +102,3 @@ This provides two levels of atomicity:
 A root execution seeds one logical global environment node and its initial bindings. The root's environment component is otherwise ordinary transaction state; there is no mutable environment catalog or process-global binding store underneath it.
 
 Environments created directly by the root execution remain part of that root's state. Child-local transient environments are pruned when they reconcile upward unless surviving topology requires them.
-
-## Remaining Workflow-State Migration
-
-The runtime named-module registry remains the next Cyborg-owned mutable workflow-state boundary. It should become a separate transactional participant because its values and conflict semantics differ from environment graph state, while the transaction coordinator still publishes both participants atomically.

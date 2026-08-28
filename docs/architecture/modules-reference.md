@@ -4,7 +4,7 @@ This document covers the configuration and behavior of all Cyborg modules. Modul
 
 Every module is identified by a versioned ID (e.g., `cyborg.modules.sequence.v1`) which serves as both the JSON discriminator key and the version identifier. Modules communicate through a hierarchical environment of typed variables, where each module can read from and publish to scoped environments. Module properties support runtime overrides from the environment, enabling data-driven composition patterns.
 
-For details on the execution model, environment scoping semantics, variable resolution, the property override system, and artifact publishing, see [Runtime Infrastructure](../architecture.md).
+For details on the execution model, environment scoping semantics, variable resolution, the property override system, and artifact publishing, see [Runtime Infrastructure](../architecture.md). For invocation isolation, reconciliation, and structured concurrent execution, see [Transactional Execution](transactions.md).
 
 <!-- @import "[TOC]" {cmd="toc" depthFrom=2 depthTo=6 orderedList=false} -->
 
@@ -17,6 +17,7 @@ For details on the execution model, environment scoping semantics, variable reso
   - [Artifacts](#artifacts)
 - [Control Flow Modules](#control-flow-modules)
   - [Sequence (`cyborg.modules.sequence.v1`)](#sequence-cyborgmodulessequencev1)
+  - [Parallel (`cyborg.modules.parallel.v1`)](#parallel-cyborgmodulesparallelv1)
   - [ForEach (`cyborg.modules.foreach.v1`)](#foreach-cyborgmodulesforeachv1)
   - [Guard (`cyborg.modules.guard.v1`)](#guard-cyborgmodulesguardv1)
   - [If (`cyborg.modules.if.v1`)](#if-cyborgmodulesifv1)
@@ -95,7 +96,7 @@ The `environment` property on a module context controls variable scope inheritan
 | `name` | string | No | `null` | Optional scope name. Required for `reference` scope; used to create named scopes with other strategies. |
 | `transient` | bool | No | `false` | Whether the scope is transient (not persisted beyond execution). |
 
-Environments declared with an explicit `name` (and not marked `transient`) are registered globally. Any subsequent module can access them via `reference` scope. This is the primary mechanism for cross-step state sharing. For a detailed overview of environment semantics, see [Runtime Infrastructure -- Environment Scoping](./architecture-overview.md#environment-scoping).
+Environments declared with an explicit `name` and not marked `transient` are registered in the current execution's transactional environment graph. A later module can access a visible registration via `reference` scope after the relevant state has reconciled. This is the primary mechanism for cross-step named state sharing. For a detailed overview of environment semantics, see [Runtime Infrastructure -- Environment Scoping](./architecture-overview.md#environment-scoping).
 
 ### Artifacts
 
@@ -130,6 +131,29 @@ Executes a list of child modules in order.
 - Executes each step sequentially.
 - If any step returns `Canceled` or `Failed`, execution aborts immediately with that status.
 - Returns `Success` if at least one step succeeds; `Skipped` if all steps are skipped.
+
+---
+
+### Parallel (`cyborg.modules.parallel.v1`)
+
+Executes multiple module contexts concurrently from one stable workflow-state baseline.
+
+**Properties:**
+
+| Property | Type | Required | Constraints | Description |
+|----------|------|----------|-------------|-------------|
+| `branches` | array of module contexts | Yes | Minimum 1 element | Branches to execute concurrently. Each branch is a complete `ModuleContext` with its own invocation transaction and DI scope. |
+
+**Behavior:**
+
+- Captures one fork-time baseline and starts every declared branch from that same state. Siblings cannot observe each other's environment, artifact, named-module, or transaction-aware service changes while they are running.
+- Executes complete branch lifecycles concurrently and waits for every started branch before reconciliation or scope disposal. Caller cancellation is propagated to all branches.
+- Preserves branch result/contributor ordering by declaration order, independent of task completion order. Non-overlapping transactional changes are combined atomically.
+- If multiple branches modify the same participant-defined logical key, the default fail-on-conflict policy rejects reconciliation. None of the fork's candidate state is published and the `Parallel` module returns `Failed`.
+- Branch exit status does not itself roll back branch state. Completed branch state still participates in reconciliation; exit-status aggregation is a separate control-flow concern.
+- After successful reconciliation, returns the first `Canceled` or `Failed` status encountered in declaration order. If neither occurs, returns `Success` when at least one branch succeeded and `Skipped` when every branch was skipped.
+
+Nested `Parallel` modules use the same transaction model: an inner join becomes part of its branch's transaction-local change set, and those changes participate in the outer join normally. See [Transactional Execution](transactions.md#sequential-and-parallel-composition) for the isolation and reconciliation model.
 
 ---
 

@@ -5,6 +5,7 @@ This document provides a comprehensive overview of the Cyborg system architectur
 For detailed reference material, see:
 
 - [Module Reference](modules-reference.md) — Complete documentation of all built-in modules
+- [Transactional Execution](transactions.md) — Invocation transactions, reconciliation, parallel execution, and transaction-aware services
 - [Dynamic Values Reference](dynamic-values-reference.md) — Dynamic value providers and typed configuration
 - [Templates Reference](templates-reference.md) — Template module usage and patterns
 - [Source Generators](source-generators.md) — Roslyn source generators for AOT-compatible code generation
@@ -30,11 +31,13 @@ For detailed reference material, see:
     - [Dynamic Value System](#dynamic-value-system)
   - [Module Identity and Descriptions](#module-identity-and-descriptions)
 - [Module Execution](#module-execution)
+  - [Invocation Boundary](#invocation-boundary)
   - [Execution Lifecycle](#execution-lifecycle)
     - [Validation Pipeline](#validation-pipeline)
     - [Lifecycle Hooks](#lifecycle-hooks)
     - [Execution and Result](#execution-and-result)
   - [Runtime Hierarchy](#runtime-hierarchy)
+  - [Transactional State](#transactional-state)
   - [Environment Binding](#environment-binding)
 - [Runtime Environment](#runtime-environment)
   - [Environment Scoping](#environment-scoping)
@@ -77,13 +80,14 @@ For detailed reference material, see:
 
 ## Overview
 
-Cyborg is a .NET 10 application providing modular, JSON-configured workflow orchestration with native AOT compilation support. Its architecture is driven by five design goals:
+Cyborg is a .NET 10 application providing modular, JSON-configured workflow orchestration with native AOT compilation support. Its architecture is driven by six design goals:
 
 1. **AOT Compilation** — Native AOT publishing for minimal startup time and memory footprint on Linux servers, and minimal external dependencies (no .NET runtime requirement, no external dynamic libraries).
 2. **Extensibility** — A plugin-like module system allowing orchestration behavior to be composed from JSON configuration without code changes.
 3. **Type Safety** — Compile-time verification of module registration, dependency injection, and JSON serialization through Roslyn source generators and the Jab DI container.
 4. **Metadata-Preserving Text Flow** — Tagged textual values retain metadata such as secret taint through runtime resolution, interpolation, and generated preparation. Presentation policy consumes those tags centrally, while raw text is exposed only at explicit boundaries.
 5. **Structured Output Parsing** — Grammar-based parser combinators for extracting structured data and metrics from subprocess output.
+6. **Transactional Execution** — Every invocation receives an isolated transaction and DI scope, with deterministic structured reconciliation for both sequential and concurrent composition.
 
 ## Project Structure
 
@@ -125,13 +129,13 @@ Each module consists of three types serving distinct responsibilities:
 
 | Type | Responsibility | Lifetime |
 |------|----------------|----------|
-| Module (record) | Immutable configuration data holder. Pure data, safe to cache or transform. Inherits from `ModuleBase` and implements `IModule`. | Per-configuration |
-| Worker | Execution logic. Inherits from `ModuleWorker<TModule>`, receives injected services, and implements module behavior through the abstract `ExecuteAsync` method. | Per-configuration, stateless |
-| Loader | JSON deserialization. Inherits from `ModuleLoader<TWorker, TModule>` with a source-generated factory method that constructs the worker from the deserialized module record and dependency-injected services. | Singleton |
+| Module (record) | Immutable configuration definition. Pure data, safe to retain in a loaded workflow graph and transform into a prepared copy for one invocation. Inherits from `ModuleBase` and implements `IModule`. | Per loaded definition |
+| Worker | Invocation-local execution logic. Inherits from `ModuleWorker<TModule>`, receives the module definition plus dependencies from the current invocation scope, and implements behavior through the abstract `ExecuteAsync` method. | Per invocation |
+| Loader | AOT-known deserialization and activation metadata. Inherits from `ModuleLoader<TWorker, TModule>`; deserializes module definitions and exposes a source-generated worker factory used later at execution time. | Singleton |
 
-Before execution, the immutable module record is copied and transformed through the generated preparation and validation pipeline, applying defaults, per-execution overrides, string interpolation, and constraints. The worker operates on the fully validated module instance, ensuring that execution logic never encounters invalid configuration and that deserialized module definitions remain immutable and free of execution-time side effects.
+Loading and execution are deliberately separated. Deserialization retains the immutable module definition and loader identity in `ModuleReference`; it does not construct a worker or resolve invocation-scoped dependencies. When the definition is invoked, the runtime first establishes the child transaction and DI scope, then activates a fresh worker from that scope.
 
-The separation of module from worker ensures that configuration data remains immutable and free of side effects. Workers are instantiated per configuration, receive the validated module record, and have access to dependency-injected services. Loaders are singletons registered in the module loader registry at startup.
+The worker's prepared module, result builder, artifact builder, and scoped dependencies therefore belong to exactly one invocation. Generated preparation copies the immutable definition through defaults, overrides, interpolation, and validation before module-specific execution begins. Repeated or concurrent execution of the same loaded definition never aliases worker fields or scoped constructor dependencies.
 
 ### ModuleContext Envelope
 
@@ -156,7 +160,7 @@ Cyborg uses a dynamic, registry-based JSON deserialization model where the modul
 
 #### Registry-Based Deserialization
 
-When the JSON deserializer encounters a `ModuleReference`, the `ModuleReferenceJsonConverter` reads the property name as a module ID, looks up the corresponding `IModuleLoader` from the `IModuleLoaderRegistry`, and delegates deserialization to that loader. The registry is backed by a `FrozenDictionary` populated at startup from all registered `IModuleLoader` implementations. Each loader produces an `IModuleWorker` ready for execution. This registry-based dispatch enables version-aware loading and extensibility — new modules only need to register a loader at startup.
+When the JSON deserializer encounters a `ModuleReference`, the `ModuleReferenceJsonConverter` reads the property name as a module ID, looks up the corresponding `IModuleLoader` from the `IModuleLoaderRegistry`, and delegates deserialization to that loader. The registry is backed by a `FrozenDictionary` populated at startup from all registered `IModuleLoader` implementations. The loader returns an immutable module definition together with its activation identity; worker construction is deferred until that reference is invoked inside an execution scope. This registry-based dispatch enables version-aware loading and extensibility while preserving per-invocation DI lifetimes.
 
 Module IDs follow a versioned, dot-separated naming convention (e.g., `cyborg.modules.subprocess.v1`). All JSON property names use `snake_case` via `JsonKnownNamingPolicy.SnakeCaseLower`.
 
@@ -176,11 +180,19 @@ Description components may carry arbitrary string hints. Hints are metadata only
 
 ## Module Execution
 
-This section describes how modules are executed at runtime: the validation pipeline that prepares module records before execution, the runtime hierarchy that manages nested module dispatch, and the environment binding model that determines each module's execution context.
+This section describes how modules are invoked at runtime: the transaction and DI boundary established for each invocation, the validation pipeline that prepares module records, the runtime views used for nested dispatch, and the environment binding model that determines each module's execution context.
+
+### Invocation Boundary
+
+Every nested runtime execution establishes a fresh child transaction and DI scope before invocation-specific services are resolved. The runtime binds transaction-aware scoped services, rebinds the selected logical environment into that transaction, executes an optional configuration module as a nested child, and only then activates the main worker from the invocation scope. The worker's generated preparation, lifecycle hooks, execution, and artifact publication all run inside that same boundary.
+
+When the invocation completes, the runtime completes and reconciles its child transaction before the caller resumes, then disposes the invocation scope after its structured nested work has terminated. Sequential child calls use a one-child fork/join; concurrent calls use one multi-child fork group so every sibling starts from the same stable baseline. Module exit status does not by itself imply transaction rollback.
+
+See [Transactional Execution](transactions.md) for snapshot isolation, reconciliation, participant atomicity, parallel execution, and transaction-aware custom services.
 
 ### Execution Lifecycle
 
-The `ModuleWorker<TModule>` base class orchestrates the complete lifecycle from raw configuration through validation to execution and artifact publishing. This lifecycle ensures that no worker ever operates on unvalidated configuration.
+After activation, the `ModuleWorker<TModule>` base class orchestrates the lifecycle from the immutable module definition through validation to execution and artifact publishing. This lifecycle ensures that module-specific execution never operates on unvalidated configuration.
 
 #### Validation Pipeline
 
@@ -220,12 +232,19 @@ Workers return results via builder methods on `ModuleWorker<TModule>`: `Success(
 
 ### Runtime Hierarchy
 
-Module execution is orchestrated by `IModuleRuntime`, which manages the environment hierarchy and child module dispatch. The runtime forms a tree rooted at `RootModuleRuntime`:
+`IModuleRuntime` is the consumer-facing execution facade for environment access and nested module dispatch. `RootModuleRuntime` establishes one execution session with a parentless transaction and logical global environment. Nested execution uses `ScopedRuntime` views associated with the current invocation transaction, environment context, and service provider.
 
-- **RootModuleRuntime** is the entry point. It holds the `GlobalRuntimeEnvironment`, the named environment registry, and the top-level execution surface.
-- **ScopedRuntime** is created for each nested execution. It carries its own `IRuntimeEnvironment` but delegates environment registration and lookup upward through the runtime tree.
+The runtime-object hierarchy expresses execution/navigation context, not canonical state ownership. Workflow-semantic environment and named-module state lives in transaction participants, and CLR environment objects are views bound to the transaction that is allowed to observe or mutate that state. Nested runtimes therefore do not discover shared mutable state by walking to a root runtime registry.
 
-When a module calls `runtime.ExecuteAsync(...)`, the runtime prepares an `IRuntimeEnvironment` based on the requested scope, binds the module's namespace to the environment, creates a new `ScopedRuntime` wrapping that environment, and invokes the module worker's `ExecuteAsync` within the scoped runtime.
+When a module calls `runtime.ExecuteAsync(...)`, the runtime creates the structured child invocation described above, binds the selected logical environment to the child transaction, activates the worker from the child DI scope, and reconciles the completed child before returning to the caller.
+
+### Transactional State
+
+Cyborg-managed workflow state participates in the invocation transaction rather than being stored in process-global mutable catalogs. The runtime environment graph and runtime named-module registry are separate transaction participants, and artifact publication writes through the current transaction's environment state. Custom DI services can opt into the same aggregate reconciliation boundary through `TransactionalServiceParticipant<TState>`.
+
+Each root execution owns independent participant state. Forked children observe a stable baseline and record local changes; siblings cannot observe one another before join. Every participant prepares a detached candidate before the coordinator publishes a single aggregate state bundle, so a conflict in one participant leaves all owner-visible participant state unchanged for that fork generation.
+
+See [Transactional Execution](transactions.md) for the complete state and extension model.
 
 ### Environment Binding
 
@@ -245,27 +264,23 @@ Environments form a hierarchical variable store. Each module executes in an envi
 |-------|----------|-------------|
 | `InheritParent` | New environment with fallback to the immediate parent | Default for most modules |
 | `Isolated` | New environment with no variable inheritance | Sandboxed execution |
-| `Global` | Execute directly in the global singleton environment | Cross-job shared state |
+| `Global` | Use the logical global environment owned by the current root execution | Execution-wide shared state |
 | `InheritGlobal` | New environment inheriting only from global (skipping parent chain) | Read global config, ignore local overrides |
-| `Parent` | Bind directly to the parent's environment (shared, no copy) | In-place variable mutation, flatten execution layers |
-| `Current` | Use the current environment as-is | Equivalent to `Parent`, describes intent from the caller's perspective |
+| `Parent` | Use the parent logical environment identity through the child transaction | Publish or mutate state at the parent environment level |
+| `Current` | Use the caller's current logical environment identity through the child transaction | Preserve the current environment level |
 | `Reference` | Reference a previously created named environment by name | Cross-step state sharing |
 
 #### Environment Types
 
-The environment hierarchy is implemented by three types:
+The runtime exposes `RuntimeEnvironment` views, with `InheritedRuntimeEnvironment` representing a view that falls back through a logical parent and `GlobalRuntimeEnvironment` defining the global environment shape used to seed a root execution. The mutable workflow state is not owned by those CLR objects: transaction-bound views route variable reads, writes, removals, and topology lookup through the current environment transaction participant.
 
-- **RuntimeEnvironment** — Base environment backed by a dictionary. Supports variable resolution, interpolation, override resolution, and artifact publishing.
-- **InheritedRuntimeEnvironment** — Extends `RuntimeEnvironment` with a parent link. Variable lookups first check the local dictionary, then fall through to the parent chain.
-- **GlobalRuntimeEnvironment** — A singleton root environment. The starting point for all global-scoped lookups.
-
-When a scope is `InheritParent`, the runtime creates an `InheritedRuntimeEnvironment` whose parent is the current module's environment. Variables set locally shadow the parent, but unresolved lookups propagate upward.
+When a scope is `InheritParent`, the transaction creates a logical environment node whose parent points at the caller's environment identity. Variables set in the child node shadow its parent, while unresolved lookups traverse the logical parent chain. Reconstructing or rebinding an environment view preserves those logical identities inside the current transaction.
 
 #### Named Environments
 
-Environments declared with an explicit `name` (and not marked `transient`) are registered in the root runtime's environment registry. Any subsequent module can access them via `Reference` scope by name. This enables cross-step state sharing — for example, a guard module's `finally` block can reference the same named environment as the `body` block to read variables set during normal execution.
+Environments declared with an explicit `name` and not marked `transient` are registered in the current transaction's environment graph. A later module can resolve a visible registration through `Reference` scope by name. This enables cross-step state sharing without a process-global mutable environment registry — for example, a guard module's `finally` block can reference the same named environment as the `body` block after the relevant child state has reconciled.
 
-Transient environments (those without an explicit name, or marked `transient: true`) receive a generated unique name and are not registered.
+Transient environments receive a generated logical identity but no named registration. Their reachability is transaction-owned and reconciles with the environment graph rather than leaking through a root-runtime object registry.
 
 ### Variable Resolution
 
@@ -444,6 +459,8 @@ While modules can set arbitrary variables in the environment during execution, t
 2. **Finalization** — When the worker returns via `runtime.Exit(result)`, the artifact builder is finalized. The module's exit status is added as a variable under the configured `ExitStatusName` (default: `$?`).
 3. **Publishing** — The finalized artifacts are published to a target environment. The target is determined by `module.Artifacts.Environment`, which defaults to `Parent` scope — meaning artifacts flow to the parent module's environment.
 
+Artifact writes use the current transaction-bound environment graph. A child can observe its own published artifacts immediately, while visibility to its caller or siblings follows the same reconciliation boundary as ordinary environment writes. Artifact targets therefore cannot bypass isolation by reaching into another runtime object's mutable environment.
+
 #### Artifact Configuration
 
 Each module carries a `ModuleArtifacts` record (inherited from `ModuleBase`) that controls publishing behavior:
@@ -528,7 +545,7 @@ The `SubprocessModule` built-in module provides the JSON-configurable interface 
 
 Cyborg includes a Prometheus-compatible metrics collection subsystem. The `IMetricsCollector` interface supports creating labeled metrics in three standard types: counters, gauges, and untyped metrics. Each metric is registered with a name, description, and a builder callback that populates samples with label sets and values.
 
-Modules contribute metrics during execution. The CLI entry point writes collected metrics to a file in Prometheus exposition format after module execution completes. Metric names follow the `cyborg_` prefix convention. Label collections are reusable across multiple metric samples, and labels supplied as `TaggedString` values are rendered through `ITaggedStringRenderer` before entering the exposition data.
+Modules contribute metrics during execution, including from concurrently executing branches. Metrics are process-level observability state rather than transaction participants, so the shared collector synchronizes metric mutation and snapshot operations instead of attempting transaction reconciliation. The CLI entry point writes collected metrics to a file in Prometheus exposition format after module execution completes. Metric names follow the `cyborg_` prefix convention. Label collections are reusable across multiple metric samples, and labels supplied as `TaggedString` values are rendered through `ITaggedStringRenderer` before entering the exposition data.
 
 ## Cross-Cutting Concerns
 

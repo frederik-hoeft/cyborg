@@ -151,7 +151,7 @@ The value is a normal module-discriminator object such as:
 }
 ```
 
-Use this type when a value should hold a module worker that will be executed later through another module such as `dynamic`.
+Use this type when a value should hold a loaded module definition/reference that will be invoked later through another module such as `dynamic`. Worker activation remains deferred until that reference is executed.
 
 ### `cyborg.types.module.environment.v1`
 

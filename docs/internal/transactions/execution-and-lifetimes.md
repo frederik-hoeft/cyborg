@@ -1,6 +1,6 @@
 # Execution and Lifetimes
 
-> **Status:** Internal target design. See [Transactional Execution Design](README.md) for scope and invariants.
+> **Status:** Internal architecture notes. See [Transactional Execution Design](README.md) for scope and invariants.
 
 ## Responsibility
 
@@ -75,8 +75,8 @@ Within that invocation:
 
 1. derive the invocation transaction from the caller's current effective state;
 2. create a fresh DI scope and bind it to that transaction;
-3. prepare or select the invocation environment inside the transaction;
-4. resolve required arguments and write any normalized invocation-local values into that transaction;
+3. bind the selected logical invocation environment into the transaction;
+4. apply the context's named-module seed, then resolve required arguments and write any normalized invocation-local values into that transaction;
 5. execute the optional configuration module as a nested child invocation and reconcile it before the main module is prepared;
 6. activate the main worker from the invocation scope;
 7. run generated preparation, validation, lifecycle hooks, and worker execution;
@@ -142,7 +142,7 @@ Existing composite modules such as `Sequence`, `ForEach`, `If`, `While`, `Guard`
 
 Sibling ordering for reconciliation is structural, such as declaration order, not task-completion order. Successful non-conflicting state must therefore be deterministic regardless of scheduler timing.
 
-The parent continuation is empty for the initial `Parallel` module. The transaction core still models a continuation branch so later structured background execution can reuse the same fork/join semantics without redefining isolation.
+The `Parallel` module leaves the parent continuation empty. The transaction core still models a continuation branch so later structured background execution can reuse the same fork/join semantics without redefining isolation.
 
 ## Future Structured Consumers
 
@@ -169,13 +169,13 @@ Cancellation is a control signal, not a transaction merge operation.
 
 Module execution results are immutable execution outcomes, not transactional state components. A structured child handle associates a completed result with the child transaction that produced it.
 
-Reconciliation determines whether workflow-semantic state can be incorporated. Control-flow modules determine how child statuses map to their own status. The initial `Parallel` module should aggregate status deterministically using the established Cyborg control-flow status conventions while retaining branch results in declaration order where branch-specific reporting is required.
+Reconciliation determines whether workflow-semantic state can be incorporated. Control-flow modules determine how child statuses map to their own status. `Parallel` aggregates status deterministically using the established Cyborg control-flow status conventions, while the runtime preserves branch results in declaration order.
 
-A `Failed` or `Canceled` module result does not automatically imply rollback in the first migration stage. Commit/discard based on result status is a later invocation policy that can reuse the same completed child transaction boundary.
+A `Failed` or `Canceled` module result does not automatically imply rollback. Result-driven commit/discard is outside the current invocation policy and can be added later without changing the completed child transaction boundary.
 
 ## Subsystem Responsibilities
 
-The target architecture divides responsibilities across existing projects rather than introducing transaction behavior into module-specific code.
+The architecture divides responsibilities across existing projects rather than introducing transaction behavior into module-specific code.
 
 | Project / subsystem | Responsibility |
 |---|---|
@@ -187,4 +187,4 @@ The target architecture divides responsibilities across existing projects rather
 | `Cyborg.Modules` control flow | Express sequential/conditional/parallel execution through runtime APIs without implementing state isolation itself. |
 | `Cyborg.Cli` composition root | Process-wide application services and creation of independent workflow execution sessions; no singleton mutable workflow root. |
 | `Cyborg.Core.TestAdapter` / tests | Production-equivalent per-invocation scopes plus focused transaction, activation, and compatibility assertions. |
-| `Cyborg.Cli.Debugging` | Thread-safe/basic deterministic behavior only for the first migration; branch-aware UX remains separate. |
+| `Cyborg.Cli.Debugging` | Thread-safe deterministic breakpoint evaluation/pause behavior; branch-aware debugger UX remains a separate concern. |

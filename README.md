@@ -4,11 +4,12 @@ Cyborg is a .NET 10 workflow engine for declarative, unattended orchestration on
 
 ## Overview
 
-Cyborg treats orchestration as composition rather than scripting. Built-in modules provide sequencing, conditionals, loops, subprocess execution, environment manipulation, external configuration, and reusable templates; domain-specific libraries can add further modules without changing the runtime model. Scoped environments provide late-bound variables and overrides between modules, while artifacts publish structured results back into the workflow.
+Cyborg treats orchestration as composition rather than scripting. Built-in modules provide sequencing, isolated parallel branches, conditionals, loops, subprocess execution, environment manipulation, external configuration, and reusable templates; domain-specific libraries can add further modules without changing the runtime model. Scoped environments provide late-bound variables and overrides between modules, while artifacts publish structured results back into the workflow.
 
 Key capabilities:
 
-- **Composable declarative workflows** — Build nested execution trees from versioned JSON modules instead of procedural glue scripts, using built-in sequencing, conditionals, loops, subprocess execution, and environment manipulation as reusable building blocks.
+- **Composable declarative workflows** — Build nested execution trees from versioned JSON modules instead of procedural glue scripts, using built-in sequencing, parallel branches, conditionals, loops, subprocess execution, and environment manipulation as reusable building blocks.
+- **Transactional structured execution** — Every module invocation runs with isolated workflow state and a fresh DI scope; sequential children reconcile before the caller continues, while `cyborg.modules.parallel.v1` runs sibling branches concurrently from one stable baseline and publishes compatible state atomically.
 - **Reusable templates and late binding** — Parameterize common workflow structures, inject typed data or modules, and resolve scoped variables, artifacts, interpolation expressions, and per-module overrides at execution time.
 - **Predictable preparation and validation** — Defaults, overrides, interpolation, and recursive validation are applied before execution; source-generated code keeps this pipeline AOT-compatible without runtime reflection.
 - **Built-in diagnostics stack** — Structured logging, Prometheus metrics, prepared-module inspection, breakpoints, and the interactive debugger provide a consistent operational view across unattended workflows.
@@ -19,7 +20,7 @@ Key capabilities:
 
 ## Use Cases
 
-Cyborg's core engine is domain-agnostic — any workflow that can be expressed as a composition of subprocess calls, conditionals, loops, and environment variable passing can be orchestrated through JSON configuration. The included `Cyborg.Modules.Borg` library provides a ready-made solution for BorgBackup orchestration.
+Cyborg's core engine is domain-agnostic — any workflow that can be expressed as a composition of subprocess calls, sequential or parallel control flow, conditionals, loops, and environment variable passing can be orchestrated through JSON configuration. The included `Cyborg.Modules.Borg` library provides a ready-made solution for BorgBackup orchestration.
 
 ### BorgBackup Orchestration
 
@@ -135,7 +136,7 @@ Workflows are defined as JSON files using versioned module IDs and snake_case pr
 }
 ```
 
-Each module invocation is wrapped in a `ModuleContext` envelope that can declare environment scoping, configuration modules for variable injection, and pre-execution requirements. Modules compose arbitrarily — a sequence can contain conditionals, each branch can run loops over parameterized templates, and templates can reference external configuration files.
+Each module invocation is wrapped in a `ModuleContext` envelope that can declare environment scoping, configuration modules for variable injection, and pre-execution requirements. Modules compose arbitrarily — a sequence can launch transactional parallel branches, each branch can run conditionals or loops over parameterized templates, and templates can reference external configuration files.
 
 For details on the configuration model and all available modules, see the [Module Reference](docs/architecture/modules-reference.md).
 
@@ -152,6 +153,7 @@ See [Security Design Principles](docs/architecture/architecture-overview.md#secu
 | Document | Description |
 |----------|-------------|
 | [Architecture Overview](docs/architecture/architecture-overview.md) | System architecture: module system, runtime, environment scoping, parsing, security |
+| [Transactional Execution](docs/architecture/transactions.md) | Per-invocation transactions and DI scopes, reconciliation, parallel execution, and transaction-aware services |
 | [Module Reference](docs/architecture/modules-reference.md) | Complete documentation of all built-in modules |
 | [Dynamic Values Reference](docs/architecture/dynamic-values-reference.md) | Dynamic value providers, typed configuration, tagged strings, and secret values |
 | [Interpolation and Overrides](docs/architecture/interpolation.md) | Expression syntax, evaluation phases, override selection, and deferred interpolation |
@@ -189,9 +191,9 @@ Cyborg's architecture separates the domain-agnostic engine (`Cyborg.Core`, `Cybo
 
 3. **Import into the CLI composition root** — Add an `[Import<IYourModuleServices>]` attribute to `DefaultServiceProvider` in `Cyborg.Cli` and register any additional `JsonSerializerContext` instances required by your module types.
 
-4. **Provide JSON configuration** — Define workflow files using your module IDs. All engine-level modules (sequence, if/else, foreach, template, subprocess, guard, etc.) remain available and compose freely with custom modules.
+4. **Provide JSON configuration** — Define workflow files using your module IDs. All engine-level modules (sequence, parallel, if/else, foreach, template, subprocess, guard, etc.) remain available and compose freely with custom modules.
 
-The core engine, built-in flow-control modules, environment scoping, variable resolution, override system, and validation infrastructure require no modification. Custom modules participate in all of these subsystems automatically through the source-generated interfaces.
+The core engine, built-in flow-control modules, environment scoping, variable resolution, override system, and validation infrastructure require no modification. Custom modules participate in all of these subsystems automatically through the source-generated interfaces. If a supporting DI service owns workflow-semantic state that must inherit and reconcile across nested or parallel invocations, opt it into the transaction model explicitly rather than relying on DI lifetime alone; see [Transactional Execution](docs/architecture/transactions.md#transaction-aware-di-services).
 
 ## License
 

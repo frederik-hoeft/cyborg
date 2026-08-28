@@ -1,6 +1,6 @@
 # Transactional Services
 
-> **Status:** Internal target design. See [Transactional Execution Design](README.md) for scope and invariants.
+> **Status:** Internal architecture notes. See [Transactional Execution Design](README.md) for scope and invariants.
 
 ## Responsibility
 
@@ -160,15 +160,13 @@ and prevents arbitrary tasks from accidentally inheriting transactional authorit
 
 ## Shared Singletons Under Parallel Execution
 
-Parallel module execution increases concurrency against ordinary singleton services. The transaction migration therefore requires an audit of shared mutable singleton implementations reached from module workers.
-
-The expected resolution is ordinary thread safety, not transaction participation, unless the state itself is part of workflow semantics.
+Parallel module execution increases concurrency against ordinary singleton services. Shared mutable singleton implementations reached from module workers therefore require ordinary thread safety, not transaction participation, unless their state is itself part of workflow semantics.
 
 Examples:
 
-- metrics counters may need concurrency-safe updates but normally remain process-wide;
-- a debugger registry may remain shared but must tolerate concurrent execution safely;
-- a workflow variable catalog belongs in transactional state rather than becoming a concurrent singleton dictionary.
+- the process-wide metrics collector synchronizes concurrent mutation and snapshots;
+- debugger breakpoint evaluation and interactive pauses are serialized while the breakpoint registry remains shared;
+- workflow variables belong in transactional state rather than a concurrent singleton dictionary.
 
 ## Failure Boundary
 

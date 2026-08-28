@@ -1,12 +1,12 @@
 # Environment and Runtime State
 
-> **Status:** Internal target design. See [Transactional Execution Design](README.md) for scope and invariants.
+> **Status:** Internal architecture notes. See [Transactional Execution Design](README.md) for scope and invariants.
 
 ## Responsibility
 
 The environment subsystem is the primary built-in transactional component. It owns logical environment identity, inheritance topology, named registration, variable bindings, and the workflow-state effects of artifact publication.
 
-The current conceptual split between mutable environment objects and a separate runtime catalog is replaced by one coherent transaction-owned graph. A runtime environment exposed to module code is a view over a logical environment identity in the current transaction rather than the owner of a mutable backing dictionary.
+The environment model uses one coherent transaction-owned graph rather than treating mutable environment objects or a separate runtime catalog as authoritative workflow state. A runtime environment exposed to module code is a view over a logical environment identity in the current transaction rather than the owner of a mutable backing dictionary.
 
 Runtime named-module registrations form a second built-in transactional component because they share the same execution visibility rules but contain different domain state.
 
@@ -30,7 +30,7 @@ Topology, registration, and bindings are reconciled coherently. A named registra
 
 ## Environment Views
 
-`IRuntimeEnvironment` remains the module-facing abstraction for variable resolution and publication, but its implementation becomes a transaction-bound view.
+`IRuntimeEnvironment` is the module-facing abstraction for variable resolution and publication, implemented as a transaction-bound view.
 
 A view conceptually carries:
 
@@ -102,7 +102,7 @@ Environment-local removal semantics do not automatically become recursive hiding
 
 ## Resolution, Overrides, and Interpolation
 
-The transaction migration changes storage and visibility, not the established resolution contract.
+Transactional storage and visibility preserve the established resolution contract.
 
 Variable resolution, module-property overrides, interpolation, tags, namespaces, and decomposition continue to use the semantics documented in [System Architecture](../../architecture/architecture-overview.md) and [Interpolation and Override Resolution](../../architecture/interpolation.md).
 

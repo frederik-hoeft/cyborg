@@ -1,6 +1,6 @@
 # Transactional Environment Bindings
 
-> **Status:** Internal implementation design for the binding layer of the Stage 4 transactional environment graph.
+> **Status:** Internal architecture notes for transactional environment bindings.
 
 ## Responsibility
 
@@ -65,7 +65,7 @@ caller transaction
         +-- worker execution
 ```
 
-The child transaction completes after the module lifecycle completes. Its binding changes are prepared and reconciled into the caller before the runtime resumes the caller. A failed/canceled module result still reconciles state in this migration stage; result-status-driven rollback remains a later policy.
+The child transaction completes after the module lifecycle completes. Its binding changes are prepared and reconciled into the caller before the runtime resumes the caller. A failed or canceled module result still reconciles state under the current invocation policy; result status does not imply rollback.
 
 Nested module execution repeats the same operation. Changes reconciled from an earlier nested child therefore remain part of the owning transaction's durable parent-relative change set and propagate when that transaction later joins its own parent.
 

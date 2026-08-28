@@ -1,6 +1,6 @@
 # State and Reconciliation
 
-> **Status:** Internal target design. See [Transactional Execution Design](README.md) for scope and invariants.
+> **Status:** Internal architecture notes. See [Transactional Execution Design](README.md) for scope and invariants.
 
 ## Responsibility
 
@@ -83,7 +83,7 @@ Reads consult local changes first and fall back to the immutable baseline. A for
 
 The implementation may cache a derived effective snapshot and invalidate it on local writes. The cache is derived state, not a second mutable source of truth. Baseline and explicit changes remain authoritative.
 
-A mutable builder/transient facade can be used internally while materializing an immutable snapshot, provided an already-published snapshot can never be modified through that builder. `ImmutableDictionary<TKey, TValue>` and its builder are reasonable initial candidates; a custom persistent trie is justified only by measured need.
+A mutable builder/transient facade can be used internally while materializing an immutable snapshot, provided an already-published snapshot can never be modified through that builder. `ImmutableDictionary<TKey, TValue>` and its builder are reasonable implementation candidates; a custom persistent trie is justified only by measured need.
 
 The reusable map primitive follows this boundary directly: each branch owns a stable immutable baseline and a small local operation map, while frozen effective snapshots are persistent values shared by descendants. The primitive is single-writer; parallelism is represented by separate branch instances over one frozen baseline rather than concurrent mutation of one dictionary.
 
@@ -116,7 +116,7 @@ owner durable state before fork
 
 The owner durable state is not mutated while the fork group is open. Work after the fork belongs to the explicit continuation branch. This prevents post-fork owner writes from leaking into child baselines and gives reconciliation a complete set of contributors.
 
-Ordinary awaited child execution has an empty continuation because the owner is suspended. `Parallel` also has an empty continuation initially. Future managed background work can execute the owner continuation concurrently without changing the state model.
+Ordinary awaited child execution has an empty continuation because the owner is suspended. `Parallel` also has an empty continuation. Future managed background work can execute the owner continuation concurrently without changing the state model.
 
 Nested fork groups belong to a branch and close in structured LIFO order. An owner cannot close a transaction while one of its fork groups remains open.
 
@@ -155,7 +155,7 @@ The child removal does not conflict with the earlier parent write because that w
 
 ## Transactional Components
 
-Workflow state is split into independently typed transactional components. The initial built-in components are environment state and runtime named-module state. Runtime/custom services can add further components through the participation model described in [Transactional Services](transactional-services.md).
+Workflow state is split into independently typed transactional components. The built-in components are environment state and runtime named-module state. Runtime/custom services can add further components through the participation model described in [Transactional Services](transactional-services.md).
 
 A component is responsible for the semantics of its state:
 
@@ -195,7 +195,7 @@ If any component cannot reconcile, the pre-fork owner state remains unchanged by
 
 ## Conflict Semantics
 
-Each component defines logical conflict keys. The initial merge strategy fails when more than one fork contributor explicitly changes the same logical key.
+Each component defines logical conflict keys. The default merge strategy fails when more than one fork contributor explicitly changes the same logical key.
 
 For a map-like component:
 
@@ -212,7 +212,7 @@ B: Remove(x)   -> conflict
 
 Final value equality does not remove the conflict. A contributor that writes and later restores the baseline still counts as a writer.
 
-Reads are not tracked for conflict detection. The first migration therefore provides deterministic snapshot isolation with write/write conflict detection, not serializable database semantics.
+Reads are not tracked for conflict detection. The current model therefore provides deterministic snapshot isolation with write/write conflict detection, not serializable database semantics.
 
 ### Owner continuation conflicts
 
@@ -220,7 +220,7 @@ The owner continuation is a peer contributor for the open fork generation. If bo
 
 ### Extensibility
 
-The transaction coordinator should depend on an explicit conflict-strategy abstraction rather than hard-code failure forever. The first implementation needs only deterministic fail-on-conflict semantics, but component preparation should be capable of delegating conflict decisions without changing transaction topology.
+The transaction coordinator depends on an explicit conflict-strategy abstraction rather than hard-coding failure into participant topology. The default strategy deterministically fails on conflict, while component preparation can delegate conflict decisions without changing transaction topology.
 
 The strategy is not allowed to break atomicity. It selects a candidate result; publication still occurs only after every component has prepared successfully.
 
@@ -236,7 +236,7 @@ Remove, Set(2)          -> Set(2)
 
 Compaction changes representation, not provenance. Once a key has been successfully changed in the transaction, it remains in the change set until the transaction terminates.
 
-This is sufficient for the initial write/write conflict model and avoids maintaining unnecessary operation history.
+This is sufficient for the current write/write conflict model and avoids maintaining unnecessary operation history.
 
 ## Transaction Lifecycle
 

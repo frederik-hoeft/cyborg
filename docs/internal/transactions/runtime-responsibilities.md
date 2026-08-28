@@ -44,7 +44,7 @@ Executing a `ModuleContext` is orchestration above raw worker dispatch. It consi
 3. stopping when configuration fails or is canceled;
 4. executing the main loaded module reference.
 
-This is one cohesive responsibility and should be isolated from raw worker dispatch. It is also the boundary that later owns the main invocation transaction while configuration execution becomes a nested child invocation.
+This is one cohesive responsibility and should be isolated from raw worker dispatch. It is also the boundary that owns the main invocation transaction while configuration execution runs as a nested child invocation.
 
 ## Worker Dispatch and Lifecycle
 
@@ -94,9 +94,9 @@ Module namespace calculation and bulk publication are convenience operations rat
 
 ## What Should Not Become Consumer DI
 
-The refactor deliberately does **not** introduce module-facing services such as `IModuleExecutor`, `IEnvironmentCatalog`, `IArtifactPublisher`, or `ITransactionManager` that workers must inject for normal execution.
+The runtime boundary deliberately does **not** introduce module-facing services such as `IModuleExecutor`, `IEnvironmentCatalog`, `IArtifactPublisher`, or `ITransactionManager` that workers must inject for normal execution.
 
-Low-level runtime mechanisms may later be represented as internal DI services where lifetime or testability benefits from it, but ordinary modules should continue to receive one `IModuleRuntime` execution facade. Explicit transactional participation for custom DI services is a separate opt-in extension point described in [Transactional Services](transactional-services.md); it is not the basic runtime API.
+Low-level runtime mechanisms may be represented as internal DI services where lifetime or testability benefits from it, but ordinary modules receive one `IModuleRuntime` execution facade. Explicit transactional participation for custom DI services is a separate opt-in extension point described in [Transactional Services](transactional-services.md); it is not the basic runtime API.
 
 ## Transaction Integration
 

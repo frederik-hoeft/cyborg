@@ -1,6 +1,6 @@
 # Transactional Named-Module Registry
 
-> **Status:** Internal implemented design. See [Transactional Execution Design](README.md) for the surrounding transaction model.
+> **Status:** Internal architecture notes. See [Transactional Execution Design](README.md) for the surrounding transaction model.
 
 ## Responsibility
 
