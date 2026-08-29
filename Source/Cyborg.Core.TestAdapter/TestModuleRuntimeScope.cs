@@ -79,14 +79,20 @@ public sealed class TestModuleRuntimeScope : IAsyncDisposable
     /// </summary>
     /// <param name="moduleContextJson">The JSON string representing a full module context.</param>
     /// <returns>The deserialized module context.</returns>
-    public ModuleContext DeserializeModuleContext(string moduleContextJson)
+    public ModuleContext DeserializeModuleContext(string moduleContextJson) =>
+        DeserializeModuleConfiguration(moduleContextJson).ModuleContext;
+
+    /// <summary>
+    /// Deserializes a full module configuration while preserving load artifacts required when the context is executed.
+    /// </summary>
+    public ModuleConfigurationLoadResult DeserializeModuleConfiguration(string moduleContextJson)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(moduleContextJson);
         IJsonLoaderContext loaderContext = _serviceProvider.GetRequiredService<IJsonLoaderContext>();
         ModuleConfigurationDeserializer deserializer = new(loaderContext);
-        ModuleContext moduleContext = deserializer.Deserialize(moduleContextJson)
+        ModuleConfigurationLoadResult configuration = deserializer.Deserialize(moduleContextJson)
             ?? throw new InvalidOperationException("Deserialization of the module context JSON returned null. Verify the JSON is a valid module context.");
-        return moduleContext;
+        return configuration;
     }
 
     /// <summary>
@@ -154,6 +160,15 @@ public sealed class TestModuleRuntimeScope : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(moduleContext);
         return Runtime.ExecuteAsync(moduleContext, cancellationToken);
+    }
+
+    /// <summary>
+    /// Executes a loaded module configuration with its load artifacts.
+    /// </summary>
+    public Task<IModuleExecutionResult> ExecuteAsync(ModuleConfigurationLoadResult configuration, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        return Runtime.ExecuteAsync(configuration, cancellationToken);
     }
 
     public ValueTask DisposeAsync() => _serviceProvider.DisposeAsync();

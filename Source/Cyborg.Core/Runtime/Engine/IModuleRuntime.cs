@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Aot.Contracts;
+using Cyborg.Core.Runtime.Configuration;
 using Cyborg.Core.Runtime.Engine.Environments;
 using Cyborg.Core.Runtime.Model;
 
@@ -14,6 +15,10 @@ public interface IModuleRuntime
     IRuntimeEnvironment Environment { get; }
 
     Task<IModuleExecutionResult> ExecuteAsync(ModuleContext moduleContext, IRuntimeEnvironment environment, CancellationToken cancellationToken = default);
+
+    Task<IModuleExecutionResult> ExecuteAsync(ModuleConfigurationLoadResult configuration, IRuntimeEnvironment environment, CancellationToken cancellationToken = default);
+
+    Task<IModuleExecutionResult> ExecuteRootModuleAsync(ModuleConfigurationLoadResult configuration, IRuntimeEnvironment environment, CancellationToken cancellationToken = default);
 
     Task<IModuleExecutionResult> ExecuteAsync(ModuleReference moduleReference, IRuntimeEnvironment environment, CancellationToken cancellationToken = default);
 

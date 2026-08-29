@@ -15,7 +15,6 @@ internal sealed class ModuleContextExecutor(VariableSyntaxBuilder syntaxFactory,
         ArgumentNullException.ThrowIfNull(moduleContext);
         ArgumentNullException.ThrowIfNull(environment);
 
-        runtime.ApplyModuleRegistrySeed(moduleContext.NamedModules);
         ResolveRequiredArguments(moduleContext, environment);
         if (moduleContext.Configuration is { } configuration)
         {

@@ -1,4 +1,5 @@
-﻿using Cyborg.Core.Runtime.Engine.Environments;
+﻿using Cyborg.Core.Runtime.Configuration;
+using Cyborg.Core.Runtime.Engine.Environments;
 using Cyborg.Core.Runtime.Engine.Transactions.Internal;
 using Cyborg.Core.Runtime.Model;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,6 +30,24 @@ internal abstract class ModuleRuntimeBase
         ArgumentNullException.ThrowIfNull(environment);
         return ExecuteInNewScopeAsync(
             (runtime, scopedEnvironment) => runtime.ExecuteModuleContextInCurrentScopeAsync(moduleContext, scopedEnvironment, cancellationToken),
+            environment);
+    }
+
+    public Task<IModuleExecutionResult> ExecuteAsync(ModuleConfigurationLoadResult configuration, IRuntimeEnvironment environment, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(environment);
+        return ExecuteInNewScopeAsync(
+            (runtime, scopedEnvironment) => runtime.ExecuteLoadedConfigurationInCurrentScopeAsync(configuration, scopedEnvironment, cancellationToken),
+            environment);
+    }
+
+    public Task<IModuleExecutionResult> ExecuteRootModuleAsync(ModuleConfigurationLoadResult configuration, IRuntimeEnvironment environment, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(environment);
+        return ExecuteInNewScopeAsync(
+            (runtime, scopedEnvironment) => runtime.ExecuteLoadedRootModuleInCurrentScopeAsync(configuration, scopedEnvironment, cancellationToken),
             environment);
     }
 
@@ -112,12 +131,6 @@ internal abstract class ModuleRuntimeBase
         }
     }
 
-    void IModuleExecutionRuntime.ApplyModuleRegistrySeed(ModuleRegistrySeed seed)
-    {
-        ArgumentNullException.ThrowIfNull(seed);
-        operations.ModuleRegistry.ApplySeed(transaction, seed);
-    }
-
     Task<IModuleExecutionResult> IModuleExecutionRuntime.ExecuteActivatedWorkerAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(module);
@@ -133,6 +146,26 @@ internal abstract class ModuleRuntimeBase
         ArgumentNullException.ThrowIfNull(environment);
         IRuntimeEnvironment scopedEnvironment = environmentContext.BindEnvironment(environment);
         return operations.ContextExecutor.ExecuteAsync(this, moduleContext, scopedEnvironment, cancellationToken);
+    }
+
+    Task<IModuleExecutionResult> IModuleExecutionRuntime.ExecuteLoadedConfigurationInCurrentScopeAsync(
+        ModuleConfigurationLoadResult configuration,
+        IRuntimeEnvironment environment,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        operations.ModuleRegistry.ApplySeed(transaction, configuration.RegistrySeed);
+        return ((IModuleExecutionRuntime)this).ExecuteModuleContextInCurrentScopeAsync(configuration.ModuleContext, environment, cancellationToken);
+    }
+
+    Task<IModuleExecutionResult> IModuleExecutionRuntime.ExecuteLoadedRootModuleInCurrentScopeAsync(
+        ModuleConfigurationLoadResult configuration,
+        IRuntimeEnvironment environment,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        operations.ModuleRegistry.ApplySeed(transaction, configuration.RegistrySeed);
+        return ((IModuleExecutionRuntime)this).ExecuteModuleReferenceInCurrentScopeAsync(configuration.ModuleContext.Module, environment, cancellationToken);
     }
 
     Task<IModuleExecutionResult> IModuleExecutionRuntime.ExecuteModuleReferenceInCurrentScopeAsync(ModuleReference moduleReference, IRuntimeEnvironment environment, CancellationToken cancellationToken)

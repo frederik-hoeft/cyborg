@@ -61,7 +61,9 @@ The diagram is only an ownership aid. Transaction ancestry is not inferred from 
 
 ### Loaded graphs and worker activation
 
-Loading produces an immutable executable graph. A loaded module reference retains its module definition and AOT-known activation identity, not a worker instance or dependencies resolved from the provider that performed deserialization.
+Configuration loading keeps the executable graph structural. The load result contains the immutable root `ModuleContext` alongside immutable load artifacts that belong to that deserialization operation, such as the seed of discovered named-module definitions. Those artifacts are not stored on `ModuleContext` or other nodes in the module graph. A loaded module reference retains its module definition and AOT-known activation identity, not a worker instance or dependencies resolved from the provider that performed deserialization.
+
+The distinction matters when a configuration is loaded independently at runtime: executing its load result introduces the associated artifacts into the same child transaction that executes the loaded context. Nested `ModuleContext` values that were deserialized as part of that load remain ordinary structural values; they observe the registry state established by the enclosing loaded configuration rather than carrying hidden registry state of their own.
 
 Worker activation happens only after an invocation transaction and DI scope exist. Generated activation still performs direct, reflection-free construction, but it resolves scoped constructor dependencies from the current invocation provider. A worker can therefore keep invocation-local mutable fields such as its prepared module and result/artifact builders without those fields being shared by repeated or concurrent executions of the same loaded definition.
 
@@ -78,7 +80,7 @@ Workflow state begins at a root execution, not at the application service provid
 1. fork a child transaction from the caller's current effective state;
 2. create a fresh DI scope and bind transaction-aware scoped services to the child transaction;
 3. bind or create the logical environment selected by the context inside that transaction;
-4. apply the context's immutable named-module seed, resolve required arguments, and write normalized invocation-local values;
+4. if execution entered through a loaded configuration result, apply its immutable named-module seed to the child transaction, then resolve required arguments and write normalized invocation-local values;
 5. execute the optional configuration module as a nested child invocation and reconcile it before preparing the main module;
 6. activate a fresh main worker from the invocation scope;
 7. run generated preparation, validation, lifecycle hooks, module execution, and artifact publication;
@@ -244,7 +246,9 @@ Targets such as `Parent`, `Current`, `Global`, and named references therefore ne
 
 The runtime named-module registry is a separate participant whose logical state is `module name -> immutable loaded ModuleContext`.
 
-Configuration deserialization discovers named module definitions into immutable load-local seed data. Deserialization itself does not mutate a process-global runtime registry. When a `ModuleContext` executes, its seed is applied to the current transaction before requirements, optional configuration, and main-module execution. Dynamically loaded configurations follow the same path, so newly loaded definitions are visible immediately inside that nested execution and reconcile through normal transaction rules.
+Configuration deserialization discovers named module definitions into immutable load-local seed data. The seed belongs to the load operation, not to any `ModuleContext` in the structural graph, and deserialization itself does not mutate runtime registry state. The configuration loader returns the root context together with those load artifacts; executing that result applies the seed to the new child transaction before requirements, optional configuration, and main-module execution. Dynamically loaded configuration files follow the same path, so their definitions become visible inside the nested execution and reconcile through normal transaction rules.
+
+Discovery spans one complete module-configuration deserialization session. This includes `ModuleContext` values represented through `cyborg.types.module.context.v1` inside the same configuration, so a `DynamicModule` can execute such a value and resolve names discovered within it after the enclosing load result has established the registry seed. The dynamic value itself remains a plain `ModuleContext`: independently constructed or independently deserialized contexts do not carry hidden registry metadata. Code that loads executable configuration independently should therefore keep and execute the configuration load result rather than discarding its load artifacts.
 
 Direct runtime registration and removal use the invocation-scoped module-registry facade. A change is immediately visible to the transaction that makes it, invisible to siblings until join, and visible to the owner only after successful reconciliation. The logical conflict key is the module name.
 

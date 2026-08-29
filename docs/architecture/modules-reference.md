@@ -1,4 +1,4 @@
-# Module Reference
+﻿# Module Reference
 
 This document covers the configuration and behavior of all Cyborg modules. Modules are the building blocks of Cyborg workflows: each module is a self-contained unit that performs a specific task, and modules compose together through the module context system to form arbitrarily complex execution graphs.
 
@@ -618,7 +618,8 @@ Loads and executes a configuration module from an external JSON file.
 
 **Behavior:**
 
-- Loads the configuration module from `path` and executes it in the current environment (no new scope is created).
+- Loads the module configuration from `path` and executes only its root configuration module as a nested invocation using the current environment as its parent. The external file's environment, requirements, and optional configuration envelope are not applied.
+- Preserves load-local artifacts discovered in the external file, including named-module definitions, so the root configuration module observes the same registry state it would have when executing the complete loaded configuration.
 - Returns the loaded module's execution status.
 
 ---
@@ -646,7 +647,7 @@ This is useful when multiple modules need to share a named scope that must be cr
 
 ### Named Reference (`cyborg.modules.named.ref.v1`)
 
-Executes a module that is visible in the runtime module registry by name. During configuration loading, modules that declare a `name` in their [base properties](#module-base-properties) are collected into immutable load-local seed data rather than mutating runtime state immediately. Entering the loaded `ModuleContext` applies that seed to the current execution transaction, making those definitions referenceable within the normal transactional visibility rules. This supports defining a module once and invoking it from multiple places without duplicating the configuration.
+Executes a module that is visible in the runtime module registry by name. During module-configuration loading, modules that declare a `name` in their [base properties](#module-base-properties) are collected into immutable load-local seed data rather than mutating runtime state immediately. Executing the resulting loaded configuration applies that seed to its execution transaction, making those definitions referenceable within the normal transactional visibility rules. This supports defining a module once and invoking it from multiple places without duplicating the configuration.
 
 **Properties:**
 

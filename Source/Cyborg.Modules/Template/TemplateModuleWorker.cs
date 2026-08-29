@@ -5,7 +5,6 @@ using Cyborg.Core.Runtime.Engine;
 using Cyborg.Core.Runtime.Engine.Environments;
 using Cyborg.Core.Runtime.Engine.Environments.Syntax;
 using Cyborg.Core.Runtime.Extensions;
-using Cyborg.Core.Runtime.Model;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Modules.Template;
@@ -15,9 +14,9 @@ public sealed class TemplateModuleWorker(IWorkerContext<TemplateModule> context,
     protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
         Logger.LogTemplateLoading(Module.Path);
-        ModuleContext moduleContext = await configurationLoader.LoadModuleAsync(Module.Path, cancellationToken);
-        Logger.LogTemplateLoaded(moduleContext.Module.ModuleId, Module.Path);
-        IRuntimeEnvironment environment = runtime.PrepareEnvironment(moduleContext);
+        ModuleConfigurationLoadResult configuration = await configurationLoader.LoadModuleAsync(Module.Path, cancellationToken);
+        Logger.LogTemplateLoaded(configuration.ModuleContext.Module.ModuleId, Module.Path);
+        IRuntimeEnvironment environment = runtime.PrepareEnvironment(configuration);
         List<string> templateErrors = [];
         foreach (DynamicKeyValuePair entry in Module.Arguments)
         {
@@ -52,7 +51,7 @@ public sealed class TemplateModuleWorker(IWorkerContext<TemplateModule> context,
             throw new InvalidOperationException($"Template module '{Module.ToDisplayString()}' has invalid arguments or overrides:{errorSummary}");
         }
         Logger.LogTemplateArgumentsApplied(Module.Arguments.Count, Module.Overrides.Count, Module.Path);
-        IModuleExecutionResult executionResult = await runtime.ExecuteAsync(moduleContext, environment, cancellationToken);
+        IModuleExecutionResult executionResult = await runtime.ExecuteAsync(configuration, environment, cancellationToken);
         return runtime.Exit(WithStatus(executionResult.Status));
     }
 }

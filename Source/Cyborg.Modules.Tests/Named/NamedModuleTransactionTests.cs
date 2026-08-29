@@ -42,10 +42,10 @@ public sealed class NamedModuleTransactionTests : ModuleTestBase
             try
             {
                 IModuleConfigurationLoader loader = services.GetRequiredService<IModuleConfigurationLoader>();
-                ModuleContext moduleContext = await loader.LoadModuleAsync(path, TestContext.CancellationToken);
+                ModuleConfigurationLoadResult configuration = await loader.LoadModuleAsync(path, TestContext.CancellationToken);
                 IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
 
-                IModuleExecutionResult result = await runtime.ExecuteAsync(moduleContext, TestContext.CancellationToken);
+                IModuleExecutionResult result = await runtime.ExecuteAsync(configuration, TestContext.CancellationToken);
 
                 Microsoft.VisualStudio.TestTools.UnitTesting.Assert.AreEqual(ModuleExitStatus.Success, result.Status);
             }
@@ -75,10 +75,10 @@ public sealed class NamedModuleTransactionTests : ModuleTestBase
             try
             {
                 IModuleConfigurationLoader loader = services.GetRequiredService<IModuleConfigurationLoader>();
-                ModuleContext moduleContext = await loader.LoadModuleAsync(rootPath, TestContext.CancellationToken);
+                ModuleConfigurationLoadResult configuration = await loader.LoadModuleAsync(rootPath, TestContext.CancellationToken);
                 IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
 
-                IModuleExecutionResult result = await runtime.ExecuteAsync(moduleContext, TestContext.CancellationToken);
+                IModuleExecutionResult result = await runtime.ExecuteAsync(configuration, TestContext.CancellationToken);
 
                 Microsoft.VisualStudio.TestTools.UnitTesting.Assert.AreEqual(ModuleExitStatus.Success, result.Status);
             }
@@ -86,6 +86,111 @@ public sealed class NamedModuleTransactionTests : ModuleTestBase
             {
                 File.Delete(rootPath);
                 File.Delete(nestedPath);
+            }
+        });
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ExternalConfigurationPreservesNamedModuleLoadArtifactsAsync()
+    {
+        await TestWithDIAsync(async services =>
+        {
+            string nestedPath = await WriteTemporaryConfigurationAsync(NAMED_SEQUENCE);
+            string rootJson = $$"""
+                {
+                  "configuration": {
+                    "cyborg.modules.config.external.v1": {
+                      "path": {{System.Text.Json.JsonSerializer.Serialize(nestedPath)}}
+                    }
+                  },
+                  "module": {
+                    "cyborg.modules.empty.v1": {}
+                  }
+                }
+                """;
+            string rootPath = await WriteTemporaryConfigurationAsync(rootJson);
+            try
+            {
+                IModuleConfigurationLoader loader = services.GetRequiredService<IModuleConfigurationLoader>();
+                ModuleConfigurationLoadResult configuration = await loader.LoadModuleAsync(rootPath, TestContext.CancellationToken);
+                IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+
+                IModuleExecutionResult result = await runtime.ExecuteAsync(configuration, TestContext.CancellationToken);
+
+                Microsoft.VisualStudio.TestTools.UnitTesting.Assert.AreEqual(ModuleExitStatus.Success, result.Status);
+            }
+            finally
+            {
+                File.Delete(rootPath);
+                File.Delete(nestedPath);
+            }
+        });
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ModuleContextDynamicValueContributesNamedModulesToLoadSeedAsync()
+    {
+        await TestWithDIAsync(async services =>
+        {
+            const string JSON = """
+                {
+                  "configuration": {
+                    "cyborg.modules.config.map.v1": {
+                      "entries": [
+                        {
+                          "key": "@dynamic.target",
+                          "cyborg.types.module.context.v1": {
+                            "module": {
+                              "cyborg.modules.sequence.v1": {
+                                "steps": [
+                                  {
+                                    "module": {
+                                      "cyborg.modules.empty.v1": {
+                                        "name": "dynamic_named"
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "module": {
+                                      "cyborg.modules.named.ref.v1": {
+                                        "target": "dynamic_named"
+                                      }
+                                    }
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "module": {
+                    "cyborg.modules.dynamic.v1": {
+                      "name": "dynamic",
+                      "target": {
+                        "module": {
+                          "cyborg.modules.empty.v1": {}
+                        }
+                      }
+                    }
+                  }
+                }
+                """;
+            string path = await WriteTemporaryConfigurationAsync(JSON);
+            try
+            {
+                IModuleConfigurationLoader loader = services.GetRequiredService<IModuleConfigurationLoader>();
+                ModuleConfigurationLoadResult configuration = await loader.LoadModuleAsync(path, TestContext.CancellationToken);
+                IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+
+                IModuleExecutionResult result = await runtime.ExecuteAsync(configuration, TestContext.CancellationToken);
+
+                Microsoft.VisualStudio.TestTools.UnitTesting.Assert.AreEqual(ModuleExitStatus.Success, result.Status);
+            }
+            finally
+            {
+                File.Delete(path);
             }
         });
     }
@@ -109,8 +214,8 @@ public sealed class NamedModuleTransactionTests : ModuleTestBase
             try
             {
                 IModuleConfigurationLoader loader = services.GetRequiredService<IModuleConfigurationLoader>();
-                ModuleContext seedContext = await loader.LoadModuleAsync(seedPath, TestContext.CancellationToken);
-                ModuleContext referenceContext = await loader.LoadModuleAsync(referencePath, TestContext.CancellationToken);
+                ModuleConfigurationLoadResult seedContext = await loader.LoadModuleAsync(seedPath, TestContext.CancellationToken);
+                ModuleConfigurationLoadResult referenceContext = await loader.LoadModuleAsync(referencePath, TestContext.CancellationToken);
                 IModuleRuntime firstRoot = services.GetRequiredService<IModuleRuntime>();
                 IModuleRuntime secondRoot = services.GetRequiredService<IModuleRuntime>();
 

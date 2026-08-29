@@ -1,6 +1,7 @@
-﻿using System.Collections.Immutable;
+﻿using Cyborg.Core.Runtime.Model;
+using System.Collections.Immutable;
 
-namespace Cyborg.Core.Runtime.Model;
+namespace Cyborg.Core.Runtime.Configuration;
 
 internal sealed class ModuleRegistrySeed
 {

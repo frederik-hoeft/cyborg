@@ -60,7 +60,7 @@ public sealed class ParallelModuleTests : ModuleTestBase
     [TestMethod]
     public Task TestExecutionAsync_ConflictingSiblingWritesFailAtomicallyAsync() => TestWithDIAsync(async services =>
     {
-        ModuleContext context = await LoadContextAsync(services, """
+        ModuleConfigurationLoadResult context = await LoadContextAsync(services, """
                 {
                   "environment": { "scope": "global" },
                   "module": {
@@ -110,7 +110,7 @@ public sealed class ParallelModuleTests : ModuleTestBase
     [TestMethod]
     public Task ExecuteAsync_NestedParallelPreservesDescendantWritesThroughOuterJoinAsync() => TestWithDIAsync(async services =>
     {
-        ModuleContext context = await LoadContextAsync(services, """
+        ModuleConfigurationLoadResult context = await LoadContextAsync(services, """
                 {
                   "environment": { "scope": "global" },
                   "module": {
@@ -178,7 +178,7 @@ public sealed class ParallelModuleTests : ModuleTestBase
         MSAssert.AreEqual("outer", outerSibling);
     });
 
-    private async Task<ModuleContext> LoadContextAsync(IServiceProvider services, string json)
+    private async Task<ModuleConfigurationLoadResult> LoadContextAsync(IServiceProvider services, string json)
     {
         string path = Path.GetTempFileName();
         try

@@ -17,7 +17,7 @@ public sealed class SequentialCompatibilityTests : ModuleTestBase
     [TestMethod]
     public Task ExecuteAsync_Sequence_JoinedChildStateIsVisibleToLaterStepsAndCallerAsync() => TestWithDIAsync(async services =>
     {
-        ModuleContext context = await LoadContextAsync(services, """
+        ModuleConfigurationLoadResult context = await LoadContextAsync(services, """
             {
               "environment": { "scope": "global" },
               "module": {
@@ -60,7 +60,7 @@ public sealed class SequentialCompatibilityTests : ModuleTestBase
     [TestMethod]
     public Task ExecuteAsync_Foreach_IterationStateIsLocalAndArtifactsPublishToParentAsync() => TestWithDIAsync(async services =>
     {
-        ModuleContext context = await LoadContextAsync(services, """
+        ModuleConfigurationLoadResult context = await LoadContextAsync(services, """
             {
               "environment": { "scope": "global" },
               "module": {
@@ -99,7 +99,7 @@ public sealed class SequentialCompatibilityTests : ModuleTestBase
     [TestMethod]
     public Task ExecuteAsync_While_ConditionArtifactsComposeAcrossIterationsAsync() => TestWithDIAsync(async services =>
     {
-        ModuleContext context = await LoadContextAsync(services, """
+        ModuleConfigurationLoadResult context = await LoadContextAsync(services, """
             {
               "environment": { "scope": "global" },
               "module": {
@@ -138,7 +138,7 @@ public sealed class SequentialCompatibilityTests : ModuleTestBase
     [TestMethod]
     public Task ExecuteAsync_If_ConditionArtifactPublishesToParentAndSelectedBranchRunsAsync() => TestWithDIAsync(async services =>
     {
-        ModuleContext context = await LoadContextAsync(services, """
+        ModuleConfigurationLoadResult context = await LoadContextAsync(services, """
             {
               "environment": { "scope": "global" },
               "module": {
@@ -187,7 +187,7 @@ public sealed class SequentialCompatibilityTests : ModuleTestBase
     [TestMethod]
     public Task ExecuteAsync_ConfigurationStateIsVisibleDuringMainPreparationAsync() => TestWithDIAsync(async services =>
     {
-        ModuleContext context = await LoadContextAsync(services, """
+        ModuleConfigurationLoadResult context = await LoadContextAsync(services, """
             {
               "environment": { "scope": "global" },
               "configuration": {
@@ -229,7 +229,7 @@ public sealed class SequentialCompatibilityTests : ModuleTestBase
     [TestMethod]
     public Task ExecuteAsync_NamedReference_ReactivatesWorkerAndUsesCurrentTransactionSnapshotAsync() => TestWithDIAsync(async services =>
     {
-        ModuleContext context = await LoadContextAsync(services, """
+        ModuleConfigurationLoadResult context = await LoadContextAsync(services, """
             {
               "environment": { "scope": "global" },
               "module": {
@@ -313,7 +313,7 @@ public sealed class SequentialCompatibilityTests : ModuleTestBase
         services.AddSingleton<IModuleWorkerFactory>(static provider => provider.GetRequiredService<RecordingModuleWorkerFactory>());
     }
 
-    private async Task<ModuleContext> LoadContextAsync(IServiceProvider services, string json)
+    private async Task<ModuleConfigurationLoadResult> LoadContextAsync(IServiceProvider services, string json)
     {
         string path = Path.GetTempFileName();
         try

@@ -1,6 +1,7 @@
 ﻿using Cyborg.Core.Configuration;
 using Cyborg.Core.Configuration.Builders;
 using Cyborg.Core.Runtime;
+using Cyborg.Core.Runtime.Configuration;
 using Cyborg.Core.Runtime.Engine;
 using Cyborg.Core.Runtime.Engine.Environments;
 using Cyborg.Core.Runtime.Model;
@@ -541,8 +542,8 @@ public abstract class CyborgTestBase
         string resolvedJson = await ResolveModuleJsonAsync(moduleContextJson);
         await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
         environmentSetup?.Invoke(scope.GlobalEnvironment);
-        ModuleContext moduleContext = scope.DeserializeModuleContext(resolvedJson);
-        IModuleExecutionResult result = await scope.ExecuteAsync(moduleContext, TestContext.CancellationToken);
+        ModuleConfigurationLoadResult configuration = scope.DeserializeModuleConfiguration(resolvedJson);
+        IModuleExecutionResult result = await scope.ExecuteAsync(configuration, TestContext.CancellationToken);
         await assertion(result, scope);
     }
 

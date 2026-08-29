@@ -7,22 +7,22 @@ namespace Cyborg.Core.Runtime.Configuration;
 
 internal sealed class ModuleConfigurationDeserializer(IJsonLoaderContext context)
 {
-    public async ValueTask<ModuleContext?> DeserializeAsync(Stream stream, CancellationToken cancellationToken = default)
+    public async ValueTask<ModuleConfigurationLoadResult?> DeserializeAsync(Stream stream, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(stream);
-        (JsonSerializerOptions Options, ModuleRegistrySeedBuilder SeedBuilder) load = CreateLoadState();
-        JsonTypeInfo<ModuleContext> typeInfo = (JsonTypeInfo<ModuleContext>)load.Options.GetTypeInfo(typeof(ModuleContext));
+        (JsonSerializerOptions options, ModuleRegistrySeedBuilder seedBuilder) = CreateLoadState();
+        JsonTypeInfo<ModuleContext> typeInfo = (JsonTypeInfo<ModuleContext>)options.GetTypeInfo(typeof(ModuleContext));
         ModuleContext? moduleContext = await JsonSerializer.DeserializeAsync(stream, typeInfo, cancellationToken);
-        return AttachSeed(moduleContext, load.SeedBuilder);
+        return CreateResult(moduleContext, seedBuilder);
     }
 
-    public ModuleContext? Deserialize(string json)
+    public ModuleConfigurationLoadResult? Deserialize(string json)
     {
         ArgumentNullException.ThrowIfNull(json);
-        (JsonSerializerOptions Options, ModuleRegistrySeedBuilder SeedBuilder) load = CreateLoadState();
-        JsonTypeInfo<ModuleContext> typeInfo = (JsonTypeInfo<ModuleContext>)load.Options.GetTypeInfo(typeof(ModuleContext));
+        (JsonSerializerOptions options, ModuleRegistrySeedBuilder seedBuilder) = CreateLoadState();
+        JsonTypeInfo<ModuleContext> typeInfo = (JsonTypeInfo<ModuleContext>)options.GetTypeInfo(typeof(ModuleContext));
         ModuleContext? moduleContext = JsonSerializer.Deserialize(json, typeInfo);
-        return AttachSeed(moduleContext, load.SeedBuilder);
+        return CreateResult(moduleContext, seedBuilder);
     }
 
     private (JsonSerializerOptions Options, ModuleRegistrySeedBuilder SeedBuilder) CreateLoadState()
@@ -40,6 +40,6 @@ internal sealed class ModuleConfigurationDeserializer(IJsonLoaderContext context
         return (options, seedBuilder);
     }
 
-    private static ModuleContext? AttachSeed(ModuleContext? moduleContext, ModuleRegistrySeedBuilder seedBuilder) =>
-        moduleContext is null ? null : moduleContext with { NamedModules = seedBuilder.Build() };
+    private static ModuleConfigurationLoadResult? CreateResult(ModuleContext? moduleContext, ModuleRegistrySeedBuilder seedBuilder) =>
+        moduleContext is null ? null : new ModuleConfigurationLoadResult(moduleContext, seedBuilder.Build());
 }

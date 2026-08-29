@@ -13,7 +13,7 @@ namespace Cyborg.Core.Tests.Configuration;
 public sealed class ModuleRegistryLoadingTests
 {
     [TestMethod]
-    public void Deserialize_CollectsNamedModulesIntoImmutableRootSeed()
+    public void Deserialize_CollectsNamedModulesIntoImmutableLoadResultSeed()
     {
         JsonSerializerOptions options = new()
         {
@@ -43,9 +43,9 @@ public sealed class ModuleRegistryLoadingTests
             }
             """;
 
-        ModuleContext root = deserializer.Deserialize(JSON)
-            ?? throw new AssertFailedException("Expected a loaded module context.");
-        Dictionary<string, ModuleContext> namedModules = root.NamedModules.Modules.ToDictionary(StringComparer.Ordinal);
+        ModuleConfigurationLoadResult configuration = deserializer.Deserialize(JSON)
+            ?? throw new AssertFailedException("Expected a loaded module configuration.");
+        Dictionary<string, ModuleContext> namedModules = configuration.RegistrySeed.Modules.ToDictionary(StringComparer.Ordinal);
 
         Assert.HasCount(2, namedModules);
         Assert.AreEqual("outer", namedModules["outer"].Module.Definition.Name);

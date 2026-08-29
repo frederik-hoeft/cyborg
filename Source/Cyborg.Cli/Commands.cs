@@ -126,11 +126,7 @@ internal sealed class Commands
             logger.LogStartup(RenderRunArguments(main, options, environmentVariables, config, metrics, logLevel, breakAt, argumentLogRenderer));
 
             IModuleConfigurationLoader moduleLoader = services.GetRequiredService<IModuleConfigurationLoader>();
-            ModuleContext module = await moduleLoader.LoadModuleAsync(main, cancellationToken);
-            module = module with
-            {
-                Environment = module.Environment ?? ModuleEnvironment.Default,
-            };
+            ModuleConfigurationLoadResult module = await moduleLoader.LoadModuleAsync(main, cancellationToken);
             TaggedString target = globalEnvironment.ResolveVariableOrDefault(WellKnownVariables.Target, new TaggedString("<unspecified>"));
             string renderedTarget = services.GetRequiredService<ITaggedStringRenderer>().Render(target);
             logger.LogRunStarted(renderedTarget);

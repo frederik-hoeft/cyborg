@@ -136,12 +136,14 @@ Encapsulates the per-test lifecycle: builds a `ServiceProvider` from the configu
 Key methods:
 - `Create(IServiceCollection)` — Static factory that builds the scope and resolves a fresh runtime execution session from the configured service collection.
 - `DeserializeModule(string)` — Runs a module JSON string through the production `ModuleReferenceJsonConverter` pipeline and returns the immutable module definition/reference.
-- `DeserializeModuleContext(string)` — Runs a module context JSON string through the production `ModuleContextJsonConverter` pipeline.
+- `DeserializeModuleContext(string)` — Deserializes and returns the structural `ModuleContext` for tests that only need to inspect the graph.
+- `DeserializeModuleConfiguration(string)` — Deserializes a complete module configuration and retains load artifacts such as discovered named-module definitions for subsequent execution.
 - `ExtractModule<TModule>(ModuleReference)` — Extracts the expected concrete module definition from a deserialized reference.
 - `ActivateWorker(ModuleReference)` — Explicit test helper that activates a worker early when a test needs to inspect the concrete worker instance. Normal execution should use the `ModuleReference` overload so the runtime owns activation timing.
 - `ExecuteAsync(ModuleReference, CancellationToken)` — Executes a loaded module through the production activation, transaction, and runtime lifecycle.
 - `ExecuteAsync(IModuleWorker, CancellationToken)` — Executes an already activated worker for worker-inspection tests.
-- `ExecuteAsync(ModuleContext, CancellationToken)` — Executes a full module context (with environment setup, configuration, and requires).
+- `ExecuteAsync(ModuleContext, CancellationToken)` — Executes a structural module context without additional configuration-load artifacts.
+- `ExecuteAsync(ModuleConfigurationLoadResult, CancellationToken)` — Executes a complete loaded configuration, including its load artifacts, through the production transaction lifecycle.
 
 ### CyborgTestBase
 

@@ -135,6 +135,8 @@ Each module consists of three types serving distinct responsibilities:
 
 Loading and execution are deliberately separated. Deserialization retains the immutable module definition and loader identity in `ModuleReference`; it does not construct a worker or resolve invocation-scoped dependencies. When the definition is invoked, the runtime first establishes the child transaction and DI scope, then activates a fresh worker from that scope.
 
+Module-configuration loading also produces immutable load artifacts that are derived from the configuration document but are not part of the structural module graph. Named-module discovery is one such artifact: the loader returns it alongside the root `ModuleContext`, and the runtime applies it transactionally when that loaded configuration is executed. Keeping this metadata at the loading/execution boundary prevents deserialization state from leaking into otherwise immutable module definitions and contexts.
+
 The worker's prepared module, result builder, artifact builder, and scoped dependencies therefore belong to exactly one invocation. Generated preparation copies the immutable definition through defaults, overrides, interpolation, and validation before module-specific execution begins. Repeated or concurrent execution of the same loaded definition never aliases worker fields or scoped constructor dependencies.
 
 ### ModuleContext Envelope
