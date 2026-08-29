@@ -7,6 +7,7 @@ Cyborg is a .NET 10 application providing modular, JSON-configured workflow orch
 | Document | Description |
 |----------|-------------|
 | [System Architecture](architecture/architecture-overview.md) | Comprehensive architecture overview: module lifecycle, runtime, scoping, host configuration, descriptions, parsing, and core subsystems |
+| [Transactional Execution](architecture/transactions.md) | Per-invocation transactions and DI scopes, snapshot isolation, reconciliation, parallel execution, and transaction-aware services |
 | [Module Reference](architecture/modules-reference.md) | Complete documentation of all built-in modules |
 | [Dynamic Values Reference](architecture/dynamic-values-reference.md) | Dynamic value providers, typed configuration, tagged strings, and secrets |
 | [Interpolation and Overrides](architecture/interpolation.md) | Expression syntax, resolution phases, override selection, and deferred interpolation |

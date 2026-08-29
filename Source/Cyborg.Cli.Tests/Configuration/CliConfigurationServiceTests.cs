@@ -1,7 +1,7 @@
 ﻿using Cyborg.Cli.Configuration;
 using Cyborg.Core.Configuration;
 using Cyborg.Core.Configuration.Model;
-using Cyborg.Core.Modules.Debugging;
+using Cyborg.Core.Runtime.Services.Debugging;
 using Cyborg.Core.Services.Default;
 using Cyborg.Core.Services.Security.Trust.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -36,7 +36,7 @@ public sealed class CliConfigurationServiceTests : CyborgCliTestBase
                     Assert.AreEqual("cyborg", configuration.Get<string>(CliConfigurationDefaults.METRICS_NAMESPACE_KEY));
                     Assert.AreEqual(TrustEnforcementMode.Enforce, configuration.Get(CliConfigurationDefaults.TRUST_ENFORCEMENT_MODE_KEY, TrustEnforcementMode.Disabled));
                     IReadOnlyList<DynamicValue> policies = configuration.Get<IReadOnlyList<DynamicValue>>(CliConfigurationDefaults.TRUST_POLICIES_KEY)!;
-                    Assert.AreEqual(0, policies.Count);
+                    Assert.IsEmpty(policies);
                 },
                 buildConfiguration: configuration =>
                 {

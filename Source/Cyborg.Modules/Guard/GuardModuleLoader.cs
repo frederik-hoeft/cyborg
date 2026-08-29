@@ -1,7 +1,7 @@
 ﻿using Cyborg.Core.Aot.Modules.Loaders.Configuration;
-using Cyborg.Core.Modules.Configuration;
+using Cyborg.Core.Runtime.Configuration;
 
 namespace Cyborg.Modules.Guard;
 
 [GeneratedModuleLoaderFactory]
-public sealed partial class GuardModuleLoader(IServiceProvider serviceProvider) : ModuleLoader<GuardModuleWorker, GuardModule>(serviceProvider);
+public sealed partial class GuardModuleLoader : ModuleLoader<GuardModuleWorker, GuardModule>;

@@ -1,7 +1,6 @@
-﻿using Cyborg.Core.Modules;
-using Cyborg.Core.Modules.Configuration;
-using Cyborg.Core.Modules.Configuration.Model;
-using Cyborg.Core.Modules.Runtime;
+﻿using Cyborg.Core.Runtime;
+using Cyborg.Core.Runtime.Configuration;
+using Cyborg.Core.Runtime.Engine;
 using Cyborg.Core.Text;
 using Cyborg.Core.Text.Rendering;
 using System.Diagnostics.CodeAnalysis;
@@ -26,8 +25,8 @@ public sealed class SwitchModuleWorker(IWorkerContext<SwitchModule> context, IMo
         }
         Logger.LogSwitchCaseSelected(renderedCaseName, templatePath);
         // Load the case content from the specified path
-        ModuleContext module = await configurationLoader.LoadModuleAsync(templatePath, cancellationToken);
-        IModuleExecutionResult result = await runtime.ExecuteAsync(module, cancellationToken);
+        ModuleConfigurationLoadResult configuration = await configurationLoader.LoadModuleAsync(templatePath, cancellationToken);
+        IModuleExecutionResult result = await runtime.ExecuteAsync(configuration, cancellationToken);
         return runtime.Exit(WithStatus(result.Status));
     }
 }

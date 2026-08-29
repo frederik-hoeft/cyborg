@@ -1,7 +1,7 @@
-﻿using Cyborg.Core.Modules;
-using Cyborg.Core.Modules.Runtime;
-using Cyborg.Core.Modules.Runtime.Environments;
-using Cyborg.Core.Modules.Runtime.Environments.Syntax;
+﻿using Cyborg.Core.Runtime;
+using Cyborg.Core.Runtime.Engine;
+using Cyborg.Core.Runtime.Engine.Environments;
+using Cyborg.Core.Runtime.Engine.Environments.Syntax;
 using Cyborg.Core.Text;
 using Cyborg.Modules.Conditions;
 using System.Diagnostics.CodeAnalysis;
@@ -14,7 +14,7 @@ public sealed class AssertModuleWorker(IWorkerContext<AssertModule> context) : C
     {
         PathSyntax childNamespace = runtime.Environment.SyntaxFactory.Path(runtime.Environment.Namespace);
         IRuntimeEnvironment environment = CreateChildEnvironment(runtime, Module.Assertion, childNamespace);
-        IModuleExecutionResult result = await runtime.ExecuteAsync(Module.Assertion.Module, environment, cancellationToken);
+        IModuleExecutionResult result = await runtime.ExecuteAsync(Module.Assertion, environment, cancellationToken);
         if (result.Status is not ModuleExitStatus.Success)
         {
             // this was unexpected

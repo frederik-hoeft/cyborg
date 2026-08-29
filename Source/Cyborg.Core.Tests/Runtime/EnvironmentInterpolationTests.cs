@@ -1,7 +1,8 @@
-﻿using Cyborg.Core.Modules;
-using Cyborg.Core.Modules.Runtime;
-using Cyborg.Core.Modules.Runtime.Environments;
+﻿using Cyborg.Core.Runtime;
+using Cyborg.Core.Runtime.Engine;
+using Cyborg.Core.Runtime.Engine.Environments;
 using Microsoft.Extensions.DependencyInjection;
+using System.Text.Json;
 
 namespace Cyborg.Core.Tests.Runtime;
 
@@ -115,7 +116,7 @@ public sealed class EnvironmentInterpolationTests : CyborgCoreTestBase
     [TestMethod]
     public Task Test_TryResolveVariable_CurrentAndEntryPointSelfReferences_UseDistinctScopesAsync() => TestWithDIAsync(services =>
     {
-        GlobalRuntimeEnvironment environment = services.GetRequiredService<GlobalRuntimeEnvironment>() with
+        GlobalRuntimeEnvironment environment = new(JsonNamingPolicy.SnakeCaseLower)
         {
             Namespace = "parent"
         };
@@ -193,6 +194,22 @@ public sealed class EnvironmentInterpolationTests : CyborgCoreTestBase
         int actual = environment.Resolve(module, module.Port);
 
         Assert.AreEqual(22, actual);
+    });
+
+    [TestMethod]
+    public Task Test_Bind_SharesEnvironmentVariableStoreAsync() => TestWithDIAsync(services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        IRuntimeEnvironment environment = runtime.Environment;
+        environment.SetVariable("value", "before");
+        IRuntimeEnvironment bound = environment.Bind("child");
+
+        bound.SetVariable("value", "after");
+
+        Assert.IsTrue(environment.TryResolveVariable("value", out string? parentValue));
+        Assert.IsTrue(bound.TryResolveVariable("value", out string? childValue));
+        Assert.AreEqual("after", parentValue);
+        Assert.AreEqual("after", childValue);
     });
 
     [TestMethod]

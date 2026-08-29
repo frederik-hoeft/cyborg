@@ -1,6 +1,6 @@
 ﻿using Cyborg.Cli.Debugging;
 using Cyborg.Core.Configuration;
-using Cyborg.Core.Modules.Debugging.Breakpoints;
+using Cyborg.Core.Runtime.Services.Debugging.Breakpoints;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Cyborg.Cli.Tests.Debugging;

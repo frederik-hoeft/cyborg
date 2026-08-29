@@ -1,5 +1,5 @@
-﻿using Cyborg.Core.Modules.Runtime;
-using Cyborg.Core.Modules.Validation;
+﻿using Cyborg.Core.Runtime.Engine;
+using Cyborg.Core.Runtime.Services.Validation;
 using Cyborg.TestModules.Validation;
 using Microsoft.Extensions.DependencyInjection;
 

@@ -99,12 +99,12 @@ The adapter is structured as a layered set of components, each with a single res
                                           │ IJabServiceDiscovery  │                  │ uses
                                           │ JabServiceDiscovery   │       ┌──────────▼────────────────┐
                                           │                       │       │  Production runtime:      │
-                                          │  Reflects over Jab    │       │  RootModuleRuntime,       │
-                                          │  [Singleton<>],       │       │  GlobalRuntimeEnvironment │
-                                          │  [Scoped<>],          │       │  IJsonLoaderContext,      │
-                                          │  [Transient<>] and    │       │  IModuleLoaderRegistry    │
-                                          │  [Import<>] attrs     │       └───────────────────────────┘
-                                          │  to build MEDI        │
+                                          │  Reflects over Jab    │       │  IModuleRuntime session,  │
+                                          │  [Singleton<>],       │       │  transaction-bound global │
+                                          │  [Scoped<>],          │       │  environment,             │
+                                          │  [Transient<>] and    │       │  IJsonLoaderContext,      │
+                                          │  [Import<>] attrs     │       │  IModuleLoaderRegistry    │
+                                          │  to build MEDI        │       └───────────────────────────┘
                                           │  registrations        │
                                           └───────────────────────┘
 ```
@@ -131,15 +131,19 @@ Provides a single static factory method `CreateDefaultServices()` that returns a
 
 **File:** `Cyborg.Core.TestAdapter/TestModuleRuntimeScope.cs`
 
-Encapsulates the per-test lifecycle: builds a `ServiceProvider` from the configured `IServiceCollection`, constructs a `RootModuleRuntime` with a fresh `GlobalRuntimeEnvironment` and the configured runtime lifecycle services, and provides methods for module deserialization and execution. This preserves runtime-owned behavior such as the post-execution hook pipeline when tests execute through the scope rather than resolving `IModuleRuntime` directly. Implements `IAsyncDisposable` for deterministic cleanup.
+Encapsulates the per-test lifecycle: builds a `ServiceProvider` from the configured `IServiceCollection`, resolves a fresh production `IModuleRuntime` execution session, and exposes that session's transaction-bound global environment together with module deserialization and execution helpers. Tests that execute a `ModuleReference` therefore use the normal runtime-owned worker activation and transaction lifecycle. Implements `IAsyncDisposable` for deterministic cleanup.
 
 Key methods:
-- `Create(IServiceCollection)` — Static factory that builds the scope from a configured service collection.
-- `DeserializeModule(string)` — Runs a module JSON string through the production `ModuleReferenceJsonConverter` pipeline.
-- `DeserializeModuleContext(string)` — Runs a module context JSON string through the production `ModuleContextJsonConverter` pipeline.
-- `ExtractModule<TModule>(IModuleWorker)` — Downcasts the worker's `IModule` reference to the expected concrete type.
-- `ExecuteAsync(IModuleWorker, CancellationToken)` — Executes a module worker within the scope's runtime.
-- `ExecuteAsync(ModuleContext, CancellationToken)` — Executes a full module context (with environment setup, configuration, and requires).
+- `Create(IServiceCollection)` — Static factory that builds the scope and resolves a fresh runtime execution session from the configured service collection.
+- `DeserializeModule(string)` — Runs a module JSON string through the production `ModuleReferenceJsonConverter` pipeline and returns the immutable module definition/reference.
+- `DeserializeModuleContext(string)` — Deserializes and returns the structural `ModuleContext` for tests that only need to inspect the graph.
+- `DeserializeModuleConfiguration(string)` — Deserializes a complete module configuration and retains load artifacts such as discovered named-module definitions for subsequent execution.
+- `ExtractModule<TModule>(ModuleReference)` — Extracts the expected concrete module definition from a deserialized reference.
+- `ActivateWorker(ModuleReference)` — Explicit test helper that activates a worker early when a test needs to inspect the concrete worker instance. Normal execution should use the `ModuleReference` overload so the runtime owns activation timing.
+- `ExecuteAsync(ModuleReference, CancellationToken)` — Executes a loaded module through the production activation, transaction, and runtime lifecycle.
+- `ExecuteAsync(IModuleWorker, CancellationToken)` — Executes an already activated worker for worker-inspection tests.
+- `ExecuteAsync(ModuleContext, CancellationToken)` — Executes a structural module context without additional configuration-load artifacts.
+- `ExecuteAsync(ModuleConfigurationLoadResult, CancellationToken)` — Executes a complete loaded configuration, including its load artifacts, through the production transaction lifecycle.
 
 ### CyborgTestBase
 
@@ -289,7 +293,7 @@ protected Task TestModuleAsync<TModule, TWorker>(
     Action<IConfigurationBuilder>? buildConfiguration = null)
 ```
 
-Deserializes, executes, and passes the module record, typed worker, and execution result to the assertion. This is the primary HOF for testing worker correctness, result publishing, and artifact exposure.
+Deserializes, explicitly activates a worker for inspection, executes that worker, and passes the module record, typed worker, and execution result to the assertion. This is the primary HOF when a test must inspect worker state after execution. Because it intentionally exposes the activated worker, it uses the adapter's test-specific early-activation path rather than the normal production activation boundary.
 
 ```csharp
 protected Task TestExecutionAsync(
@@ -307,7 +311,7 @@ protected Task TestExecutionAsync(
     Action<IConfigurationBuilder>? buildConfiguration = null)
 ```
 
-Simplified variant that passes only the execution result to the assertion.
+Simplified variant that passes only the execution result to the assertion. It executes the deserialized `ModuleReference` directly, so worker activation remains owned by the runtime immediately before the invocation begins.
 
 ### Exception Testing
 
@@ -439,7 +443,7 @@ Each HOF method invocation creates a fully independent test scope:
 - A fresh `IServiceCollection` is built from defaults.
 - Per-test-class and per-test-case overrides are applied.
 - A fresh `ServiceProvider` is constructed and is not shared across tests.
-- A fresh `RootModuleRuntime` and `GlobalRuntimeEnvironment` are created.
+- A fresh root runtime execution session and transaction-owned logical global environment are resolved.
 - Class-level and per-test configuration sources are applied to a fresh singleton `IConfiguration` before the test pipeline runs.
 - The scope is disposed at the end of the test, releasing all resources.
 

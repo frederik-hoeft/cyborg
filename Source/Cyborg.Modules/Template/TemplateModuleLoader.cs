@@ -1,7 +1,7 @@
 ﻿using Cyborg.Core.Aot.Modules.Loaders.Configuration;
-using Cyborg.Core.Modules.Configuration;
+using Cyborg.Core.Runtime.Configuration;
 
 namespace Cyborg.Modules.Template;
 
 [GeneratedModuleLoaderFactory]
-public sealed partial class TemplateModuleLoader(IServiceProvider serviceProvider) : ModuleLoader<TemplateModuleWorker, TemplateModule>(serviceProvider);
+public sealed partial class TemplateModuleLoader : ModuleLoader<TemplateModuleWorker, TemplateModule>;

@@ -1,7 +1,7 @@
 ﻿using Cyborg.Core.Aot.Modules.Loaders.Configuration;
-using Cyborg.Core.Modules.Configuration;
+using Cyborg.Core.Runtime.Configuration;
 
 namespace Cyborg.Modules.Conditions.Not;
 
 [GeneratedModuleLoaderFactory]
-public sealed partial class NotModuleLoader(IServiceProvider serviceProvider) : ModuleLoader<NotModuleWorker, NotModule>(serviceProvider);
+public sealed partial class NotModuleLoader : ModuleLoader<NotModuleWorker, NotModule>;

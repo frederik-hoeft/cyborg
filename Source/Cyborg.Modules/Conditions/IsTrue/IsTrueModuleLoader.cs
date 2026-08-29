@@ -1,7 +1,7 @@
 ﻿using Cyborg.Core.Aot.Modules.Loaders.Configuration;
-using Cyborg.Core.Modules.Configuration;
+using Cyborg.Core.Runtime.Configuration;
 
 namespace Cyborg.Modules.Conditions.IsTrue;
 
 [GeneratedModuleLoaderFactory]
-public sealed partial class IsTrueModuleLoader(IServiceProvider serviceProvider) : ModuleLoader<IsTrueModuleWorker, IsTrueModule>(serviceProvider);
+public sealed partial class IsTrueModuleLoader : ModuleLoader<IsTrueModuleWorker, IsTrueModule>;

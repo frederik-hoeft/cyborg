@@ -1,10 +1,11 @@
 ﻿using Cyborg.Core.Configuration;
 using Cyborg.Core.Configuration.Builders;
-using Cyborg.Core.Modules;
-using Cyborg.Core.Modules.Configuration.Model;
-using Cyborg.Core.Modules.Runtime;
-using Cyborg.Core.Modules.Runtime.Environments;
-using Cyborg.Core.Modules.Validation;
+using Cyborg.Core.Runtime;
+using Cyborg.Core.Runtime.Configuration;
+using Cyborg.Core.Runtime.Engine;
+using Cyborg.Core.Runtime.Engine.Environments;
+using Cyborg.Core.Runtime.Model;
+using Cyborg.Core.Runtime.Services.Validation;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Cyborg.Core.TestAdapter;
@@ -81,11 +82,22 @@ public abstract class CyborgTestBase
         return new DefaultWorkerContext<TModule>(module, serviceProvider);
     }
 
-    protected Task<IModuleExecutionResult> ExecuteWorkerAsync(IModuleWorker worker, IModuleRuntime runtime)
+    protected Task<IModuleExecutionResult> ExecuteWorkerAsync(IModuleWorker worker, IModuleRuntime runtime) =>
+        ExecuteWorkerAsync(worker, runtime, TestContext.CancellationToken);
+
+    protected Task<IModuleExecutionResult> ExecuteWorkerAsync(
+        IModuleWorker worker,
+        IModuleRuntime runtime,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(worker);
         ArgumentNullException.ThrowIfNull(runtime);
-        return worker.ExecuteAsync(runtime, TestContext.CancellationToken);
+        if (runtime is not IModuleExecutionRuntime executionRuntime)
+        {
+            throw new ArgumentException("Runtime does not expose Cyborg's internal module-execution capabilities.", nameof(runtime));
+        }
+        IRuntimeEnvironment environment = runtime.PrepareEnvironment(new ModuleEnvironment { Scope = EnvironmentScope.Global });
+        return executionRuntime.ExecuteActivatedWorkerAsync(worker, environment, cancellationToken);
     }
 
     #region DI-based Testing
@@ -128,8 +140,8 @@ public abstract class CyborgTestBase
         ArgumentNullException.ThrowIfNull(assertion);
         string resolvedJson = await ResolveModuleJsonAsync(moduleJson);
         await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
-        IModuleWorker worker = scope.DeserializeModule(resolvedJson);
-        TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(worker);
+        ModuleReference moduleReference = scope.DeserializeModule(resolvedJson);
+        TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(moduleReference);
         await assertion(module);
     }
 
@@ -218,8 +230,8 @@ public abstract class CyborgTestBase
         ArgumentNullException.ThrowIfNull(assertion);
         string resolvedJson = await ResolveModuleJsonAsync(moduleJson);
         await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
-        IModuleWorker worker = scope.DeserializeModule(resolvedJson);
-        TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(worker);
+        ModuleReference moduleReference = scope.DeserializeModule(resolvedJson);
+        TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(moduleReference);
         IValidationResult<TModule> validationResult = await module.ValidateAsync(scope.Runtime, scope.ServiceProvider, TestContext.CancellationToken);
         await assertion(validationResult);
     }
@@ -267,8 +279,8 @@ public abstract class CyborgTestBase
         ArgumentNullException.ThrowIfNull(assertion);
         string resolvedJson = await ResolveModuleJsonAsync(moduleJson);
         await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
-        IModuleWorker worker = scope.DeserializeModule(resolvedJson);
-        TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(worker);
+        ModuleReference moduleReference = scope.DeserializeModule(resolvedJson);
+        TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(moduleReference);
         IValidationResult<TModule> validationResult = await module.ValidateAsync(scope.Runtime, scope.ServiceProvider, TestContext.CancellationToken);
         validationResult.EnsureValid();
         await assertion(validationResult.Module, scope);
@@ -303,8 +315,8 @@ public abstract class CyborgTestBase
         string resolvedJson = await ResolveModuleJsonAsync(moduleJson);
         await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
         environmentSetup(scope.GlobalEnvironment);
-        IModuleWorker worker = scope.DeserializeModule(resolvedJson);
-        TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(worker);
+        ModuleReference moduleReference = scope.DeserializeModule(resolvedJson);
+        TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(moduleReference);
         IValidationResult<TModule> validationResult = await module.ValidateAsync(scope.Runtime, scope.ServiceProvider, TestContext.CancellationToken);
         validationResult.EnsureValid();
         await assertion(validationResult.Module);
@@ -364,8 +376,9 @@ public abstract class CyborgTestBase
         string resolvedJson = await ResolveModuleJsonAsync(moduleJson);
         await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
         environmentSetup?.Invoke(scope.GlobalEnvironment);
-        IModuleWorker worker = scope.DeserializeModule(resolvedJson);
-        TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(worker);
+        ModuleReference moduleReference = scope.DeserializeModule(resolvedJson);
+        TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(moduleReference);
+        IModuleWorker worker = scope.ActivateWorker(moduleReference);
         IModuleExecutionResult result = await scope.ExecuteAsync(worker, TestContext.CancellationToken);
         if (worker is not TWorker typedWorker)
         {
@@ -425,8 +438,8 @@ public abstract class CyborgTestBase
         string resolvedJson = await ResolveModuleJsonAsync(moduleJson);
         await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
         environmentSetup?.Invoke(scope.GlobalEnvironment);
-        IModuleWorker worker = scope.DeserializeModule(resolvedJson);
-        IModuleExecutionResult result = await scope.ExecuteAsync(worker, TestContext.CancellationToken);
+        ModuleReference moduleReference = scope.DeserializeModule(resolvedJson);
+        IModuleExecutionResult result = await scope.ExecuteAsync(moduleReference, TestContext.CancellationToken);
         await assertion(result);
     }
 
@@ -471,9 +484,9 @@ public abstract class CyborgTestBase
         string resolvedJson = await ResolveModuleJsonAsync(moduleJson);
         await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
         environmentSetup?.Invoke(scope.GlobalEnvironment);
-        IModuleWorker worker = scope.DeserializeModule(resolvedJson);
+        ModuleReference moduleReference = scope.DeserializeModule(resolvedJson);
         TException exception = await Assert.ThrowsExactlyAsync<TException>(
-            () => scope.ExecuteAsync(worker, TestContext.CancellationToken));
+            () => scope.ExecuteAsync(moduleReference, TestContext.CancellationToken));
         if (assertion is not null)
         {
             await assertion(exception);
@@ -529,8 +542,8 @@ public abstract class CyborgTestBase
         string resolvedJson = await ResolveModuleJsonAsync(moduleContextJson);
         await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
         environmentSetup?.Invoke(scope.GlobalEnvironment);
-        ModuleContext moduleContext = scope.DeserializeModuleContext(resolvedJson);
-        IModuleExecutionResult result = await scope.ExecuteAsync(moduleContext, TestContext.CancellationToken);
+        ModuleConfigurationLoadResult configuration = scope.DeserializeModuleConfiguration(resolvedJson);
+        IModuleExecutionResult result = await scope.ExecuteAsync(configuration, TestContext.CancellationToken);
         await assertion(result, scope);
     }
 

@@ -1,9 +1,8 @@
-﻿using Cyborg.Core.Modules;
-using Cyborg.Core.Modules.Configuration.Model;
-using Cyborg.Core.Modules.Runtime;
-using Cyborg.Core.Modules.Runtime.Environments;
-using Cyborg.Core.Modules.Runtime.Environments.Syntax;
-using Cyborg.Core.Modules.Validation;
+﻿using Cyborg.Core.Runtime;
+using Cyborg.Core.Runtime.Engine;
+using Cyborg.Core.Runtime.Engine.Environments;
+using Cyborg.Core.Runtime.Engine.Environments.Syntax;
+using Cyborg.Core.Runtime.Model;
 
 namespace Cyborg.Modules.Conditions;
 
@@ -12,8 +11,8 @@ public abstract class ConditionalCombinatorModuleWorkerBase<TModule>(IWorkerCont
     protected async Task<ChildExecutionResult> ExecuteConditionAsync(IModuleRuntime runtime, ModuleReference condition, PathSyntax conditionNamespace, CancellationToken cancellationToken)
     {
         IRuntimeEnvironment environment = CreateChildEnvironment(runtime, condition, conditionNamespace);
-        string conditionModuleId = condition.Module.ModuleId;
-        IModuleExecutionResult result = await runtime.ExecuteAsync(condition.Module, environment, cancellationToken);
+        string conditionModuleId = condition.ModuleId;
+        IModuleExecutionResult result = await runtime.ExecuteAsync(condition, environment, cancellationToken);
         if (result.Status is ModuleExitStatus.Canceled)
         {
             return ChildExecutionResult.NonSuccess(ModuleExitStatus.Canceled);

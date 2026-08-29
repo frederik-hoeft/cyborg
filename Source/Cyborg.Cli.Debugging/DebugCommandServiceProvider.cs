@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Modules.Debugging;
+﻿using Cyborg.Core.Runtime.Services.Debugging;
 using DIKvp = (System.Type Key, object? Value);
 
 namespace Cyborg.Cli.Debugging;

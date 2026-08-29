@@ -1,7 +1,7 @@
 ﻿using Cyborg.Core.Aot.Modules.Loaders.Configuration;
-using Cyborg.Core.Modules.Configuration;
+using Cyborg.Core.Runtime.Configuration;
 
 namespace Cyborg.Modules.Borg.Create;
 
 [GeneratedModuleLoaderFactory]
-public sealed partial class BorgCreateModuleLoader(IServiceProvider serviceProvider) : ModuleLoader<BorgCreateModuleWorker, BorgCreateModule>(serviceProvider);
+public sealed partial class BorgCreateModuleLoader : ModuleLoader<BorgCreateModuleWorker, BorgCreateModule>;

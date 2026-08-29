@@ -1,7 +1,7 @@
 ﻿using Cyborg.Core.Aot.Modules.Loaders.Configuration;
-using Cyborg.Core.Modules.Configuration;
+using Cyborg.Core.Runtime.Configuration;
 
 namespace Cyborg.Modules.External;
 
 [GeneratedModuleLoaderFactory]
-public sealed partial class ExternalModuleLoader(IServiceProvider serviceProvider) : ModuleLoader<ExternalModuleWorker, ExternalModule>(serviceProvider);
+public sealed partial class ExternalModuleLoader : ModuleLoader<ExternalModuleWorker, ExternalModule>;

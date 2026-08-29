@@ -20,7 +20,7 @@ public sealed class DynamicValueJsonConverter(IDynamicValueProviderRegistry regi
             throw new JsonException($"Expected value token for dynamic value type '{typeName}'.");
         }
 
-        DynamicValue result = DynamicValueDeserializer.ReadValue(typeName, ref reader, registry, Context);
+        DynamicValue result = DynamicValueDeserializer.ReadValue(typeName, ref reader, registry, GetContext(options));
 
         if (!reader.Read() || reader.TokenType != JsonTokenType.EndObject)
         {

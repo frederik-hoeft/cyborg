@@ -1,7 +1,8 @@
-﻿using Cyborg.Core.Modules;
-using Cyborg.Core.Modules.Hooks;
-using Cyborg.Core.Modules.Runtime;
-using Cyborg.Core.Modules.Runtime.Environments;
+﻿using Cyborg.Core.Runtime;
+using Cyborg.Core.Runtime.Engine;
+using Cyborg.Core.Runtime.Engine.Environments;
+using Cyborg.Core.Runtime.Hooks;
+using Cyborg.Core.Tests.TestInfrastructure;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Cyborg.Core.Tests.Runtime;
@@ -18,7 +19,7 @@ public sealed class ModulePostExecutionHookTests : CyborgCoreTestBase
         await TestWithDIAsync(async services =>
         {
             IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
-            IModuleExecutionResult result = await runtime.ExecuteAsync(new ProbeModuleWorker(ProbeBehavior.Success), cancellationToken: TestContext.CancellationToken);
+            IModuleExecutionResult result = await ExecuteWorkerAsync(new ProbeModuleWorker(ProbeBehavior.Success), runtime, TestContext.CancellationToken);
 
             Assert.AreEqual(ModuleExitStatus.Success, result.Status);
             Assert.AreEqual(1, failingHook.CallCount);
@@ -40,7 +41,7 @@ public sealed class ModulePostExecutionHookTests : CyborgCoreTestBase
         await TestWithDIAsync(async services =>
         {
             IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
-            IModuleExecutionResult result = await runtime.ExecuteAsync(new ProbeModuleWorker(ProbeBehavior.Throw), cancellationToken: TestContext.CancellationToken);
+            IModuleExecutionResult result = await ExecuteWorkerAsync(new ProbeModuleWorker(ProbeBehavior.Throw), runtime, TestContext.CancellationToken);
 
             Assert.AreEqual(ModuleExitStatus.Failed, result.Status);
             Assert.AreEqual(1, hook.CallCount);
@@ -58,7 +59,7 @@ public sealed class ModulePostExecutionHookTests : CyborgCoreTestBase
         await TestWithDIAsync(async services =>
         {
             IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
-            IModuleExecutionResult result = await runtime.ExecuteAsync(new ProbeModuleWorker(ProbeBehavior.Cancel), cancellationToken: cancellationSource.Token);
+            IModuleExecutionResult result = await ExecuteWorkerAsync(new ProbeModuleWorker(ProbeBehavior.Cancel), runtime, cancellationSource.Token);
 
             Assert.AreEqual(ModuleExitStatus.Canceled, result.Status);
             Assert.AreEqual(1, hook.CallCount);
@@ -75,8 +76,8 @@ public sealed class ModulePostExecutionHookTests : CyborgCoreTestBase
         await TestWithDIAsync(async services =>
         {
             IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
-            await runtime.ExecuteAsync(new ProbeModuleWorker(ProbeBehavior.Success), cancellationToken: TestContext.CancellationToken);
-            await runtime.ExecuteAsync(new ProbeModuleWorker(ProbeBehavior.Success), cancellationToken: TestContext.CancellationToken);
+            await ExecuteWorkerAsync(new ProbeModuleWorker(ProbeBehavior.Success), runtime, TestContext.CancellationToken);
+            await ExecuteWorkerAsync(new ProbeModuleWorker(ProbeBehavior.Success), runtime, TestContext.CancellationToken);
 
             Assert.AreEqual(2, createdHooks);
         }, services => services.AddTransient<IModulePostExecutionHook>(_ =>
@@ -92,7 +93,7 @@ public sealed class ModulePostExecutionHookTests : CyborgCoreTestBase
         await TestWithDIAsync(async services =>
         {
             IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
-            IModuleExecutionResult result = await runtime.ExecuteAsync(new ProbeModuleWorker(ProbeBehavior.Success), cancellationToken: TestContext.CancellationToken);
+            IModuleExecutionResult result = await ExecuteWorkerAsync(new ProbeModuleWorker(ProbeBehavior.Success), runtime, TestContext.CancellationToken);
 
             Assert.AreEqual(ModuleExitStatus.Success, result.Status);
         }, services => services.AddTransient<IModulePostExecutionHook>(static _ => throw new InvalidOperationException("Synthetic post-hook construction failure.")));
@@ -131,7 +132,7 @@ public sealed class ModulePostExecutionHookTests : CyborgCoreTestBase
         {
             return behavior switch
             {
-                ProbeBehavior.Success => Task.FromResult<IModuleExecutionResult>(new ProbeExecutionResult(Module, ModuleExitStatus.Success, runtime.Environment.CreateArtifactCollection())),
+                ProbeBehavior.Success => Task.FromResult<IModuleExecutionResult>(new ProbeExecutionResult(Module, ModuleExitStatus.Success, runtime.Environment.CreateTestArtifactCollection())),
                 ProbeBehavior.Throw => Task.FromException<IModuleExecutionResult>(new InvalidOperationException("Synthetic module failure.")),
                 ProbeBehavior.Cancel => Task.FromException<IModuleExecutionResult>(new OperationCanceledException("Synthetic module cancellation.", cancellationToken)),
                 _ => throw new ArgumentOutOfRangeException(nameof(behavior), behavior, "Unknown probe behavior.")

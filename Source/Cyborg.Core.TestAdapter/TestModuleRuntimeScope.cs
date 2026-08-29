@@ -1,10 +1,10 @@
 ﻿using Cyborg.Core.Configuration.Serialization;
-using Cyborg.Core.Modules;
-using Cyborg.Core.Modules.Configuration.Model;
-using Cyborg.Core.Modules.Runtime;
-using Cyborg.Core.Modules.Runtime.Environments;
+using Cyborg.Core.Runtime;
+using Cyborg.Core.Runtime.Configuration;
+using Cyborg.Core.Runtime.Engine;
+using Cyborg.Core.Runtime.Engine.Environments;
+using Cyborg.Core.Runtime.Model;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
 namespace Cyborg.Core.TestAdapter;
@@ -25,28 +25,28 @@ public sealed class TestModuleRuntimeScope : IAsyncDisposable
     /// <summary>
     /// Gets the root module runtime for this test scope.
     /// </summary>
-    public RootModuleRuntime Runtime { get; }
+    public IModuleRuntime Runtime { get; }
 
     /// <summary>
     /// Gets the global runtime environment where top-level variables are stored.
     /// </summary>
-    public GlobalRuntimeEnvironment GlobalEnvironment { get; }
+    public IRuntimeEnvironment GlobalEnvironment { get; }
 
     /// <summary>
     /// Gets the service provider backing this test scope.
     /// </summary>
     public IServiceProvider ServiceProvider => _serviceProvider;
 
-    private TestModuleRuntimeScope(ServiceProvider serviceProvider, RootModuleRuntime runtime, GlobalRuntimeEnvironment globalEnvironment)
+    private TestModuleRuntimeScope(ServiceProvider serviceProvider, IModuleRuntime runtime)
     {
         _serviceProvider = serviceProvider;
         Runtime = runtime;
-        GlobalEnvironment = globalEnvironment;
+        GlobalEnvironment = runtime.GlobalEnvironment;
     }
 
     /// <summary>
-    /// Creates a new test scope from the given service collection. Builds the service provider,
-    /// resolves the global environment and logger factory, and constructs a <see cref="RootModuleRuntime"/>.
+    /// Creates a new test scope from the given service collection. Builds the service provider and
+    /// resolves a fresh root runtime execution session from the configured services.
     /// </summary>
     /// <param name="services">The fully configured service collection.</param>
     /// <returns>A ready-to-use test scope.</returns>
@@ -54,25 +54,23 @@ public sealed class TestModuleRuntimeScope : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(services);
         ServiceProvider serviceProvider = services.BuildServiceProvider();
-        GlobalRuntimeEnvironment globalEnvironment = serviceProvider.GetRequiredService<GlobalRuntimeEnvironment>();
-        ILoggerFactory loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
-        RootModuleRuntime runtime = new(globalEnvironment, loggerFactory, serviceProvider);
-        return new TestModuleRuntimeScope(serviceProvider, runtime, globalEnvironment);
+        IModuleRuntime runtime = serviceProvider.GetRequiredService<IModuleRuntime>();
+        return new TestModuleRuntimeScope(serviceProvider, runtime);
     }
 
     /// <summary>
-    /// Deserializes a module JSON string into an <see cref="IModuleWorker"/> by running it through
+    /// Deserializes a module JSON string into a <see cref="ModuleReference"/> by running it through
     /// the registry-based deserialization pipeline (the same path used in production).
     /// </summary>
     /// <param name="moduleJson">The JSON string representing a module reference (e.g., <c>{ "cyborg.modules.subprocess.v1": { ... } }</c>).</param>
-    /// <returns>The deserialized module worker, ready for execution.</returns>
-    public IModuleWorker DeserializeModule(string moduleJson)
+    /// <returns>The deserialized immutable module reference.</returns>
+    public ModuleReference DeserializeModule(string moduleJson)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(moduleJson);
         IJsonLoaderContext loaderContext = _serviceProvider.GetRequiredService<IJsonLoaderContext>();
         ModuleReference moduleReference = JsonSerializer.Deserialize<ModuleReference>(moduleJson, loaderContext.JsonSerializerOptions)
             ?? throw new InvalidOperationException("Deserialization of the module JSON returned null. Verify the JSON is a valid module reference.");
-        return moduleReference.Module;
+        return moduleReference;
     }
 
     /// <summary>
@@ -81,31 +79,49 @@ public sealed class TestModuleRuntimeScope : IAsyncDisposable
     /// </summary>
     /// <param name="moduleContextJson">The JSON string representing a full module context.</param>
     /// <returns>The deserialized module context.</returns>
-    public ModuleContext DeserializeModuleContext(string moduleContextJson)
+    public ModuleContext DeserializeModuleContext(string moduleContextJson) =>
+        DeserializeModuleConfiguration(moduleContextJson).ModuleContext;
+
+    /// <summary>
+    /// Deserializes a full module configuration while preserving load artifacts required when the context is executed.
+    /// </summary>
+    public ModuleConfigurationLoadResult DeserializeModuleConfiguration(string moduleContextJson)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(moduleContextJson);
         IJsonLoaderContext loaderContext = _serviceProvider.GetRequiredService<IJsonLoaderContext>();
-        ModuleContext moduleContext = JsonSerializer.Deserialize<ModuleContext>(moduleContextJson, loaderContext.JsonSerializerOptions)
+        ModuleConfigurationDeserializer deserializer = new(loaderContext);
+        ModuleConfigurationLoadResult configuration = deserializer.Deserialize(moduleContextJson)
             ?? throw new InvalidOperationException("Deserialization of the module context JSON returned null. Verify the JSON is a valid module context.");
-        return moduleContext;
+        return configuration;
     }
 
     /// <summary>
     /// Extracts the concrete module record of type <typeparamref name="TModule"/> from a deserialized
-    /// <see cref="IModuleWorker"/> by downcasting through the module worker's <see cref="IModule"/> reference.
+    /// <see cref="ModuleReference"/>.
     /// </summary>
     /// <typeparam name="TModule">The expected concrete module record type.</typeparam>
-    /// <param name="worker">The deserialized module worker.</param>
+    /// <param name="moduleReference">The deserialized module reference.</param>
     /// <returns>The typed module record.</returns>
-    public static TModule ExtractModule<TModule>(IModuleWorker worker) where TModule : ModuleBase, IModule
+    public static TModule ExtractModule<TModule>(ModuleReference moduleReference) where TModule : ModuleBase, IModule
     {
-        ArgumentNullException.ThrowIfNull(worker);
-        if (worker.Module is TModule typedModule)
+        ArgumentNullException.ThrowIfNull(moduleReference);
+        if (moduleReference.Definition is TModule typedModule)
         {
             return typedModule;
         }
         throw new InvalidOperationException(
-            $"Expected module of type '{typeof(TModule).Name}' but the worker contains '{worker.Module.GetType().Name}'.");
+            $"Expected module of type '{typeof(TModule).Name}' but the module reference contains '{moduleReference.Definition.GetType().Name}'.");
+    }
+
+    /// <summary>
+    /// Activates a fresh worker from a loaded module reference using this scope's service provider.
+    /// Normal execution should prefer <see cref="ExecuteAsync(ModuleReference,CancellationToken)"/> so the runtime owns activation timing.
+    /// </summary>
+    public IModuleWorker ActivateWorker(ModuleReference moduleReference)
+    {
+        ArgumentNullException.ThrowIfNull(moduleReference);
+        IModuleWorkerFactory workerFactory = _serviceProvider.GetRequiredService<IModuleWorkerFactory>();
+        return workerFactory.CreateWorker(moduleReference, _serviceProvider);
     }
 
     /// <summary>
@@ -117,7 +133,21 @@ public sealed class TestModuleRuntimeScope : IAsyncDisposable
     public Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker worker, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(worker);
-        return Runtime.ExecuteAsync(worker, cancellationToken: cancellationToken);
+        if (Runtime is not IModuleExecutionRuntime executionRuntime)
+        {
+            throw new InvalidOperationException("Runtime does not expose Cyborg's internal module-execution capabilities.");
+        }
+        IRuntimeEnvironment environment = Runtime.PrepareEnvironment(new ModuleEnvironment { Scope = EnvironmentScope.Global });
+        return executionRuntime.ExecuteActivatedWorkerAsync(worker, environment, cancellationToken);
+    }
+
+    /// <summary>
+    /// Executes a loaded module reference. The runtime activates a fresh worker immediately before execution.
+    /// </summary>
+    public Task<IModuleExecutionResult> ExecuteAsync(ModuleReference moduleReference, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(moduleReference);
+        return Runtime.ExecuteAsync(moduleReference, cancellationToken: cancellationToken);
     }
 
     /// <summary>
@@ -130,6 +160,15 @@ public sealed class TestModuleRuntimeScope : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(moduleContext);
         return Runtime.ExecuteAsync(moduleContext, cancellationToken);
+    }
+
+    /// <summary>
+    /// Executes a loaded module configuration with its load artifacts.
+    /// </summary>
+    public Task<IModuleExecutionResult> ExecuteAsync(ModuleConfigurationLoadResult configuration, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        return Runtime.ExecuteAsync(configuration, cancellationToken);
     }
 
     public ValueTask DisposeAsync() => _serviceProvider.DisposeAsync();

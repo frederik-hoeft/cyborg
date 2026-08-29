@@ -12,7 +12,8 @@ unset Platform || true
 
 dotnet restore Cyborg.slnx \
     --packages "$CACHE" \
-    --source https://api.nuget.org/v3/index.json
+    --source https://api.nuget.org/v3/index.json \
+    --runtime linux-x64
 
 find "$CACHE" -type f -name '*.nupkg' -exec cp -n {} "$OUT/" \;
 

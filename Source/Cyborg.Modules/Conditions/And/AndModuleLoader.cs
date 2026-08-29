@@ -1,7 +1,7 @@
 ﻿using Cyborg.Core.Aot.Modules.Loaders.Configuration;
-using Cyborg.Core.Modules.Configuration;
+using Cyborg.Core.Runtime.Configuration;
 
 namespace Cyborg.Modules.Conditions.And;
 
 [GeneratedModuleLoaderFactory]
-public sealed partial class AndModuleLoader(IServiceProvider serviceProvider) : ModuleLoader<AndModuleWorker, AndModule>(serviceProvider);
+public sealed partial class AndModuleLoader : ModuleLoader<AndModuleWorker, AndModule>;

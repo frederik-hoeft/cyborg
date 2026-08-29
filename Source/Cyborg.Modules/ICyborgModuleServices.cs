@@ -1,5 +1,5 @@
-﻿using Cyborg.Core.Modules.Configuration;
-using Cyborg.Core.Modules.Configuration.Model;
+﻿using Cyborg.Core.Runtime.Configuration;
+using Cyborg.Core.Runtime.Model;
 using Cyborg.Modules.Assert;
 using Cyborg.Modules.Conditions.And;
 using Cyborg.Modules.Conditions.DirectoryExists;
@@ -22,6 +22,7 @@ using Cyborg.Modules.If;
 using Cyborg.Modules.Named;
 using Cyborg.Modules.Network.SshShutdown;
 using Cyborg.Modules.Network.WakeOnLan;
+using Cyborg.Modules.Parallel;
 using Cyborg.Modules.Sequence;
 using Cyborg.Modules.Subprocess;
 using Cyborg.Modules.Switch;
@@ -37,6 +38,7 @@ namespace Cyborg.Modules;
 [Singleton<ModuleJsonSerializerContext>(Factory = nameof(GetModuleJsonSerializerContext))]
 [Singleton<JsonSerializerContext>(Factory = nameof(GetModuleJsonSerializerContext))]
 [Singleton<JsonNamingPolicy>(Factory = nameof(GetModuleJsonNamingPolicy))]
+[Singleton<IModuleLoader, ParallelModuleLoader>]
 [Singleton<IModuleLoader, SequenceModuleLoader>]
 [Singleton<IModuleLoader, SubprocessModuleLoader>]
 [Singleton<IModuleLoader, SwitchModuleLoader>]

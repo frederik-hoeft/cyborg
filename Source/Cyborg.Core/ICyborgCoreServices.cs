@@ -4,15 +4,17 @@ using Cyborg.Core.Configuration.Loaders;
 using Cyborg.Core.Configuration.Model;
 using Cyborg.Core.Configuration.Serialization;
 using Cyborg.Core.Configuration.Serialization.Dynamics;
-using Cyborg.Core.Modules;
-using Cyborg.Core.Modules.Configuration;
-using Cyborg.Core.Modules.Configuration.Model;
-using Cyborg.Core.Modules.Debugging;
-using Cyborg.Core.Modules.Descriptors;
-using Cyborg.Core.Modules.Hooks;
-using Cyborg.Core.Modules.Runtime;
-using Cyborg.Core.Modules.Runtime.Environments;
-using Cyborg.Core.Modules.Runtime.Environments.Artifacts;
+using Cyborg.Core.Runtime;
+using Cyborg.Core.Runtime.Configuration;
+using Cyborg.Core.Runtime.Engine;
+using Cyborg.Core.Runtime.Engine.Environments;
+using Cyborg.Core.Runtime.Engine.Environments.Artifacts;
+using Cyborg.Core.Runtime.Engine.Environments.Syntax;
+using Cyborg.Core.Runtime.Hooks;
+using Cyborg.Core.Runtime.Model;
+using Cyborg.Core.Runtime.Services.Debugging;
+using Cyborg.Core.Runtime.Services.ModuleDescriptors;
+using Cyborg.Core.Runtime.Services.Transactions;
 using Cyborg.Core.Services;
 using Cyborg.Core.Services.Dispatch;
 using Cyborg.Core.Services.Metrics;
@@ -21,6 +23,7 @@ using Cyborg.Core.Services.Pipelines;
 using Cyborg.Core.Services.Security.Trust;
 using Cyborg.Core.Text;
 using Jab;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -52,8 +55,10 @@ namespace Cyborg.Core;
 [Singleton<IModuleLoaderRegistry, DefaultModuleLoaderRegistry>]
 [Singleton<IModuleWorkerFactory, DefaultModuleWorkerFactory>]
 [Singleton<IModuleConfigurationLoader, DefaultModuleConfigurationLoader>]
-[Singleton<IModuleRuntime, RootModuleRuntime>]
-[Singleton<IModuleRegistry, DefaultModuleRegistry>]
+[Singleton<VariableSyntaxBuilder>]
+[Transient<IModuleRuntime>(Factory = nameof(CreateRootModuleRuntime))]
+[Scoped<IModuleRegistry, DefaultModuleRegistry>]
+[Scoped<ITransactionalServiceContext>(Factory = nameof(CreateTransactionalServiceContext))]
 [Singleton<IModuleArtifactsFactory, DefaultModuleArtifactsFactory>]
 [Transient<IServicePipeline<IModuleValidationHook>, ServicePipeline<IModuleValidationHook>>]
 [Transient<IServicePipeline<IModulePreExecutionHook>, ServicePipeline<IModulePreExecutionHook>>]
@@ -65,7 +70,6 @@ namespace Cyborg.Core;
 [Singleton<IModuleResultBuilderFactory, ModuleResultBuilderFactory>]
 [Singleton<MetricsCollectorOptions>]
 [Singleton<IMetricsCollector, MetricsCollector>]
-[Singleton<GlobalRuntimeEnvironment>(Factory = nameof(CreateGlobalRuntimeEnvironment))]
 [Singleton<JsonSerializerContext>(Factory = nameof(GetCoreJsonSerializerContext))]
 public interface ICyborgCoreServices
 {
@@ -75,11 +79,25 @@ public interface ICyborgCoreServices
 
     static JsonConverter CreateDecompositionStrategyConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<DecompositionStrategy>(namingPolicy);
 
-    static GlobalRuntimeEnvironment CreateGlobalRuntimeEnvironment(
-        JsonNamingPolicy namingPolicy,
-        ITaggedStringConversionObserver taggedStringConversionObserver) =>
-        new(namingPolicy)
-        {
-            TaggedStringConversionObserver = taggedStringConversionObserver
-        };
+    static IModuleRuntime CreateRootModuleRuntime(
+        VariableSyntaxBuilder syntaxFactory,
+        ITaggedStringConversionObserver taggedStringConversionObserver,
+        ILoggerFactory loggerFactory,
+        IServiceProvider serviceProvider,
+        IEnumerable<TransactionalServiceParticipant> transactionalServiceParticipants)
+    {
+        IRuntimeEnvironmentFactory environmentFactory = new DefaultRuntimeEnvironmentFactory(syntaxFactory, taggedStringConversionObserver);
+        IRuntimeModuleRegistry moduleRegistry = new RuntimeModuleRegistry();
+        RuntimeTransactionalServices transactionalServices = new(transactionalServiceParticipants);
+        ModuleRuntimeServices services = new(
+            new ModuleArtifactPublisher(loggerFactory),
+            new ModuleContextRunner(syntaxFactory, environmentFactory, loggerFactory),
+            new ModuleDispatcher(environmentFactory, loggerFactory),
+            moduleRegistry,
+            transactionalServices);
+        GlobalRuntimeEnvironment globalEnvironment = environmentFactory.CreateGlobalEnvironment();
+        return new RootModuleRuntime(globalEnvironment, environmentFactory, services, loggerFactory, serviceProvider);
+    }
+
+    static ITransactionalServiceContext CreateTransactionalServiceContext() => new TransactionalServiceContext();
 }

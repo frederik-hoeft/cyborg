@@ -40,6 +40,8 @@ The validation result carried into the debugger always contains the prepared mod
 
 The debugger itself is inactive when no breakpoints are registered. On an active pre-execution boundary it evaluates the breakpoint registry against the module and, when a breakpoint matches, resolves the selected `IDebugFrontend` and presents an `IDebugPauseContext`.
 
+Parallel module execution can reach multiple pre-execution boundaries concurrently, but one debugger instance serializes breakpoint evaluation together with the complete frontend pause. A second branch re-evaluates debugger state only after the preceding pause resumes, so actions such as `step` and `detach` take effect before another waiting branch consumes breakpoint state. This also prevents a singleton interactive frontend from being driven concurrently by multiple branches; it does not impose serialization on module execution when no debug pause is active.
+
 Frontend selection uses the keyed-service selection setting `cyborg.core.debug.frontend`. Core deliberately has no implicit frontend (`DebugOptions.Default.Frontend` is `null`), because frontend policy belongs to the host. `Cyborg.Cli.Debugging` registers the built-in `console` frontend and owns breakpoint argument integration, while the `Cyborg.Cli` composition root includes `DebugOptions.Default with { Frontend = "console" }` in its general dictionary-backed defaults. The options file and explicit `--config` source are applied afterward and can therefore replace that selection. Other hosts can choose their own frontend registration and configuration policy.
 
 ## Breakpoints

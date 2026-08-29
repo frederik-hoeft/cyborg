@@ -1,8 +1,8 @@
-﻿using Cyborg.Core.Modules;
-using Cyborg.Core.Modules.Configuration.Model;
-using Cyborg.Core.Modules.Runtime;
-using Cyborg.Core.Modules.Runtime.Environments;
-using Cyborg.Core.Modules.Runtime.Environments.Syntax;
+﻿using Cyborg.Core.Runtime;
+using Cyborg.Core.Runtime.Engine;
+using Cyborg.Core.Runtime.Engine.Environments;
+using Cyborg.Core.Runtime.Engine.Environments.Syntax;
+using Cyborg.Core.Runtime.Model;
 using Cyborg.Modules.Conditions;
 using System.Diagnostics.CodeAnalysis;
 
@@ -14,9 +14,9 @@ public sealed class IfModuleWorker(IWorkerContext<IfModule> context) : Condition
     {
         PathSyntax childNamespace = runtime.Environment.SyntaxFactory.Path(runtime.Environment.Namespace);
         IRuntimeEnvironment environment = CreateChildEnvironment(runtime, Module.Condition, childNamespace);
-        string conditionModuleId = Module.Condition.Module.ModuleId;
+        string conditionModuleId = Module.Condition.ModuleId;
         Logger.LogConditionEvaluating(conditionModuleId);
-        IModuleExecutionResult result = await runtime.ExecuteAsync(Module.Condition.Module, environment, cancellationToken);
+        IModuleExecutionResult result = await runtime.ExecuteAsync(Module.Condition, environment, cancellationToken);
         if (result.Status is ModuleExitStatus.Canceled)
         {
             return runtime.Exit(WithStatus(ModuleExitStatus.Canceled));

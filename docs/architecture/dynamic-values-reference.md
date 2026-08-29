@@ -151,7 +151,7 @@ The value is a normal module-discriminator object such as:
 }
 ```
 
-Use this type when a value should hold a module worker that will be executed later through another module such as `dynamic`.
+Use this type when a value should hold a loaded module definition/reference that will be invoked later through another module such as `dynamic`. Worker activation remains deferred until that reference is executed.
 
 ### `cyborg.types.module.environment.v1`
 
@@ -186,7 +186,7 @@ Represents a full executable `ModuleContext`.
 | `configuration` | module reference | No | `null` |
 | `requires` | requirements object | No | no argument requirements |
 
-This is the main type used by template arguments that supply executable workflows as data.
+This is the main type used by template arguments that supply executable workflows as data. The value is purely structural and does not carry named-module registry state. When it is deserialized as part of a module-configuration load, named definitions inside the value contribute to that surrounding load operation's registry seed; executing the enclosing loaded configuration establishes that seed before a `DynamicModule` invokes the context. Independently deserialized or programmatically constructed `ModuleContext` values have no hidden load artifacts.
 
 ## Borg Types
 

@@ -30,7 +30,7 @@ public static class DynamicValueTypeReferenceParser
             return new DynamicValueTypeReference(typeName, []);
         }
 
-        offset++; // '<'
+        ++offset; // '<'
         ImmutableArray<DynamicValueTypeReference>.Builder typeArguments = ImmutableArray.CreateBuilder<DynamicValueTypeReference>();
 
         while (true)
@@ -55,7 +55,7 @@ public static class DynamicValueTypeReferenceParser
                 throw new FormatException($"Expected ',' or '>' in dynamic type '{input}' at offset {offset}.");
             }
 
-            offset++;
+            ++offset;
         }
 
         return new DynamicValueTypeReference(typeName, typeArguments.ToImmutable());
@@ -73,7 +73,7 @@ public static class DynamicValueTypeReferenceParser
                 break;
             }
 
-            offset++;
+            ++offset;
         }
 
         if (offset == start)
@@ -88,7 +88,7 @@ public static class DynamicValueTypeReferenceParser
     {
         while (offset < input.Length && char.IsWhiteSpace(input[offset]))
         {
-            offset++;
+            ++offset;
         }
     }
 }

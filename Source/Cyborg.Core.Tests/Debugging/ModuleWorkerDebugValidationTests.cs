@@ -1,7 +1,7 @@
-﻿using Cyborg.Core.Modules;
-using Cyborg.Core.Modules.Debugging;
-using Cyborg.Core.Modules.Runtime;
-using Cyborg.Core.Modules.Validation;
+﻿using Cyborg.Core.Runtime;
+using Cyborg.Core.Runtime.Engine;
+using Cyborg.Core.Runtime.Services.Debugging;
+using Cyborg.Core.Runtime.Services.Validation;
 using Cyborg.TestModules.Debugging;
 using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics.CodeAnalysis;

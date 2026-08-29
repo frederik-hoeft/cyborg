@@ -6,11 +6,10 @@ using Cyborg.Cli.Logging;
 using Cyborg.Cli.Metrics;
 using Cyborg.Core.Configuration;
 using Cyborg.Core.Configuration.Builders;
-using Cyborg.Core.Modules.Configuration;
-using Cyborg.Core.Modules.Configuration.Model;
-using Cyborg.Core.Modules.Extensions;
-using Cyborg.Core.Modules.Runtime;
-using Cyborg.Core.Modules.Runtime.Environments;
+using Cyborg.Core.Runtime.Configuration;
+using Cyborg.Core.Runtime.Engine;
+using Cyborg.Core.Runtime.Engine.Environments;
+using Cyborg.Core.Runtime.Extensions;
 using Cyborg.Core.Services.Metrics;
 using Cyborg.Core.Text;
 using Cyborg.Core.Text.Rendering;
@@ -86,7 +85,8 @@ internal sealed class Commands
         services.GetRequiredService<MetricsCollectorOptions>().Namespace = metricsNamespace;
         IMetricsCollector metricsCollector = services.GetRequiredService<IMetricsCollector>();
         string metricsDestinationPath = metrics ?? configuredMetricsPath;
-        GlobalRuntimeEnvironment globalEnvironment = services.GetRequiredService<GlobalRuntimeEnvironment>();
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        IRuntimeEnvironment globalEnvironment = runtime.GlobalEnvironment;
         bool runSucceeded = false;
 
         try
@@ -125,12 +125,7 @@ internal sealed class Commands
             logger.LogStartup(RenderRunArguments(main, options, environmentVariables, config, metrics, logLevel, breakAt, argumentLogRenderer));
 
             IModuleConfigurationLoader moduleLoader = services.GetRequiredService<IModuleConfigurationLoader>();
-            ModuleContext module = await moduleLoader.LoadModuleAsync(main, cancellationToken);
-            module = module with
-            {
-                Environment = module.Environment ?? ModuleEnvironment.Default,
-            };
-            IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+            ModuleConfigurationLoadResult module = await moduleLoader.LoadModuleAsync(main, cancellationToken);
             TaggedString target = globalEnvironment.ResolveVariableOrDefault(WellKnownVariables.Target, new TaggedString("<unspecified>"));
             string renderedTarget = services.GetRequiredService<ITaggedStringRenderer>().Render(target);
             logger.LogRunStarted(renderedTarget);
@@ -212,7 +207,7 @@ internal sealed class Commands
         return $"\"{escaped}\"";
     }
 
-    private static void CollectRunMetrics(GlobalRuntimeEnvironment environment, IMetricsCollector metricsCollector, bool runSucceeded)
+    private static void CollectRunMetrics(IEnvironmentLike environment, IMetricsCollector metricsCollector, bool runSucceeded)
     {
         IMetricsLabelCollection labels = metricsCollector.CreateLabels();
         if (environment.TryResolveVariable(WellKnownVariables.Target, out TaggedString target))

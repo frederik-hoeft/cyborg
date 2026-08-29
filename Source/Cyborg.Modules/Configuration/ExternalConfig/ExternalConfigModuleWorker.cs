@@ -1,7 +1,6 @@
-﻿using Cyborg.Core.Modules;
-using Cyborg.Core.Modules.Configuration;
-using Cyborg.Core.Modules.Configuration.Model;
-using Cyborg.Core.Modules.Runtime;
+﻿using Cyborg.Core.Runtime;
+using Cyborg.Core.Runtime.Configuration;
+using Cyborg.Core.Runtime.Engine;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Modules.Configuration.ExternalConfig;
@@ -10,8 +9,8 @@ public sealed class ExternalConfigModuleWorker(IWorkerContext<ExternalConfigModu
 {
     protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
-        ModuleContext moduleContext = await configurationLoader.LoadModuleAsync(Module.Path, cancellationToken);
-        IModuleExecutionResult executionResult = await runtime.ExecuteAsync(moduleContext.Module.Module, runtime.Environment, cancellationToken);
+        ModuleConfigurationLoadResult configuration = await configurationLoader.LoadModuleAsync(Module.Path, cancellationToken);
+        IModuleExecutionResult executionResult = await runtime.ExecuteRootModuleAsync(configuration, runtime.Environment, cancellationToken);
         return runtime.Exit(WithStatus(executionResult.Status));
     }
 }

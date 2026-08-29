@@ -1,9 +1,9 @@
-﻿using Cyborg.Core.Modules;
-using Cyborg.Core.Modules.Configuration.Model;
-using Cyborg.Core.Modules.Runtime;
-using Cyborg.Core.Modules.Runtime.Environments;
-using Cyborg.Core.Modules.Runtime.Environments.Artifacts;
-using Cyborg.Core.Modules.Runtime.Environments.Syntax;
+﻿using Cyborg.Core.Runtime;
+using Cyborg.Core.Runtime.Engine;
+using Cyborg.Core.Runtime.Engine.Environments;
+using Cyborg.Core.Runtime.Engine.Environments.Artifacts;
+using Cyborg.Core.Runtime.Engine.Environments.Syntax;
+using Cyborg.Core.Runtime.Model;
 using Cyborg.Modules.Conditions;
 using System.Diagnostics.CodeAnalysis;
 
@@ -13,7 +13,7 @@ public sealed class WhileModuleWorker(IWorkerContext<WhileModule> context) : Mod
 {
     protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
-        string conditionModuleId = Module.Condition.Module.ModuleId;
+        string conditionModuleId = Module.Condition.ModuleId;
         ModuleArtifacts childArtifacts = ModuleArtifacts.Default with
         {
             Namespace = runtime.Environment.Namespace,
@@ -31,7 +31,7 @@ public sealed class WhileModuleWorker(IWorkerContext<WhileModule> context) : Mod
             string artifactsOverride = environment.SyntaxFactory.Path(environment.NamespaceOf(Module.Condition)).Property(Module.Artifacts).Override();
             environment.SetVariable(artifactsOverride, childArtifacts);
             Logger.LogWhileConditionEvaluating(conditionModuleId);
-            IModuleExecutionResult result = await runtime.ExecuteAsync(Module.Condition.Module, environment, cancellationToken);
+            IModuleExecutionResult result = await runtime.ExecuteAsync(Module.Condition, environment, cancellationToken);
             if (result.Status is ModuleExitStatus.Canceled)
             {
                 return runtime.Exit(WithStatus(ModuleExitStatus.Canceled));
