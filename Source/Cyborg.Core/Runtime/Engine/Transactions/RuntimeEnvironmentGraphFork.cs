@@ -17,7 +17,7 @@ internal sealed class RuntimeEnvironmentGraphFork(TransactionalDictionary<Runtim
         ITransactionConflictStrategy conflictStrategy,
         [NotNullWhen(true)] out RuntimeEnvironmentGraphState? candidate,
         [NotNullWhen(true)] out HashSet<RuntimeEnvironmentId>? retainedEnvironmentIds,
-        out TransactionConflict? conflict)
+        [NotNullWhen(false)] out TransactionConflict? conflict)
     {
         ArgumentNullException.ThrowIfNull(participant);
         ArgumentNullException.ThrowIfNull(contributors);

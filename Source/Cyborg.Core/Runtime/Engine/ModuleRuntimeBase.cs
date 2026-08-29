@@ -110,7 +110,7 @@ internal abstract class ModuleRuntimeBase
             }
             if (!fork.TryJoin(out TransactionConflict? conflict))
             {
-                throw CreateReconciliationException(conflict!);
+                throw CreateReconciliationException(conflict);
             }
             return results;
         }

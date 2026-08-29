@@ -4,7 +4,7 @@ using Cyborg.Core.Runtime.Model;
 
 namespace Cyborg.Core.Runtime.Engine.Transactions;
 
-internal sealed class RuntimeModuleRegistryTransactionFork(RuntimeModuleRegistryTransactionState owner, TransactionalDictionaryFork<string, ModuleContext> modules) : ITransactionParticipantFork
+internal sealed class RuntimeModuleRegistryTransactionFork(TransactionalDictionaryFork<string, ModuleContext> modules) : ITransactionParticipantFork
 {
     public ITransactionParticipantState CreateBranch() => new RuntimeModuleRegistryTransactionState(modules.CreateBranch());
 
@@ -13,7 +13,7 @@ internal sealed class RuntimeModuleRegistryTransactionFork(RuntimeModuleRegistry
         IReadOnlyList<ITransactionParticipantState> contributors,
         ITransactionConflictStrategy conflictStrategy,
         [NotNullWhen(true)] out ITransactionParticipantState? candidate,
-        out TransactionConflict? conflict)
+        [NotNullWhen(false)] out TransactionConflict? conflict)
     {
         ArgumentNullException.ThrowIfNull(participant);
         ArgumentNullException.ThrowIfNull(contributors);

@@ -32,7 +32,7 @@ internal sealed class ModuleTransactionForkGroup
         return child;
     }
 
-    public bool TryJoin(out TransactionConflict? conflict)
+    public bool TryJoin([NotNullWhen(false)] out TransactionConflict? conflict)
     {
         EnsureActive();
         List<ModuleTransaction> contributors = [Continuation, .. _children];

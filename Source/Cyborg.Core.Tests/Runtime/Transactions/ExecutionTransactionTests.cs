@@ -413,7 +413,7 @@ public sealed class ExecutionTransactionTests
         internal TransactionalDictionary<string, int> Values => values;
     }
 
-    private sealed class DictionaryParticipantFork(ExecutionTransactionTests.DictionaryParticipantState owner, bool failPreparation) : ITransactionParticipantFork
+    private sealed class DictionaryParticipantFork(DictionaryParticipantState owner, bool failPreparation) : ITransactionParticipantFork
     {
         private readonly TransactionalDictionaryFork<string, int> _values = new(owner.Values);
 
@@ -424,7 +424,7 @@ public sealed class ExecutionTransactionTests
             IReadOnlyList<ITransactionParticipantState> contributors,
             ITransactionConflictStrategy conflictStrategy,
             [NotNullWhen(true)] out ITransactionParticipantState? candidate,
-            out TransactionConflict? conflict)
+            [NotNullWhen(false)] out TransactionConflict? conflict)
         {
             if (failPreparation)
             {

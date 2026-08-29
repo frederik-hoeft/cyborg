@@ -20,7 +20,7 @@ internal sealed class TransactionalDictionaryFork<TKey, TValue>(TransactionalDic
         Func<TKey, object> selectLogicalKey,
         ITransactionConflictStrategy conflictStrategy,
         [NotNullWhen(true)] out Dictionary<TKey, TransactionalDictionaryChange<TValue>>? selectedChanges,
-        out TransactionConflict? conflict)
+        [NotNullWhen(false)] out TransactionConflict? conflict)
     {
         ArgumentNullException.ThrowIfNull(participant);
         ArgumentNullException.ThrowIfNull(contributors);

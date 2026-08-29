@@ -35,7 +35,7 @@ internal sealed record RuntimeModuleRegistryTransactionState(TransactionalDictio
         }
     }
 
-    public ITransactionParticipantFork CreateFork() => new RuntimeModuleRegistryTransactionFork(this, new TransactionalDictionaryFork<string, ModuleContext>(Modules));
+    public ITransactionParticipantFork CreateFork() => new RuntimeModuleRegistryTransactionFork(new TransactionalDictionaryFork<string, ModuleContext>(Modules));
 
     internal static RuntimeModuleRegistryTransactionState Create(ModuleRegistrySeed seed)
     {

@@ -8,5 +8,5 @@ internal interface ITransactionParticipantFork
         IReadOnlyList<ITransactionParticipantState> contributors,
         ITransactionConflictStrategy conflictStrategy,
         [NotNullWhen(true)] out ITransactionParticipantState? candidate,
-        out TransactionConflict? conflict);
+        [NotNullWhen(false)] out TransactionConflict? conflict);
 }

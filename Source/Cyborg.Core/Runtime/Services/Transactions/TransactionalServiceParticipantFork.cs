@@ -2,22 +2,19 @@
 
 namespace Cyborg.Core.Runtime.Services.Transactions;
 
-internal sealed class TransactionalServiceParticipantFork(
-    TransactionalServiceParticipantAdapter participant,
-    ITransactionalServiceForkAdapter fork) : ITransactionParticipantFork
+internal sealed class TransactionalServiceParticipantFork(TransactionalServiceParticipantAdapter participant, ITransactionalServiceForkAdapter fork) : ITransactionParticipantFork
 {
     private readonly TransactionalServiceParticipantAdapter _participant = participant ?? throw new ArgumentNullException(nameof(participant));
     private readonly ITransactionalServiceForkAdapter _fork = fork ?? throw new ArgumentNullException(nameof(fork));
 
-    public ITransactionParticipantState CreateBranch() =>
-        new TransactionalServiceParticipantState(_participant, _fork.CreateBranch());
+    public ITransactionParticipantState CreateBranch() => new TransactionalServiceParticipantState(_participant, _fork.CreateBranch());
 
     public bool TryPrepareMerge(
         ITransactionParticipant participant,
         IReadOnlyList<ITransactionParticipantState> contributors,
         ITransactionConflictStrategy conflictStrategy,
         [NotNullWhen(true)] out ITransactionParticipantState? candidate,
-        out TransactionConflict? conflict)
+        [NotNullWhen(false)] out TransactionConflict? conflict)
     {
         ArgumentNullException.ThrowIfNull(participant);
         ArgumentNullException.ThrowIfNull(contributors);

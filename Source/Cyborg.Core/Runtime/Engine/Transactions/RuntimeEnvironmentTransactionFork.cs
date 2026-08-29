@@ -16,7 +16,7 @@ internal sealed class RuntimeEnvironmentTransactionFork
         IReadOnlyList<ITransactionParticipantState> contributors,
         ITransactionConflictStrategy conflictStrategy,
         [NotNullWhen(true)] out ITransactionParticipantState? candidate,
-        out TransactionConflict? conflict)
+        [NotNullWhen(false)] out TransactionConflict? conflict)
     {
         ArgumentNullException.ThrowIfNull(participant);
         ArgumentNullException.ThrowIfNull(contributors);

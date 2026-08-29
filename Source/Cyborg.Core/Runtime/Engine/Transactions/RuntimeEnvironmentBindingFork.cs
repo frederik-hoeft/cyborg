@@ -16,7 +16,7 @@ internal sealed class RuntimeEnvironmentBindingFork(TransactionalDictionary<Envi
         IReadOnlySet<RuntimeEnvironmentId> retainedEnvironmentIds,
         ITransactionConflictStrategy conflictStrategy,
         [NotNullWhen(true)] out RuntimeEnvironmentBindingState? candidate,
-        out TransactionConflict? conflict)
+        [NotNullWhen(false)] out TransactionConflict? conflict)
     {
         ArgumentNullException.ThrowIfNull(participant);
         ArgumentNullException.ThrowIfNull(contributors);
