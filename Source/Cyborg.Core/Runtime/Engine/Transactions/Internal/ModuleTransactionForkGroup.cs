@@ -2,32 +2,32 @@
 
 namespace Cyborg.Core.Runtime.Engine.Transactions.Internal;
 
-internal sealed class ExecutionTransactionForkGroup
+internal sealed class ModuleTransactionForkGroup
 {
     private readonly TransactionCoordinator _coordinator;
     private readonly ImmutableDictionary<ITransactionParticipant, ITransactionParticipantFork> _participantForks;
-    private readonly List<ExecutionTransaction> _children = [];
-    private readonly ExecutionTransaction _owner;
+    private readonly List<ModuleTransaction> _children = [];
+    private readonly ModuleTransaction _owner;
 
-    public ExecutionTransactionForkGroup(ExecutionTransaction owner, TransactionCoordinator coordinator, TransactionStateBundle ownerState)
+    public ModuleTransactionForkGroup(ModuleTransaction owner, TransactionCoordinator coordinator, TransactionStateBundle ownerState)
     {
         _owner = owner;
         _coordinator = coordinator;
         _participantForks = CreateParticipantForks(coordinator.Participants, ownerState);
         Continuation = CreateBranch();
-        Lifecycle = ExecutionTransactionForkLifecycle.Active;
+        Lifecycle = ModuleTransactionForkLifecycle.Active;
     }
 
-    public ExecutionTransaction Continuation { get; }
+    public ModuleTransaction Continuation { get; }
 
-    public ExecutionTransactionForkLifecycle Lifecycle { get; private set; }
+    public ModuleTransactionForkLifecycle Lifecycle { get; private set; }
 
-    public IReadOnlyList<ExecutionTransaction> Children => _children;
+    public IReadOnlyList<ModuleTransaction> Children => _children;
 
-    public ExecutionTransaction CreateChild()
+    public ModuleTransaction CreateChild()
     {
         EnsureActive();
-        ExecutionTransaction child = CreateBranch();
+        ModuleTransaction child = CreateBranch();
         _children.Add(child);
         return child;
     }
@@ -35,9 +35,9 @@ internal sealed class ExecutionTransactionForkGroup
     public bool TryJoin(out TransactionConflict? conflict)
     {
         EnsureActive();
-        List<ExecutionTransaction> contributors = [Continuation, .. _children];
+        List<ModuleTransaction> contributors = [Continuation, .. _children];
         List<TransactionStateBundle> contributorStates = new(contributors.Count);
-        foreach (ExecutionTransaction contributor in contributors)
+        foreach (ModuleTransaction contributor in contributors)
         {
             contributorStates.Add(contributor.GetStateForReconciliation(this));
         }
@@ -63,13 +63,13 @@ internal sealed class ExecutionTransactionForkGroup
                     out candidate,
                     out conflict))
                 {
-                    CloseFork(contributors, ExecutionTransactionForkLifecycle.Conflict);
+                    CloseFork(contributors, ModuleTransactionForkLifecycle.Conflict);
                     return false;
                 }
             }
             catch
             {
-                CloseFork(contributors, ExecutionTransactionForkLifecycle.Failed);
+                CloseFork(contributors, ModuleTransactionForkLifecycle.Failed);
                 throw;
             }
             candidates.Add(participant, candidate);
@@ -77,11 +77,11 @@ internal sealed class ExecutionTransactionForkGroup
 
         TransactionStateBundle candidateState = new(candidates.ToImmutable());
         _owner.PublishForkResult(this, candidateState);
-        foreach (ExecutionTransaction contributor in contributors)
+        foreach (ModuleTransaction contributor in contributors)
         {
             contributor.MarkJoined(this);
         }
-        Lifecycle = ExecutionTransactionForkLifecycle.Joined;
+        Lifecycle = ModuleTransactionForkLifecycle.Joined;
         conflict = null;
         return true;
     }
@@ -89,17 +89,17 @@ internal sealed class ExecutionTransactionForkGroup
     public void Discard()
     {
         EnsureActive();
-        List<ExecutionTransaction> contributors = [Continuation, .. _children];
+        List<ModuleTransaction> contributors = [Continuation, .. _children];
         EnsureContributorsCanBeDiscarded(contributors);
-        foreach (ExecutionTransaction contributor in contributors)
+        foreach (ModuleTransaction contributor in contributors)
         {
             contributor.MarkDiscardedByFork(this);
         }
         _owner.ReleaseForkWithoutPublication(this);
-        Lifecycle = ExecutionTransactionForkLifecycle.Discarded;
+        Lifecycle = ModuleTransactionForkLifecycle.Discarded;
     }
 
-    private ExecutionTransaction CreateBranch()
+    private ModuleTransaction CreateBranch()
     {
         ImmutableDictionary<ITransactionParticipant, ITransactionParticipantState>.Builder states = ImmutableDictionary.CreateBuilder<ITransactionParticipant, ITransactionParticipantState>(ReferenceEqualityComparer.Instance);
         foreach (ITransactionParticipant participant in _coordinator.Participants)
@@ -108,15 +108,15 @@ internal sealed class ExecutionTransactionForkGroup
                 ?? throw new InvalidOperationException("A transaction participant returned a null branch state.");
             states.Add(participant, state);
         }
-        return new ExecutionTransaction(_coordinator, _owner, this, new TransactionStateBundle(states.ToImmutable()));
+        return new ModuleTransaction(_coordinator, _owner, this, new TransactionStateBundle(states.ToImmutable()));
     }
 
     private void CloseFork(
-        IReadOnlyCollection<ExecutionTransaction> contributors,
-        ExecutionTransactionForkLifecycle lifecycle)
+        IReadOnlyCollection<ModuleTransaction> contributors,
+        ModuleTransactionForkLifecycle lifecycle)
     {
         EnsureContributorsCanBeDiscarded(contributors);
-        foreach (ExecutionTransaction contributor in contributors)
+        foreach (ModuleTransaction contributor in contributors)
         {
             contributor.MarkDiscardedByFork(this);
         }
@@ -124,9 +124,9 @@ internal sealed class ExecutionTransactionForkGroup
         Lifecycle = lifecycle;
     }
 
-    private void EnsureContributorsCanBeDiscarded(IReadOnlyCollection<ExecutionTransaction> contributors)
+    private void EnsureContributorsCanBeDiscarded(IReadOnlyCollection<ModuleTransaction> contributors)
     {
-        foreach (ExecutionTransaction contributor in contributors)
+        foreach (ModuleTransaction contributor in contributors)
         {
             contributor.EnsureCanBeDiscardedByFork(this);
         }
@@ -134,7 +134,7 @@ internal sealed class ExecutionTransactionForkGroup
 
     private void EnsureActive()
     {
-        if (Lifecycle != ExecutionTransactionForkLifecycle.Active)
+        if (Lifecycle != ModuleTransactionForkLifecycle.Active)
         {
             throw new InvalidOperationException($"Fork group state is '{Lifecycle}' and cannot be used for this operation.");
         }

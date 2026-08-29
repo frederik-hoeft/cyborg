@@ -10,7 +10,7 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
 {
     private protected override IRuntimeEnvironment BindTransactionCore(
         RuntimeEnvironmentTransactionParticipant participant,
-        ExecutionTransaction transaction)
+        ModuleTransaction transaction)
     {
         ArgumentNullException.ThrowIfNull(participant);
         ArgumentNullException.ThrowIfNull(transaction);
@@ -30,7 +30,7 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
         VariableSyntaxBuilder syntaxFactory,
         string ns,
         RuntimeEnvironmentTransactionParticipant participant,
-        ExecutionTransaction transaction)
+        ModuleTransaction transaction)
         : this(node.Name, parent, node.IsTransient, syntaxFactory, ns)
     {
         ArgumentNullException.ThrowIfNull(node);

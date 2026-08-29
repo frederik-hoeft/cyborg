@@ -8,9 +8,9 @@ internal sealed class TransactionCoordinator(IEnumerable<ITransactionParticipant
 
     internal ImmutableArray<ITransactionParticipant> Participants { get; } = ValidateParticipants(participants);
 
-    public ExecutionTransaction CreateRoot() => CreateRoot(new TransactionRootSeed());
+    public ModuleTransaction CreateRoot() => CreateRoot(new TransactionRootSeed());
 
-    public ExecutionTransaction CreateRoot(TransactionRootSeed seed)
+    public ModuleTransaction CreateRoot(TransactionRootSeed seed)
     {
         ArgumentNullException.ThrowIfNull(seed);
         ImmutableDictionary<ITransactionParticipant, ITransactionParticipantState>.Builder states = ImmutableDictionary
@@ -21,7 +21,7 @@ internal sealed class TransactionCoordinator(IEnumerable<ITransactionParticipant
                 ?? throw new InvalidOperationException("A transaction participant returned a null root state.");
             states.Add(participant, state);
         }
-        return new ExecutionTransaction(coordinator: this, parent: null, ownerFork: null, new TransactionStateBundle(states.ToImmutable()));
+        return new ModuleTransaction(coordinator: this, parent: null, ownerFork: null, new TransactionStateBundle(states.ToImmutable()));
     }
 
     private static ImmutableArray<ITransactionParticipant> ValidateParticipants(IEnumerable<ITransactionParticipant> participants)

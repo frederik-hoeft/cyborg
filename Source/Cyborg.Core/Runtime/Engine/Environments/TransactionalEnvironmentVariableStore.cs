@@ -7,7 +7,7 @@ namespace Cyborg.Core.Runtime.Engine.Environments;
 internal sealed class TransactionalEnvironmentVariableStore(
     RuntimeEnvironmentId environmentId,
     RuntimeEnvironmentTransactionParticipant participant,
-    ExecutionTransaction transaction) : IEnvironmentVariableStore
+    ModuleTransaction transaction) : IEnvironmentVariableStore
 {
     public bool TryGetValue(string name, out object? value)
     {

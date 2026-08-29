@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Cyborg.Core.Runtime.Engine;
 
-internal sealed class ModuleExecutionDispatcher(IRuntimeEnvironmentFactory environmentFactory, ILoggerFactory loggerFactory) : IModuleExecutionDispatcher
+internal sealed class ModuleDispatcher(IRuntimeEnvironmentFactory environmentFactory, ILoggerFactory loggerFactory) : IModuleDispatcher
 {
     private readonly ILogger _logger = loggerFactory.CreateLogger("cyborg.core.runtime");
 

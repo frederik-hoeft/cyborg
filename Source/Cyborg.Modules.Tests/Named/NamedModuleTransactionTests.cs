@@ -1,6 +1,5 @@
 ﻿using Cyborg.Core.Runtime.Configuration;
 using Cyborg.Core.Runtime.Engine;
-using Cyborg.Core.Runtime.Model;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Cyborg.Modules.Tests.Named;

@@ -7,8 +7,8 @@ internal sealed class ScopedRuntime
     IModuleRuntime root,
     IModuleRuntime parent,
     RuntimeEnvironmentContext environmentContext,
-    ModuleRuntimeOperations operations,
-    ExecutionTransaction transaction,
+    ModuleRuntimeServices operations,
+    ModuleTransaction transaction,
     IServiceProvider serviceProvider
 ) : ModuleRuntimeBase(environmentContext, operations, transaction, serviceProvider)
 {

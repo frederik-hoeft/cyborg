@@ -1,10 +1,9 @@
 ﻿namespace Cyborg.Core.Runtime.Engine.Transactions.Internal;
 
-internal enum ExecutionTransactionForkLifecycle
+internal enum ModuleTransactionLifecycle
 {
     Active,
+    Completed,
     Joined,
-    Discarded,
-    Conflict,
-    Failed
+    Discarded
 }

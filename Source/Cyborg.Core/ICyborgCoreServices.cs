@@ -89,14 +89,14 @@ public interface ICyborgCoreServices
         IRuntimeEnvironmentFactory environmentFactory = new DefaultRuntimeEnvironmentFactory(syntaxFactory, taggedStringConversionObserver);
         IRuntimeModuleRegistry moduleRegistry = new RuntimeModuleRegistry();
         RuntimeTransactionalServices transactionalServices = new(transactionalServiceParticipants);
-        ModuleRuntimeOperations operations = new(
+        ModuleRuntimeServices services = new(
             new ModuleArtifactPublisher(loggerFactory),
-            new ModuleContextExecutor(syntaxFactory, environmentFactory, loggerFactory),
-            new ModuleExecutionDispatcher(environmentFactory, loggerFactory),
+            new ModuleContextRunner(syntaxFactory, environmentFactory, loggerFactory),
+            new ModuleDispatcher(environmentFactory, loggerFactory),
             moduleRegistry,
             transactionalServices);
         GlobalRuntimeEnvironment globalEnvironment = environmentFactory.CreateGlobalEnvironment();
-        return new RootModuleRuntime(globalEnvironment, environmentFactory, operations, loggerFactory, serviceProvider);
+        return new RootModuleRuntime(globalEnvironment, environmentFactory, services, loggerFactory, serviceProvider);
     }
 
     static ITransactionalServiceContext CreateTransactionalServiceContext() => new TransactionalServiceContext();

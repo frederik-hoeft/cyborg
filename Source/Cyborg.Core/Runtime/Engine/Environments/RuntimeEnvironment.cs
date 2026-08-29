@@ -203,12 +203,12 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
 
     IRuntimeEnvironment ITransactionalRuntimeEnvironment.BindTransaction(
         RuntimeEnvironmentTransactionParticipant participant,
-        ExecutionTransaction transaction) =>
+        ModuleTransaction transaction) =>
         BindTransactionCore(participant, transaction);
 
     private protected virtual IRuntimeEnvironment BindTransactionCore(
         RuntimeEnvironmentTransactionParticipant participant,
-        ExecutionTransaction transaction)
+        ModuleTransaction transaction)
     {
         ArgumentNullException.ThrowIfNull(participant);
         ArgumentNullException.ThrowIfNull(transaction);
@@ -224,7 +224,7 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         VariableSyntaxBuilder syntaxFactory,
         string ns,
         RuntimeEnvironmentTransactionParticipant participant,
-        ExecutionTransaction transaction)
+        ModuleTransaction transaction)
         : this(node.Name, node.IsTransient, syntaxFactory, ns)
     {
         ArgumentNullException.ThrowIfNull(node);

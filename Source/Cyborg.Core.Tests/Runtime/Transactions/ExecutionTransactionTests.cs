@@ -12,8 +12,8 @@ public sealed class ExecutionTransactionTests
     {
         DictionaryParticipant participant = new();
         TransactionCoordinator coordinator = new([participant]);
-        ExecutionTransaction first = coordinator.CreateRoot();
-        ExecutionTransaction second = coordinator.CreateRoot();
+        ModuleTransaction first = coordinator.CreateRoot();
+        ModuleTransaction second = coordinator.CreateRoot();
 
         first.GetParticipantState(participant).Set("value", 1);
 
@@ -33,8 +33,8 @@ public sealed class ExecutionTransactionTests
         TransactionRootSeed firstSeed = new TransactionRootSeed().With(participant, firstValues);
         TransactionRootSeed secondSeed = new TransactionRootSeed().With(participant, secondValues);
 
-        ExecutionTransaction first = coordinator.CreateRoot(firstSeed);
-        ExecutionTransaction second = coordinator.CreateRoot(secondSeed);
+        ModuleTransaction first = coordinator.CreateRoot(firstSeed);
+        ModuleTransaction second = coordinator.CreateRoot(secondSeed);
 
         Assert.AreEqual(1, first.GetParticipantState(participant)["seed"]);
         Assert.AreEqual(2, second.GetParticipantState(participant)["seed"]);
@@ -45,12 +45,12 @@ public sealed class ExecutionTransactionTests
     {
         DictionaryParticipant participant = new(("baseline", 1));
         TransactionCoordinator coordinator = new([participant]);
-        ExecutionTransaction root = coordinator.CreateRoot();
+        ModuleTransaction root = coordinator.CreateRoot();
         root.GetParticipantState(participant).Set("before-fork", 2);
 
-        ExecutionTransactionForkGroup fork = root.Fork();
-        ExecutionTransaction first = fork.CreateChild();
-        ExecutionTransaction second = fork.CreateChild();
+        ModuleTransactionForkGroup fork = root.Fork();
+        ModuleTransaction first = fork.CreateChild();
+        ModuleTransaction second = fork.CreateChild();
         DictionaryParticipantState continuationState = fork.Continuation.GetParticipantState(participant);
         DictionaryParticipantState firstState = first.GetParticipantState(participant);
         DictionaryParticipantState secondState = second.GetParticipantState(participant);
@@ -69,15 +69,15 @@ public sealed class ExecutionTransactionTests
     public void Fork_OwnerStateIsUnavailableUntilForkCloses()
     {
         DictionaryParticipant participant = new();
-        ExecutionTransaction root = new TransactionCoordinator([participant]).CreateRoot();
+        ModuleTransaction root = new TransactionCoordinator([participant]).CreateRoot();
 
-        ExecutionTransactionForkGroup fork = root.Fork();
+        ModuleTransactionForkGroup fork = root.Fork();
 
         Assert.ThrowsExactly<InvalidOperationException>(() => root.GetParticipantState(participant));
         Assert.ThrowsExactly<InvalidOperationException>(root.Fork);
         Assert.ThrowsExactly<InvalidOperationException>(root.Complete);
         fork.Discard();
-        Assert.AreEqual(ExecutionTransactionLifecycle.Active, root.Lifecycle);
+        Assert.AreEqual(ModuleTransactionLifecycle.Active, root.Lifecycle);
         Assert.IsNotNull(root.GetParticipantState(participant));
     }
 
@@ -85,9 +85,9 @@ public sealed class ExecutionTransactionTests
     public void TryJoin_NonOverlappingContinuationAndChildChangesPublishAtomically()
     {
         DictionaryParticipant participant = new();
-        ExecutionTransaction root = new TransactionCoordinator([participant]).CreateRoot();
-        ExecutionTransactionForkGroup fork = root.Fork();
-        ExecutionTransaction child = fork.CreateChild();
+        ModuleTransaction root = new TransactionCoordinator([participant]).CreateRoot();
+        ModuleTransactionForkGroup fork = root.Fork();
+        ModuleTransaction child = fork.CreateChild();
         fork.Continuation.GetParticipantState(participant).Set("continuation", 1);
         child.GetParticipantState(participant).Set("child", 2);
         fork.Continuation.Complete();
@@ -100,19 +100,19 @@ public sealed class ExecutionTransactionTests
         DictionaryParticipantState state = root.GetParticipantState(participant);
         Assert.AreEqual(1, state["continuation"]);
         Assert.AreEqual(2, state["child"]);
-        Assert.AreEqual(ExecutionTransactionForkLifecycle.Joined, fork.Lifecycle);
-        Assert.AreEqual(ExecutionTransactionLifecycle.Joined, fork.Continuation.Lifecycle);
-        Assert.AreEqual(ExecutionTransactionLifecycle.Joined, child.Lifecycle);
+        Assert.AreEqual(ModuleTransactionForkLifecycle.Joined, fork.Lifecycle);
+        Assert.AreEqual(ModuleTransactionLifecycle.Joined, fork.Continuation.Lifecycle);
+        Assert.AreEqual(ModuleTransactionLifecycle.Joined, child.Lifecycle);
     }
 
     [TestMethod]
     public void TryJoin_SiblingWriteConflictLeavesOwnerUnchanged()
     {
         DictionaryParticipant participant = new(("baseline", 1));
-        ExecutionTransaction root = new TransactionCoordinator([participant]).CreateRoot();
-        ExecutionTransactionForkGroup fork = root.Fork();
-        ExecutionTransaction first = fork.CreateChild();
-        ExecutionTransaction second = fork.CreateChild();
+        ModuleTransaction root = new TransactionCoordinator([participant]).CreateRoot();
+        ModuleTransactionForkGroup fork = root.Fork();
+        ModuleTransaction first = fork.CreateChild();
+        ModuleTransaction second = fork.CreateChild();
         first.GetParticipantState(participant).Set("value", 2);
         second.GetParticipantState(participant).Set("value", 2);
         fork.Continuation.Complete();
@@ -130,19 +130,19 @@ public sealed class ExecutionTransactionTests
         Assert.AreEqual(2, conflict.ContributorIndices[1]);
         Assert.AreEqual(1, root.GetParticipantState(participant)["baseline"]);
         Assert.IsFalse(root.GetParticipantState(participant).ContainsKey("value"));
-        Assert.AreEqual(ExecutionTransactionForkLifecycle.Conflict, fork.Lifecycle);
-        Assert.AreEqual(ExecutionTransactionLifecycle.Discarded, first.Lifecycle);
-        Assert.AreEqual(ExecutionTransactionLifecycle.Discarded, second.Lifecycle);
+        Assert.AreEqual(ModuleTransactionForkLifecycle.Conflict, fork.Lifecycle);
+        Assert.AreEqual(ModuleTransactionLifecycle.Discarded, first.Lifecycle);
+        Assert.AreEqual(ModuleTransactionLifecycle.Discarded, second.Lifecycle);
     }
 
     [TestMethod]
     public void TryJoin_AddThenRemoveStillParticipatesInConflictDetection()
     {
         DictionaryParticipant participant = new();
-        ExecutionTransaction root = new TransactionCoordinator([participant]).CreateRoot();
-        ExecutionTransactionForkGroup fork = root.Fork();
-        ExecutionTransaction first = fork.CreateChild();
-        ExecutionTransaction second = fork.CreateChild();
+        ModuleTransaction root = new TransactionCoordinator([participant]).CreateRoot();
+        ModuleTransactionForkGroup fork = root.Fork();
+        ModuleTransaction first = fork.CreateChild();
+        ModuleTransaction second = fork.CreateChild();
         DictionaryParticipantState firstState = first.GetParticipantState(participant);
         firstState.Set("value", 1);
         Assert.IsTrue(firstState.TryRemove("value"));
@@ -163,9 +163,9 @@ public sealed class ExecutionTransactionTests
     public void TryJoin_OwnerContinuationAndChildUseSameConflictSemantics()
     {
         DictionaryParticipant participant = new();
-        ExecutionTransaction root = new TransactionCoordinator([participant]).CreateRoot();
-        ExecutionTransactionForkGroup fork = root.Fork();
-        ExecutionTransaction child = fork.CreateChild();
+        ModuleTransaction root = new TransactionCoordinator([participant]).CreateRoot();
+        ModuleTransactionForkGroup fork = root.Fork();
+        ModuleTransaction child = fork.CreateChild();
         fork.Continuation.GetParticipantState(participant).Set("value", 1);
         child.GetParticipantState(participant).Set("value", 2);
         fork.Continuation.Complete();
@@ -186,10 +186,10 @@ public sealed class ExecutionTransactionTests
     {
         DictionaryParticipant participant = new();
         TransactionCoordinator coordinator = new([participant], new SelectLastContributorConflictStrategy());
-        ExecutionTransaction root = coordinator.CreateRoot();
-        ExecutionTransactionForkGroup fork = root.Fork();
-        ExecutionTransaction first = fork.CreateChild();
-        ExecutionTransaction second = fork.CreateChild();
+        ModuleTransaction root = coordinator.CreateRoot();
+        ModuleTransactionForkGroup fork = root.Fork();
+        ModuleTransaction first = fork.CreateChild();
+        ModuleTransaction second = fork.CreateChild();
         first.GetParticipantState(participant).Set("value", 1);
         second.GetParticipantState(participant).Set("value", 2);
         fork.Continuation.Complete();
@@ -207,10 +207,10 @@ public sealed class ExecutionTransactionTests
     {
         DictionaryParticipant firstParticipant = new();
         DictionaryParticipant conflictingParticipant = new();
-        ExecutionTransaction root = new TransactionCoordinator([firstParticipant, conflictingParticipant]).CreateRoot();
-        ExecutionTransactionForkGroup fork = root.Fork();
-        ExecutionTransaction first = fork.CreateChild();
-        ExecutionTransaction second = fork.CreateChild();
+        ModuleTransaction root = new TransactionCoordinator([firstParticipant, conflictingParticipant]).CreateRoot();
+        ModuleTransactionForkGroup fork = root.Fork();
+        ModuleTransaction first = fork.CreateChild();
+        ModuleTransaction second = fork.CreateChild();
         first.GetParticipantState(firstParticipant).Set("valid", 1);
         first.GetParticipantState(conflictingParticipant).Set("conflict", 1);
         second.GetParticipantState(conflictingParticipant).Set("conflict", 2);
@@ -232,9 +232,9 @@ public sealed class ExecutionTransactionTests
     {
         DictionaryParticipant firstParticipant = new();
         DictionaryParticipant failingParticipant = new(failPreparation: true);
-        ExecutionTransaction root = new TransactionCoordinator([firstParticipant, failingParticipant]).CreateRoot();
-        ExecutionTransactionForkGroup fork = root.Fork();
-        ExecutionTransaction child = fork.CreateChild();
+        ModuleTransaction root = new TransactionCoordinator([firstParticipant, failingParticipant]).CreateRoot();
+        ModuleTransactionForkGroup fork = root.Fork();
+        ModuleTransaction child = fork.CreateChild();
         child.GetParticipantState(firstParticipant).Set("valid", 1);
         fork.Continuation.Complete();
         child.Complete();
@@ -243,30 +243,30 @@ public sealed class ExecutionTransactionTests
             fork.TryJoin(out TransactionConflict? _));
 
         Assert.Contains("Synthetic preparation failure", exception.Message);
-        Assert.AreEqual(ExecutionTransactionForkLifecycle.Failed, fork.Lifecycle);
+        Assert.AreEqual(ModuleTransactionForkLifecycle.Failed, fork.Lifecycle);
         Assert.IsFalse(root.GetParticipantState(firstParticipant).ContainsKey("valid"));
-        Assert.AreEqual(ExecutionTransactionLifecycle.Discarded, child.Lifecycle);
+        Assert.AreEqual(ModuleTransactionLifecycle.Discarded, child.Lifecycle);
     }
 
     [TestMethod]
     public void TryJoin_RepeatedNestedForkGenerationsRetainChangesWhenJoiningUpward()
     {
         DictionaryParticipant participant = new();
-        ExecutionTransaction root = new TransactionCoordinator([participant]).CreateRoot();
-        ExecutionTransactionForkGroup outerFork = root.Fork();
-        ExecutionTransaction parent = outerFork.CreateChild();
+        ModuleTransaction root = new TransactionCoordinator([participant]).CreateRoot();
+        ModuleTransactionForkGroup outerFork = root.Fork();
+        ModuleTransaction parent = outerFork.CreateChild();
         outerFork.Continuation.Complete();
         parent.GetParticipantState(participant).Set("parent", 1);
 
-        ExecutionTransactionForkGroup firstFork = parent.Fork();
-        ExecutionTransaction firstChild = firstFork.CreateChild();
+        ModuleTransactionForkGroup firstFork = parent.Fork();
+        ModuleTransaction firstChild = firstFork.CreateChild();
         firstFork.Continuation.Complete();
         firstChild.GetParticipantState(participant).Set("first", 2);
         firstChild.Complete();
         Assert.IsTrue(firstFork.TryJoin(out TransactionConflict? firstConflict), firstConflict?.LogicalKey.ToString());
 
-        ExecutionTransactionForkGroup secondFork = parent.Fork();
-        ExecutionTransaction secondChild = secondFork.CreateChild();
+        ModuleTransactionForkGroup secondFork = parent.Fork();
+        ModuleTransaction secondChild = secondFork.CreateChild();
         secondFork.Continuation.Complete();
         secondChild.GetParticipantState(participant).Set("second", 3);
         secondChild.Complete();
@@ -288,23 +288,23 @@ public sealed class ExecutionTransactionTests
     public void TryJoin_RequiresEveryContributorToComplete()
     {
         DictionaryParticipant participant = new();
-        ExecutionTransaction root = new TransactionCoordinator([participant]).CreateRoot();
-        ExecutionTransactionForkGroup fork = root.Fork();
-        ExecutionTransaction child = fork.CreateChild();
+        ModuleTransaction root = new TransactionCoordinator([participant]).CreateRoot();
+        ModuleTransactionForkGroup fork = root.Fork();
+        ModuleTransaction child = fork.CreateChild();
         fork.Continuation.Complete();
 
         Assert.ThrowsExactly<InvalidOperationException>(() => fork.TryJoin(out TransactionConflict? _));
-        Assert.AreEqual(ExecutionTransactionLifecycle.Active, child.Lifecycle);
-        Assert.AreEqual(ExecutionTransactionForkLifecycle.Active, fork.Lifecycle);
+        Assert.AreEqual(ModuleTransactionLifecycle.Active, child.Lifecycle);
+        Assert.AreEqual(ModuleTransactionForkLifecycle.Active, fork.Lifecycle);
     }
 
     [TestMethod]
     public void TryJoin_CompletedBranchesAndForkCannotBeReused()
     {
         DictionaryParticipant participant = new();
-        ExecutionTransaction root = new TransactionCoordinator([participant]).CreateRoot();
-        ExecutionTransactionForkGroup fork = root.Fork();
-        ExecutionTransaction child = fork.CreateChild();
+        ModuleTransaction root = new TransactionCoordinator([participant]).CreateRoot();
+        ModuleTransactionForkGroup fork = root.Fork();
+        ModuleTransaction child = fork.CreateChild();
         fork.Continuation.Complete();
         child.Complete();
         Assert.IsTrue(fork.TryJoin(out TransactionConflict? conflict), conflict?.LogicalKey.ToString());
@@ -319,16 +319,16 @@ public sealed class ExecutionTransactionTests
     public void Discard_ClosesForkWithoutPublishingContributorState()
     {
         DictionaryParticipant participant = new();
-        ExecutionTransaction root = new TransactionCoordinator([participant]).CreateRoot();
-        ExecutionTransactionForkGroup fork = root.Fork();
-        ExecutionTransaction child = fork.CreateChild();
+        ModuleTransaction root = new TransactionCoordinator([participant]).CreateRoot();
+        ModuleTransactionForkGroup fork = root.Fork();
+        ModuleTransaction child = fork.CreateChild();
         child.GetParticipantState(participant).Set("discarded", 1);
 
         fork.Discard();
 
-        Assert.AreEqual(ExecutionTransactionForkLifecycle.Discarded, fork.Lifecycle);
-        Assert.AreEqual(ExecutionTransactionLifecycle.Discarded, fork.Continuation.Lifecycle);
-        Assert.AreEqual(ExecutionTransactionLifecycle.Discarded, child.Lifecycle);
+        Assert.AreEqual(ModuleTransactionForkLifecycle.Discarded, fork.Lifecycle);
+        Assert.AreEqual(ModuleTransactionLifecycle.Discarded, fork.Continuation.Lifecycle);
+        Assert.AreEqual(ModuleTransactionLifecycle.Discarded, child.Lifecycle);
         Assert.IsFalse(root.GetParticipantState(participant).ContainsKey("discarded"));
     }
 
@@ -336,16 +336,16 @@ public sealed class ExecutionTransactionTests
     public void Discard_DiscardedChildCanStillBeClosedByOwningFork()
     {
         DictionaryParticipant participant = new();
-        ExecutionTransaction root = new TransactionCoordinator([participant]).CreateRoot();
-        ExecutionTransactionForkGroup fork = root.Fork();
-        ExecutionTransaction child = fork.CreateChild();
+        ModuleTransaction root = new TransactionCoordinator([participant]).CreateRoot();
+        ModuleTransactionForkGroup fork = root.Fork();
+        ModuleTransaction child = fork.CreateChild();
         child.GetParticipantState(participant).Set("discarded", 1);
         child.Discard();
 
         fork.Discard();
 
-        Assert.AreEqual(ExecutionTransactionForkLifecycle.Discarded, fork.Lifecycle);
-        Assert.AreEqual(ExecutionTransactionLifecycle.Discarded, child.Lifecycle);
+        Assert.AreEqual(ModuleTransactionForkLifecycle.Discarded, fork.Lifecycle);
+        Assert.AreEqual(ModuleTransactionLifecycle.Discarded, child.Lifecycle);
         Assert.IsFalse(root.GetParticipantState(participant).ContainsKey("discarded"));
     }
 
@@ -353,16 +353,16 @@ public sealed class ExecutionTransactionTests
     public void Complete_TransactionWithOpenNestedForkIsRejected()
     {
         DictionaryParticipant participant = new();
-        ExecutionTransaction root = new TransactionCoordinator([participant]).CreateRoot();
-        ExecutionTransactionForkGroup outerFork = root.Fork();
-        ExecutionTransaction child = outerFork.CreateChild();
+        ModuleTransaction root = new TransactionCoordinator([participant]).CreateRoot();
+        ModuleTransactionForkGroup outerFork = root.Fork();
+        ModuleTransaction child = outerFork.CreateChild();
         child.Fork();
 
         Assert.ThrowsExactly<InvalidOperationException>(child.Complete);
         Assert.ThrowsExactly<InvalidOperationException>(outerFork.Discard);
-        Assert.AreEqual(ExecutionTransactionForkLifecycle.Active, outerFork.Lifecycle);
-        Assert.AreEqual(ExecutionTransactionLifecycle.Active, outerFork.Continuation.Lifecycle);
-        Assert.AreEqual(ExecutionTransactionLifecycle.Active, child.Lifecycle);
+        Assert.AreEqual(ModuleTransactionForkLifecycle.Active, outerFork.Lifecycle);
+        Assert.AreEqual(ModuleTransactionLifecycle.Active, outerFork.Continuation.Lifecycle);
+        Assert.AreEqual(ModuleTransactionLifecycle.Active, child.Lifecycle);
     }
 
     [TestMethod]

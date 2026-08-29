@@ -20,7 +20,7 @@ internal sealed class DefaultRuntimeEnvironmentFactory(
     public IRuntimeEnvironment BindTransaction(
         IRuntimeEnvironment environment,
         RuntimeEnvironmentTransactionParticipant participant,
-        ExecutionTransaction transaction)
+        ModuleTransaction transaction)
     {
         ArgumentNullException.ThrowIfNull(environment);
         ArgumentNullException.ThrowIfNull(participant);
@@ -43,7 +43,7 @@ internal sealed class DefaultRuntimeEnvironmentFactory(
         IRuntimeEnvironment? parent,
         string ns,
         RuntimeEnvironmentTransactionParticipant participant,
-        ExecutionTransaction transaction)
+        ModuleTransaction transaction)
     {
         ArgumentNullException.ThrowIfNull(node);
         ArgumentNullException.ThrowIfNull(ns);

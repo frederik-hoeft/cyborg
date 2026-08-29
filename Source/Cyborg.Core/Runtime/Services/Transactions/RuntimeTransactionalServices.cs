@@ -31,7 +31,7 @@ internal sealed class RuntimeTransactionalServices
 
     public ImmutableArray<ITransactionParticipant> Participants { get; }
 
-    public void BindExecutionScope(IServiceProvider services, ExecutionTransaction transaction)
+    public void BindExecutionScope(IServiceProvider services, ModuleTransaction transaction)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(transaction);
@@ -52,7 +52,7 @@ internal sealed class RuntimeTransactionalServices
         transactionBoundContext.Bind(this, transaction);
     }
 
-    public TState GetState<TParticipant, TState>(ExecutionTransaction transaction)
+    public TState GetState<TParticipant, TState>(ModuleTransaction transaction)
         where TParticipant : TransactionalServiceParticipant<TState>
         where TState : class
     {

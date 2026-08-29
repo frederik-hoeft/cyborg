@@ -1,24 +1,24 @@
 ﻿namespace Cyborg.Core.Runtime.Engine.Transactions.Internal;
 
-internal sealed class ExecutionTransaction
+internal sealed class ModuleTransaction
 (
     TransactionCoordinator coordinator,
-    ExecutionTransaction? parent,
-    ExecutionTransactionForkGroup? ownerFork,
+    ModuleTransaction? parent,
+    ModuleTransactionForkGroup? ownerFork,
     TransactionStateBundle state
 )
 {
-    private readonly ExecutionTransactionForkGroup? _ownerFork = ownerFork;
+    private readonly ModuleTransactionForkGroup? _ownerFork = ownerFork;
 
-    private ExecutionTransactionForkGroup? _openFork;
+    private ModuleTransactionForkGroup? _openFork;
 
     private TransactionStateBundle _state = state;
 
-    public ExecutionTransaction? Parent { get; } = parent;
+    public ModuleTransaction? Parent { get; } = parent;
 
     public bool IsRoot => Parent is null;
 
-    public ExecutionTransactionLifecycle Lifecycle { get; private set; } = ExecutionTransactionLifecycle.Active;
+    public ModuleTransactionLifecycle Lifecycle { get; private set; } = ModuleTransactionLifecycle.Active;
 
     internal bool HasOpenFork => _openFork is not null;
 
@@ -29,7 +29,7 @@ internal sealed class ExecutionTransaction
         return Volatile.Read(ref _state).Get(participant);
     }
 
-    public ExecutionTransactionForkGroup Fork()
+    public ModuleTransactionForkGroup Fork()
     {
         EnsureActive();
         if (_openFork is not null)
@@ -37,7 +37,7 @@ internal sealed class ExecutionTransaction
             throw new InvalidOperationException("A transaction cannot open another fork group before its current fork group closes.");
         }
 
-        ExecutionTransactionForkGroup fork = new(this, coordinator, Volatile.Read(ref _state));
+        ModuleTransactionForkGroup fork = new(this, coordinator, Volatile.Read(ref _state));
         _openFork = fork;
         return fork;
     }
@@ -46,30 +46,30 @@ internal sealed class ExecutionTransaction
     {
         EnsureActive();
         EnsureNoOpenFork();
-        Lifecycle = ExecutionTransactionLifecycle.Completed;
+        Lifecycle = ModuleTransactionLifecycle.Completed;
     }
 
     public void Discard()
     {
         EnsureActive();
         EnsureNoOpenFork();
-        Lifecycle = ExecutionTransactionLifecycle.Discarded;
+        Lifecycle = ModuleTransactionLifecycle.Discarded;
     }
 
-    internal TransactionStateBundle GetStateForReconciliation(ExecutionTransactionForkGroup ownerFork)
+    internal TransactionStateBundle GetStateForReconciliation(ModuleTransactionForkGroup ownerFork)
     {
         if (!ReferenceEquals(_ownerFork, ownerFork))
         {
             throw new InvalidOperationException("The transaction does not belong to the supplied fork group.");
         }
-        if (Lifecycle != ExecutionTransactionLifecycle.Completed)
+        if (Lifecycle != ModuleTransactionLifecycle.Completed)
         {
             throw new InvalidOperationException("Only completed transaction branches can participate in reconciliation.");
         }
         return Volatile.Read(ref _state);
     }
 
-    internal void PublishForkResult(ExecutionTransactionForkGroup fork, TransactionStateBundle state)
+    internal void PublishForkResult(ModuleTransactionForkGroup fork, TransactionStateBundle state)
     {
         ArgumentNullException.ThrowIfNull(state);
         EnsureActive();
@@ -81,7 +81,7 @@ internal sealed class ExecutionTransaction
         _openFork = null;
     }
 
-    internal void ReleaseForkWithoutPublication(ExecutionTransactionForkGroup fork)
+    internal void ReleaseForkWithoutPublication(ModuleTransactionForkGroup fork)
     {
         EnsureActive();
         if (!ReferenceEquals(_openFork, fork))
@@ -91,20 +91,20 @@ internal sealed class ExecutionTransaction
         _openFork = null;
     }
 
-    internal void MarkJoined(ExecutionTransactionForkGroup ownerFork)
+    internal void MarkJoined(ModuleTransactionForkGroup ownerFork)
     {
         if (!ReferenceEquals(_ownerFork, ownerFork))
         {
             throw new InvalidOperationException("The transaction does not belong to the supplied fork group.");
         }
-        if (Lifecycle != ExecutionTransactionLifecycle.Completed)
+        if (Lifecycle != ModuleTransactionLifecycle.Completed)
         {
             throw new InvalidOperationException("Only completed transaction branches can be joined.");
         }
-        Lifecycle = ExecutionTransactionLifecycle.Joined;
+        Lifecycle = ModuleTransactionLifecycle.Joined;
     }
 
-    internal void EnsureCanBeDiscardedByFork(ExecutionTransactionForkGroup ownerFork)
+    internal void EnsureCanBeDiscardedByFork(ModuleTransactionForkGroup ownerFork)
     {
         if (!ReferenceEquals(_ownerFork, ownerFork))
         {
@@ -114,18 +114,18 @@ internal sealed class ExecutionTransaction
         {
             throw new InvalidOperationException("A transaction branch with an open nested fork cannot be discarded by its owner.");
         }
-        if (Lifecycle is not ExecutionTransactionLifecycle.Active
-            and not ExecutionTransactionLifecycle.Completed
-            and not ExecutionTransactionLifecycle.Discarded)
+        if (Lifecycle is not ModuleTransactionLifecycle.Active
+            and not ModuleTransactionLifecycle.Completed
+            and not ModuleTransactionLifecycle.Discarded)
         {
             throw new InvalidOperationException("Only active, completed, or already discarded transaction branches can be discarded by their owner.");
         }
     }
 
-    internal void MarkDiscardedByFork(ExecutionTransactionForkGroup ownerFork)
+    internal void MarkDiscardedByFork(ModuleTransactionForkGroup ownerFork)
     {
         EnsureCanBeDiscardedByFork(ownerFork);
-        Lifecycle = ExecutionTransactionLifecycle.Discarded;
+        Lifecycle = ModuleTransactionLifecycle.Discarded;
     }
 
     private void EnsureStateAccessible()
@@ -139,7 +139,7 @@ internal sealed class ExecutionTransaction
 
     private void EnsureActive()
     {
-        if (Lifecycle != ExecutionTransactionLifecycle.Active)
+        if (Lifecycle != ModuleTransactionLifecycle.Active)
         {
             throw new InvalidOperationException($"Transaction state is '{Lifecycle}' and cannot be used for this operation.");
         }

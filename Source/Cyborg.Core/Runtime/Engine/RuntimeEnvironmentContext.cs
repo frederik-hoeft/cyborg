@@ -15,7 +15,7 @@ internal sealed class RuntimeEnvironmentContext
     private readonly RuntimeEnvironmentTransactionParticipant _environments;
     private readonly ILogger _logger;
     private readonly RuntimeEnvironmentContext? _parent;
-    private readonly ExecutionTransaction _transaction;
+    private readonly ModuleTransaction _transaction;
 
     public IRuntimeEnvironment GlobalEnvironment { get; }
 
@@ -28,7 +28,7 @@ internal sealed class RuntimeEnvironmentContext
     private RuntimeEnvironmentContext(
         IRuntimeEnvironmentFactory environmentFactory,
         RuntimeEnvironmentTransactionParticipant environments,
-        ExecutionTransaction transaction,
+        ModuleTransaction transaction,
         ILogger logger,
         RuntimeEnvironmentContext? parent,
         IRuntimeEnvironment globalEnvironment,
@@ -47,7 +47,7 @@ internal sealed class RuntimeEnvironmentContext
         GlobalRuntimeEnvironment globalEnvironment,
         IRuntimeEnvironmentFactory environmentFactory,
         RuntimeEnvironmentTransactionParticipant environments,
-        ExecutionTransaction transaction,
+        ModuleTransaction transaction,
         ILoggerFactory loggerFactory)
     {
         ArgumentNullException.ThrowIfNull(globalEnvironment);
@@ -72,7 +72,7 @@ internal sealed class RuntimeEnvironmentContext
             transactionalGlobal);
     }
 
-    public RuntimeEnvironmentContext CreateTransactionView(ExecutionTransaction transaction)
+    public RuntimeEnvironmentContext CreateTransactionView(ModuleTransaction transaction)
     {
         ArgumentNullException.ThrowIfNull(transaction);
         RuntimeEnvironmentContext? parent = _parent?.CreateTransactionView(transaction);
@@ -153,7 +153,7 @@ internal sealed class RuntimeEnvironmentContext
         };
     }
 
-    private IRuntimeEnvironment BindEnvironment(IRuntimeEnvironment environment, ExecutionTransaction transaction)
+    private IRuntimeEnvironment BindEnvironment(IRuntimeEnvironment environment, ModuleTransaction transaction)
     {
         EnsureEnvironmentExists(environment, transaction);
         return _environmentFactory.BindTransaction(environment, _environments, transaction);
@@ -197,7 +197,7 @@ internal sealed class RuntimeEnvironmentContext
         return CreateEnvironmentView(environmentId, UNBOUND_ENVIRONMENT, overrideResolutionTags: [], _transaction);
     }
 
-    private IRuntimeEnvironment CreateEnvironmentView(RuntimeEnvironmentId environmentId, string ns, IReadOnlyCollection<string> overrideResolutionTags, ExecutionTransaction? transaction = null)
+    private IRuntimeEnvironment CreateEnvironmentView(RuntimeEnvironmentId environmentId, string ns, IReadOnlyCollection<string> overrideResolutionTags, ModuleTransaction? transaction = null)
     {
         transaction ??= _transaction;
         RuntimeEnvironmentTransactionState state = GetState(transaction);
@@ -207,7 +207,7 @@ internal sealed class RuntimeEnvironmentContext
             : environment.WithOverrideResolutionTags(overrideResolutionTags);
     }
 
-    private IRuntimeEnvironment CreateEnvironmentViewCore(RuntimeEnvironmentId environmentId, string ns, ExecutionTransaction transaction, RuntimeEnvironmentTransactionState state, HashSet<RuntimeEnvironmentId> visited)
+    private IRuntimeEnvironment CreateEnvironmentViewCore(RuntimeEnvironmentId environmentId, string ns, ModuleTransaction transaction, RuntimeEnvironmentTransactionState state, HashSet<RuntimeEnvironmentId> visited)
     {
         if (!visited.Add(environmentId))
         {
@@ -243,7 +243,7 @@ internal sealed class RuntimeEnvironmentContext
         return environment;
     }
 
-    private void EnsureEnvironmentExists(IRuntimeEnvironment environment, ExecutionTransaction transaction)
+    private void EnsureEnvironmentExists(IRuntimeEnvironment environment, ModuleTransaction transaction)
     {
         RuntimeEnvironmentId environmentId = GetEnvironmentId(environment);
         RuntimeEnvironmentTransactionState state = GetState(transaction);
@@ -287,7 +287,7 @@ internal sealed class RuntimeEnvironmentContext
         return false;
     }
 
-    private RuntimeEnvironmentTransactionState GetState(ExecutionTransaction transaction) =>
+    private RuntimeEnvironmentTransactionState GetState(ModuleTransaction transaction) =>
         transaction.GetParticipantState(_environments);
 
     private static RuntimeEnvironmentParent CreateParentReference(IRuntimeEnvironment environment) =>

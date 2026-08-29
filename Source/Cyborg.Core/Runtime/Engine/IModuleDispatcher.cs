@@ -3,7 +3,7 @@ using Cyborg.Core.Runtime.Model;
 
 namespace Cyborg.Core.Runtime.Engine;
 
-internal interface IModuleExecutionDispatcher
+internal interface IModuleDispatcher
 {
     IModuleWorker ActivateWorker(ModuleReference moduleReference, IServiceProvider? serviceProvider);
 

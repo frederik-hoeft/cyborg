@@ -5,7 +5,7 @@ namespace Cyborg.Core.Runtime.Services.Transactions;
 internal sealed class TransactionalServiceContext : ITransactionalServiceContext, ITransactionBoundTransactionalServiceContext
 {
     private RuntimeTransactionalServices? _services;
-    private ExecutionTransaction? _transaction;
+    private ModuleTransaction? _transaction;
 
     public ITransactionalServiceState<TState> GetState<TParticipant, TState>()
         where TParticipant : TransactionalServiceParticipant<TState>
@@ -18,12 +18,12 @@ internal sealed class TransactionalServiceContext : ITransactionalServiceContext
     {
         RuntimeTransactionalServices services = _services
             ?? throw new InvalidOperationException("Transactional service state can only be accessed from a module execution scope.");
-        ExecutionTransaction transaction = _transaction
+        ModuleTransaction transaction = _transaction
             ?? throw new InvalidOperationException("Transactional service state can only be accessed from a module execution scope.");
         return services.GetState<TParticipant, TState>(transaction);
     }
 
-    void ITransactionBoundTransactionalServiceContext.Bind(RuntimeTransactionalServices services, ExecutionTransaction transaction)
+    void ITransactionBoundTransactionalServiceContext.Bind(RuntimeTransactionalServices services, ModuleTransaction transaction)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(transaction);

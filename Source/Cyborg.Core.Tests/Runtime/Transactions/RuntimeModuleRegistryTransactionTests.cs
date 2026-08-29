@@ -15,10 +15,10 @@ public sealed class RuntimeModuleRegistryTransactionTests
     public void Fork_SiblingRegistrationsRemainIsolatedAndConflictOnJoin()
     {
         RuntimeModuleRegistryTransactionParticipant participant = new();
-        ExecutionTransaction root = new TransactionCoordinator([participant]).CreateRoot();
-        ExecutionTransactionForkGroup fork = root.Fork();
-        ExecutionTransaction first = fork.CreateChild();
-        ExecutionTransaction second = fork.CreateChild();
+        ModuleTransaction root = new TransactionCoordinator([participant]).CreateRoot();
+        ModuleTransactionForkGroup fork = root.Fork();
+        ModuleTransaction first = fork.CreateChild();
+        ModuleTransaction second = fork.CreateChild();
         ModuleContext firstModule = CreateModuleContext("first");
         ModuleContext secondModule = CreateModuleContext("second");
 
@@ -45,15 +45,15 @@ public sealed class RuntimeModuleRegistryTransactionTests
         ModuleRegistrySeedBuilder seedBuilder = new();
         seedBuilder.Add("seeded", seededModule);
         TransactionRootSeed rootSeed = new TransactionRootSeed().With(participant, seedBuilder.Build());
-        ExecutionTransaction root = new TransactionCoordinator([participant]).CreateRoot(rootSeed);
+        ModuleTransaction root = new TransactionCoordinator([participant]).CreateRoot(rootSeed);
 
-        ExecutionTransactionForkGroup outerFork = root.Fork();
-        ExecutionTransaction parent = outerFork.CreateChild();
+        ModuleTransactionForkGroup outerFork = root.Fork();
+        ModuleTransaction parent = outerFork.CreateChild();
         outerFork.Continuation.Complete();
         Assert.IsTrue(parent.GetParticipantState(participant).TryRemoveModule("seeded"));
 
-        ExecutionTransactionForkGroup innerFork = parent.Fork();
-        ExecutionTransaction child = innerFork.CreateChild();
+        ModuleTransactionForkGroup innerFork = parent.Fork();
+        ModuleTransaction child = innerFork.CreateChild();
         innerFork.Continuation.Complete();
         ModuleContext childModule = CreateModuleContext("child");
         Assert.IsTrue(child.GetParticipantState(participant).TryAddModule("child", childModule));
@@ -71,7 +71,7 @@ public sealed class RuntimeModuleRegistryTransactionTests
     public void BindExecutionScope_RegistryFacadeUsesCurrentTransactionState()
     {
         RuntimeModuleRegistry moduleRegistry = new();
-        ExecutionTransaction transaction = new TransactionCoordinator([moduleRegistry.Participant]).CreateRoot();
+        ModuleTransaction transaction = new TransactionCoordinator([moduleRegistry.Participant]).CreateRoot();
         ServiceCollection services = new();
         services.AddScoped<IModuleRegistry, DefaultModuleRegistry>();
         using ServiceProvider provider = services.BuildServiceProvider();
@@ -91,7 +91,7 @@ public sealed class RuntimeModuleRegistryTransactionTests
     public void ApplySeed_RegistersImmutableLoadedGraphIntoCurrentTransaction()
     {
         RuntimeModuleRegistry moduleRegistry = new();
-        ExecutionTransaction transaction = new TransactionCoordinator([moduleRegistry.Participant]).CreateRoot();
+        ModuleTransaction transaction = new TransactionCoordinator([moduleRegistry.Participant]).CreateRoot();
         ModuleContext module = CreateModuleContext("module");
         ModuleRegistrySeedBuilder seedBuilder = new();
         seedBuilder.Add("module", module);

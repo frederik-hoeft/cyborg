@@ -20,7 +20,7 @@ internal sealed class RootModuleRuntime : ModuleRuntimeBase
     internal RootModuleRuntime(
         GlobalRuntimeEnvironment defaultEnvironment,
         IRuntimeEnvironmentFactory environmentFactory,
-        ModuleRuntimeOperations operations,
+        ModuleRuntimeServices operations,
         ILoggerFactory loggerFactory,
         IServiceProvider serviceProvider)
         : this(CreateState(defaultEnvironment, environmentFactory, operations, loggerFactory), operations, serviceProvider)
@@ -32,7 +32,7 @@ internal sealed class RootModuleRuntime : ModuleRuntimeBase
     {
     }
 
-    private RootModuleRuntime(RootRuntimeState state, ModuleRuntimeOperations operations, IServiceProvider? serviceProvider)
+    private RootModuleRuntime(RootRuntimeState state, ModuleRuntimeServices operations, IServiceProvider? serviceProvider)
         : base(state.EnvironmentContext, operations, state.Transaction, serviceProvider)
     {
     }
@@ -43,16 +43,16 @@ internal sealed class RootModuleRuntime : ModuleRuntimeBase
         ArgumentNullException.ThrowIfNull(loggerFactory);
         IRuntimeEnvironmentFactory environmentFactory = new DefaultRuntimeEnvironmentFactory(defaultEnvironment.SyntaxFactory, taggedStringConversionObserver: null);
         IRuntimeModuleRegistry moduleRegistry = new RuntimeModuleRegistry();
-        ModuleRuntimeOperations operations = new(
+        ModuleRuntimeServices operations = new(
             new ModuleArtifactPublisher(loggerFactory),
-            new ModuleContextExecutor(defaultEnvironment.SyntaxFactory, environmentFactory, loggerFactory),
-            new ModuleExecutionDispatcher(environmentFactory, loggerFactory),
+            new ModuleContextRunner(defaultEnvironment.SyntaxFactory, environmentFactory, loggerFactory),
+            new ModuleDispatcher(environmentFactory, loggerFactory),
             moduleRegistry,
             new RuntimeTransactionalServices([]));
         return new RootRuntimeComposition(CreateState(defaultEnvironment, environmentFactory, operations, loggerFactory), operations);
     }
 
-    private static RootRuntimeState CreateState(GlobalRuntimeEnvironment defaultEnvironment, IRuntimeEnvironmentFactory environmentFactory, ModuleRuntimeOperations operations, ILoggerFactory loggerFactory)
+    private static RootRuntimeState CreateState(GlobalRuntimeEnvironment defaultEnvironment, IRuntimeEnvironmentFactory environmentFactory, ModuleRuntimeServices operations, ILoggerFactory loggerFactory)
     {
         ArgumentNullException.ThrowIfNull(defaultEnvironment);
         ArgumentNullException.ThrowIfNull(environmentFactory);
@@ -60,17 +60,17 @@ internal sealed class RootModuleRuntime : ModuleRuntimeBase
         ArgumentNullException.ThrowIfNull(loggerFactory);
 
         RuntimeEnvironmentTransactionParticipant environments = new();
-        TransactionCoordinator coordinator = new([environments, operations.ModuleRegistry.Participant, .. operations.TransactionalServices.Participants]);
+        TransactionCoordinator coordinator = new([environments, operations.ModuleRegistry.Participant, .. operations.Transactional.Participants]);
         RuntimeEnvironmentNode globalNode = new(defaultEnvironment.Name, defaultEnvironment.IsTransient, Parent: null);
         RuntimeEnvironmentSeed globalSeed = new(defaultEnvironment.EnvironmentId, globalNode, [.. defaultEnvironment], RegisterName: false);
         RuntimeEnvironmentTransactionSeed environmentSeed = new(defaultEnvironment.EnvironmentId, [globalSeed]);
         TransactionRootSeed seed = new TransactionRootSeed().With(environments, environmentSeed);
-        ExecutionTransaction transaction = coordinator.CreateRoot(seed);
+        ModuleTransaction transaction = coordinator.CreateRoot(seed);
         RuntimeEnvironmentContext environmentContext = RuntimeEnvironmentContext.CreateRoot(defaultEnvironment, environmentFactory, environments, transaction, loggerFactory);
         return new RootRuntimeState(transaction, environmentContext);
     }
 
-    private sealed record RootRuntimeComposition(RootRuntimeState State, ModuleRuntimeOperations Operations);
+    private sealed record RootRuntimeComposition(RootRuntimeState State, ModuleRuntimeServices Operations);
 
-    private sealed record RootRuntimeState(ExecutionTransaction Transaction, RuntimeEnvironmentContext EnvironmentContext);
+    private sealed record RootRuntimeState(ModuleTransaction Transaction, RuntimeEnvironmentContext EnvironmentContext);
 }

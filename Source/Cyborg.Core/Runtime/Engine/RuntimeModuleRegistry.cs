@@ -1,7 +1,6 @@
 ﻿using Cyborg.Core.Runtime.Configuration;
 using Cyborg.Core.Runtime.Engine.Transactions;
 using Cyborg.Core.Runtime.Engine.Transactions.Internal;
-using Cyborg.Core.Runtime.Model;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Cyborg.Core.Runtime.Engine;
@@ -12,7 +11,7 @@ internal sealed class RuntimeModuleRegistry : IRuntimeModuleRegistry
 
     public ITransactionParticipant Participant => _participant;
 
-    public void ApplySeed(ExecutionTransaction transaction, ModuleRegistrySeed seed)
+    public void ApplySeed(ModuleTransaction transaction, ModuleRegistrySeed seed)
     {
         ArgumentNullException.ThrowIfNull(transaction);
         ArgumentNullException.ThrowIfNull(seed);
@@ -20,7 +19,7 @@ internal sealed class RuntimeModuleRegistry : IRuntimeModuleRegistry
         state.ApplySeed(seed);
     }
 
-    public void BindExecutionScope(IServiceProvider services, ExecutionTransaction transaction)
+    public void BindExecutionScope(IServiceProvider services, ModuleTransaction transaction)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(transaction);

@@ -23,7 +23,7 @@ public sealed class TransactionalServiceIntegrationTests : CyborgCoreTestBase
         using TransactionalProbeServiceProvider services = new();
         TransactionalServiceParticipant[] participants = [.. services.GetServices<TransactionalServiceParticipant>()];
         RuntimeTransactionalServices transactionalServices = new(participants);
-        ExecutionTransaction transaction = new TransactionCoordinator(transactionalServices.Participants).CreateRoot();
+        ModuleTransaction transaction = new TransactionCoordinator(transactionalServices.Participants).CreateRoot();
         using IServiceScope scope = services.CreateScope();
         transactionalServices.BindExecutionScope(scope.ServiceProvider, transaction);
 
@@ -82,10 +82,10 @@ public sealed class TransactionalServiceIntegrationTests : CyborgCoreTestBase
         TransactionalCounterParticipant descriptor = new();
         RuntimeTransactionalServices services = new([descriptor]);
         TransactionCoordinator coordinator = new(services.Participants);
-        ExecutionTransaction root = coordinator.CreateRoot();
-        ExecutionTransactionForkGroup fork = root.Fork();
-        ExecutionTransaction first = fork.CreateChild();
-        ExecutionTransaction second = fork.CreateChild();
+        ModuleTransaction root = coordinator.CreateRoot();
+        ModuleTransactionForkGroup fork = root.Fork();
+        ModuleTransaction first = fork.CreateChild();
+        ModuleTransaction second = fork.CreateChild();
         fork.Continuation.Complete();
         services.GetState<TransactionalCounterParticipant, TransactionalCounterState>(first).Set(1);
         services.GetState<TransactionalCounterParticipant, TransactionalCounterState>(second).Set(1);
@@ -104,10 +104,10 @@ public sealed class TransactionalServiceIntegrationTests : CyborgCoreTestBase
         TransactionalCounterParticipant descriptor = new();
         RuntimeTransactionalServices services = new([descriptor]);
         TransactionCoordinator coordinator = new([moduleRegistry, .. services.Participants]);
-        ExecutionTransaction root = coordinator.CreateRoot();
-        ExecutionTransactionForkGroup fork = root.Fork();
-        ExecutionTransaction first = fork.CreateChild();
-        ExecutionTransaction second = fork.CreateChild();
+        ModuleTransaction root = coordinator.CreateRoot();
+        ModuleTransactionForkGroup fork = root.Fork();
+        ModuleTransaction first = fork.CreateChild();
+        ModuleTransaction second = fork.CreateChild();
         ModuleContext module = new(
             CreateReference(ProbeBehavior.Increment),
             new ModuleEnvironment(),
@@ -133,10 +133,10 @@ public sealed class TransactionalServiceIntegrationTests : CyborgCoreTestBase
         TransactionalCounterParticipant descriptor = new();
         RuntimeTransactionalServices services = new([descriptor]);
         TransactionCoordinator coordinator = new(services.Participants, new SelectLastContributorConflictStrategy());
-        ExecutionTransaction root = coordinator.CreateRoot();
-        ExecutionTransactionForkGroup fork = root.Fork();
-        ExecutionTransaction first = fork.CreateChild();
-        ExecutionTransaction second = fork.CreateChild();
+        ModuleTransaction root = coordinator.CreateRoot();
+        ModuleTransactionForkGroup fork = root.Fork();
+        ModuleTransaction first = fork.CreateChild();
+        ModuleTransaction second = fork.CreateChild();
         fork.Continuation.Complete();
         services.GetState<TransactionalCounterParticipant, TransactionalCounterState>(first).Set(1);
         services.GetState<TransactionalCounterParticipant, TransactionalCounterState>(second).Set(2);
@@ -153,12 +153,12 @@ public sealed class TransactionalServiceIntegrationTests : CyborgCoreTestBase
     {
         TransactionalCounterParticipant descriptor = new();
         RuntimeTransactionalServices services = new([descriptor]);
-        ExecutionTransaction root = new TransactionCoordinator(services.Participants).CreateRoot();
+        ModuleTransaction root = new TransactionCoordinator(services.Participants).CreateRoot();
         TransactionalServiceContext context = new();
         ((ITransactionBoundTransactionalServiceContext)context).Bind(services, root);
         ITransactionalServiceState<TransactionalCounterState> state =
             context.GetState<TransactionalCounterParticipant, TransactionalCounterState>();
-        ExecutionTransactionForkGroup fork = root.Fork();
+        ModuleTransactionForkGroup fork = root.Fork();
 
         Assert.ThrowsExactly<InvalidOperationException>(() => state.Mutate(static counter => counter.Set(1)));
 
@@ -177,7 +177,7 @@ public sealed class TransactionalServiceIntegrationTests : CyborgCoreTestBase
         using ServiceProvider serviceProvider = serviceCollection.BuildServiceProvider();
         using IServiceScope scope = serviceProvider.CreateScope();
         RuntimeTransactionalServices services = new([]);
-        ExecutionTransaction root = new TransactionCoordinator(services.Participants).CreateRoot();
+        ModuleTransaction root = new TransactionCoordinator(services.Participants).CreateRoot();
         services.BindExecutionScope(scope.ServiceProvider, root);
         ITransactionalServiceContext context = scope.ServiceProvider.GetRequiredService<ITransactionalServiceContext>();
         ITransactionalServiceState<TransactionalCounterState> state =
@@ -193,9 +193,9 @@ public sealed class TransactionalServiceIntegrationTests : CyborgCoreTestBase
     {
         InvalidFailureParticipant descriptor = new();
         RuntimeTransactionalServices services = new([descriptor]);
-        ExecutionTransaction root = new TransactionCoordinator(services.Participants).CreateRoot();
-        ExecutionTransactionForkGroup fork = root.Fork();
-        ExecutionTransaction child = fork.CreateChild();
+        ModuleTransaction root = new TransactionCoordinator(services.Participants).CreateRoot();
+        ModuleTransactionForkGroup fork = root.Fork();
+        ModuleTransaction child = fork.CreateChild();
         fork.Continuation.Complete();
         child.Complete();
 
@@ -203,7 +203,7 @@ public sealed class TransactionalServiceIntegrationTests : CyborgCoreTestBase
             fork.TryJoin(out TransactionConflict? _));
 
         Assert.Contains("without reporting a conflict", exception.Message);
-        Assert.AreEqual(ExecutionTransactionForkLifecycle.Failed, fork.Lifecycle);
+        Assert.AreEqual(ModuleTransactionForkLifecycle.Failed, fork.Lifecycle);
     }
 
     private static ModuleReference CreateReference(ProbeBehavior behavior) =>

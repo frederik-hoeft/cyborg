@@ -33,10 +33,10 @@ public sealed class TransactionalRuntimeEnvironmentTests
             RegisterName: false);
         RuntimeEnvironmentTransactionSeed environmentRootSeed = new(environmentId, [environmentSeed]);
         TransactionRootSeed seed = new TransactionRootSeed().With(participant, environmentRootSeed);
-        ExecutionTransaction root = new TransactionCoordinator([participant]).CreateRoot(seed);
-        ExecutionTransactionForkGroup fork = root.Fork();
-        ExecutionTransaction first = fork.CreateChild();
-        ExecutionTransaction second = fork.CreateChild();
+        ModuleTransaction root = new TransactionCoordinator([participant]).CreateRoot(seed);
+        ModuleTransactionForkGroup fork = root.Fork();
+        ModuleTransaction first = fork.CreateChild();
+        ModuleTransaction second = fork.CreateChild();
         RuntimeEnvironmentTransactionState firstState = first.GetParticipantState(participant);
         RuntimeEnvironmentTransactionState secondState = second.GetParticipantState(participant);
 
@@ -63,7 +63,7 @@ public sealed class TransactionalRuntimeEnvironmentTests
     public void RuntimeEnvironmentParticipant_RegistrationCollisionChangesNeitherCatalogNorTopology()
     {
         RuntimeEnvironmentTransactionParticipant participant = new();
-        ExecutionTransaction root = CreateEnvironmentRoot(participant, out RuntimeEnvironmentId _);
+        ModuleTransaction root = CreateEnvironmentRoot(participant, out RuntimeEnvironmentId _);
         RuntimeEnvironmentTransactionState state = root.GetParticipantState(participant);
         RuntimeEnvironmentId firstId = RuntimeEnvironmentId.Create();
         RuntimeEnvironmentId secondId = RuntimeEnvironmentId.Create();
@@ -83,9 +83,9 @@ public sealed class TransactionalRuntimeEnvironmentTests
     public void RuntimeEnvironmentParticipant_TransientChildEnvironmentIsPrunedOnJoin()
     {
         RuntimeEnvironmentTransactionParticipant participant = new();
-        ExecutionTransaction root = CreateEnvironmentRoot(participant, out RuntimeEnvironmentId _);
-        ExecutionTransactionForkGroup fork = root.Fork();
-        ExecutionTransaction child = fork.CreateChild();
+        ModuleTransaction root = CreateEnvironmentRoot(participant, out RuntimeEnvironmentId _);
+        ModuleTransactionForkGroup fork = root.Fork();
+        ModuleTransaction child = fork.CreateChild();
         RuntimeEnvironmentTransactionState childState = child.GetParticipantState(participant);
         RuntimeEnvironmentId transientId = RuntimeEnvironmentId.Create();
         RuntimeEnvironmentNode transientNode = new("temporary", IsTransient: true, Parent: null);
@@ -106,9 +106,9 @@ public sealed class TransactionalRuntimeEnvironmentTests
     public void RuntimeEnvironmentParticipant_NamedEnvironmentRetainsTransientAncestorOnJoin()
     {
         RuntimeEnvironmentTransactionParticipant participant = new();
-        ExecutionTransaction root = CreateEnvironmentRoot(participant, out RuntimeEnvironmentId _);
-        ExecutionTransactionForkGroup fork = root.Fork();
-        ExecutionTransaction child = fork.CreateChild();
+        ModuleTransaction root = CreateEnvironmentRoot(participant, out RuntimeEnvironmentId _);
+        ModuleTransactionForkGroup fork = root.Fork();
+        ModuleTransaction child = fork.CreateChild();
         RuntimeEnvironmentTransactionState childState = child.GetParticipantState(participant);
         RuntimeEnvironmentId transientParentId = RuntimeEnvironmentId.Create();
         RuntimeEnvironmentId namedChildId = RuntimeEnvironmentId.Create();
@@ -143,10 +143,10 @@ public sealed class TransactionalRuntimeEnvironmentTests
     public void RuntimeEnvironmentParticipant_SiblingNamedRegistrationsConflictAtomically()
     {
         RuntimeEnvironmentTransactionParticipant participant = new();
-        ExecutionTransaction root = CreateEnvironmentRoot(participant, out RuntimeEnvironmentId _);
-        ExecutionTransactionForkGroup fork = root.Fork();
-        ExecutionTransaction first = fork.CreateChild();
-        ExecutionTransaction second = fork.CreateChild();
+        ModuleTransaction root = CreateEnvironmentRoot(participant, out RuntimeEnvironmentId _);
+        ModuleTransactionForkGroup fork = root.Fork();
+        ModuleTransaction first = fork.CreateChild();
+        ModuleTransaction second = fork.CreateChild();
         RuntimeEnvironmentTransactionState firstState = first.GetParticipantState(participant);
         RuntimeEnvironmentTransactionState secondState = second.GetParticipantState(participant);
         RuntimeEnvironmentId firstId = RuntimeEnvironmentId.Create();
@@ -290,7 +290,7 @@ public sealed class TransactionalRuntimeEnvironmentTests
         Assert.AreEqual(42, value);
     }
 
-    private static ExecutionTransaction CreateEnvironmentRoot(
+    private static ModuleTransaction CreateEnvironmentRoot(
         RuntimeEnvironmentTransactionParticipant participant,
         out RuntimeEnvironmentId globalEnvironmentId)
     {
