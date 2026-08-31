@@ -27,8 +27,8 @@ public sealed class TransactionalServiceIntegrationTests : CyborgCoreTestBase
         using IServiceScope scope = services.CreateScope();
         transactionalServices.BindExecutionScope(scope.ServiceProvider, transaction);
 
-        Assert.HasCount(1, participants);
-        TransactionalServiceParticipant participant = participants[0];
+        Assert.Contains(static participant => participant is TransactionalProbeParticipant, participants);
+        TransactionalServiceParticipant participant = participants.Single(static participant => participant is TransactionalProbeParticipant);
         TransactionalProbeService probe = scope.ServiceProvider.GetRequiredService<TransactionalProbeService>();
         IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
 

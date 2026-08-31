@@ -2,6 +2,7 @@
 using Cyborg.Core.Runtime.Hooks;
 using Cyborg.Core.Runtime.Services.Debugging.Breakpoints;
 using Cyborg.Core.Runtime.Services.Debugging.Configuration;
+using Cyborg.Core.Runtime.Services.Transactions;
 using Cyborg.Core.Services.Default;
 using Jab;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,6 +13,9 @@ namespace Cyborg.Core.Runtime.Services.Debugging;
 [ServiceProviderModule]
 [Singleton<IDynamicValueProvider>(Factory = nameof(CreateDebugOptionsProvider))]
 [Singleton<IBreakpointRegistry>(Factory = nameof(CreateBreakpointRegistry))]
+[Singleton<IDebugSessionState>(Factory = nameof(CreateDebugSessionState))]
+[Singleton<TransactionalServiceParticipant>(Factory = nameof(CreateDebugBranchControlParticipant))]
+[Scoped<IDebugBranchControl>(Factory = nameof(CreateDebugBranchControl))]
 [Singleton<IWorkflowDebugger>(Factory = nameof(CreateWorkflowDebugger))]
 [Singleton<IDebugExecutionTopology>(Factory = nameof(CreateExecutionTopology))]
 [Singleton<IServiceSelectionKey<IDebugFrontend>>(Instance = nameof(DebugFrontendSelectionKey))]
@@ -25,6 +29,21 @@ public interface IDebugServices
     static IDynamicValueProvider CreateDebugOptionsProvider() => new DebugOptionsProvider();
 
     static IBreakpointRegistry CreateBreakpointRegistry() => new BreakpointRegistry();
+
+    static IDebugSessionState CreateDebugSessionState() => new DebugSessionState();
+
+    static TransactionalServiceParticipant CreateDebugBranchControlParticipant(IDebugSessionState sessionState)
+    {
+        ArgumentNullException.ThrowIfNull(sessionState);
+        return new DebugBranchControlParticipant(sessionState);
+    }
+
+    static IDebugBranchControl CreateDebugBranchControl(ITransactionalServiceContext context, IDebugSessionState sessionState)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(sessionState);
+        return new DebugBranchControl(context, sessionState);
+    }
 
     static IWorkflowDebugger CreateWorkflowDebugger(IBreakpointRegistry breakpoints, ILoggerFactory loggerFactory, IDefault<IDebugFrontend> defaultFrontend)
     {
