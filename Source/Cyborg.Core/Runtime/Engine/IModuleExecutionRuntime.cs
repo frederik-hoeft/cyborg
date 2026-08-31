@@ -6,6 +6,8 @@ namespace Cyborg.Core.Runtime.Engine;
 
 internal interface IModuleExecutionRuntime : IModuleRuntime
 {
+    ModuleInvocationContext? InvocationContext { get; }
+
     Task<IModuleExecutionResult> ExecuteActivatedWorkerAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken);
 
     Task<IModuleExecutionResult> ExecuteActivatedWorkerInCurrentScopeAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken);

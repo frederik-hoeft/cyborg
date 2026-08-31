@@ -10,8 +10,6 @@ internal sealed class RootModuleRuntime : ModuleRuntimeBase
 {
     protected override IModuleRuntime Root => this;
 
-    protected override IModuleRuntime? Parent => null;
-
     public RootModuleRuntime(GlobalRuntimeEnvironment defaultEnvironment, ILoggerFactory loggerFactory, IServiceProvider? serviceProvider = null)
         : this(CreateStandaloneComposition(defaultEnvironment, loggerFactory), serviceProvider)
     {
