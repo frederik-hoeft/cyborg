@@ -1,12 +1,12 @@
-﻿namespace Cyborg.Core.Runtime.Services.Debugging;
+namespace Cyborg.Core.Runtime.Services.Debugging;
 
 /// <summary>
-/// Disposition returned when a debug pause ends and workflow execution may proceed.
+/// Disposition returned by a debug frontend when the current pause ends.
 /// </summary>
 public enum DebugResumeAction
 {
     /// <summary>
-    /// Continue executing the current module and the rest of the workflow.
+    /// Continue executing the current branch until another breakpoint or step boundary pauses it.
     /// </summary>
     Continue = 0,
 
@@ -14,4 +14,14 @@ public enum DebugResumeAction
     /// Cancel the current module without executing it (workflow cancellation path).
     /// </summary>
     Cancel = 1,
+
+    /// <summary>
+    /// Continue while leaving the current execution branch in step mode.
+    /// </summary>
+    Step = 2,
+
+    /// <summary>
+    /// End the current debugger session, clearing global breakpoints and invalidating branch-local step state.
+    /// </summary>
+    Detach = 3,
 }

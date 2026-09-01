@@ -44,8 +44,7 @@ internal sealed class ConsoleDebugFrontend(IDebugReplIo io, DebugCommandDispatch
             if (line is null)
             {
                 // EOF: detach and continue so unattended pipes do not hang forever.
-                context.Detach();
-                return DebugResumeAction.Continue;
+                return DebugResumeAction.Detach;
             }
 
             line = line.Trim();

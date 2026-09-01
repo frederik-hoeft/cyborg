@@ -45,12 +45,19 @@ public interface IDebugServices
         return new DebugBranchControl(context, sessionState);
     }
 
-    static IWorkflowDebugger CreateWorkflowDebugger(IBreakpointRegistry breakpoints, ILoggerFactory loggerFactory, IDefault<IDebugFrontend> defaultFrontend)
+    static IWorkflowDebugger CreateWorkflowDebugger(
+        IBreakpointRegistry breakpoints,
+        ILoggerFactory loggerFactory,
+        IDefault<IDebugFrontend> defaultFrontend,
+        IDebugExecutionTopology topology,
+        IDebugSessionState sessionState)
     {
         ArgumentNullException.ThrowIfNull(breakpoints);
         ArgumentNullException.ThrowIfNull(loggerFactory);
         ArgumentNullException.ThrowIfNull(defaultFrontend);
-        return new WorkflowDebugger(breakpoints, loggerFactory, defaultFrontend);
+        ArgumentNullException.ThrowIfNull(topology);
+        ArgumentNullException.ThrowIfNull(sessionState);
+        return new WorkflowDebugger(breakpoints, loggerFactory, defaultFrontend, topology, sessionState);
     }
 
     static IDebugExecutionTopology CreateExecutionTopology() => new DebugExecutionTopology();

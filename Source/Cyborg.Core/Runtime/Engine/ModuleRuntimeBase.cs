@@ -25,6 +25,8 @@ internal abstract class ModuleRuntimeBase
 
     ModuleInvocationContext? IModuleExecutionRuntime.InvocationContext => invocationContext;
 
+    IServiceProvider? IModuleExecutionRuntime.ExecutionServices => serviceProvider;
+
     public Task<IModuleExecutionResult> ExecuteAsync(ModuleContext moduleContext, IRuntimeEnvironment environment, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(moduleContext);

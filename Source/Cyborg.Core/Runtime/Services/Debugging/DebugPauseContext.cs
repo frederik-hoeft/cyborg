@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Runtime.Engine;
+using Cyborg.Core.Runtime.Engine;
 using Cyborg.Core.Runtime.Services.Debugging.Breakpoints;
 using Cyborg.Core.Runtime.Services.Validation;
 
@@ -11,12 +11,5 @@ internal sealed record DebugPauseContext
     IModuleRuntime Runtime,
     IServiceProvider Services,
     IBreakpointRegistry Breakpoints,
-    IReadOnlyList<DebugDiagnostic> Diagnostics,
-    Action RequestStepAction,
-    Action DetachAction
-) : IDebugPauseContext
-{
-    public void RequestStep() => RequestStepAction();
-
-    public void Detach() => DetachAction();
-}
+    IReadOnlyList<DebugDiagnostic> Diagnostics
+) : IDebugPauseContext;

@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Runtime.Engine;
+using Cyborg.Core.Runtime.Engine;
 using Cyborg.Core.Runtime.Services.Debugging.Breakpoints;
 using Cyborg.Core.Runtime.Services.Validation;
 
@@ -22,10 +22,4 @@ public interface IDebugPauseContext
 
     /// <summary>Diagnostics associated with entering the current pause, such as breakpoint evaluation failures.</summary>
     IReadOnlyList<DebugDiagnostic> Diagnostics { get; }
-
-    /// <summary>Requests a one-shot break at the next module executed through the runtime (step).</summary>
-    void RequestStep();
-
-    /// <summary>Removes all breakpoints and leaves debugging inactive after the current resume.</summary>
-    void Detach();
 }

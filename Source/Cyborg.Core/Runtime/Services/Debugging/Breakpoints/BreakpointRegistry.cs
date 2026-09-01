@@ -55,8 +55,8 @@ public sealed class BreakpointRegistry : IBreakpointRegistry
         ArgumentNullException.ThrowIfNull(targets);
         IReadOnlyCollection<string> matchTargets = targets as IReadOnlyCollection<string> ?? [.. targets];
         KeyValuePair<int, BreakpointExpression>[] candidates = [.. _breakpoints];
-        // One-shot breakpoints are evaluated first so step always applies to the next execution boundary, even when that module also matches an older
-        // persistent breakpoint. Newer one-shots come first, matching front-of-queue insertion semantics.
+        // One-shot breakpoints are evaluated before persistent expressions so a transient pause request wins when the same boundary also matches
+        // an older persistent breakpoint. Newer one-shots come first, matching front-of-queue insertion semantics.
         foreach ((int id, BreakpointExpression candidate) in candidates
             .OrderByDescending(static breakpoint => breakpoint.Value.IsOneShot)
             .ThenBy(static breakpoint => breakpoint.Value.IsOneShot ? -(long)breakpoint.Key : breakpoint.Key))
