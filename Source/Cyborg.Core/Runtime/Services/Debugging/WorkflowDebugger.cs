@@ -78,11 +78,13 @@ internal sealed class WorkflowDebugger(
 
         DebugPauseContext pauseContext = new(
             moduleId,
+            executionId,
             validationResult,
             runtime,
             services,
             breakpoints,
-            evaluationResult.Diagnostics);
+            evaluationResult.Diagnostics,
+            topology);
 
         LogPause(pauseContext, evaluationResult, stepping);
         DebugResumeAction action = await frontend.PauseAsync(pauseContext, cancellationToken).ConfigureAwait(false);

@@ -9,6 +9,11 @@ public interface IDebugPauseContext
 {
     string ModuleId { get; }
 
+    /// <summary>
+    /// Stable identity of the paused logical invocation. Contexts that are not attached to a runtime execution scope expose <see langword="null"/>.
+    /// </summary>
+    ModuleExecutionId? ExecutionId => null;
+
     IValidationResult<IModule> ValidationResult { get; }
 
     IModuleRuntime Runtime { get; }
@@ -22,4 +27,14 @@ public interface IDebugPauseContext
 
     /// <summary>Diagnostics associated with entering the current pause, such as breakpoint evaluation failures.</summary>
     IReadOnlyList<DebugDiagnostic> Diagnostics { get; }
+
+    /// <summary>
+    /// Immutable point-in-time snapshot of the currently open logical execution tree. Runtime-provided contexts capture a fresh snapshot on each access.
+    /// </summary>
+    IExecutionTreeSnapshot Tree => ExecutionTreeSnapshot.Empty;
+
+    /// <summary>
+    /// Immutable point-in-time ancestry of <see cref="ExecutionId"/>, ordered from the current invocation to the root. Runtime-provided contexts capture a fresh projection on each access.
+    /// </summary>
+    IReadOnlyList<IExecutionTreeNode> Stack => [];
 }

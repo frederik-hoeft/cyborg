@@ -12,5 +12,6 @@ internal static class DebugCommandRegistration
         app.Add<DebugExecutionCommands>();
         app.Add<DebugInspectionCommands>();
         app.Add<DebugBreakpointCommands>();
+        app.Add<DebugTopologyCommands>();
     }
 }
