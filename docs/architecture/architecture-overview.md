@@ -11,7 +11,7 @@ For detailed reference material, see:
 - [Source Generators](source-generators.md) — Roslyn source generators for AOT-compatible code generation
 - [Validation Attributes Reference](validation-attributes-reference.md) — Validation, defaulting, override, and interpolation control attributes
 - [Module Testing](module-testing.md) — Production-backed test infrastructure and generator regression fixtures
-- [Workflow Debugging](debugging.md) — Breakpoints, interactive REPL, module inspection, and debug adapters
+- [Workflow Debugging](debugging.md) — Breakpoints, branch-scoped stepping, live execution topology, pause coordination, and interactive inspection
 
 **Table of Contents**
 
@@ -186,7 +186,9 @@ This section describes how modules are invoked at runtime: the transaction and D
 
 ### Invocation Boundary
 
-Every nested runtime execution establishes a fresh child transaction and DI scope before invocation-specific services are resolved. The runtime binds transaction-aware scoped services, rebinds the selected logical environment into that transaction, executes an optional configuration module as a nested child, and only then activates the main worker from the invocation scope. The worker's generated preparation, lifecycle hooks, execution, and artifact publication all run inside that same boundary.
+Every nested runtime execution establishes a fresh child transaction and DI scope before invocation-specific services are resolved. The same boundary receives a stable `ModuleExecutionId` together with the parent execution ID of its structured caller. Every runtime view created for that logical invocation reuses this identity; execution ancestry does not depend on CLR thread identity, ambient `ExecutionContext` state, or discovery through runtime-object references.
+
+The runtime binds transaction-aware scoped services, rebinds the selected logical environment into the child transaction, executes an optional configuration module as a nested child, and only then activates the main worker from the invocation scope. The worker's generated preparation, module lifecycle hooks, execution, and artifact publication all run inside that same boundary. A general execution-lifecycle pipeline observes the invocation from scope creation through structured close, including invocations that fail before worker preparation reaches the ordinary pre-execution hook boundary.
 
 When the invocation completes, the runtime completes and reconciles its child transaction before the caller resumes, then disposes the invocation scope after its structured nested work has terminated. Sequential child calls use a one-child fork/join; concurrent calls use one multi-child fork group so every sibling starts from the same stable baseline. Module exit status does not by itself imply transaction rollback.
 
@@ -218,13 +220,14 @@ Generated validation returns `IValidationResult<TModule>`, which always carries 
 
 #### Lifecycle Hooks
 
-Module execution exposes three ordered service pipelines for cross-cutting lifecycle behavior. Every hook has a numeric priority; lower values execute first, and the resolved handlers are snapshotted in pipeline order.
+Module execution exposes three ordered module hook pipelines plus one structured invocation-lifecycle pipeline. Every hook has a numeric priority; lower values execute first, and the resolved handlers are snapshotted in pipeline order.
 
 1. **Validation hooks** run after generated validation and the worker-specific `OnValidationAsync` extension point. A hook receives the current validation result and runtime environment and may return a replacement result. After the final validation hook, the resulting module instance becomes the stable module used for the remainder of execution.
 2. **Pre-execution hooks** run after artifact/result builders have been created but before validity is enforced and before the worker runs. They receive the prepared validation result, runtime, module identity, and result builder, and may return an execution result to short-circuit normal execution. The workflow debugger is implemented as an early pre-execution hook, which is why it can inspect invalid prepared modules and cancel them without first triggering `EnsureValid()`.
 3. **Post-execution hooks** run at the runtime dispatch boundary after a concrete execution result has been established. They receive that result together with the scoped runtime and observe it without changing the result contract. The runtime enters this pipeline for ordinary worker returns as well as failures and cancellations produced by thrown exceptions. Each post hook is isolated: a failing hook is logged, later hooks still run, and the established module result is preserved. The module execution cancellation token does not short-circuit this cleanup/observation pipeline. For ordinary worker results, `runtime.Exit(...)` has already finalized artifact publication before the post hooks observe the result.
+4. **Execution-lifecycle hooks** observe the structured invocation boundary independently of module preparation. `Started` is emitted after the invocation scope and identity exist but before failure-producing invocation work; `Completed` is emitted once a definite `IModuleExecutionResult` exists and before the child transaction closes; `Closed` is emitted after join or discard. These hooks are observers only: failures are isolated so they cannot change workflow execution, reconciliation, or delivery to later observers. The debugger's live execution topology is built on this general-purpose pipeline.
 
-If no pre-execution hook short-circuits the module, `ModuleWorker<TModule>` enforces the final validation result with `EnsureValid()`. Invalid results therefore fail before worker code executes, while valid results proceed to `ExecuteAsync`. The runtime owns the final dispatch/result boundary and the post-execution pipeline, while the worker owns validation, pre-execution participation, and module-specific execution. This separation provides reliable before/after extension points without making worker implementations responsible for runtime cleanup behavior.
+If no pre-execution hook short-circuits the module, `ModuleWorker<TModule>` enforces the final validation result with `EnsureValid()`. Invalid results therefore fail before worker code executes, while valid results proceed to `ExecuteAsync`. The runtime owns invocation identity, the structured execution-lifecycle boundary, final dispatch/result establishment, and the post-execution pipeline; the worker owns validation, pre-execution participation, and module-specific execution. This separation gives observers reliable scope/result/close boundaries without making worker implementations responsible for runtime cleanup behavior.
 
 #### Execution and Result
 
@@ -239,6 +242,8 @@ Workers return results via builder methods on `ModuleWorker<TModule>`: `Success(
 Workers normally interact with this facade rather than injecting transaction coordinators, environment catalogs, artifact publishers, or worker-dispatch mechanisms directly. Those responsibilities are runtime infrastructure behind the stable module-facing boundary. Explicit transaction-aware state for a custom DI service is a separate opt-in extension point rather than part of ordinary module execution.
 
 The runtime-object hierarchy expresses execution/navigation context, not canonical state ownership. Workflow-semantic environment and named-module state lives in transaction participants, and CLR environment objects are views bound to the transaction that is allowed to observe or mutate that state. Nested runtimes therefore do not discover shared mutable state by walking to a root runtime registry.
+
+Logical execution ancestry is carried separately by the invocation context: every invocation has a stable execution ID and an explicit optional parent execution ID. Runtime views may be replaced or rebound while that identity remains stable, allowing observers such as the debugger topology to model structured execution without treating runtime-object identity as execution identity.
 
 When a module calls `runtime.ExecuteAsync(...)`, the runtime creates the structured child invocation described above, binds the selected logical environment to the child transaction, activates the worker from the child DI scope, and reconciles the completed child before returning to the caller.
 

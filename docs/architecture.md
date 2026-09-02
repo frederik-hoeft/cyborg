@@ -15,6 +15,6 @@ Cyborg is a .NET 10 application providing modular, JSON-configured workflow orch
 | [Source Generators](architecture/source-generators.md) | Roslyn source generators for AOT-compatible code generation |
 | [Validation Attributes Reference](architecture/validation-attributes-reference.md) | Complete reference for validation, defaulting, override, and interpolation control attributes |
 | [Module Testing](architecture/module-testing.md) | Production-backed module test adapter and dedicated source-generator fixture assembly |
-| [Workflow Debugging](architecture/debugging.md) | Breakpoints, debugger frontend boundaries, module descriptions, inspection, and console REPL architecture |
+| [Workflow Debugging](architecture/debugging.md) | Breakpoints, branch-scoped stepping, live execution topology, pause coordination, frontend boundaries, inspection, and console REPL architecture |
 
 For operational metric output, see [Metrics](metrics.md).
