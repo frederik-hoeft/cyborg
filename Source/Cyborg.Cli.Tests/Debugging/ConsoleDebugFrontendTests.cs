@@ -115,11 +115,11 @@ public sealed class ConsoleDebugFrontendTests : CyborgCliTestBase
         (DebugResumeAction action, string output) = await RunReplAsync(services, "b at other\nb ls\nb rm 1\ni\ns\n");
         IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
 
-        Assert.AreEqual(DebugResumeAction.Continue, action);
+        Assert.AreEqual(DebugResumeAction.Step, action);
         Assert.Contains("Breakpoint 1 set: other", output);
         Assert.Contains("Removed breakpoint 1.", output);
         Assert.Contains("cyborg.tests.probe.v1", output);
-        Assert.Contains(static breakpoint => breakpoint.Expression == ".*" && breakpoint.IsOneShot, breakpoints.ToList());
+        Assert.AreEqual(0, breakpoints.Count);
     });
 
     [TestMethod]
@@ -171,23 +171,24 @@ public sealed class ConsoleDebugFrontendTests : CyborgCliTestBase
     });
 
     [TestMethod]
-    public Task Test_PauseAsync_Step_AddsOneShotWildcardAsync() => TestWithDIAsync(async services =>
+    public Task Test_PauseAsync_Step_ReturnsStepWithoutMutatingBreakpointsAsync() => TestWithDIAsync(async services =>
     {
         (DebugResumeAction action, _) = await RunReplAsync(services, "step\n", ["probe"]);
         IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
 
-        Assert.AreEqual(DebugResumeAction.Continue, action);
-        Assert.Contains(static breakpoint => breakpoint.Expression == ".*" && breakpoint.IsOneShot, breakpoints.ToList());
+        Assert.AreEqual(DebugResumeAction.Step, action);
+        Assert.AreEqual(1, breakpoints.Count);
+        Assert.DoesNotContain(static breakpoint => breakpoint.IsOneShot, breakpoints.ToList());
     });
 
     [TestMethod]
-    public Task Test_PauseAsync_Detach_ClearsBreakpointsAsync() => TestWithDIAsync(async services =>
+    public Task Test_PauseAsync_Detach_ReturnsDetachWithoutMutatingBreakpointsAsync() => TestWithDIAsync(async services =>
     {
         (DebugResumeAction action, _) = await RunReplAsync(services, "detach\n", ["probe", "other"]);
         IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
 
-        Assert.AreEqual(DebugResumeAction.Continue, action);
-        Assert.AreEqual(0, breakpoints.Count);
+        Assert.AreEqual(DebugResumeAction.Detach, action);
+        Assert.AreEqual(2, breakpoints.Count);
     });
 
     [TestMethod]
@@ -198,12 +199,12 @@ public sealed class ConsoleDebugFrontendTests : CyborgCliTestBase
     });
 
     [TestMethod]
-    public Task Test_PauseAsync_Eof_DetachesAndContinuesAsync() => TestWithDIAsync(async services =>
+    public Task Test_PauseAsync_Eof_ReturnsDetachWithoutMutatingBreakpointsAsync() => TestWithDIAsync(async services =>
     {
-        (DebugResumeAction action, _) = await RunReplAsync(services, string.Empty);
+        (DebugResumeAction action, _) = await RunReplAsync(services, string.Empty, ["probe"]);
         IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
-        Assert.AreEqual(DebugResumeAction.Continue, action);
-        Assert.AreEqual(0, breakpoints.Count);
+        Assert.AreEqual(DebugResumeAction.Detach, action);
+        Assert.AreEqual(1, breakpoints.Count);
     });
 
     [TestMethod]
@@ -224,9 +225,7 @@ public sealed class ConsoleDebugFrontendTests : CyborgCliTestBase
             runtime,
             services,
             breakpoints,
-            Diagnostics: [],
-            RequestStepAction: () => breakpoints.Add(".*", isOneShot: true),
-            DetachAction: breakpoints.Clear);
+            Diagnostics: []);
 
         DebugResumeAction action = await frontend.PauseAsync(context, TestContext.CancellationToken);
         Assert.IsInstanceOfType<RecordingDebugReplIo>(io);
@@ -253,9 +252,7 @@ public sealed class ConsoleDebugFrontendTests : CyborgCliTestBase
             runtime,
             services,
             breakpoints,
-            [diagnostic],
-            RequestStepAction: () => breakpoints.Add(".*", isOneShot: true),
-            DetachAction: breakpoints.Clear);
+            [diagnostic]);
 
         DebugResumeAction action = await frontend.PauseAsync(context, TestContext.CancellationToken);
         Assert.IsInstanceOfType<RecordingDebugReplIo>(io);
@@ -281,9 +278,7 @@ public sealed class ConsoleDebugFrontendTests : CyborgCliTestBase
             runtime,
             services,
             breakpoints,
-            Diagnostics: [],
-            RequestStepAction: () => breakpoints.Add(".*", isOneShot: true),
-            DetachAction: breakpoints.Clear);
+            Diagnostics: []);
 
         DebugResumeAction action = await frontend.PauseAsync(context, TestContext.CancellationToken);
         Assert.IsInstanceOfType<RecordingDebugReplIo>(io);
@@ -327,9 +322,7 @@ public sealed class ConsoleDebugFrontendTests : CyborgCliTestBase
             runtime,
             services,
             registry,
-            diagnostics ?? [],
-            RequestStepAction: () => registry.Add(".*", isOneShot: true),
-            DetachAction: registry.Clear);
+            diagnostics ?? []);
 
         DebugResumeAction action = default;
         for (int index = 0; index < pauseCount; index++)
@@ -350,15 +343,8 @@ public sealed class ConsoleDebugFrontendTests : CyborgCliTestBase
         IModuleRuntime Runtime,
         IServiceProvider Services,
         IBreakpointRegistry Breakpoints,
-        IReadOnlyList<DebugDiagnostic> Diagnostics,
-        Action RequestStepAction,
-        Action DetachAction
-    ) : IDebugPauseContext
-    {
-        public void RequestStep() => RequestStepAction();
-
-        public void Detach() => DetachAction();
-    }
+        IReadOnlyList<DebugDiagnostic> Diagnostics
+    ) : IDebugPauseContext;
 
     private sealed class RecordingDebugReplIo(IEnumerable<string?> input) : IDebugReplIo
     {

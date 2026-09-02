@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Runtime.Engine;
+using Cyborg.Core.Runtime.Engine;
 using Cyborg.Core.Runtime.Services.Debugging.Breakpoints;
 using Cyborg.Core.Runtime.Services.Validation;
 
@@ -7,16 +7,16 @@ namespace Cyborg.Core.Runtime.Services.Debugging;
 internal sealed record DebugPauseContext
 (
     string ModuleId,
+    ModuleExecutionId? ExecutionId,
     IValidationResult<IModule> ValidationResult,
     IModuleRuntime Runtime,
     IServiceProvider Services,
     IBreakpointRegistry Breakpoints,
     IReadOnlyList<DebugDiagnostic> Diagnostics,
-    Action RequestStepAction,
-    Action DetachAction
+    IDebugExecutionTopology Topology
 ) : IDebugPauseContext
 {
-    public void RequestStep() => RequestStepAction();
+    public IExecutionTreeSnapshot Tree => Topology.CaptureTree();
 
-    public void Detach() => DetachAction();
+    public IReadOnlyList<IExecutionTreeNode> Stack => ExecutionId is { } executionId ? Topology.CaptureAncestry(executionId) : [];
 }

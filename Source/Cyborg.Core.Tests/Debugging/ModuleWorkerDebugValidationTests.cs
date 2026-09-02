@@ -54,8 +54,6 @@ public sealed class ModuleWorkerDebugValidationTests : CyborgCoreTestBase
 
     private sealed class RecordingDebugger : IWorkflowDebugger
     {
-        public bool IsEnabled => true;
-
         public int EvaluationCount { get; private set; }
 
         public string? LastModuleId { get; private set; }

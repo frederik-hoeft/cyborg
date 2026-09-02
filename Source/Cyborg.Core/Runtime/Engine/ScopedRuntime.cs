@@ -5,15 +5,12 @@ namespace Cyborg.Core.Runtime.Engine;
 internal sealed class ScopedRuntime
 (
     IModuleRuntime root,
-    IModuleRuntime parent,
     RuntimeEnvironmentContext environmentContext,
     ModuleRuntimeServices operations,
     ModuleTransaction transaction,
-    IServiceProvider serviceProvider
-) : ModuleRuntimeBase(environmentContext, operations, transaction, serviceProvider)
+    IServiceProvider serviceProvider,
+    ModuleInvocationContext invocationContext
+) : ModuleRuntimeBase(environmentContext, operations, transaction, serviceProvider, invocationContext)
 {
     protected override IModuleRuntime Root => root;
-
-    [NotNull]
-    protected override IModuleRuntime? Parent => parent;
 }

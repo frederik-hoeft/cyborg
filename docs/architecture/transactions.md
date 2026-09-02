@@ -15,6 +15,8 @@ Four relationships coexist during execution and serve different purposes:
 - **DI scopes** define service-object lifetime and dependency resolution;
 - **environment topology** defines variable inheritance and named environment identity inside transactional state.
 
+Execution ownership is represented by stable `ModuleExecutionId` values with explicit parent execution IDs. The identity follows the logical invocation across its runtime views, while transaction ancestry continues to define state inheritance and reconciliation. Neither relationship is inferred from CLR thread identity or ambient `ExecutionContext` propagation.
+
 ```mermaid
 flowchart LR
     subgraph Execution[Execution ownership]
@@ -78,13 +80,13 @@ Workflow state begins at a root execution, not at the application service provid
 `ModuleContext` is the main invocation envelope. Executing it establishes one transaction/DI boundary around environment selection, requirements, optional configuration, and the main module lifecycle:
 
 1. fork a child transaction from the caller's current effective state;
-2. create a fresh DI scope and bind transaction-aware scoped services to the child transaction;
+2. create a fresh DI scope, allocate the invocation's stable execution ID/parent ID, bind transaction-aware scoped services to the child transaction, and emit the structured `Started` lifecycle observation;
 3. bind or create the logical environment selected by the context inside that transaction;
 4. if execution entered through a loaded configuration result, apply its immutable named-module seed to the child transaction, then resolve required arguments and write normalized invocation-local values;
 5. execute the optional configuration module as a nested child invocation and reconcile it before preparing the main module;
 6. activate a fresh main worker from the invocation scope;
-7. run generated preparation, validation, lifecycle hooks, module execution, and artifact publication;
-8. complete the child transaction and reconcile it according to the caller's structured execution policy;
+7. run generated preparation, validation, module lifecycle hooks, module execution, and artifact publication;
+8. if a definite result exists, emit `Completed` and complete the child transaction; reconcile completed state or discard exceptional no-result state according to the caller's structured execution policy, then emit `Closed` after that structural outcome is known;
 9. dispose the invocation scope only after all runtime-owned nested work has terminated.
 
 The scope is part of the invocation contract, not a best-effort optimization. Production execution does not silently fall back to the caller or application-root service provider when an invocation scope cannot be established.
@@ -152,9 +154,12 @@ The built-in participants are:
 
 - the runtime environment subsystem;
 - the runtime named-module registry;
+- debugger branch-control state used for transaction-aware per-branch stepping;
 - any custom DI service that explicitly opts into transaction participation.
 
 Participant boundaries follow state semantics rather than runtime ownership. Unrelated concerns remain separate because the coordinator already provides aggregate atomic publication. A composite participant is appropriate only when preparing a valid candidate for one part intrinsically depends on the candidate state of another part. The environment subsystem uses this pattern because binding lifetime depends on the reconciled environment graph; the named-module registry remains separate because its state is independent. Successful semantics must not depend on participant registration or preparation order because participants cannot publish owner-visible state during preparation.
+
+The debugger participant carries execution-control state rather than module data. Its merge is deliberately conflict-free: children inherit the owner's step flag, sibling decisions remain isolated while the fork is open, and after join the owner remains stepping when any non-stale child remains stepping. The frozen owner continuation is ignored when real child contributors exist so pre-fork step state cannot resurrect after every child explicitly continued. A debugger-session generation fences state copied into branches before `detach`; only the newest represented generation may restore stepping.
 
 ### Prepare, then publish
 
@@ -292,6 +297,8 @@ Participant implementations own only their state semantics. They do not receive 
 
 A participant should represent one independently transactional service concern. Atomicity with other concerns is not a reason to combine them because the coordinator already publishes all participants atomically.
 
+Debugger branch control is a concrete built-in use of this extension model. `IDebugBranchControl` is scoped to an invocation and obtains its state through `ITransactionalServiceContext`; it does not maintain a parallel process-global map of branch IDs. Persistent breakpoint expressions and debugger-session generation remain global debugger concerns because they intentionally do not follow transaction branches.
+
 The scoped invocation context is the routing mechanism for transaction-aware services. Normal transactional access does not use a process-wide `AsyncLocal` transaction pointer, which avoids creating a second ambient propagation mechanism alongside DI and prevents arbitrary tasks from inheriting transactional authority merely through `ExecutionContext` flow.
 
 ## State Outside Transactions
@@ -321,6 +328,7 @@ The steady-state model establishes these guarantees:
 - publication is atomic across all participants;
 - default conflict handling is deterministic and based on explicit write/write conflicts;
 - DI lifetime never implicitly enables transaction participation;
+- debugger step state inherits, isolates, and reconciles through the same structured branch model without introducing transaction conflicts;
 - external/process state remains outside the transaction model unless it explicitly participates.
 
 The model does not currently provide:
@@ -331,7 +339,7 @@ The model does not currently provide:
 - deep transactional semantics for arbitrary object graphs stored as values;
 - retry-attempt selection or managed background/sidecar execution policy;
 - richer merge policies beyond the existing conflict-strategy boundary;
-- branch-aware debugger stepping UX;
+- interactive selection or switching of the active debugger frontend among already-queued pause points;
 - persistence or export policy for final root transaction state.
 
 These are policy or product extensions over the same invocation and reconciliation boundaries. They should not require a second workflow-state model or different worker/DI lifetime semantics.

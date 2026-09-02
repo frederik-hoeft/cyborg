@@ -31,6 +31,12 @@ internal static partial class ModuleRuntimeLog
     [ZLoggerMessage(LogLevel.Error, "Post-execution hook pipeline could not be resolved while observing module '{moduleId}'. The module result is unchanged.")]
     public static partial void LogPostExecutionHookPipelineFailed(this ILogger logger, string moduleId, Exception exception);
 
+    [ZLoggerMessage(LogLevel.Error, "Execution lifecycle hook '{hookType}' failed during '{eventName}' for module '{moduleId}' (execution '{executionId}'). Execution continues unchanged.")]
+    public static partial void LogExecutionLifecycleHookFailed(this ILogger logger, string moduleId, string executionId, string eventName, string hookType, Exception exception);
+
+    [ZLoggerMessage(LogLevel.Error, "Execution lifecycle hook pipeline could not be resolved during '{eventName}' for module '{moduleId}' (execution '{executionId}'). Execution continues unchanged.")]
+    public static partial void LogExecutionLifecycleHookPipelineFailed(this ILogger logger, string moduleId, string executionId, string eventName, Exception exception);
+
     // ── Module context execution ──────────────────────────────────────────────
 
     [ZLoggerMessage(LogLevel.Debug, "Running configuration module '{configModuleId}' before main module '{mainModuleId}'")]

@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Runtime.Engine;
+using Cyborg.Core.Runtime.Engine;
 using Cyborg.Core.Runtime.Services.Debugging.Breakpoints;
 using Cyborg.Core.Runtime.Services.Validation;
 
@@ -8,6 +8,11 @@ namespace Cyborg.Core.Runtime.Services.Debugging;
 public interface IDebugPauseContext
 {
     string ModuleId { get; }
+
+    /// <summary>
+    /// Stable identity of the paused logical invocation. Contexts that are not attached to a runtime execution scope expose <see langword="null"/>.
+    /// </summary>
+    ModuleExecutionId? ExecutionId => null;
 
     IValidationResult<IModule> ValidationResult { get; }
 
@@ -23,9 +28,13 @@ public interface IDebugPauseContext
     /// <summary>Diagnostics associated with entering the current pause, such as breakpoint evaluation failures.</summary>
     IReadOnlyList<DebugDiagnostic> Diagnostics { get; }
 
-    /// <summary>Requests a one-shot break at the next module executed through the runtime (step).</summary>
-    void RequestStep();
+    /// <summary>
+    /// Immutable point-in-time snapshot of the currently open logical execution tree. Runtime-provided contexts capture a fresh snapshot on each access.
+    /// </summary>
+    IExecutionTreeSnapshot Tree => ExecutionTreeSnapshot.Empty;
 
-    /// <summary>Removes all breakpoints and leaves debugging inactive after the current resume.</summary>
-    void Detach();
+    /// <summary>
+    /// Immutable point-in-time ancestry of <see cref="ExecutionId"/>, ordered from the current invocation to the root. Runtime-provided contexts capture a fresh projection on each access.
+    /// </summary>
+    IReadOnlyList<IExecutionTreeNode> Stack => [];
 }

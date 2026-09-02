@@ -1,9 +1,12 @@
-﻿using Cyborg.Core.Runtime.Engine;
+using Cyborg.Core.Runtime.Engine;
 using Cyborg.Core.Runtime.Hooks;
 
 namespace Cyborg.Core.Runtime.Services.Debugging;
 
-internal sealed class DebuggingHook(IServiceProvider serviceProvider, IWorkflowDebugger? debugger = null) : IModulePreExecutionHook
+internal sealed class DebuggingHook(
+    IServiceProvider serviceProvider,
+    IDebugExecutionTopologyController topology,
+    IWorkflowDebugger? debugger = null) : IModulePreExecutionHook
 {
     // run before most other hooks, so that we can pause before the module executes
     public int Priority => -short.MaxValue;
@@ -11,11 +14,23 @@ internal sealed class DebuggingHook(IServiceProvider serviceProvider, IWorkflowD
     public async ValueTask<IModuleExecutionResult<TModule>?> ExecuteAsync<TModule>(TModule module, IModulePreExecutionContext context, CancellationToken cancellationToken)
         where TModule : ModuleBase, IModule<TModule>
     {
+        IModuleExecutionRuntime? executionRuntime = context.Runtime as IModuleExecutionRuntime;
+        if (executionRuntime?.InvocationContext is { } invocation)
+        {
+            topology.EnrichPreparedModule(invocation.ExecutionId, context.ValidationResult.Module);
+        }
+
         // Debug boundary: after preparation and constraint evaluation, but before validation is enforced for execution.
         // This lets stepping stop on invalid modules and inspect both the prepared module and its validation errors.
-        if (debugger is { IsEnabled: true })
+        if (debugger is not null)
         {
-            DebugResumeAction resumeAction = await debugger.EvaluatePreExecutionAsync(TModule.ModuleId, context.ValidationResult, context.Runtime, serviceProvider, cancellationToken);
+            IServiceProvider executionServices = executionRuntime?.ExecutionServices ?? serviceProvider;
+            DebugResumeAction resumeAction = await debugger.EvaluatePreExecutionAsync(
+                TModule.ModuleId,
+                context.ValidationResult,
+                context.Runtime,
+                executionServices,
+                cancellationToken);
             if (resumeAction is DebugResumeAction.Cancel)
             {
                 return context.ResultBuilder.Canceled(module);

@@ -1,35 +1,47 @@
-﻿using Cyborg.Core.Configuration.Builders;
+using Cyborg.Core.Configuration.Builders;
 using Cyborg.Core.Runtime;
 using Cyborg.Core.Runtime.Engine;
 using Cyborg.Core.Runtime.Services.Debugging;
 using Cyborg.Core.Runtime.Services.Debugging.Breakpoints;
 using Cyborg.Core.Runtime.Services.Validation;
 using Cyborg.Core.Services.Default;
+using Cyborg.Core.TestAdapter;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Cyborg.Core.Tests.Debugging;
 
 [TestClass]
 public sealed class WorkflowDebuggerTests : CyborgCoreTestBase
 {
+    protected override void ConfigureServices(IServiceCollection services, IJabServiceDiscovery jabServiceDiscovery)
+    {
+        base.ConfigureServices(services, jabServiceDiscovery);
+        services.RemoveAll<IDebugBranchControl>();
+        services.AddSingleton<IDebugBranchControl, TestDebugBranchControl>();
+    }
+
     protected override void BuildConfiguration(IConfigurationBuilder configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         IServiceSelectionKey<IDebugFrontend> frontendKey = configuration.ServiceProvider.GetRequiredService<IServiceSelectionKey<IDebugFrontend>>();
-        // use ScriptedFrontend as the default frontend for testing
         configuration.AddDictionary(dict => dict.AddEntry(frontendKey.Key, "test"));
     }
 
     [TestMethod]
-    public Task Test_EvaluatePreExecutionAsync_WhenDisabled_ReturnsContinueWithoutFrontendAsync() => TestWithDIAsync(async services =>
+    public Task Test_EvaluatePreExecutionAsync_WhenInactive_ReturnsContinueWithoutFrontendAsync() => TestWithDIAsync(async services =>
     {
         IWorkflowDebugger debugger = services.GetRequiredService<IWorkflowDebugger>();
         IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
 
-        DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(ProbeModule.ModuleId, ValidationResult.Valid(new ProbeModule()), runtime, services, TestContext.CancellationToken);
+        DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(
+            ProbeModule.ModuleId,
+            ValidationResult.Valid(new ProbeModule()),
+            runtime,
+            services,
+            TestContext.CancellationToken);
 
         Assert.AreEqual(DebugResumeAction.Continue, action);
-        Assert.IsFalse(debugger.IsEnabled);
     });
 
     [TestMethod]
@@ -38,26 +50,30 @@ public sealed class WorkflowDebuggerTests : CyborgCoreTestBase
         IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
         IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
         IWorkflowDebugger debugger = services.GetRequiredService<IWorkflowDebugger>();
-
+        ScriptedFrontend frontend = GetFrontend<ScriptedFrontend>(services);
         breakpoints.Add("probe");
         ProbeModule module = new() { Name = "probe-step" };
-        DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(ProbeModule.ModuleId, ValidationResult.Valid(module), runtime, services, TestContext.CancellationToken);
 
-        IDebugFrontend debugFrontend = services.GetRequiredService<IDebugFrontend>();
-        Assert.IsInstanceOfType<ScriptedFrontend>(debugFrontend);
-        ScriptedFrontend frontend = (ScriptedFrontend)debugFrontend;
+        DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(
+            ProbeModule.ModuleId,
+            ValidationResult.Valid(module),
+            runtime,
+            services,
+            TestContext.CancellationToken);
+
         Assert.AreEqual(DebugResumeAction.Continue, action);
         Assert.AreEqual(1, frontend.PauseCount);
         Assert.AreEqual("cyborg.tests.probe.v1 name=probe-step", frontend.LastIdentity);
     }, static services => services.AddSingleton<IDebugFrontend>(new ScriptedFrontend(DebugResumeAction.Continue)));
 
     [TestMethod]
-    public Task Test_EvaluatePreExecutionAsync_CancelFromFrontend_PropagatesAsync() => TestWithDIAsync(async services =>
+    public Task Test_EvaluatePreExecutionAsync_CancelFromFrontend_PropagatesAndClearsStepAsync() => TestWithDIAsync(async services =>
     {
         IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
+        IDebugBranchControl branchControl = services.GetRequiredService<IDebugBranchControl>();
         IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
         IWorkflowDebugger debugger = services.GetRequiredService<IWorkflowDebugger>();
-
+        branchControl.Step();
         breakpoints.Add(".*");
 
         DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(
@@ -68,57 +84,50 @@ public sealed class WorkflowDebuggerTests : CyborgCoreTestBase
             TestContext.CancellationToken);
 
         Assert.AreEqual(DebugResumeAction.Cancel, action);
+        Assert.IsFalse(branchControl.IsStepping);
     }, static services => services.AddSingleton<IDebugFrontend>(new ScriptedFrontend(DebugResumeAction.Cancel)));
 
     [TestMethod]
-    public Task Test_RequestStep_RegistersOneShotWildcardAsync() => TestWithDIAsync(
+    public Task Test_StepAction_UsesBranchControlWithoutRegisteringWildcardBreakpointAsync() => TestWithDIAsync(
         assertion: async services =>
         {
             IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
+            IDebugBranchControl branchControl = services.GetRequiredService<IDebugBranchControl>();
             IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
             IWorkflowDebugger debugger = services.GetRequiredService<IWorkflowDebugger>();
+            ScriptedSequenceFrontend frontend = GetFrontend<ScriptedSequenceFrontend>(services);
+            int persistentId = breakpoints.Add("first");
 
-            breakpoints.Add("first");
-            ProbeModule module = new() { Name = "first" };
+            await debugger.EvaluatePreExecutionAsync(
+                ProbeModule.ModuleId,
+                ValidationResult.Valid(new ProbeModule { Name = "first" }),
+                runtime,
+                services,
+                TestContext.CancellationToken);
 
-            await debugger.EvaluatePreExecutionAsync(ProbeModule.ModuleId, ValidationResult.Valid(module), runtime, services, TestContext.CancellationToken);
-
-            IReadOnlyList<BreakpointExpression> registeredBreakpoints = breakpoints.ToList();
-            Assert.Contains(static breakpoint => breakpoint.Expression == WorkflowDebugger.STEP_EXPRESSION && breakpoint.IsOneShot, registeredBreakpoints);
-        },
-        configureServices: static services => services.AddSingleton<IDebugFrontend, StepThenContinueFrontend>(),
-        buildConfiguration: static config =>
-        {
-            IServiceSelectionKey<IDebugFrontend> frontendKey = config.ServiceProvider.GetRequiredService<IServiceSelectionKey<IDebugFrontend>>();
-
-            config.AddDictionary(dict => dict.AddEntry(frontendKey.Key, "test-step"));
-        });
-
-    [TestMethod]
-    public Task Test_RequestStep_WhenNextModuleAlsoMatchesPersistentBreakpoint_ConsumesStepFirstAsync() => TestWithDIAsync(
-        assertion: async services =>
-        {
-            IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
-            IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
-            IWorkflowDebugger debugger = services.GetRequiredService<IWorkflowDebugger>();
-
-            int persistentId = breakpoints.Add("probe");
-            ProbeModule module = new() { Name = "probe" };
-
-            await debugger.EvaluatePreExecutionAsync(ProbeModule.ModuleId, ValidationResult.Valid(module), runtime, services, TestContext.CancellationToken);
-            await debugger.EvaluatePreExecutionAsync(ProbeModule.ModuleId, ValidationResult.Valid(module), runtime, services, TestContext.CancellationToken);
-
+            Assert.IsTrue(branchControl.IsStepping);
             IReadOnlyList<BreakpointExpression> registeredBreakpoints = breakpoints.ToList();
             Assert.HasCount(1, registeredBreakpoints);
             Assert.AreEqual(persistentId, registeredBreakpoints[0].Id);
             Assert.IsFalse(registeredBreakpoints[0].IsOneShot);
+            Assert.IsTrue(breakpoints.Remove(persistentId));
+
+            DebugResumeAction secondAction = await debugger.EvaluatePreExecutionAsync(
+                ProbeModule.ModuleId,
+                ValidationResult.Valid(new ProbeModule { Name = "second" }),
+                runtime,
+                services,
+                TestContext.CancellationToken);
+
+            Assert.AreEqual(DebugResumeAction.Continue, secondAction);
+            Assert.AreEqual(2, frontend.PauseCount);
+            Assert.IsFalse(branchControl.IsStepping);
+            Assert.AreEqual(0, breakpoints.Count);
         },
-        configureServices: static services => services.AddSingleton<IDebugFrontend, StepOnceThenContinueFrontend>(),
-        buildConfiguration: static config =>
-        {
-            IServiceSelectionKey<IDebugFrontend> frontendKey = config.ServiceProvider.GetRequiredService<IServiceSelectionKey<IDebugFrontend>>();
-            config.AddDictionary(dict => dict.AddEntry(frontendKey.Key, "test-step-once"));
-        });
+        configureServices: static services => services.AddSingleton<IDebugFrontend>(new ScriptedSequenceFrontend([
+            DebugResumeAction.Step,
+            DebugResumeAction.Continue,
+        ])));
 
     [TestMethod]
     public Task Test_EvaluatePreExecutionAsync_InvalidResult_PassesPreparedModuleAndErrorsToFrontendAsync() => TestWithDIAsync(
@@ -127,18 +136,18 @@ public sealed class WorkflowDebuggerTests : CyborgCoreTestBase
             IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
             IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
             IWorkflowDebugger debugger = services.GetRequiredService<IWorkflowDebugger>();
-
+            ScriptedFrontend frontend = GetFrontend<ScriptedFrontend>(services);
             breakpoints.Add("probe");
-
             ProbeModule module = new() { Name = "probe-invalid" };
             ValidationError error = new(nameof(ProbeModule.Name), "test-rule", "The probe is invalid.");
             IValidationResult<ProbeModule> validationResult = ValidationResult.Invalid(module, [error]);
 
-            DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(ProbeModule.ModuleId, validationResult, runtime, services, TestContext.CancellationToken);
-
-            IDebugFrontend debugFrontend = services.GetRequiredService<IDebugFrontend>();
-            Assert.IsInstanceOfType<ScriptedFrontend>(debugFrontend);
-            ScriptedFrontend frontend = (ScriptedFrontend)debugFrontend;
+            DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(
+                ProbeModule.ModuleId,
+                validationResult,
+                runtime,
+                services,
+                TestContext.CancellationToken);
 
             Assert.AreEqual(DebugResumeAction.Continue, action);
             Assert.IsFalse(frontend.LastIsValid);
@@ -154,10 +163,14 @@ public sealed class WorkflowDebuggerTests : CyborgCoreTestBase
             IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
             IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
             IWorkflowDebugger debugger = services.GetRequiredService<IWorkflowDebugger>();
-
             breakpoints.Add("probe");
 
-            DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(ProbeModule.ModuleId, ValidationResult.Valid(new ProbeModule()), runtime, services, TestContext.CancellationToken);
+            DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(
+                ProbeModule.ModuleId,
+                ValidationResult.Valid(new ProbeModule()),
+                runtime,
+                services,
+                TestContext.CancellationToken);
 
             Assert.AreEqual(DebugResumeAction.Continue, action);
         },
@@ -168,40 +181,100 @@ public sealed class WorkflowDebuggerTests : CyborgCoreTestBase
         });
 
     [TestMethod]
-    public Task Test_EvaluatePreExecutionAsync_ConcurrentPausesAreSerializedAndObserveDetachAsync() => TestWithDIAsync(
+    public Task Test_ConcurrentDecidedPauses_AreFifoAndBreakpointDeletionDoesNotRevokeQueuedAsync() => TestWithDIAsync(
         assertion: async services =>
         {
             IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
             IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
             IWorkflowDebugger debugger = services.GetRequiredService<IWorkflowDebugger>();
-            IDebugFrontend debugFrontend = services.GetRequiredService<IDebugFrontend>();
-            Assert.IsInstanceOfType<DetachingBlockingFrontend>(debugFrontend);
-            DetachingBlockingFrontend frontend = (DetachingBlockingFrontend)debugFrontend;
+            ControlledFrontend frontend = GetFrontend<ControlledFrontend>(services);
             breakpoints.Add(".*");
 
-            ValueTask<DebugResumeAction> first = debugger.EvaluatePreExecutionAsync(
-                ProbeModule.ModuleId,
-                ValidationResult.Valid(new ProbeModule { Name = "first" }),
-                runtime,
-                services,
-                TestContext.CancellationToken);
-            await frontend.FirstPauseEntered;
-
-            ValueTask<DebugResumeAction> second = debugger.EvaluatePreExecutionAsync(
-                ProbeModule.ModuleId,
-                ValidationResult.Valid(new ProbeModule { Name = "second" }),
-                runtime,
-                services,
-                TestContext.CancellationToken);
+            ValueTask<DebugResumeAction> first = EvaluateAsync(debugger, runtime, services, "first", TestContext.CancellationToken);
+            ControlledPause firstPause = await frontend.WaitForPauseAsync(1, TestContext.CancellationToken);
+            ValueTask<DebugResumeAction> second = EvaluateAsync(debugger, runtime, services, "second", TestContext.CancellationToken);
+            ValueTask<DebugResumeAction> third = EvaluateAsync(debugger, runtime, services, "third", TestContext.CancellationToken);
 
             Assert.AreEqual(1, frontend.PauseCount);
-            frontend.ReleaseFirstPause();
+            breakpoints.Clear();
+            firstPause.Resume(DebugResumeAction.Continue);
+            Assert.AreEqual(DebugResumeAction.Continue, await first);
+
+            ControlledPause secondPause = await frontend.WaitForPauseAsync(2, TestContext.CancellationToken);
+            Assert.AreEqual("cyborg.tests.probe.v1 name=second", secondPause.Identity);
+            secondPause.Resume(DebugResumeAction.Continue);
+            Assert.AreEqual(DebugResumeAction.Continue, await second);
+
+            ControlledPause thirdPause = await frontend.WaitForPauseAsync(3, TestContext.CancellationToken);
+            Assert.AreEqual("cyborg.tests.probe.v1 name=third", thirdPause.Identity);
+            thirdPause.Resume(DebugResumeAction.Continue);
+            Assert.AreEqual(DebugResumeAction.Continue, await third);
+            Assert.AreSequenceEqual(
+                [
+                    "cyborg.tests.probe.v1 name=first",
+                    "cyborg.tests.probe.v1 name=second",
+                    "cyborg.tests.probe.v1 name=third",
+                ],
+                frontend.Identities);
+        },
+        configureServices: static services => services.AddSingleton<IDebugFrontend, ControlledFrontend>());
+
+    [TestMethod]
+    public Task Test_Detach_InvalidatesQueuedAndFuturePausesAsync() => TestWithDIAsync(
+        assertion: async services =>
+        {
+            IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
+            IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+            IWorkflowDebugger debugger = services.GetRequiredService<IWorkflowDebugger>();
+            ControlledFrontend frontend = GetFrontend<ControlledFrontend>(services);
+            breakpoints.Add(".*");
+
+            ValueTask<DebugResumeAction> first = EvaluateAsync(debugger, runtime, services, "first", TestContext.CancellationToken);
+            ControlledPause firstPause = await frontend.WaitForPauseAsync(1, TestContext.CancellationToken);
+            ValueTask<DebugResumeAction> second = EvaluateAsync(debugger, runtime, services, "second", TestContext.CancellationToken);
+            Assert.AreEqual(1, frontend.PauseCount);
+
+            firstPause.Resume(DebugResumeAction.Detach);
             Assert.AreEqual(DebugResumeAction.Continue, await first);
             Assert.AreEqual(DebugResumeAction.Continue, await second);
             Assert.AreEqual(1, frontend.PauseCount);
             Assert.AreEqual(0, breakpoints.Count);
+
+            DebugResumeAction future = await EvaluateAsync(debugger, runtime, services, "future", TestContext.CancellationToken);
+            Assert.AreEqual(DebugResumeAction.Continue, future);
+            Assert.AreEqual(1, frontend.PauseCount);
         },
-        configureServices: static services => services.AddSingleton<IDebugFrontend, DetachingBlockingFrontend>());
+        configureServices: static services => services.AddSingleton<IDebugFrontend, ControlledFrontend>());
+
+    [TestMethod]
+    public Task Test_QueuedPauseCancellation_RemovesQueueEntryAndDoesNotBlockFollowingPauseAsync() => TestWithDIAsync(
+        assertion: async services =>
+        {
+            IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
+            IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+            IWorkflowDebugger debugger = services.GetRequiredService<IWorkflowDebugger>();
+            ControlledFrontend frontend = GetFrontend<ControlledFrontend>(services);
+            breakpoints.Add(".*");
+            using CancellationTokenSource queuedCancellation = new();
+
+            ValueTask<DebugResumeAction> first = EvaluateAsync(debugger, runtime, services, "first", TestContext.CancellationToken);
+            ControlledPause firstPause = await frontend.WaitForPauseAsync(1, TestContext.CancellationToken);
+            ValueTask<DebugResumeAction> canceled = EvaluateAsync(debugger, runtime, services, "canceled", queuedCancellation.Token);
+            ValueTask<DebugResumeAction> third = EvaluateAsync(debugger, runtime, services, "third", TestContext.CancellationToken);
+
+            await queuedCancellation.CancelAsync();
+            await Assert.ThrowsAsync<OperationCanceledException>(async () => await canceled);
+            Assert.AreEqual(1, frontend.PauseCount);
+
+            firstPause.Resume(DebugResumeAction.Continue);
+            Assert.AreEqual(DebugResumeAction.Continue, await first);
+            ControlledPause thirdPause = await frontend.WaitForPauseAsync(2, TestContext.CancellationToken);
+            Assert.AreEqual("cyborg.tests.probe.v1 name=third", thirdPause.Identity);
+            thirdPause.Resume(DebugResumeAction.Continue);
+            Assert.AreEqual(DebugResumeAction.Continue, await third);
+            Assert.AreEqual(2, frontend.PauseCount);
+        },
+        configureServices: static services => services.AddSingleton<IDebugFrontend, ControlledFrontend>());
 
     [TestMethod]
     public Task Test_EvaluatePreExecutionAsync_WhenSpecifiedFrontendIsNotFound_ThrowsAsync() => TestWithDIAsync(
@@ -210,18 +283,50 @@ public sealed class WorkflowDebuggerTests : CyborgCoreTestBase
             IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
             IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
             IWorkflowDebugger debugger = services.GetRequiredService<IWorkflowDebugger>();
-
             breakpoints.Add("probe");
 
             await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-                await debugger.EvaluatePreExecutionAsync(ProbeModule.ModuleId, ValidationResult.Valid(new ProbeModule()), runtime, services, TestContext.CancellationToken));
+                await debugger.EvaluatePreExecutionAsync(
+                    ProbeModule.ModuleId,
+                    ValidationResult.Valid(new ProbeModule()),
+                    runtime,
+                    services,
+                    TestContext.CancellationToken));
         },
         buildConfiguration: static config =>
         {
             IServiceSelectionKey<IDebugFrontend> frontendKey = config.ServiceProvider.GetRequiredService<IServiceSelectionKey<IDebugFrontend>>();
-
             config.AddDictionary(dict => dict.AddEntry(frontendKey.Key, "does-not-exist"));
         });
+
+    private static ValueTask<DebugResumeAction> EvaluateAsync(
+        IWorkflowDebugger debugger,
+        IModuleRuntime runtime,
+        IServiceProvider services,
+        string name,
+        CancellationToken cancellationToken) =>
+        debugger.EvaluatePreExecutionAsync(
+            ProbeModule.ModuleId,
+            ValidationResult.Valid(new ProbeModule { Name = name }),
+            runtime,
+            services,
+            cancellationToken);
+
+    private static TFrontend GetFrontend<TFrontend>(IServiceProvider services) where TFrontend : class, IDebugFrontend
+    {
+        IDebugFrontend frontend = services.GetRequiredService<IDebugFrontend>();
+        Assert.IsInstanceOfType<TFrontend>(frontend);
+        return (TFrontend)frontend;
+    }
+
+    private sealed class TestDebugBranchControl : IDebugBranchControl
+    {
+        public bool IsStepping { get; private set; }
+
+        public void Step() => IsStepping = true;
+
+        public void Continue() => IsStepping = false;
+    }
 
     private sealed record ProbeModule : ModuleBase, IModule
     {
@@ -254,59 +359,87 @@ public sealed class WorkflowDebuggerTests : CyborgCoreTestBase
         }
     }
 
-    private sealed class DetachingBlockingFrontend : IDebugFrontend
+    private sealed class ScriptedSequenceFrontend(IReadOnlyList<DebugResumeAction> actions) : IDebugFrontend
     {
-        private readonly TaskCompletionSource _firstPauseEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly TaskCompletionSource _releaseFirstPause = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private int _pauseCount;
+        public string Key => "test";
+
+        public int PauseCount { get; private set; }
+
+        public ValueTask<DebugResumeAction> PauseAsync(IDebugPauseContext context, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            int index = PauseCount++;
+            Assert.IsLessThan(actions.Count, index);
+            return ValueTask.FromResult(actions[index]);
+        }
+    }
+
+    private sealed class ControlledFrontend : IDebugFrontend
+    {
+        private readonly object _lock = new();
+        private readonly List<ControlledPause> _pauses = [];
+        private readonly SemaphoreSlim _entered = new(initialCount: 0);
 
         public string Key => "test";
 
-        public Task FirstPauseEntered => _firstPauseEntered.Task;
+        public int PauseCount
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _pauses.Count;
+                }
+            }
+        }
 
-        public int PauseCount => Volatile.Read(ref _pauseCount);
-
-        public void ReleaseFirstPause() => _releaseFirstPause.TrySetResult();
+        public IReadOnlyList<string> Identities
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _pauses.Select(static pause => pause.Identity).ToArray();
+                }
+            }
+        }
 
         public async ValueTask<DebugResumeAction> PauseAsync(IDebugPauseContext context, CancellationToken cancellationToken)
         {
-            int pauseCount = Interlocked.Increment(ref _pauseCount);
-            if (pauseCount == 1)
+            ControlledPause pause = new(context.GetModuleIdentity());
+            lock (_lock)
             {
-                _firstPauseEntered.TrySetResult();
-                await _releaseFirstPause.Task.WaitAsync(cancellationToken);
-                context.Detach();
+                _pauses.Add(pause);
             }
-            return DebugResumeAction.Continue;
+            _entered.Release();
+            return await pause.WaitForResumeAsync(cancellationToken);
+        }
+
+        public async Task<ControlledPause> WaitForPauseAsync(int expectedCount, CancellationToken cancellationToken)
+        {
+            while (true)
+            {
+                lock (_lock)
+                {
+                    if (_pauses.Count >= expectedCount)
+                    {
+                        return _pauses[expectedCount - 1];
+                    }
+                }
+                await _entered.WaitAsync(cancellationToken);
+            }
         }
     }
 
-    private sealed class StepOnceThenContinueFrontend : IDebugFrontend
+    private sealed class ControlledPause(string identity)
     {
-        public string Key => "test-step-once";
+        private readonly TaskCompletionSource<DebugResumeAction> _resume = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        private int PauseCount { get; set; }
+        public string Identity { get; } = identity;
 
-        public ValueTask<DebugResumeAction> PauseAsync(IDebugPauseContext context, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (PauseCount++ == 0)
-            {
-                context.RequestStep();
-            }
-            return ValueTask.FromResult(DebugResumeAction.Continue);
-        }
-    }
+        public void Resume(DebugResumeAction action) => _resume.TrySetResult(action);
 
-    private sealed class StepThenContinueFrontend : IDebugFrontend
-    {
-        public string Key => "test-step";
-
-        public ValueTask<DebugResumeAction> PauseAsync(IDebugPauseContext context, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            context.RequestStep();
-            return ValueTask.FromResult(DebugResumeAction.Continue);
-        }
+        public async ValueTask<DebugResumeAction> WaitForResumeAsync(CancellationToken cancellationToken) =>
+            await _resume.Task.WaitAsync(cancellationToken);
     }
 }

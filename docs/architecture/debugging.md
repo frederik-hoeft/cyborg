@@ -2,78 +2,135 @@
 
 This document describes the workflow debugging subsystem and the format-neutral module-description pipeline used by debugger inspection and other presentation clients.
 
-For the surrounding execution model and lifecycle-hook pipeline, see [Architecture Overview](architecture-overview.md). For the source generation that produces rich module descriptors, see [Source Generators](source-generators.md).
+For the surrounding invocation, transaction, and lifecycle model, see [Architecture Overview](architecture-overview.md) and [Transactional Execution](transactions.md). For the source generation that produces rich module descriptors, see [Source Generators](source-generators.md).
 
 ## Overview
 
-Cyborg debugging operates at module execution boundaries. A breakpoint is evaluated after defaults, override resolution, interpolation, and constraint evaluation have produced an `IValidationResult<TModule>`, but before that result is enforced and before the worker executes. The debugger therefore sees the prepared module together with any validation errors, including configurations that would fail normal execution.
+Cyborg debugging operates at prepared module execution boundaries. A breakpoint is evaluated after defaults, override resolution, interpolation, and constraint evaluation have produced an `IValidationResult<TModule>`, but before that result is enforced and before the worker executes. The debugger can therefore inspect the prepared module together with any validation errors, including configurations that would fail normal execution.
 
-The subsystem is split into three architectural layers:
+The debugger combines four kinds of state with deliberately different ownership:
 
-- `Cyborg.Core` owns breakpoint state and matching, the runtime debugger contract, module descriptors, immutable description trees, serializer discovery, and serialization orchestration.
-- `Cyborg.Cli.Debugging` provides the console frontend and its isolated command surface.
-- `Cyborg.Cli` is the host composition root: it registers the CLI debugger services and selects runtime configuration sources.
+- persistent breakpoint expressions are process-wide debugger-session state;
+- step state follows the transaction branch of the paused invocation;
+- the live execution topology is a Core-owned projection of currently open structured module invocations;
+- frontend ownership is serialized by a debugger pause coordinator so only one interactive frontend session is active at a time.
 
-`IDebugFrontend` is the host-facing presentation boundary. Hosts can provide a console, remote, graphical, or other frontend without changing module execution. Module descriptions are independent of debugging: `IModuleDescriptionSerializer` is the format extension boundary, so applications can register additional output formats through DI and reuse the same descriptor tree elsewhere.
+`Cyborg.Core` owns these runtime mechanics and exposes frontend-neutral pause state through `IDebugFrontend` and `IDebugPauseContext`. `Cyborg.Cli.Debugging` provides the console frontend, command surface, and text rendering for execution trees and ancestry. `Cyborg.Cli` is the host composition root: it registers the CLI debugger services and selects runtime configuration sources.
 
-## Execution Boundary
+Module descriptions remain independent of debugger control. `IModuleDescriptionSerializer` is the format extension boundary, so applications can register additional output formats through DI and reuse the same descriptor tree outside a debugging session.
 
-Debugging participates in execution through the general pre-execution hook pipeline rather than being hard-wired into `ModuleWorker<TModule>`:
+## Execution Boundary and Identity
+
+Every runtime-owned module invocation carries a stable `ModuleExecutionId` and an optional parent execution ID. All runtime views that belong to the same invocation reuse that identity. Nested execution creates a child identity from the structured caller rather than inferring ancestry from a CLR thread, `AsyncLocal<T>`, or runtime-object discovery.
+
+The runtime exposes a general-purpose execution-lifecycle observer independently of module validation/pre/post hooks:
 
 ```text
-Load
-  -> Apply Defaults
-  -> Resolve Overrides
-  -> Reapply Defaults
-  -> Interpolate
-  -> Evaluate Constraints
-  -> OnValidationAsync
-  -> Validation Hooks
-  -> [PRE-EXECUTION HOOKS: DEBUGGER MAY PAUSE]
-  -> EnsureValid
-  -> ExecuteAsync
-  -> [RUNTIME RESULT BOUNDARY]
-  -> Post-Execution Hooks
+invocation scope created
+  -> Started(execution id, parent id, initial module identity)
+  -> environment/configuration/main module work
+       -> generated preparation and validation
+       -> validation hooks
+       -> pre-execution hooks [debugger may pause]
+       -> EnsureValid
+       -> worker execution
+       -> post-execution hooks
+  -> Completed(result)              // only after a definite result exists
+  -> transaction reconciliation/discard
+  -> Closed(joined/discarded)
+  -> invocation scope disposal
 ```
 
-The validation result carried into the debugger always contains the prepared module. If the result is invalid, the frontend can inspect both that module and its errors before `EnsureValid()` would reject execution. Returning `Continue` resumes the normal lifecycle; returning `Cancel` lets the debugging hook produce a canceled module result through the normal result-building path without invoking the worker. The runtime establishes the final execution result before entering the post-execution pipeline, including when validation or worker execution throws or is canceled. Post-execution hook failures are isolated from that result and from later hooks, making the post pipeline a reliable observation/cleanup boundary rather than another result-producing stage.
+`Started` is early enough to observe invocations that fail before the module pre-execution boundary. `Completed` records a definite module result while the invocation may still be structurally open, and `Closed` marks the point after reconciliation or discard when that invocation no longer belongs in a current-state execution topology. Lifecycle observers are isolated from workflow execution: an observer failure is logged and does not change the module result, reconciliation, or delivery to later observers.
 
-The debugger itself is inactive when no breakpoints are registered. On an active pre-execution boundary it evaluates the breakpoint registry against the module and, when a breakpoint matches, resolves the selected `IDebugFrontend` and presents an `IDebugPauseContext`.
+The workflow debugger itself participates through the normal pre-execution hook. The validation result carried into the debugger always contains the prepared module. Returning `Continue` resumes the normal lifecycle; returning `Cancel` lets the debugging hook produce a canceled module result without invoking the worker. `Step` and `Detach` are debugger control actions interpreted centrally by the workflow debugger rather than mutations performed by the frontend.
 
-Parallel module execution can reach multiple pre-execution boundaries concurrently, but one debugger instance serializes breakpoint evaluation together with the complete frontend pause. A second branch re-evaluates debugger state only after the preceding pause resumes, so actions such as `step` and `detach` take effect before another waiting branch consumes breakpoint state. This also prevents a singleton interactive frontend from being driven concurrently by multiple branches; it does not impose serialization on module execution when no debug pause is active.
+## Breakpoints and Branch-Scoped Stepping
 
-Frontend selection uses the keyed-service selection setting `cyborg.core.debug.frontend`. Core deliberately has no implicit frontend (`DebugOptions.Default.Frontend` is `null`), because frontend policy belongs to the host. `Cyborg.Cli.Debugging` registers the built-in `console` frontend and owns breakpoint argument integration, while the `Cyborg.Cli` composition root includes `DebugOptions.Default with { Frontend = "console" }` in its general dictionary-backed defaults. The options file and explicit `--config` source are applied afterward and can therefore replace that selection. Other hosts can choose their own frontend registration and configuration policy.
+`IBreakpointRegistry` stores numbered regular-expression breakpoints. Expressions are culture-invariant and matched against the module ID plus `Name` and `Group` when present. Persistent breakpoints are global across execution branches and remain registered until explicitly removed or detached. The registry also supports one-shot expressions as a general feature, but built-in stepping does not use a wildcard breakpoint.
 
-## Breakpoints
-
-`IBreakpointRegistry` stores numbered regular-expression breakpoints. Expressions are culture-invariant and matched against the module ID plus `Name` and `Group` when present. Persistent breakpoints are evaluated in breakpoint-ID order. One-shot breakpoints are evaluated first, with the newest one-shot taking priority, so stepping applies to the immediately following execution boundary even when that module also matches an older persistent breakpoint. Registration and removal remain thread-safe.
+Persistent expressions are evaluated in breakpoint-ID order. One-shot expressions are evaluated first, newest first, and a matching one-shot is atomically consumed by the caller that wins its removal. A persistent expression remains registered after a match. Regular-expression matching has a bounded timeout; a timeout pauses execution with a debugger diagnostic rather than failing the workflow. A timed-out persistent expression remains registered, while a one-shot is consumed when its evaluation causes that pause.
 
 | Expression | Meaning |
 |---|---|
 | `step-two` | Substring match against ID/name/group |
 | `^step-two$` | Exact name/group match |
 | `cyborg\.modules\.empty\.v1` | Match the empty module ID |
-| `.*` | Match every module; used for one-shot stepping |
+| `.*` | Match every module |
 
-Breakpoint state belongs to the workflow debugging session rather than to an individual pause:
+At each prepared module boundary, the debugger evaluates two independent inputs:
 
-| Action | Registry effect |
+```text
+should pause = persistent/one-shot breakpoint decision
+               OR current branch is stepping
+```
+
+There is no process-wide `IsEnabled` mirror for branch stepping. The pre-execution hook resolves the transaction-scoped `IDebugBranchControl` from the current invocation provider and performs the cheap branch-state/breakpoint check directly.
+
+### Step propagation
+
+Step state is transaction-aware execution-control state. A child invocation inherits the step state of the transaction branch from which it forks. Sibling branches receive isolated copies and can independently choose `Step` or `Continue`.
+
+When a fork generation reconciles, the restored owner state is derived from the child contributors rather than from the frozen pre-fork owner continuation:
+
+```text
+owner stepping after join = any non-stale child remains stepping
+```
+
+This gives the following behavior:
+
+- stepping a sequential child causes the next child invocation on that branch to pause;
+- stepping into a nested or dynamic module follows that structured descendant;
+- stepping one parallel branch does not implicitly step unrelated siblings;
+- `Continue` clears stepping only for the branch represented by that pause;
+- if every child of a parallel generation continues, stepping is cleared when the owner resumes after join;
+- if any current-generation child remains stepping, the owner resumes in step mode and the next invocation on that restored branch pauses;
+- persistent breakpoint matches remain global and can pause an unrelated branch without consuming another branch's step state.
+
+The debugger session has a monotonically increasing generation used as a fencing token for branch-control state. `Detach` advances the generation so transactional state already copied into live branches becomes stale without requiring the debugger to discover and mutate every transaction instance. During reconciliation, only contributors from the newest represented generation can restore step state.
+
+## Pause Coordination
+
+Parallel execution can decide to pause on several branches concurrently. Breakpoint matching and branch-step evaluation happen on the executing branch before frontend ownership is requested. Once a boundary has decided to pause, ordinary breakpoint mutation does not retroactively revoke that decision.
+
+`DebugPauseCoordinator` serializes frontend ownership with FIFO semantics:
+
+```text
+branch decides to pause
+  -> mark execution as paused
+  -> enqueue/acquire frontend ownership
+  -> mark owner as current
+  -> frontend session
+  -> release ownership
+  -> restore running state and promote next valid queued pause
+```
+
+Only one frontend session is active. Other decided pauses remain logically paused and visible in the execution topology while they wait. Admission and release share one coordinator synchronization boundary, so a pause arriving while another session resumes is either queued before release or acquires the newly free slot; it is not lost between a separate queue check and resume decision.
+
+Deleting a breakpoint does not un-pause a branch that already matched it. `Detach` has stronger semantics because it invalidates the debugger session itself: it clears global breakpoints, advances the session generation, clears the current branch's effective step state, and suppresses queued pauses that belong to the invalidated generation. Cancellation of a queued execution removes its queue request and restores its topology state without preventing later valid requests from acquiring the frontend.
+
+## Live Execution Topology
+
+`IDebugExecutionTopology` is the read-only Core boundary for the debugger's current logical execution topology. It is populated by the general execution-lifecycle observer and keyed by explicit `ModuleExecutionId` values.
+
+A node is created on `Started`, before generated preparation or pre-execution hooks are required to succeed. The debugging pre-execution hook enriches the node with the prepared module's final `Name` and `Group` when that boundary is reached. `Completed` records the exit status but retains the node until `Closed`, which means a completed parallel sibling remains visible while other siblings are still open. `Closed` removes the invocation from the live topology.
+
+The topology is deliberately a current-state model, not a trace. Once a structured invocation closes, its node is pruned. Consumers that require execution history should build that concern as a separate lifecycle observer rather than keeping closed debugger nodes indefinitely.
+
+Open nodes expose these states:
+
+| State | Meaning |
 |---|---|
-| `break at <expression>` | Add a persistent expression |
-| `break rm <id>` | Remove one expression |
-| `break ls` | List current expressions |
-| `step` | Add a one-shot `.*` expression and resume |
-| `continue` | Resume without changing the registry |
-| `detach` | Clear all breakpoint state and resume |
-| REPL EOF | Detach and continue |
+| `running` | The invocation is active and has not produced a definite result |
+| `completed: <status>` | A definite result exists, but the structured invocation has not closed yet |
+| `paused` | The invocation decided to pause and is waiting for frontend ownership |
+| `paused/current` | The invocation currently owns the frontend session |
 
-One-shot removal is atomic: a matching one-shot breakpoint is consumed by the caller that successfully removes it. Persistent breakpoints remain registered until explicitly removed or detached.
-
-Breakpoint evaluation failures use the same pause path as successful matches. Regular-expression matching has a bounded timeout; if an expression exceeds it, execution pauses at that module boundary instead of failing the workflow. The evaluation produces debugger diagnostics that are attached to the pause context and can be rendered by any frontend. A timed-out persistent breakpoint remains registered, while a one-shot breakpoint is consumed when its evaluation causes the pause. This diagnostic channel is intentionally not regex-specific and can carry future debugger-side evaluation problems through the same boundary.
+`CaptureTree()` returns an immutable point-in-time forest of open invocations. `CaptureAncestry(executionId)` returns the selected invocation followed by its explicit logical ancestors up to the root. These projections do not expose the mutable internal topology.
 
 ## Frontend Boundary
 
-The runtime-facing frontend contract is deliberately small:
+The host-facing frontend contract remains small:
 
 ```csharp
 public interface IDebugFrontend : IKeyedService
@@ -82,26 +139,40 @@ public interface IDebugFrontend : IKeyedService
 }
 ```
 
-`IDebugPauseContext` exposes the state and debugger operations that are valid during a pause:
+Frontend selection uses the keyed-service setting `cyborg.core.debug.frontend`. Core has no implicit frontend (`DebugOptions.Default.Frontend` is `null`) because presentation policy belongs to the host. `Cyborg.Cli.Debugging` registers the built-in `console` frontend, while the CLI composition root supplies `console` as its host default; ordinary configuration sources can replace that selection.
+
+A frontend returns one of four dispositions:
+
+| Action | Meaning |
+|---|---|
+| `Continue` | Clear stepping on the current branch and resume |
+| `Step` | Resume with the current branch left in step mode |
+| `Cancel` | Clear stepping and cancel the current module before worker execution |
+| `Detach` | End the debugger session, clear breakpoints, invalidate branch-local debugger state, and resume |
+
+`IDebugPauseContext` exposes the state that is valid while the frontend owns a pause:
 
 | Member | Purpose |
 |---|---|
 | `ModuleId` | Canonical versioned ID of the paused module |
+| `ExecutionId` | Stable logical invocation ID when the context belongs to runtime execution |
 | `ValidationResult` | Prepared module, validity state, and validation errors |
 | `Runtime` | Runtime associated with the paused execution boundary |
-| `Services` | Host service provider associated with the executing module |
-| `Breakpoints` | Session breakpoint registry |
+| `Services` | Invocation service provider used as the fallback for frontend command DI |
+| `Breakpoints` | Global debugger-session breakpoint registry |
 | `Diagnostics` | Debugger-side diagnostics associated with entering this pause |
-| `RequestStep()` | Add the one-shot step breakpoint |
-| `Detach()` | Clear session breakpoint state |
+| `Tree` | Fresh immutable snapshot of all currently open logical executions |
+| `Stack` | Fresh immutable ancestry projection for the paused execution |
 
-The pause context intentionally carries the module's service provider because frontend command dispatch may need ordinary host services alongside pause-local state. It is an integration boundary, not a general recommendation to use service-location within module code.
+Runtime-provided pause contexts capture `Tree` and `Stack` on each access. A long-running frontend can therefore observe siblings that progress from running to paused or completed while the current session remains open. Custom contexts that are not attached to a runtime invocation can expose no execution ID and use the empty default projections.
+
+The frontend does not mutate transactional stepping state directly. This keeps presentation adapters independent from transaction mechanics and gives `WorkflowDebugger` one place to apply resume actions, session invalidation, and branch-control changes.
 
 ## Console REPL and CAF Isolation
 
-`ConsoleDebugFrontend` owns the interactive pause lifecycle: display the pause state and any debugger diagnostics, read a prompt-aware command line through `IDebugReplIo`, dispatch it, and continue until a command returns a resume action. EOF detaches and resumes. Inspection serializes the paused module descriptor and then reports any associated validation errors so failed configuration can be correlated with its prepared state.
+`ConsoleDebugFrontend` owns the interactive pause lifecycle: display the pause state and debugger diagnostics, read a prompt-aware command line through `IDebugReplIo`, dispatch it, and continue until a command returns a resume action. EOF returns `Detach`, allowing the workflow debugger to perform the same centralized session cleanup as the explicit command. Inspection serializes the prepared module descriptor and then reports associated validation errors.
 
-The console frontend uses ConsoleAppFramework (CAF) for command routing, aliases, argument binding, validation, generated help, and command dependency injection. Cyborg retains only a lexical tokenizer because an interactive REPL receives one input string while CAF consumes an argument vector. Quoting and escaping are therefore handled before CAF dispatch, while command grammar remains CAF-owned.
+The console frontend uses ConsoleAppFramework (CAF) for command routing, aliases, argument binding, validation, generated help, and command dependency injection. Cyborg retains only a lexical tokenizer because an interactive REPL receives one input string while CAF consumes an argument vector. Quoting and escaping are handled before CAF dispatch, while command grammar remains CAF-owned.
 
 The process CLI and debugger command surfaces live in separate compilations:
 
@@ -110,34 +181,34 @@ Cyborg.Cli
   main CAF command surface (`run`, ...)
 
 Cyborg.Cli.Debugging
-  debugger CAF command surface (`continue`, `break`, ...)
+  debugger CAF command surface (`continue`, `step`, `tree`, `stack`, `break`, ...)
 ```
 
-This isolation prevents debugger help and routing from exposing or recursively invoking the process-level CLI commands. During one debugger command dispatch, pause-local objects are layered over the module's host service provider so command classes can receive both kinds of dependencies through constructor injection.
+This isolation prevents debugger help and routing from exposing or recursively invoking process-level commands. During one debugger command dispatch, pause-local objects are layered over the invocation service provider so command classes can receive both kinds of dependencies through constructor injection.
 
-`IDebugReplIo` is the console presentation extension boundary. It owns prompt-aware reads and semantic writes classified by `OutputKind` (`Text`, `Status`, `Success`, `Warning`, and `Error`). The command layer therefore does not depend on a specific terminal rendering library; a richer I/O implementation can style those categories without changing debugger command behavior.
-
-Breakpoint expressions may consume multiple positional tokens, so `break at backup group` is interpreted as the expression `backup group`. Quoting remains available when whitespace grouping must be explicit, for example `break at "backup  group"`.
+`IDebugReplIo` is the console presentation extension boundary. It owns prompt-aware reads and semantic writes classified by `OutputKind` (`Text`, `Status`, `Success`, `Warning`, and `Error`). Core topology objects carry no text-formatting policy; `ExecutionTreeFormatter` and the `tree`/`stack` commands live in `Cyborg.Cli.Debugging`.
 
 ### Built-in commands
 
 | Command | Aliases | Behavior |
 |---|---|---|
-| `continue` | `c`, `resume` | Resume until another breakpoint matches |
-| `step` | `s` | Register a one-shot `.*` breakpoint and resume |
-| `detach` | none | Clear breakpoint state and resume |
+| `continue` | `c`, `resume` | Clear step mode on this branch and resume until another breakpoint/step boundary |
+| `step` | `s` | Resume with this execution branch in step mode |
+| `detach` | none | End the debugger session and resume execution |
+| `cancel` | `q`, `quit` | Cancel the paused module before its worker executes |
 | `inspect` | `i` | Serialize the prepared module descriptor and print associated validation errors |
+| `tree` | none | Render the current live logical execution tree |
+| `stack` | none | Render the current invocation followed by its logical ancestors |
 | `break at <expression>` | `b at ...` | Add a persistent breakpoint |
 | `break ls` | `break list`, `b ls`, `b list` | List breakpoints |
 | `break rm <id>` | `break remove`, `b rm`, `b remove` | Remove one breakpoint |
-| `cancel` | `q`, `quit` | Cancel the paused module execution |
 | `help [command]` | `h`, `?` | Display CAF-generated debugger help |
 
-Debugger commands are organized into focused internal command classes. `IDebugReplIo` remains public because console presentation is an intended extension boundary; command routing itself remains an implementation detail of the CLI frontend.
+`tree` distinguishes running, completed-but-open, queued paused, and current paused invocations. `stack` numbers frames from the current invocation (`#0`) toward the root. Empty views are rendered explicitly rather than as blank output.
 
 ## Module Identity and Descriptor Capability
 
-`IModule` defines the runtime identity and inspection surface shared by all modules: `Name`, `Group`, and `GetDescriptor()`. `IModuleDefinition` adds the static versioned `ModuleId` used for loading and execution. Short identity strings combine these values for diagnostics and breakpoint banners without relying on the concrete module type.
+`IModule` defines the runtime identity and inspection surface shared by all modules: `Name`, `Group`, and `GetDescriptor()`. `IModuleDefinition` adds the static versioned `ModuleId` used for loading and execution. Short identity strings combine these values for diagnostics, breakpoint banners, and topology rendering without relying on the concrete module type.
 
 Descriptor support is therefore not an optional debugger-only capability. Generated module records return their rich generated descriptor from `GetDescriptor()`, while `ModuleBase` supplies a minimal fallback containing CLR type, name, and group for hand-written modules. Consumers such as `inspect` can always request a descriptor and do not need to special-case whether a module implements a separate capability interface.
 
@@ -192,22 +263,30 @@ IModuleDescriptionServices
   serialization service
 
 IDebugServices
-  debug options provider
-  breakpoint registry
-  workflow debugger
+  global breakpoint registry
+  debugger session generation
+  transactional branch-control participant + scoped facade
+  workflow debugger / FIFO pause coordinator
+  live execution topology
   frontend selection service
   pre-execution debugging hook
+  execution-lifecycle topology observer
 
 ICyborgCliDebugServices (Cyborg.Cli.Debugging)
   console REPL I/O
   keyed console debug frontend
   CLI breakpoint argument integration
+  tree/stack rendering and command surface
 ```
 
-This split keeps debugger mechanics, description serialization, and host presentation independently replaceable. The core defines contracts and orchestration; the CLI debugger assembly owns console-specific behavior; the application composition root decides which services and configuration sources are active.
+The execution lifecycle observer is a general runtime extension point; only the registered topology observer is debugger-specific. Transaction participation is likewise provided by the generic transaction-aware service infrastructure, while the debugger defines only its branch-state merge semantics.
+
+This split keeps runtime observation/control, module-description serialization, and host presentation independently replaceable. Core defines execution identity, current-state projections, and debugger orchestration; the CLI debugger assembly owns console-specific behavior; the application composition root decides which frontend and configuration sources are active.
 
 ## Testing Expectations
 
-Tests should preserve architectural boundaries rather than merely individual command implementations. Description coverage should exercise generated scalar/nested/collection traversal, nullable and default collection shapes, hint preservation, custom serializer registration, and cancellation. Debugger coverage should exercise breakpoint lifecycle, one-shot/persistent precedence, evaluation diagnostics, invalid prepared-module inspection, frontend selection and host defaults, repeated pauses, command aliases/tokenization, EOF/detach behavior, and cancellation.
+Debugger tests should preserve architectural boundaries rather than merely command implementations. Core coverage owns execution identity/lifecycle ordering, topology snapshot semantics, branch-control fork/join rules, pause-coordinator FIFO/cancellation/session invalidation, breakpoint evaluation diagnostics, and workflow-debugger action application. CLI coverage owns command registration, aliases/tokenization, tree/stack rendering, prompt-aware I/O, semantic output categories, inspection, and EOF behavior.
 
-The console debugger tests should dispatch through the real debugger CAF command surface. In particular, generated debugger help must remain isolated from the main CLI `run` command, and alternate `IDebugReplIo` implementations must be able to observe prompt and semantic output categories without command classes depending on console-specific rendering.
+Production-flow integration coverage should exercise the same model through real control-flow modules: sequential and dynamic nested calls, parallel descendant stepping, independent sibling step/continue decisions, global breakpoint hits alongside branch-local stepping, join restoration after all/some descendants continue, failures before the main debugger boundary, and forced queued-pause detach/cancellation scenarios.
+
+Module-description coverage should exercise generated scalar/nested/collection traversal, nullable and default collection shapes, hint preservation, tagged-value rendering, custom serializer registration, and cancellation.

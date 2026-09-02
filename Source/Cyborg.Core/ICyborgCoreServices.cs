@@ -63,6 +63,7 @@ namespace Cyborg.Core;
 [Transient<IServicePipeline<IModuleValidationHook>, ServicePipeline<IModuleValidationHook>>]
 [Transient<IServicePipeline<IModulePreExecutionHook>, ServicePipeline<IModulePreExecutionHook>>]
 [Transient<IServicePipeline<IModulePostExecutionHook>, ServicePipeline<IModulePostExecutionHook>>]
+[Transient<IServicePipeline<IModuleExecutionLifecycleHook>, ServicePipeline<IModuleExecutionLifecycleHook>>]
 [Singleton<IChildProcessDispatcher, DefaultChildProcessDispatcher>]
 [Singleton<IPingService, DefaultPingService>]
 [Singleton<IPortProbeService, TcpPortProbeService>]
