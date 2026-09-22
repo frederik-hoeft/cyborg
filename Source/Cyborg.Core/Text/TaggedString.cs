@@ -20,14 +20,13 @@ namespace Cyborg.Core.Text;
 public readonly struct TaggedString : IEquatable<TaggedString>
 {
     private readonly ImmutableHashSet<string>? _tags;
-    private readonly string? _value;
 
     /// <summary>
     /// The raw string value. This is the execution-facing surface and is never redacted.
     /// </summary>
-    public string Value => _value ?? string.Empty;
+    public string Value => field ?? string.Empty;
 
-    public ImmutableHashSet<string> Tags => _tags ?? ImmutableHashSet<string>.Empty;
+    public ImmutableHashSet<string> Tags => _tags ?? [];
 
     public bool HasTags => _tags is { Count: > 0 };
 
@@ -35,7 +34,7 @@ public readonly struct TaggedString : IEquatable<TaggedString>
 
     public TaggedString(string? value, IEnumerable<string>? tags = null)
     {
-        _value = value ?? string.Empty;
+        Value = value ?? string.Empty;
         _tags = NormalizeTags(tags);
     }
 
