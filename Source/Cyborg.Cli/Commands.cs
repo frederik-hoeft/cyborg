@@ -70,33 +70,29 @@ internal sealed class Commands
         IConfiguration configuration = services.GetRequiredService<IConfiguration>();
         IConfigurationBuilder configurationBuilder = services.GetRequiredService<IConfigurationBuilder>();
         ICliConfigurationService cliConfigurationService = services.GetRequiredService<ICliConfigurationService>();
-        bool configurationArgumentsValid = cliConfigurationService.TryConfigure(
-            configurationBuilder,
-            options,
-            config,
-            out string? configurationArgumentError);
+        bool configurationArgumentsValid = cliConfigurationService.TryConfigure(configurationBuilder, options, config, out string? configurationArgumentError);
+        // CLI --log-level overrides only the console sink minimum level.
+        if (logLevel.HasValue)
+        {
+            services.GetRequiredService<LoggingOptions>().MinimumLevel = logLevel.Value;
+        }
+        // set up debugger
         ICliDebugArgumentHandler debugArgumentHandler = services.GetRequiredService<ICliDebugArgumentHandler>();
         bool debuggerArgumentsValid = debugArgumentHandler.TryConfigure(breakAt, out string? invalidBreakpointExpression, out string? debuggerArgumentError);
         await configurationBuilder.ApplyToAsync(configuration, cancellationToken);
-
+        // set up metrics
         MetricsOptions metricsDefaults = CliConfigurationDefaults.Metrics;
         string metricsNamespace = configuration.Get(CliConfigurationDefaults.METRICS_NAMESPACE_KEY, metricsDefaults.Namespace);
         string configuredMetricsPath = configuration.Get(CliConfigurationDefaults.METRICS_FILE_PATH_KEY, metricsDefaults.FilePath);
         services.GetRequiredService<MetricsCollectorOptions>().Namespace = metricsNamespace;
         IMetricsCollector metricsCollector = services.GetRequiredService<IMetricsCollector>();
         string metricsDestinationPath = metrics ?? configuredMetricsPath;
+
         IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
         IRuntimeEnvironment globalEnvironment = runtime.GlobalEnvironment;
         bool runSucceeded = false;
-
         try
         {
-            // CLI --log-level overrides only the console sink minimum level.
-            if (logLevel.HasValue)
-            {
-                services.GetRequiredService<LoggingOptions>().MinimumLevel = logLevel.Value;
-            }
-
             ILogger logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("cyborg.cli.main");
 
             if (!configurationArgumentsValid)
