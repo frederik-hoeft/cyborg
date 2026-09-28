@@ -86,12 +86,24 @@ Workflow state begins at a root execution, not at the application service provid
 5. execute the optional configuration module as a nested child invocation and reconcile it before preparing the main module;
 6. activate a fresh main worker from the invocation scope;
 7. run generated preparation, validation, module lifecycle hooks, module execution, and artifact publication;
-8. if a definite result exists, emit `Completed` and complete the child transaction; reconcile completed state or discard exceptional no-result state according to the caller's structured execution policy, then emit `Closed` after that structural outcome is known;
+8. if a definite result exists, emit `Completed` and complete the child transaction; reconcile it under the invocation's failure-publication policy, or discard exceptional no-result state, then emit `Closed` after that structural outcome is known;
 9. dispose the invocation scope only after all runtime-owned nested work has terminated.
 
 The scope is part of the invocation contract, not a best-effort optimization. Production execution does not silently fall back to the caller or application-root service provider when an invocation scope cannot be established.
 
-Module result status and transaction publication are separate concerns. `Success`, `Failed`, `Skipped`, and `Canceled` describe execution outcomes; they do not currently select commit versus rollback. Ordinary nested execution reconciles completed transaction state unless execution fails before reconciliation can occur or reconciliation itself fails.
+Module result status and transaction publication are separate facts, connected by one policy. `Success` and `Skipped` always join the completed child. `Failed` and `Canceled` consult `ModuleBase.Transaction.OnError`:
+
+- `commit` joins the child, which is the historical behavior;
+- `rollback` reconciles the fork but publishes the fork baseline for workflow-data participants, so the child's workflow writes do not become parent-visible;
+- an omitted setting uses the global default `cyborg.core.transactions.on_error` (`cyborg.types.core.transactions.on_error.v1` when the value is supplied as a typed dynamic value). The built-in default is `commit`.
+
+The module setting wins over the global default. `Transaction` is structural configuration: overrides do not replace it. A missing options provider, including standalone runtimes that have no configuration, also resolves to `commit`.
+
+Rollback does not discard the fork. Control participants still contribute their completed state, so workflow-agnostic execution-control decisions survive. Debugger branch-control state is the built-in control participant; a custom `TransactionalServiceParticipant<TState>` remains workflow data unless it overrides `Role` to `TransactionParticipantRole.Control`. Environment state, the named-module registry, and ordinary transactional services are workflow data.
+
+`Closed.Joined` stays true for both commit and workflow rollback, because the fork reconciled. It is false only when the fork is discarded. Discard remains the path when execution fails before a definite result exists, or when reconciliation itself fails; that path publishes nothing, including control state.
+
+Inner and outer policies compose by nesting. An inner invocation decides what enters the outer transaction. The outer invocation's own `OnError` decides what leaves it, and only when the outer outcome is `Failed` or `Canceled`. A configuration module nested in a context is an inner invocation. The context's main module supplies the policy for the context transaction.
 
 `IModuleRuntime` remains the normal module-facing execution facade. Workers use it for environment access and structured nested execution rather than coordinating transaction objects or environment catalogs directly. The runtime owns the execution boundary and hides the mechanisms used for worker dispatch, environment views, artifact publication, and reconciliation.
 
@@ -142,7 +154,7 @@ All contributors start from the same baseline. Siblings cannot observe each othe
 
 Nested fork groups are structured lifetime scopes. A branch must close its own nested groups before it can complete, and an owner cannot terminate while one of its fork groups remains open. This prevents runtime-owned child work from outliving the transaction and DI scope that own it.
 
-Sequential nested execution uses exactly the same model with one child and an empty continuation. After the child joins, the reconciled changes remain part of the parent's parent-relative change set, so a later child forks from the updated effective state without losing provenance from earlier children.
+Sequential nested execution uses exactly the same model with one child and an empty continuation. After the child joins, the reconciled changes remain part of the parent's parent-relative change set, so a later child forks from the updated effective state without losing provenance from earlier children. A child completed with workflow rollback contributes a fresh baseline branch for each workflow-data participant. That baseline carries no change provenance, so a rolled-back child cannot conflict with a sibling and cannot republish writes it made and then withheld.
 
 Cancellation is a control signal rather than a merge operation. Caller cancellation propagates to runtime-owned children, but every started child is still observed before its fork closes. Cancellation may prevent reconciliation from starting; it does not permit partial publication or abandonment of invocation scopes that still own running work.
 
@@ -261,9 +273,9 @@ The registry remains separate from the environment participant because neither c
 
 ## Sequential and Parallel Composition
 
-Sequential control-flow modules contain no special transaction implementation. Each nested runtime call opens a one-child fork from the caller's current effective state, executes the complete child invocation, reconciles it, and only then resumes the caller. This preserves existing sequential visibility for configuration, artifacts, named references, loops, and conditionals while using the same state model as concurrent execution.
+Sequential control-flow modules contain no special transaction implementation. Each nested runtime call opens a one-child fork from the caller's current effective state, executes the complete child invocation, reconciles it under that child's failure-publication policy, and only then resumes the caller. This preserves existing sequential visibility for configuration, artifacts, named references, loops, and conditionals while using the same state model as concurrent execution. `cyborg.modules.retry.v1` is ordinary sequential composition: each attempt is one nested invocation, so a committed failed attempt is visible to the next attempt and a rolled-back attempt is not. The retry module's own `OnError` applies only when the retry invocation joins its parent.
 
-`cyborg.modules.parallel.v1` is the multi-sibling structured-execution surface. The runtime opens one fork group for all declared branches, creates one child transaction and DI scope per branch, and starts each complete branch invocation concurrently from the same fork baseline.
+`cyborg.modules.parallel.v1` is the multi-sibling structured-execution surface. The runtime opens one fork group for all declared branches, creates one child transaction and DI scope per branch, and starts each complete branch invocation concurrently from the same fork baseline. Each branch's failure-publication policy is applied to that contributor before the shared join.
 
 Every started branch is observed before reconciliation or disposal. Results are returned in declaration order even when tasks complete in another order, and reconciliation uses the same structural contributor order. Compatible changes publish together; an unresolved conflict publishes nothing and causes `Parallel` to fail.
 
@@ -326,6 +338,7 @@ The steady-state model establishes these guarantees:
 - runtime-owned child work cannot outlive its structured owner;
 - participants prepare detached candidates before any owner-visible state is published;
 - publication is atomic across all participants;
+- failure publication is selected per invocation by `Transaction.OnError` or the global default, and workflow rollback still reconciles control participants;
 - default conflict handling is deterministic and based on explicit write/write conflicts;
 - DI lifetime never implicitly enables transaction participation;
 - debugger step state inherits, isolates, and reconciles through the same structured branch model without introducing transaction conflicts;
@@ -333,11 +346,10 @@ The steady-state model establishes these guarantees:
 
 The model does not currently provide:
 
-- result-driven commit/rollback policy;
 - compensating actions for external side effects;
 - serializable read-set conflict detection;
 - deep transactional semantics for arbitrary object graphs stored as values;
-- retry-attempt selection or managed background/sidecar execution policy;
+- managed background or sidecar execution policy;
 - richer merge policies beyond the existing conflict-strategy boundary;
 - interactive selection or switching of the active debugger frontend among already-queued pause points;
 - persistence or export policy for final root transaction state.

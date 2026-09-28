@@ -13,6 +13,12 @@ public abstract class TransactionalServiceParticipant
     {
     }
 
+    /// <summary>
+    /// Classifies this participant for failure publication. The default is workflow data, which rollback withholds.
+    /// Override with <see cref="TransactionParticipantRole.Control"/> for execution-control state that must survive workflow rollback.
+    /// </summary>
+    public virtual TransactionParticipantRole Role => TransactionParticipantRole.WorkflowData;
+
     internal abstract object CreateRootStateCore();
 
     internal abstract ITransactionalServiceForkAdapter CreateForkCore(object ownerState);

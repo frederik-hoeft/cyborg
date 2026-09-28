@@ -1,4 +1,5 @@
-﻿using System.Collections.Immutable;
+﻿using Cyborg.Core.Runtime.Services.Transactions;
+using System.Collections.Immutable;
 
 namespace Cyborg.Core.Runtime.Engine.Transactions.Internal;
 
@@ -39,7 +40,8 @@ internal sealed class ModuleTransactionForkGroup
         List<TransactionStateBundle> contributorStates = new(contributors.Count);
         foreach (ModuleTransaction contributor in contributors)
         {
-            contributorStates.Add(contributor.GetStateForReconciliation(this));
+            TransactionStateBundle contributed = contributor.GetStateForReconciliation(this);
+            contributorStates.Add(contributor.PublishWorkflowData ? contributed : RestoreWorkflowBaseline(contributed));
         }
 
         ImmutableDictionary<ITransactionParticipant, ITransactionParticipantState>.Builder candidates =
@@ -97,6 +99,22 @@ internal sealed class ModuleTransactionForkGroup
         }
         _owner.ReleaseForkWithoutPublication(this);
         Lifecycle = ModuleTransactionForkLifecycle.Discarded;
+    }
+
+    private TransactionStateBundle RestoreWorkflowBaseline(TransactionStateBundle contributed)
+    {
+        ImmutableDictionary<ITransactionParticipant, ITransactionParticipantState>.Builder states =
+            ImmutableDictionary.CreateBuilder<ITransactionParticipant, ITransactionParticipantState>(ReferenceEqualityComparer.Instance);
+        foreach (ITransactionParticipant participant in _coordinator.Participants)
+        {
+            ITransactionParticipantState state = participant.Role == TransactionParticipantRole.Control
+                ? contributed.Get(participant)
+                : _participantForks[participant].CreateBranch()
+                    ?? throw new InvalidOperationException("A transaction participant returned a null branch state.");
+            states.Add(participant, state);
+        }
+
+        return new TransactionStateBundle(states.ToImmutable());
     }
 
     private ModuleTransaction CreateBranch()

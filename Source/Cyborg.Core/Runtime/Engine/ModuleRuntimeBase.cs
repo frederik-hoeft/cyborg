@@ -1,5 +1,6 @@
 ﻿using Cyborg.Core.Runtime.Configuration;
 using Cyborg.Core.Runtime.Engine.Environments;
+using Cyborg.Core.Runtime.Engine.Transactions;
 using Cyborg.Core.Runtime.Engine.Transactions.Internal;
 using Cyborg.Core.Runtime.Model;
 using Microsoft.Extensions.DependencyInjection;
@@ -88,9 +89,14 @@ internal abstract class ModuleRuntimeBase
             }
             IModuleExecutionResult[] results = await Task.WhenAll(executions);
 
-            foreach (ConcurrentExecutionBranch branch in branches)
+            for (int i = 0; i < branches.Count; i++)
             {
-                branch.Transaction.Complete();
+                CompleteChild(
+                    branches[i].Transaction,
+                    TransactionFailurePublication.PublishWorkflowData(
+                        branches[i].ModuleContext.Module.Definition,
+                        results[i].Status,
+                        serviceProvider));
             }
             bool joined = fork.TryJoin(out TransactionConflict? conflict);
             await NotifyConcurrentBranchesClosedAsync(branches, joined);
@@ -211,7 +217,7 @@ internal abstract class ModuleRuntimeBase
             IRuntimeEnvironment scopedEnvironment = invocationScope.BindEnvironment(request.Environment);
             IModuleExecutionResult result = await request.ExecuteInCurrentScopeAsync(invocationScope.Runtime, scopedEnvironment);
             await invocationScope.NotifyCompletedAsync(result);
-            childTransaction.Complete();
+            CompleteChild(childTransaction, TransactionFailurePublication.PublishWorkflowData(request.Module, result.Status, serviceProvider));
             bool joined = fork.TryJoin(out TransactionConflict? conflict);
             await invocationScope.CloseAsync(joined);
             if (!joined)
@@ -294,6 +300,17 @@ internal abstract class ModuleRuntimeBase
         {
             await branch.Scope.CloseAsync(joined);
         }
+    }
+
+    private static void CompleteChild(ModuleTransaction childTransaction, bool publishWorkflowData)
+    {
+        if (publishWorkflowData)
+        {
+            childTransaction.Complete();
+            return;
+        }
+
+        childTransaction.CompleteRollingBackWorkflowData();
     }
 
     private ModuleInvocationContext CreateInvocationContext(string moduleId, IModule module) =>

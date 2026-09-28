@@ -1,6 +1,8 @@
 ﻿using Cyborg.Cli.Logging;
 using Cyborg.Cli.Metrics;
+using Cyborg.Core.Runtime;
 using Cyborg.Core.Runtime.Services.Debugging.Configuration;
+using Cyborg.Core.Runtime.Services.Transactions;
 using Cyborg.Core.Services.Security.Trust.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -34,6 +36,7 @@ internal static class CliConfigurationDefaults
     internal const string TRUST_OPTIONS_KEY = "cyborg.services.trust";
     internal const string TRUST_POLICIES_KEY = TRUST_OPTIONS_KEY + ".policies";
     internal const string TRUST_ENFORCEMENT_MODE_KEY = TRUST_OPTIONS_KEY + ".enforcement_mode";
+    internal const string TRANSACTION_ON_ERROR_KEY = ITransactionOptionsProvider.ON_ERROR_KEY;
 
     private const string CONSOLE_DEBUG_FRONTEND = "console";
 
@@ -60,5 +63,6 @@ internal static class CliConfigurationDefaults
         [FILE_LOGGING_OPTIONS_KEY] = FileLogging,
         [METRICS_OPTIONS_KEY] = Metrics,
         [TRUST_OPTIONS_KEY] = Trust,
+        [TRANSACTION_ON_ERROR_KEY] = TransactionOnError.Commit,
     };
 }

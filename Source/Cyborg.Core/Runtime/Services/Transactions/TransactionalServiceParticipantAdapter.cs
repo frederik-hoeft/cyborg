@@ -7,6 +7,8 @@ internal sealed class TransactionalServiceParticipantAdapter(TransactionalServic
 {
     public TransactionalServiceParticipant Participant { get; } = participant ?? throw new ArgumentNullException(nameof(participant));
 
+    public TransactionParticipantRole Role => Participant.Role;
+
     public TransactionalServiceParticipantState CreateRootState(TransactionRootSeed seed)
     {
         ArgumentNullException.ThrowIfNull(seed);

@@ -267,6 +267,76 @@ public sealed class TransactionalRuntimeEnvironmentTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_FailedRollbackDoesNotPublishEnvironmentChangesAsync()
+    {
+        GlobalRuntimeEnvironment globalEnvironment = new(JsonNamingPolicy.SnakeCaseLower);
+        using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
+        using ServiceProvider serviceProvider = new ServiceCollection()
+            .AddSingleton<IModuleWorkerFactory>(new EnvironmentProbeWorkerFactory())
+            .BuildServiceProvider();
+        RootModuleRuntime runtime = new(globalEnvironment, loggerFactory, serviceProvider);
+        ModuleReference module = new(
+            new EnvironmentProbeModule
+            {
+                Name = "failed",
+                Transaction = new ModuleTransactionSettings(TransactionOnError.Rollback),
+            },
+            EnvironmentProbeModule.ModuleId);
+
+        IModuleExecutionResult result = await runtime.ExecuteAsync(module, cancellationToken: TestContext.CancellationToken);
+
+        Assert.AreEqual(ModuleExitStatus.Failed, result.Status);
+        Assert.IsFalse(runtime.GlobalEnvironment.TryResolveVariable("failed-write", out object? _));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_SuccessfulRollbackStillPublishesEnvironmentChangesAsync()
+    {
+        GlobalRuntimeEnvironment globalEnvironment = new(JsonNamingPolicy.SnakeCaseLower);
+        using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
+        using ServiceProvider serviceProvider = new ServiceCollection()
+            .AddSingleton<IModuleWorkerFactory>(new EnvironmentProbeWorkerFactory())
+            .BuildServiceProvider();
+        RootModuleRuntime runtime = new(globalEnvironment, loggerFactory, serviceProvider);
+        ModuleReference module = new(
+            new EnvironmentProbeModule
+            {
+                Name = "success-write",
+                Transaction = new ModuleTransactionSettings(TransactionOnError.Rollback),
+            },
+            EnvironmentProbeModule.ModuleId);
+
+        IModuleExecutionResult result = await runtime.ExecuteAsync(module, cancellationToken: TestContext.CancellationToken);
+
+        Assert.AreEqual(ModuleExitStatus.Success, result.Status);
+        Assert.IsTrue(runtime.GlobalEnvironment.TryResolveVariable("kept", out string? value));
+        Assert.AreEqual("visible", value);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_CanceledRollbackDoesNotPublishEnvironmentChangesAsync()
+    {
+        GlobalRuntimeEnvironment globalEnvironment = new(JsonNamingPolicy.SnakeCaseLower);
+        using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
+        using ServiceProvider serviceProvider = new ServiceCollection()
+            .AddSingleton<IModuleWorkerFactory>(new EnvironmentProbeWorkerFactory())
+            .BuildServiceProvider();
+        RootModuleRuntime runtime = new(globalEnvironment, loggerFactory, serviceProvider);
+        ModuleReference module = new(
+            new EnvironmentProbeModule
+            {
+                Name = "canceled",
+                Transaction = new ModuleTransactionSettings(TransactionOnError.Rollback),
+            },
+            EnvironmentProbeModule.ModuleId);
+
+        IModuleExecutionResult result = await runtime.ExecuteAsync(module, cancellationToken: TestContext.CancellationToken);
+
+        Assert.AreEqual(ModuleExitStatus.Canceled, result.Status);
+        Assert.IsFalse(runtime.GlobalEnvironment.TryResolveVariable("canceled-write", out object? _));
+    }
+
+    [TestMethod]
     public async Task Exit_DefaultParentArtifactsPublishThroughCurrentTransactionAsync()
     {
         GlobalRuntimeEnvironment globalEnvironment = new(JsonNamingPolicy.SnakeCaseLower);
@@ -397,6 +467,12 @@ public sealed class TransactionalRuntimeEnvironmentTests
                 case "failed":
                     runtime.GlobalEnvironment.SetVariable("failed-write", "committed");
                     return new EnvironmentProbeExecutionResult(module, ModuleExitStatus.Failed, runtime.Environment.CreateTestArtifactCollection());
+                case "success-write":
+                    runtime.GlobalEnvironment.SetVariable("kept", "visible");
+                    return new EnvironmentProbeExecutionResult(module, ModuleExitStatus.Success, runtime.Environment.CreateTestArtifactCollection());
+                case "canceled":
+                    runtime.GlobalEnvironment.SetVariable("canceled-write", "dropped");
+                    return new EnvironmentProbeExecutionResult(module, ModuleExitStatus.Canceled, runtime.Environment.CreateTestArtifactCollection());
                 case "artifact":
                     IEnvironmentLike artifactValues = runtime.Environment.CreateTestArtifactCollection();
                     artifactValues.SetVariable("artifact-value", 42);

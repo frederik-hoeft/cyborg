@@ -20,6 +20,12 @@ internal sealed class ModuleTransaction
 
     public ModuleTransactionLifecycle Lifecycle { get; private set; } = ModuleTransactionLifecycle.Active;
 
+    /// <summary>
+    /// <see langword="false"/> when reconciliation must substitute fork baselines for workflow-data participants.
+    /// Control participants still contribute their completed state.
+    /// </summary>
+    internal bool PublishWorkflowData { get; private set; } = true;
+
     internal bool HasOpenFork => _openFork is not null;
 
     public TState GetParticipantState<TState>(ITransactionParticipant<TState> participant)
@@ -42,10 +48,15 @@ internal sealed class ModuleTransaction
         return fork;
     }
 
-    public void Complete()
+    public void Complete() => Finish(publishWorkflowData: true);
+
+    internal void CompleteRollingBackWorkflowData() => Finish(publishWorkflowData: false);
+
+    private void Finish(bool publishWorkflowData)
     {
         EnsureActive();
         EnsureNoOpenFork();
+        PublishWorkflowData = publishWorkflowData;
         Lifecycle = ModuleTransactionLifecycle.Completed;
     }
 

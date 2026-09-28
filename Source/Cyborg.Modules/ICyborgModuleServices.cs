@@ -23,6 +23,7 @@ using Cyborg.Modules.Named;
 using Cyborg.Modules.Network.SshShutdown;
 using Cyborg.Modules.Network.WakeOnLan;
 using Cyborg.Modules.Parallel;
+using Cyborg.Modules.Retry;
 using Cyborg.Modules.Sequence;
 using Cyborg.Modules.Subprocess;
 using Cyborg.Modules.Switch;
@@ -50,6 +51,7 @@ namespace Cyborg.Modules;
 [Singleton<IModuleLoader, WakeOnLanModuleLoader>]
 [Singleton<IModuleLoader, IfModuleLoader>]
 [Singleton<IModuleLoader, WhileModuleLoader>]
+[Singleton<IModuleLoader, RetryModuleLoader>]
 [Singleton<IModuleLoader, IsTrueModuleLoader>]
 [Singleton<IModuleLoader, IsSetModuleLoader>]
 [Singleton<IModuleLoader, FileExistsModuleLoader>]

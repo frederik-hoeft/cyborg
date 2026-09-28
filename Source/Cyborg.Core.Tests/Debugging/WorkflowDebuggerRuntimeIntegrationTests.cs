@@ -57,6 +57,30 @@ public sealed class WorkflowDebuggerRuntimeIntegrationTests : CyborgCoreTestBase
         Assert.AreEqual(0, breakpoints.Count);
     }, ConfigureServices);
 
+    [TestMethod]
+    public Task Test_Rollback_StepDecisionStillReachesTheNextInvocationAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        StepThenContinueFrontend frontend = (StepThenContinueFrontend)services.GetRequiredService<IDebugFrontend>();
+        ModuleReference failing = new(
+            new DebugProbeModule
+            {
+                Name = "rollback-step",
+                Transaction = new ModuleTransactionSettings(TransactionOnError.Rollback),
+            },
+            DebugProbeModule.ModuleId);
+
+        IModuleExecutionResult failed = await runtime.ExecuteAsync(failing, cancellationToken: TestContext.CancellationToken);
+        IModuleExecutionResult next = await runtime.ExecuteAsync(
+            new ModuleReference(new DebugProbeModule { Name = "after-rollback" }, DebugProbeModule.ModuleId),
+            cancellationToken: TestContext.CancellationToken);
+
+        Assert.AreEqual(ModuleExitStatus.Failed, failed.Status);
+        Assert.AreEqual(ModuleExitStatus.Success, next.Status);
+        Assert.IsFalse(runtime.GlobalEnvironment.TryResolveVariable("rolled-back", out object? _));
+        Assert.AreSequenceEqual(["cyborg.tests.debug-orchestration.v1 name=after-rollback"], frontend.Identities);
+    }, ConfigureServices);
+
     private static void ConfigureServices(IServiceCollection services)
     {
         services.RemoveAll<IModuleWorkerFactory>();
@@ -96,8 +120,17 @@ public sealed class WorkflowDebuggerRuntimeIntegrationTests : CyborgCoreTestBase
 
     private sealed class DebugProbeWorker(IWorkerContext<DebugProbeModule> context) : ModuleWorker<DebugProbeModule>(context)
     {
-        protected override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken) =>
-            Task.FromResult(runtime.Exit(Success()));
+        protected override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
+        {
+            if (Module.Name == "rollback-step")
+            {
+                ServiceProvider.GetRequiredService<IDebugBranchControl>().Step();
+                runtime.GlobalEnvironment.SetVariable("rolled-back", "nope");
+                return Task.FromResult(runtime.Exit(Failed()));
+            }
+
+            return Task.FromResult(runtime.Exit(Success()));
+        }
     }
 
     private sealed class StepThenContinueFrontend : IDebugFrontend

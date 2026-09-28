@@ -68,6 +68,9 @@ namespace Cyborg.Core;
 [Singleton<IPingService, DefaultPingService>]
 [Singleton<IPortProbeService, TcpPortProbeService>]
 [Singleton<IPosixShellCommandBuilder, PosixShellCommandBuilder>]
+[Singleton<ITransactionOptionsProvider, DefaultTransactionOptionsProvider>]
+[Singleton<IDynamicValueProvider, DynamicTransactionOnErrorProvider>]
+[Singleton<JsonConverter>(Factory = nameof(CreateTransactionOnErrorConverter))]
 [Singleton<IModuleResultBuilderFactory, ModuleResultBuilderFactory>]
 [Singleton<MetricsCollectorOptions>]
 [Singleton<IMetricsCollector, MetricsCollector>]
@@ -77,6 +80,8 @@ public interface ICyborgCoreServices
     static CoreJsonSerializerContext GetCoreJsonSerializerContext() => CoreJsonSerializerContext.Default;
 
     static JsonConverter CreateEnvironmentScopeConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<EnvironmentScope>(namingPolicy);
+
+    static JsonConverter CreateTransactionOnErrorConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<TransactionOnError>(namingPolicy);
 
     static JsonConverter CreateDecompositionStrategyConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<DecompositionStrategy>(namingPolicy);
 

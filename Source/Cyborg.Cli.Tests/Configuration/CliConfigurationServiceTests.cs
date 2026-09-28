@@ -1,6 +1,7 @@
 ﻿using Cyborg.Cli.Configuration;
 using Cyborg.Core.Configuration;
 using Cyborg.Core.Configuration.Model;
+using Cyborg.Core.Runtime;
 using Cyborg.Core.Runtime.Services.Debugging;
 using Cyborg.Core.Services.Default;
 using Cyborg.Core.Services.Security.Trust.Configuration;
@@ -35,6 +36,7 @@ public sealed class CliConfigurationServiceTests : CyborgCliTestBase
                     Assert.IsFalse(configuration.Get(CliConfigurationDefaults.ROLLING_LOGGING_ENABLED_KEY, true));
                     Assert.AreEqual("cyborg", configuration.Get<string>(CliConfigurationDefaults.METRICS_NAMESPACE_KEY));
                     Assert.AreEqual(TrustEnforcementMode.Enforce, configuration.Get(CliConfigurationDefaults.TRUST_ENFORCEMENT_MODE_KEY, TrustEnforcementMode.Disabled));
+                    Assert.AreEqual(TransactionOnError.Commit, configuration.Get(CliConfigurationDefaults.TRANSACTION_ON_ERROR_KEY, TransactionOnError.Rollback));
                     IReadOnlyList<DynamicValue> policies = configuration.Get<IReadOnlyList<DynamicValue>>(CliConfigurationDefaults.TRUST_POLICIES_KEY)!;
                     Assert.IsEmpty(policies);
                 },
