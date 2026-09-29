@@ -20,11 +20,8 @@ internal sealed class ModuleTransaction
 
     public ModuleTransactionLifecycle Lifecycle { get; private set; } = ModuleTransactionLifecycle.Active;
 
-    /// <summary>
-    /// <see langword="false"/> when reconciliation must substitute fork baselines for workflow-data participants.
-    /// Control participants still contribute their completed state.
-    /// </summary>
-    internal bool PublishWorkflowData { get; private set; } = true;
+    /// <summary>Completion disposition, interpreted separately by each participant's contribution policy.</summary>
+    internal TransactionPublicationDisposition Publication { get; private set; } = TransactionPublicationDisposition.Commit;
 
     internal bool HasOpenFork => _openFork is not null;
 
@@ -48,15 +45,17 @@ internal sealed class ModuleTransaction
         return fork;
     }
 
-    public void Complete() => Finish(publishWorkflowData: true);
+    public void Complete() => Complete(TransactionPublicationDisposition.Commit);
 
-    internal void CompleteRollingBackWorkflowData() => Finish(publishWorkflowData: false);
-
-    private void Finish(bool publishWorkflowData)
+    internal void Complete(TransactionPublicationDisposition publication)
     {
         EnsureActive();
         EnsureNoOpenFork();
-        PublishWorkflowData = publishWorkflowData;
+        if (!Enum.IsDefined(publication))
+        {
+            throw new ArgumentOutOfRangeException(nameof(publication), publication, "Unsupported transaction publication disposition.");
+        }
+        Publication = publication;
         Lifecycle = ModuleTransactionLifecycle.Completed;
     }
 

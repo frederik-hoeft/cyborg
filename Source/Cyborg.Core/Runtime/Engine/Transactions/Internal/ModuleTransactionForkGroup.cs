@@ -1,5 +1,4 @@
-﻿using Cyborg.Core.Runtime.Services.Transactions;
-using System.Collections.Immutable;
+﻿using System.Collections.Immutable;
 
 namespace Cyborg.Core.Runtime.Engine.Transactions.Internal;
 
@@ -40,8 +39,7 @@ internal sealed class ModuleTransactionForkGroup
         List<TransactionStateBundle> contributorStates = new(contributors.Count);
         foreach (ModuleTransaction contributor in contributors)
         {
-            TransactionStateBundle contributed = contributor.GetStateForReconciliation(this);
-            contributorStates.Add(contributor.PublishWorkflowData ? contributed : RestoreWorkflowBaseline(contributed));
+            contributorStates.Add(contributor.GetStateForReconciliation(this));
         }
 
         ImmutableDictionary<ITransactionParticipant, ITransactionParticipantState>.Builder candidates =
@@ -49,15 +47,19 @@ internal sealed class ModuleTransactionForkGroup
         foreach (ITransactionParticipant participant in _coordinator.Participants)
         {
             ITransactionParticipantFork participantFork = _participantForks[participant];
-            ITransactionParticipantState[] participantContributors = new ITransactionParticipantState[contributorStates.Count];
-            for (int i = 0; i < contributorStates.Count; i++)
-            {
-                participantContributors[i] = contributorStates[i].Get(participant);
-            }
-
             ITransactionParticipantState? candidate;
             try
             {
+                ITransactionParticipantContributionPolicy contributionPolicy = participant.ContributionPolicy;
+                ITransactionParticipantState[] participantContributors = new ITransactionParticipantState[contributorStates.Count];
+                for (int i = 0; i < contributorStates.Count; i++)
+                {
+                    participantContributors[i] = contributionPolicy.SelectContribution(
+                        contributors[i].Publication,
+                        participantFork,
+                        contributorStates[i].Get(participant));
+                }
+
                 if (!participantFork.TryPrepareMerge(
                     participant,
                     participantContributors,
@@ -99,22 +101,6 @@ internal sealed class ModuleTransactionForkGroup
         }
         _owner.ReleaseForkWithoutPublication(this);
         Lifecycle = ModuleTransactionForkLifecycle.Discarded;
-    }
-
-    private TransactionStateBundle RestoreWorkflowBaseline(TransactionStateBundle contributed)
-    {
-        ImmutableDictionary<ITransactionParticipant, ITransactionParticipantState>.Builder states =
-            ImmutableDictionary.CreateBuilder<ITransactionParticipant, ITransactionParticipantState>(ReferenceEqualityComparer.Instance);
-        foreach (ITransactionParticipant participant in _coordinator.Participants)
-        {
-            ITransactionParticipantState state = participant.Role == TransactionParticipantRole.Control
-                ? contributed.Get(participant)
-                : _participantForks[participant].CreateBranch()
-                    ?? throw new InvalidOperationException("A transaction participant returned a null branch state.");
-            states.Add(participant, state);
-        }
-
-        return new TransactionStateBundle(states.ToImmutable());
     }
 
     private ModuleTransaction CreateBranch()

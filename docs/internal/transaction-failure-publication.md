@@ -37,7 +37,9 @@ External I/O, process-wide singletons, and mutation inside objects stored as env
 
 The fork group still prepares one aggregate candidate and publishes it atomically, or publishes nothing on conflict. Rollback does not add a second publication path and does not discard the fork.
 
-Before preparation, a child completed with workflow rollback contributes a fresh baseline branch for every workflow-data participant and its real post-execution state for every control participant. The baseline branch is created from the fork captured at open, so it carries no change provenance. Control state merges with the existing conflict-free rules. Because the substituted workflow state records no writes, siblings cannot conflict with a rolled-back child, and the owner's pre-fork workflow values remain.
+The runtime resolves the module outcome and its effective failure policy into a completion disposition (`Commit` or `Rollback`). Each participant role selects a contribution policy through the participant interface. For workflow data, rollback selects a fresh baseline branch; for control state, either disposition selects the completed branch. The fork group applies the selected policies uniformly to all contributors, without role-specific conditionals or per-category publication flags. Further roles need their own contribution policy and role mapping, without changes to fork reconciliation.
+
+The baseline branch is created from the fork captured at open, so it carries no change provenance. Control state merges with the existing conflict-free rules. Because the substituted workflow state records no writes, siblings cannot conflict with a rolled-back child, and the owner's pre-fork workflow values remain.
 
 `Closed.Joined` stays `true` for this outcome. The fork reconciled. Joined means the invocation was not discarded; it does not mean every participant published child writes. Full discard remains the path for an incomplete child or a preparation failure, and that path still publishes nothing, including control state.
 

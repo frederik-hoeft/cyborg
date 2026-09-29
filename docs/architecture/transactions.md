@@ -99,7 +99,9 @@ Module result status and transaction publication are separate facts, connected b
 
 The module setting wins over the global default. `Transaction` is structural configuration: overrides do not replace it. A missing options provider, including standalone runtimes that have no configuration, also resolves to `commit`.
 
-Rollback does not discard the fork. Control participants still contribute their completed state, so workflow-agnostic execution-control decisions survive. Debugger branch-control state is the built-in control participant; a custom `TransactionalServiceParticipant<TState>` remains workflow data unless it overrides `Role` to `TransactionParticipantRole.Control`. Environment state, the named-module registry, and ordinary transactional services are workflow data.
+The runtime resolves the module result and configured failure policy into a transaction completion disposition before reconciliation. Each participant's role selects a contribution policy: workflow data contributes its completed branch on commit or a fresh branch from the stable fork baseline on rollback, while control participants contribute their completed branch for either disposition. The fork group applies these policies uniformly before preparing the aggregate merge; it does not interpret participant roles itself. Adding a participant role requires defining its contribution policy, not another reconciliation path.
+
+Rollback therefore does not discard the fork. Workflow-agnostic execution-control decisions survive through normal reconciliation. Debugger branch-control state is the built-in control participant; a custom `TransactionalServiceParticipant<TState>` remains workflow data unless it overrides `Role` to `TransactionParticipantRole.Control`. Environment state, the named-module registry, and ordinary transactional services are workflow data.
 
 `Closed.Joined` stays true for both commit and workflow rollback, because the fork reconciled. It is false only when the fork is discarded. Discard remains the path when execution fails before a definite result exists, or when reconciliation itself fails; that path publishes nothing, including control state.
 

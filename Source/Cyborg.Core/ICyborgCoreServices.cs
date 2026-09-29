@@ -10,6 +10,7 @@ using Cyborg.Core.Runtime.Engine;
 using Cyborg.Core.Runtime.Engine.Environments;
 using Cyborg.Core.Runtime.Engine.Environments.Artifacts;
 using Cyborg.Core.Runtime.Engine.Environments.Syntax;
+using Cyborg.Core.Runtime.Engine.Transactions;
 using Cyborg.Core.Runtime.Hooks;
 using Cyborg.Core.Runtime.Model;
 using Cyborg.Core.Runtime.Services.Debugging;
@@ -90,7 +91,8 @@ public interface ICyborgCoreServices
         ITaggedStringConversionObserver taggedStringConversionObserver,
         ILoggerFactory loggerFactory,
         IServiceProvider serviceProvider,
-        IEnumerable<TransactionalServiceParticipant> transactionalServiceParticipants)
+        IEnumerable<TransactionalServiceParticipant> transactionalServiceParticipants,
+        ITransactionOptionsProvider transactionOptions)
     {
         IRuntimeEnvironmentFactory environmentFactory = new DefaultRuntimeEnvironmentFactory(syntaxFactory, taggedStringConversionObserver);
         IRuntimeModuleRegistry moduleRegistry = new RuntimeModuleRegistry();
@@ -100,7 +102,8 @@ public interface ICyborgCoreServices
             new ModuleContextRunner(syntaxFactory, environmentFactory, loggerFactory),
             new ModuleDispatcher(environmentFactory, loggerFactory),
             moduleRegistry,
-            transactionalServices);
+            transactionalServices,
+            new DefaultTransactionCompletionPolicy(transactionOptions));
         GlobalRuntimeEnvironment globalEnvironment = environmentFactory.CreateGlobalEnvironment();
         return new RootModuleRuntime(globalEnvironment, environmentFactory, services, loggerFactory, serviceProvider);
     }
