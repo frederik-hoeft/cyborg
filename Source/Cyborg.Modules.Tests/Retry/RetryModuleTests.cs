@@ -3,6 +3,7 @@ using Cyborg.Core.Configuration.Serialization;
 using Cyborg.Core.Runtime;
 using Cyborg.Core.Runtime.Engine;
 using Cyborg.Core.Runtime.Hooks;
+using Cyborg.Core.Runtime.Model;
 using Cyborg.Core.Runtime.Services.Transactions;
 using Cyborg.Core.TestAdapter;
 using Cyborg.Modules.Assert;
