@@ -7,9 +7,11 @@ namespace Cyborg.Modules.Retry;
 
 [GeneratedModuleValidation]
 public sealed partial record RetryModule(
-    [property: Required][property: Range<int>(Min = 1)] int Attempts,
+    [property: Required][property: Range<int>(Min = 1, Max = MAX_ATTEMPTS)] int Attempts,
     [property: Required] ModuleContext Body
 ) : ModuleBase, IModule
 {
+    public const int MAX_ATTEMPTS = 1000;
+
     public static string ModuleId => "cyborg.modules.retry.v1";
 }

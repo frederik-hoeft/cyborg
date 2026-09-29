@@ -1,9 +1,15 @@
 using Cyborg.Core.Configuration.Builders;
+using Cyborg.Core.Configuration.Serialization;
 using Cyborg.Core.Runtime;
 using Cyborg.Core.Runtime.Engine;
+using Cyborg.Core.Runtime.Hooks;
+using Cyborg.Core.Runtime.Model;
 using Cyborg.Core.Runtime.Services.Transactions;
 using Cyborg.Core.TestAdapter;
+using Cyborg.Modules.Assert;
 using Cyborg.Modules.Retry;
+using Microsoft.Extensions.DependencyInjection;
+using System.Text.Json;
 
 namespace Cyborg.Modules.Tests.Retry;
 
@@ -31,6 +37,52 @@ public sealed class RetryModuleTests : ModuleTestBase
             """
             {
               "cyborg.modules.retry.v1": {
+                "body": {
+                  "module": { "cyborg.modules.empty.v1": {} }
+                }
+              }
+            }
+            """,
+            result => MSAssert.IsFalse(result.IsValid));
+
+    [TestMethod]
+    public Task TestValidationAsync_AttemptsAboveLimit_IsInvalidAsync() =>
+        TestValidationAsync<RetryModule>(
+            $"""
+            {
+              "cyborg.modules.retry.v1": {
+                "attempts": {{RetryModule.MAX_ATTEMPTS + 1}},
+                "body": {
+                  "module": { "cyborg.modules.empty.v1": {} }
+                }
+              }
+            }
+            """,
+            result => MSAssert.IsFalse(result.IsValid));
+
+    [TestMethod]
+    public Task TestValidationAsync_MaximumAttempts_IsValidAsync() =>
+        TestValidationAsync<RetryModule>(
+            $"""
+            {
+              "cyborg.modules.retry.v1": {
+                "attempts": {{RetryModule.MAX_ATTEMPTS}},
+                "body": {
+                  "module": { "cyborg.modules.empty.v1": {} }
+                }
+              }
+            }
+            """,
+            result => MSAssert.IsTrue(result.IsValid));
+
+    [TestMethod]
+    public Task TestValidationAsync_UndefinedTransactionOnError_IsInvalidAsync() =>
+        TestValidationAsync<RetryModule>(
+            """
+            {
+              "cyborg.modules.retry.v1": {
+                "attempts": 1,
+                "transaction": { "on_error": 2147483647 },
                 "body": {
                   "module": { "cyborg.modules.empty.v1": {} }
                 }
@@ -130,6 +182,42 @@ public sealed class RetryModuleTests : ModuleTestBase
             {
                 [ITransactionOptionsProvider.ON_ERROR_KEY] = TransactionOnError.Rollback,
             }));
+
+    [TestMethod]
+    public async Task TestExecutionAsync_CancellationAfterFailedAttemptStopsRetriesAsync()
+    {
+        using CancellationTokenSource cancellation = new();
+        CancelAfterFailedAttemptHook hook = new(cancellation);
+        await TestWithDIAsync(async services =>
+        {
+            IJsonLoaderContext loaderContext = services.GetRequiredService<IJsonLoaderContext>();
+            ModuleReference retry = JsonSerializer.Deserialize<ModuleReference>(
+                """
+                {
+                  "cyborg.modules.retry.v1": {
+                    "attempts": 5,
+                    "body": {
+                      "module": {
+                        "cyborg.modules.assert.v1": {
+                          "assertion": {
+                            "cyborg.modules.condition.is_true.v1": { "variable": "missing" }
+                          },
+                          "message": "fail attempt"
+                        }
+                      }
+                    }
+                  }
+                }
+                """,
+                loaderContext.JsonSerializerOptions) ?? throw new InvalidOperationException("Unable to deserialize retry module.");
+
+            IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+            IModuleExecutionResult result = await runtime.ExecuteAsync(retry, cancellationToken: cancellation.Token);
+
+            MSAssert.AreEqual(ModuleExitStatus.Canceled, result.Status);
+            MSAssert.AreEqual(1, hook.FailedAttempts);
+        }, configureServices: services => services.AddSingleton<IModulePostExecutionHook>(hook));
+    }
 
     [TestMethod]
     public Task TestExecutionAsync_ParallelRollbackBranchDoesNotPublishAsync() =>
@@ -314,5 +402,21 @@ public sealed class RetryModuleTests : ModuleTestBase
           }
         }
         """;
+    }
+
+    private sealed class CancelAfterFailedAttemptHook(CancellationTokenSource cancellation) : IModulePostExecutionHook
+    {
+        public int FailedAttempts { get; private set; }
+
+        public ValueTask ExecuteAsync(IModulePostExecutionContext context, CancellationToken cancellationToken)
+        {
+            if (context.Result is { Module: AssertModule, Status: ModuleExitStatus.Failed })
+            {
+                ++FailedAttempts;
+                cancellation.Cancel();
+            }
+
+            return ValueTask.CompletedTask;
+        }
     }
 }
