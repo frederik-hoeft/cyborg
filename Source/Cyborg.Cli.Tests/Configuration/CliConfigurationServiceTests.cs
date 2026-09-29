@@ -2,6 +2,7 @@
 using Cyborg.Core.Configuration;
 using Cyborg.Core.Configuration.Model;
 using Cyborg.Core.Runtime;
+using Cyborg.Core.Runtime.Services.Transactions;
 using Cyborg.Core.Runtime.Services.Debugging;
 using Cyborg.Core.Services.Default;
 using Cyborg.Core.Services.Security.Trust.Configuration;
@@ -68,6 +69,47 @@ public sealed class CliConfigurationServiceTests : CyborgCliTestBase
                     Assert.AreEqual("custom", defaultFrontend.GetRequiredDefault().Key);
                 },
                 configureServices: static services => services.AddSingleton<IDebugFrontend>(new CustomDebugFrontend()),
+                buildConfiguration: configuration =>
+                {
+                    ICliConfigurationService service = configuration.ServiceProvider.GetRequiredService<ICliConfigurationService>();
+                    Assert.IsTrue(service.TryConfigure(configuration, optionsPath, configurationEntries: null, out _));
+                });
+        }
+        finally
+        {
+            File.Delete(optionsPath);
+        }
+    }
+
+    [TestMethod]
+    public async Task Test_TryConfigure_TypedTransactionPolicyFileOverridesDefaultAsync()
+    {
+        string optionsPath = Path.GetTempFileName();
+        await File.WriteAllTextAsync(
+            optionsPath,
+            """
+            {
+              "options": [
+                {
+                  "key": "cyborg.core.transactions.on_error",
+                  "cyborg.types.core.transactions.on_error.v1": "rollback"
+                }
+              ]
+            }
+            """,
+            TestContext.CancellationToken);
+        try
+        {
+            await TestWithDIAsync(
+                assertion: services =>
+                {
+                    IConfiguration configuration = services.GetRequiredService<IConfiguration>();
+                    ITransactionOptionsProvider options = services.GetRequiredService<ITransactionOptionsProvider>();
+
+                    Assert.AreEqual(TransactionOnError.Rollback, configuration.Get(
+                        CliConfigurationDefaults.TRANSACTION_ON_ERROR_KEY, TransactionOnError.Commit));
+                    Assert.AreEqual(TransactionOnError.Rollback, options.OnError);
+                },
                 buildConfiguration: configuration =>
                 {
                     ICliConfigurationService service = configuration.ServiceProvider.GetRequiredService<ICliConfigurationService>();
