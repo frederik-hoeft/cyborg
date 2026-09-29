@@ -1,4 +1,4 @@
-using Cyborg.Core.Configuration.Builders;
+﻿using Cyborg.Core.Configuration.Builders;
 using Cyborg.Core.Configuration.Serialization;
 using Cyborg.Core.Runtime;
 using Cyborg.Core.Runtime.Engine;
@@ -48,7 +48,7 @@ public sealed class RetryModuleTests : ModuleTestBase
     [TestMethod]
     public Task TestValidationAsync_AttemptsAboveLimit_IsInvalidAsync() =>
         TestValidationAsync<RetryModule>(
-            $"""
+            $$"""
             {
               "cyborg.modules.retry.v1": {
                 "attempts": {{RetryModule.MAX_ATTEMPTS + 1}},
@@ -63,7 +63,7 @@ public sealed class RetryModuleTests : ModuleTestBase
     [TestMethod]
     public Task TestValidationAsync_MaximumAttempts_IsValidAsync() =>
         TestValidationAsync<RetryModule>(
-            $"""
+            $$"""
             {
               "cyborg.modules.retry.v1": {
                 "attempts": {{RetryModule.MAX_ATTEMPTS}},
@@ -408,15 +408,15 @@ public sealed class RetryModuleTests : ModuleTestBase
     {
         public int FailedAttempts { get; private set; }
 
-        public ValueTask ExecuteAsync(IModulePostExecutionContext context, CancellationToken cancellationToken)
+        public int Priority => 0;
+
+        public async ValueTask ExecuteAsync(IModulePostExecutionContext context, CancellationToken cancellationToken)
         {
             if (context.Result is { Module: AssertModule, Status: ModuleExitStatus.Failed })
             {
                 ++FailedAttempts;
-                cancellation.Cancel();
+                await cancellation.CancelAsync();
             }
-
-            return ValueTask.CompletedTask;
         }
     }
 }

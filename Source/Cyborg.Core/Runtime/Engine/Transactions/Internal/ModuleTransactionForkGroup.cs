@@ -54,18 +54,10 @@ internal sealed class ModuleTransactionForkGroup
                 ITransactionParticipantState[] participantContributors = new ITransactionParticipantState[contributorStates.Count];
                 for (int i = 0; i < contributorStates.Count; i++)
                 {
-                    participantContributors[i] = contributionPolicy.SelectContribution(
-                        contributors[i].Publication,
-                        participantFork,
-                        contributorStates[i].Get(participant));
+                    participantContributors[i] = contributionPolicy.SelectContribution(contributors[i].Publication, participantFork, contributorStates[i].Get(participant));
                 }
 
-                if (!participantFork.TryPrepareMerge(
-                    participant,
-                    participantContributors,
-                    _coordinator.ConflictStrategy,
-                    out candidate,
-                    out conflict))
+                if (!participantFork.TryPrepareMerge(participant, participantContributors, _coordinator.ConflictStrategy, out candidate, out conflict))
                 {
                     CloseFork(contributors, ModuleTransactionForkLifecycle.Conflict);
                     return false;
@@ -105,7 +97,8 @@ internal sealed class ModuleTransactionForkGroup
 
     private ModuleTransaction CreateBranch()
     {
-        ImmutableDictionary<ITransactionParticipant, ITransactionParticipantState>.Builder states = ImmutableDictionary.CreateBuilder<ITransactionParticipant, ITransactionParticipantState>(ReferenceEqualityComparer.Instance);
+        ImmutableDictionary<ITransactionParticipant, ITransactionParticipantState>.Builder states =
+            ImmutableDictionary.CreateBuilder<ITransactionParticipant, ITransactionParticipantState>(ReferenceEqualityComparer.Instance);
         foreach (ITransactionParticipant participant in _coordinator.Participants)
         {
             ITransactionParticipantState state = _participantForks[participant].CreateBranch()
@@ -115,9 +108,7 @@ internal sealed class ModuleTransactionForkGroup
         return new ModuleTransaction(_coordinator, _owner, this, new TransactionStateBundle(states.ToImmutable()));
     }
 
-    private void CloseFork(
-        IReadOnlyCollection<ModuleTransaction> contributors,
-        ModuleTransactionForkLifecycle lifecycle)
+    private void CloseFork(IReadOnlyCollection<ModuleTransaction> contributors, ModuleTransactionForkLifecycle lifecycle)
     {
         EnsureContributorsCanBeDiscarded(contributors);
         foreach (ModuleTransaction contributor in contributors)

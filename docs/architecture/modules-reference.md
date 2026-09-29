@@ -268,7 +268,7 @@ Runs a nested `body` until it succeeds or the attempt budget is exhausted.
 
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
-| `attempts` | int | Yes | -- | Maximum number of body executions. Must be between 1 and 1,000 (inclusive). |
+| `attempts` | int | Yes | -- | Maximum number of body executions. Must be between 1 and 65535 (inclusive). |
 | `body` | module context | Yes | -- | Nested invocation executed on each attempt. |
 
 **Behavior:**
