@@ -403,6 +403,7 @@ public sealed class RetryModuleTests : ModuleTestBase
         }
         """;
     }
+
     private sealed class CancelAfterFailedAttemptHook(CancellationTokenSource cancellation) : IModulePostExecutionHook
     {
         public int FailedAttempts { get; private set; }
