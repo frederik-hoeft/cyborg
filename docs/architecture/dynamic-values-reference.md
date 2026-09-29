@@ -128,6 +128,7 @@ Configuration-facing enum leaves have dedicated dynamic value providers so comma
 | `cyborg.types.services.logging.format.v1` | `LogFormat` |
 | `cyborg.types.services.logging.rolling_interval.v1` | `RollingInterval` |
 | `cyborg.types.services.trust.enforcement_mode.v1` | `TrustEnforcementMode` |
+| `cyborg.types.core.transactions.on_error.v1` | `TransactionOnError` (`commit`, `rollback`) |
 
 For example, `"log_only"` is a valid value for `cyborg.types.services.trust.enforcement_mode.v1`. These providers are registered by the service layer that owns the corresponding option type rather than by the core primitive-provider set.
 

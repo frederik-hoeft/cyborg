@@ -1,5 +1,6 @@
 ﻿using Cyborg.Core.Runtime.Engine.Transactions.Collections;
 using Cyborg.Core.Runtime.Engine.Transactions.Internal;
+using Cyborg.Core.Runtime.Services.Transactions;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Core.Tests.Runtime.Transactions;
@@ -366,6 +367,65 @@ public sealed class ExecutionTransactionTests
     }
 
     [TestMethod]
+    public void TryJoin_WorkflowRollbackRestoresBaselineAndKeepsControlChanges()
+    {
+        DictionaryParticipant workflow = new(("kept", 1));
+        DictionaryParticipant control = new() { Role = TransactionParticipantRole.Control };
+        ModuleTransaction root = new TransactionCoordinator([workflow, control]).CreateRoot();
+        ModuleTransactionForkGroup fork = root.Fork();
+        ModuleTransaction rolledBack = fork.CreateChild();
+        ModuleTransaction committed = fork.CreateChild();
+        rolledBack.GetParticipantState(workflow).Set("kept", 9);
+        rolledBack.GetParticipantState(workflow).Set("rolled", 2);
+        rolledBack.GetParticipantState(control).Set("step", 1);
+        committed.GetParticipantState(workflow).Set("added", 3);
+        fork.Continuation.Complete();
+        rolledBack.Complete(TransactionPublicationDisposition.Rollback);
+        committed.Complete();
+
+        bool joined = fork.TryJoin(out TransactionConflict? conflict);
+
+        Assert.IsTrue(joined, conflict?.LogicalKey.ToString());
+        DictionaryParticipantState workflowState = root.GetParticipantState(workflow);
+        Assert.AreEqual(1, workflowState["kept"]);
+        Assert.IsFalse(workflowState.ContainsKey("rolled"));
+        Assert.AreEqual(3, workflowState["added"]);
+        Assert.AreEqual(1, root.GetParticipantState(control)["step"]);
+    }
+
+    [TestMethod]
+    public void TryJoin_ContributionPolicyCanOverrideParticipantRole()
+    {
+        DictionaryParticipant participant = new() { ContributionPolicyOverride = new PreserveCompletedStatePolicy() };
+        ModuleTransaction root = new TransactionCoordinator([participant]).CreateRoot();
+        ModuleTransactionForkGroup fork = root.Fork();
+        ModuleTransaction child = fork.CreateChild();
+        child.GetParticipantState(participant).Set("value", 7);
+        fork.Continuation.Complete();
+        child.Complete(TransactionPublicationDisposition.Rollback);
+
+        Assert.IsTrue(fork.TryJoin(out TransactionConflict? conflict));
+        Assert.IsNull(conflict);
+        Assert.AreEqual(7, root.GetParticipantState(participant)["value"]);
+    }
+
+    [TestMethod]
+    public void TryJoin_UnsupportedParticipantRoleFailsWithoutPublication()
+    {
+        DictionaryParticipant participant = new() { Role = (TransactionParticipantRole)int.MaxValue };
+        ModuleTransaction root = new TransactionCoordinator([participant]).CreateRoot();
+        ModuleTransactionForkGroup fork = root.Fork();
+        ModuleTransaction child = fork.CreateChild();
+        child.GetParticipantState(participant).Set("value", 7);
+        fork.Continuation.Complete();
+        child.Complete(TransactionPublicationDisposition.Rollback);
+
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => fork.TryJoin(out TransactionConflict? _));
+        Assert.AreEqual(ModuleTransactionForkLifecycle.Failed, fork.Lifecycle);
+        Assert.IsFalse(root.GetParticipantState(participant).ContainsKey("value"));
+    }
+
+    [TestMethod]
     public void Coordinator_DuplicateParticipantDescriptorIsRejected()
     {
         DictionaryParticipant participant = new();
@@ -376,6 +436,12 @@ public sealed class ExecutionTransactionTests
     private sealed class DictionaryParticipant(bool failPreparation, params (string Key, int Value)[] seed) : ITransactionParticipant<DictionaryParticipantState>
     {
         private readonly KeyValuePair<string, int>[] _seed = [.. seed.Select(static value => KeyValuePair.Create(value.Key, value.Value))];
+
+        public TransactionParticipantRole Role { get; init; } = TransactionParticipantRole.WorkflowData;
+
+        public ITransactionParticipantContributionPolicy? ContributionPolicyOverride { get; init; }
+
+        public ITransactionParticipantContributionPolicy ContributionPolicy => ContributionPolicyOverride ?? Role.GetContributionPolicy();
 
         public DictionaryParticipant(params (string Key, int Value)[] seed) : this(failPreparation: false, seed)
         {
@@ -411,6 +477,14 @@ public sealed class ExecutionTransactionTests
             new DictionaryParticipantFork(this, failPreparation);
 
         internal TransactionalDictionary<string, int> Values => values;
+    }
+
+    private sealed class PreserveCompletedStatePolicy : ITransactionParticipantContributionPolicy
+    {
+        public ITransactionParticipantState SelectContribution(
+            TransactionPublicationDisposition disposition,
+            ITransactionParticipantFork fork,
+            ITransactionParticipantState completedState) => completedState;
     }
 
     private sealed class DictionaryParticipantFork(DictionaryParticipantState owner, bool failPreparation) : ITransactionParticipantFork

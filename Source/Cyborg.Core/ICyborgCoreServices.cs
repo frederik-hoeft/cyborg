@@ -10,6 +10,7 @@ using Cyborg.Core.Runtime.Engine;
 using Cyborg.Core.Runtime.Engine.Environments;
 using Cyborg.Core.Runtime.Engine.Environments.Artifacts;
 using Cyborg.Core.Runtime.Engine.Environments.Syntax;
+using Cyborg.Core.Runtime.Engine.Transactions;
 using Cyborg.Core.Runtime.Hooks;
 using Cyborg.Core.Runtime.Model;
 using Cyborg.Core.Runtime.Services.Debugging;
@@ -68,6 +69,9 @@ namespace Cyborg.Core;
 [Singleton<IPingService, DefaultPingService>]
 [Singleton<IPortProbeService, TcpPortProbeService>]
 [Singleton<IPosixShellCommandBuilder, PosixShellCommandBuilder>]
+[Singleton<ITransactionOptionsProvider, DefaultTransactionOptionsProvider>]
+[Singleton<IDynamicValueProvider, DynamicTransactionOnErrorProvider>]
+[Singleton<JsonConverter>(Factory = nameof(CreateTransactionOnErrorConverter))]
 [Singleton<IModuleResultBuilderFactory, ModuleResultBuilderFactory>]
 [Singleton<MetricsCollectorOptions>]
 [Singleton<IMetricsCollector, MetricsCollector>]
@@ -78,6 +82,8 @@ public interface ICyborgCoreServices
 
     static JsonConverter CreateEnvironmentScopeConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<EnvironmentScope>(namingPolicy);
 
+    static JsonConverter CreateTransactionOnErrorConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<TransactionOnError>(namingPolicy);
+
     static JsonConverter CreateDecompositionStrategyConverter(JsonNamingPolicy namingPolicy) => new JsonStringEnumConverter<DecompositionStrategy>(namingPolicy);
 
     static IModuleRuntime CreateRootModuleRuntime(
@@ -85,7 +91,8 @@ public interface ICyborgCoreServices
         ITaggedStringConversionObserver taggedStringConversionObserver,
         ILoggerFactory loggerFactory,
         IServiceProvider serviceProvider,
-        IEnumerable<TransactionalServiceParticipant> transactionalServiceParticipants)
+        IEnumerable<TransactionalServiceParticipant> transactionalServiceParticipants,
+        ITransactionOptionsProvider transactionOptions)
     {
         IRuntimeEnvironmentFactory environmentFactory = new DefaultRuntimeEnvironmentFactory(syntaxFactory, taggedStringConversionObserver);
         IRuntimeModuleRegistry moduleRegistry = new RuntimeModuleRegistry();
@@ -95,7 +102,8 @@ public interface ICyborgCoreServices
             new ModuleContextRunner(syntaxFactory, environmentFactory, loggerFactory),
             new ModuleDispatcher(environmentFactory, loggerFactory),
             moduleRegistry,
-            transactionalServices);
+            transactionalServices,
+            new DefaultTransactionCompletionPolicy(transactionOptions));
         GlobalRuntimeEnvironment globalEnvironment = environmentFactory.CreateGlobalEnvironment();
         return new RootModuleRuntime(globalEnvironment, environmentFactory, services, loggerFactory, serviceProvider);
     }

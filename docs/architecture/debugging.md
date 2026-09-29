@@ -80,6 +80,7 @@ owner stepping after join = any non-stale child remains stepping
 This gives the following behavior:
 
 - stepping a sequential child causes the next child invocation on that branch to pause;
+- a workflow rollback still reconciles step state, because branch control is execution-control state rather than workflow data;
 - stepping into a nested or dynamic module follows that structured descendant;
 - stepping one parallel branch does not implicitly step unrelated siblings;
 - `Continue` clears stepping only for the branch represented by that pause;

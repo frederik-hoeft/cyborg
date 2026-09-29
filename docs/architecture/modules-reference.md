@@ -22,6 +22,7 @@ For details on the execution model, environment scoping semantics, variable reso
   - [Guard (`cyborg.modules.guard.v1`)](#guard-cyborgmodulesguardv1)
   - [If (`cyborg.modules.if.v1`)](#if-cyborgmodulesifv1)
   - [While (`cyborg.modules.while.v1`)](#while-cyborgmoduleswhilev1)
+  - [Retry (`cyborg.modules.retry.v1`)](#retry-cyborgmodulesretryv1)
   - [Assert (`cyborg.modules.assert.v1`)](#assert-cyborgmodulesassertv1)
   - [Switch (`cyborg.modules.switch.v1`)](#switch-cyborgmodulesswitchv1)
   - [Dynamic (`cyborg.modules.dynamic.v1`)](#dynamic-cyborgmodulesdynamicv1)
@@ -72,6 +73,7 @@ All modules inherit the following properties from `ModuleBase`:
 | `name` | string | No | `null` | Optional structural identifier. Named modules are registered in the module registry and can be referenced by the Named Reference module. It is not overridden or auto-interpolated because environment binding consumes it before validation. |
 | `group` | string | No | `null` | Optional structural grouping tag. Like `name`, it is not overridden or auto-interpolated. |
 | `artifacts` | object | No | See below | Controls how module results are published to the environment. |
+| `transaction.on_error` | `commit` \| `rollback` | No | process default (`commit`) | Failure-publication policy for this invocation. `commit` joins workflow data after `Failed` or `Canceled`. `rollback` withholds that workflow data and still reconciles execution-control state. `Success` and `Skipped` always join. Omitted values use `cyborg.core.transactions.on_error`. See [Transactional Execution](transactions.md). |
 
 ### Module Context
 
@@ -255,6 +257,29 @@ Repeatedly executes a `body` module as long as a `condition` module evaluates to
 - Returns `Success` when the loop exits normally (condition no longer met).
 
 See [Condition Modules](#condition-modules) for built-in conditions.
+
+---
+
+### Retry (`cyborg.modules.retry.v1`)
+
+Runs a nested `body` until it succeeds or the attempt budget is exhausted.
+
+**Properties:**
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `attempts` | int | Yes | -- | Maximum number of body executions. Must be between 1 and 65535 (inclusive). |
+| `body` | module context | Yes | -- | Nested invocation executed on each attempt. |
+
+**Behavior:**
+
+- Each attempt is an ordinary nested invocation and uses the body's own `transaction.on_error`.
+- Returns `Success` on the first successful attempt and stops.
+- Returns `Canceled` immediately if an attempt is canceled or the retry itself is canceled before the next attempt. Remaining attempts are not run.
+- Any other attempt status consumes one attempt.
+- Returns `Failed` when every attempt has been used without a success.
+- A body that commits on failure leaves its workflow writes in the retry transaction, so the next attempt observes them. A body that rolls back leaves the next attempt on the same workflow baseline.
+- The retry module's own `transaction.on_error` applies only to the retry invocation. It does not change the body's policy. A successful retry always publishes the attempts that committed into it. A failed or canceled retry publishes or withholds that accumulated workflow state according to its own setting.
 
 ---
 

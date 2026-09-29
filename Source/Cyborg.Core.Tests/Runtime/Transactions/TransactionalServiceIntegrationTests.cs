@@ -166,6 +166,49 @@ public sealed class TransactionalServiceIntegrationTests : CyborgCoreTestBase
     }
 
     [TestMethod]
+    public void TransactionCoordinator_FailedRollbackWithholdsCustomWorkflowState()
+    {
+        TransactionalCounterParticipant descriptor = new();
+        RuntimeTransactionalServices services = new([descriptor]);
+        ModuleTransaction root = new TransactionCoordinator(services.Participants).CreateRoot();
+        ModuleTransactionForkGroup fork = root.Fork();
+        ModuleTransaction rolledBack = fork.CreateChild();
+        ModuleTransaction committed = fork.CreateChild();
+
+        services.GetState<TransactionalCounterParticipant, TransactionalCounterState>(rolledBack).Set(10);
+        services.GetState<TransactionalCounterParticipant, TransactionalCounterState>(committed).Set(3);
+        fork.Continuation.Complete();
+        rolledBack.Complete(TransactionPublicationDisposition.Rollback);
+        committed.Complete();
+
+        Assert.IsTrue(fork.TryJoin(out TransactionConflict? conflict), conflict?.LogicalKey.ToString());
+        Assert.AreEqual(3, services.GetState<TransactionalCounterParticipant, TransactionalCounterState>(root).Value);
+    }
+
+    [TestMethod]
+    public void TransactionCoordinator_FailedRollbackRestoresCustomWorkflowBaseline()
+    {
+        TransactionalCounterParticipant descriptor = new();
+        RuntimeTransactionalServices services = new([descriptor]);
+        ModuleTransaction root = new TransactionCoordinator(services.Participants).CreateRoot();
+        ModuleTransactionForkGroup initialFork = root.Fork();
+        ModuleTransaction initial = initialFork.CreateChild();
+        services.GetState<TransactionalCounterParticipant, TransactionalCounterState>(initial).Set(5);
+        initialFork.Continuation.Complete();
+        initial.Complete();
+        Assert.IsTrue(initialFork.TryJoin(out TransactionConflict? initialConflict), initialConflict?.LogicalKey.ToString());
+
+        ModuleTransactionForkGroup fork = root.Fork();
+        ModuleTransaction failed = fork.CreateChild();
+        services.GetState<TransactionalCounterParticipant, TransactionalCounterState>(failed).Set(10);
+        fork.Continuation.Complete();
+        failed.Complete(TransactionPublicationDisposition.Rollback);
+
+        Assert.IsTrue(fork.TryJoin(out TransactionConflict? conflict), conflict?.LogicalKey.ToString());
+        Assert.AreEqual(5, services.GetState<TransactionalCounterParticipant, TransactionalCounterState>(root).Value);
+    }
+
+    [TestMethod]
     public void RuntimeTransactionalServices_DuplicateParticipantType_FailsExplicitly() =>
         Assert.ThrowsExactly<InvalidOperationException>(() => new RuntimeTransactionalServices([new TransactionalCounterParticipant(), new TransactionalCounterParticipant()]));
 

@@ -23,6 +23,13 @@ public abstract record ModuleBase : IModule
     [DefaultInstance]
     public ModuleArtifacts Artifacts { get; init; } = null!;
 
+    /// <summary>
+    /// Optional failure-publication policy. When <see cref="ModuleTransactionSettings.OnError"/> is omitted, the process default applies.
+    /// </summary>
+    [IgnoreOverride(recurse: true)]
+    [DefaultInstance]
+    public ModuleTransactionSettings Transaction { get; init; } = null!;
+
     public virtual IModuleDescriptor GetDescriptor() => new MinimalModuleDescriptor(this);
 
     private sealed class MinimalModuleDescriptor(ModuleBase module) : IModuleDescriptor
@@ -32,6 +39,7 @@ public abstract record ModuleBase : IModule
             descriptionBuilder.AddProperty("$clrtype", module.GetType().FullName);
             descriptionBuilder.AddProperty(nameof(Name), module.Name);
             descriptionBuilder.AddProperty(nameof(Group), module.Group);
+            descriptionBuilder.AddProperty("transaction.on_error", module.Transaction?.OnError?.ToString());
             return ValueTask.CompletedTask;
         }
     }

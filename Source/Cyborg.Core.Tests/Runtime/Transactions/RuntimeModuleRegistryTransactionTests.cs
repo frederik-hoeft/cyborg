@@ -68,6 +68,47 @@ public sealed class RuntimeModuleRegistryTransactionTests
     }
 
     [TestMethod]
+    public void TryJoin_RollbackWithholdsNamedModulesAndDoesNotConflictWithSibling()
+    {
+        RuntimeModuleRegistryTransactionParticipant participant = new();
+        ModuleTransaction root = new TransactionCoordinator([participant]).CreateRoot();
+        ModuleTransactionForkGroup fork = root.Fork();
+        ModuleTransaction rolledBack = fork.CreateChild();
+        ModuleTransaction committed = fork.CreateChild();
+        ModuleContext rolledBackModule = CreateModuleContext("rolled-back");
+        ModuleContext committedModule = CreateModuleContext("committed");
+
+        Assert.IsTrue(rolledBack.GetParticipantState(participant).TryAddModule("shared", rolledBackModule));
+        Assert.IsTrue(committed.GetParticipantState(participant).TryAddModule("shared", committedModule));
+        fork.Continuation.Complete();
+        rolledBack.Complete(TransactionPublicationDisposition.Rollback);
+        committed.Complete();
+
+        Assert.IsTrue(fork.TryJoin(out TransactionConflict? conflict), conflict?.LogicalKey.ToString());
+        Assert.AreSame(committedModule, GetRequiredModule(root.GetParticipantState(participant), "shared"));
+    }
+
+    [TestMethod]
+    public void TryJoin_RollbackPreservesPreexistingNamedModule()
+    {
+        RuntimeModuleRegistryTransactionParticipant participant = new();
+        ModuleContext originalModule = CreateModuleContext("original");
+        ModuleRegistrySeedBuilder seedBuilder = new();
+        seedBuilder.Add("shared", originalModule);
+        ModuleTransaction root = new TransactionCoordinator([participant]).CreateRoot(
+            new TransactionRootSeed().With(participant, seedBuilder.Build()));
+        ModuleTransactionForkGroup fork = root.Fork();
+        ModuleTransaction failed = fork.CreateChild();
+        Assert.IsTrue(failed.GetParticipantState(participant).TryRemoveModule("shared"));
+        Assert.IsTrue(failed.GetParticipantState(participant).TryAddModule("shared", CreateModuleContext("replacement")));
+        fork.Continuation.Complete();
+        failed.Complete(TransactionPublicationDisposition.Rollback);
+
+        Assert.IsTrue(fork.TryJoin(out TransactionConflict? conflict), conflict?.LogicalKey.ToString());
+        Assert.AreSame(originalModule, GetRequiredModule(root.GetParticipantState(participant), "shared"));
+    }
+
+    [TestMethod]
     public void BindExecutionScope_RegistryFacadeUsesCurrentTransactionState()
     {
         RuntimeModuleRegistry moduleRegistry = new();

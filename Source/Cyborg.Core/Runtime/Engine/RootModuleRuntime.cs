@@ -46,7 +46,8 @@ internal sealed class RootModuleRuntime : ModuleRuntimeBase
             new ModuleContextRunner(defaultEnvironment.SyntaxFactory, environmentFactory, loggerFactory),
             new ModuleDispatcher(environmentFactory, loggerFactory),
             moduleRegistry,
-            new RuntimeTransactionalServices([]));
+            new RuntimeTransactionalServices([]),
+            new DefaultTransactionCompletionPolicy(options: null));
         return new RootRuntimeComposition(CreateState(defaultEnvironment, environmentFactory, operations, loggerFactory), operations);
     }
 

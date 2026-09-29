@@ -22,6 +22,7 @@ using Cyborg.Modules.Named;
 using Cyborg.Modules.Network.SshShutdown;
 using Cyborg.Modules.Network.WakeOnLan;
 using Cyborg.Modules.Parallel;
+using Cyborg.Modules.Retry;
 using Cyborg.Modules.Sequence;
 using Cyborg.Modules.Subprocess;
 using Cyborg.Modules.Switch;
@@ -45,6 +46,7 @@ namespace Cyborg.Modules;
 [JsonSerializable(typeof(WakeOnLanModule))]
 [JsonSerializable(typeof(IfModule))]
 [JsonSerializable(typeof(WhileModule))]
+[JsonSerializable(typeof(RetryModule))]
 [JsonSerializable(typeof(IsTrueModule))]
 [JsonSerializable(typeof(IsSetModule))]
 [JsonSerializable(typeof(FileExistsModule))]

@@ -1,5 +1,6 @@
 ﻿using Cyborg.Core.Runtime.Configuration;
 using Cyborg.Core.Runtime.Engine.Environments;
+using Cyborg.Core.Runtime.Engine.Transactions;
 using Cyborg.Core.Runtime.Engine.Transactions.Internal;
 using Cyborg.Core.Runtime.Model;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,6 +16,8 @@ internal abstract class ModuleRuntimeBase
     ModuleInvocationContext? invocationContext = null
 ) : IModuleRuntime, IModuleExecutionRuntime
 {
+    private readonly ITransactionCompletionPolicy _completionPolicy = runtimeServices.CompletionPolicy;
+
     public IRuntimeEnvironment GlobalEnvironment => environmentContext.GlobalEnvironment;
 
     public IRuntimeEnvironment ParentEnvironment => environmentContext.ParentEnvironment;
@@ -88,9 +91,9 @@ internal abstract class ModuleRuntimeBase
             }
             IModuleExecutionResult[] results = await Task.WhenAll(executions);
 
-            foreach (ConcurrentExecutionBranch branch in branches)
+            for (int i = 0; i < branches.Count; i++)
             {
-                branch.Transaction.Complete();
+                branches[i].Transaction.Complete(_completionPolicy.Resolve(branches[i].ModuleContext.Module.Definition, results[i].Status));
             }
             bool joined = fork.TryJoin(out TransactionConflict? conflict);
             await NotifyConcurrentBranchesClosedAsync(branches, joined);
@@ -211,7 +214,7 @@ internal abstract class ModuleRuntimeBase
             IRuntimeEnvironment scopedEnvironment = invocationScope.BindEnvironment(request.Environment);
             IModuleExecutionResult result = await request.ExecuteInCurrentScopeAsync(invocationScope.Runtime, scopedEnvironment);
             await invocationScope.NotifyCompletedAsync(result);
-            childTransaction.Complete();
+            childTransaction.Complete(_completionPolicy.Resolve(request.Module, result.Status));
             bool joined = fork.TryJoin(out TransactionConflict? conflict);
             await invocationScope.CloseAsync(joined);
             if (!joined)

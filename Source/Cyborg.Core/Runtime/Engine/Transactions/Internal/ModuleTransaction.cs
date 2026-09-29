@@ -20,6 +20,9 @@ internal sealed class ModuleTransaction
 
     public ModuleTransactionLifecycle Lifecycle { get; private set; } = ModuleTransactionLifecycle.Active;
 
+    /// <summary>Completion disposition, interpreted separately by each participant's contribution policy.</summary>
+    internal TransactionPublicationDisposition Publication { get; private set; } = TransactionPublicationDisposition.Commit;
+
     internal bool HasOpenFork => _openFork is not null;
 
     public TState GetParticipantState<TState>(ITransactionParticipant<TState> participant)
@@ -42,10 +45,17 @@ internal sealed class ModuleTransaction
         return fork;
     }
 
-    public void Complete()
+    public void Complete() => Complete(TransactionPublicationDisposition.Commit);
+
+    internal void Complete(TransactionPublicationDisposition publication)
     {
         EnsureActive();
         EnsureNoOpenFork();
+        if (!Enum.IsDefined(publication))
+        {
+            throw new ArgumentOutOfRangeException(nameof(publication), publication, "Unsupported transaction publication disposition.");
+        }
+        Publication = publication;
         Lifecycle = ModuleTransactionLifecycle.Completed;
     }
 
