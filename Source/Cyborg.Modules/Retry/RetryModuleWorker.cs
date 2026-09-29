@@ -9,8 +9,9 @@ public sealed class RetryModuleWorker(IWorkerContext<RetryModule> context) : Mod
     protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
     {
         int attempts = Module.Attempts;
-        for (int attempt = 1; attempt <= attempts; attempt++)
+        for (int attemptIndex = 0; attemptIndex < attempts; attemptIndex++)
         {
+            int attempt = attemptIndex + 1;
             if (cancellationToken.IsCancellationRequested)
             {
                 Logger.LogRetryCanceled(attempt, attempts);
