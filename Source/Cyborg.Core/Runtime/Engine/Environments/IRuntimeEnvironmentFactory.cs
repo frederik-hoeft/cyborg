@@ -12,7 +12,7 @@ internal interface IRuntimeEnvironmentFactory
     IRuntimeEnvironment BindTransaction(
         IRuntimeEnvironment environment,
         RuntimeEnvironmentTransactionParticipant participant,
-        ModuleTransaction transaction);
+        ActiveTransaction activeTransaction);
 
     IRuntimeEnvironment CreateTransactionView(
         RuntimeEnvironmentId environmentId,
@@ -20,5 +20,5 @@ internal interface IRuntimeEnvironmentFactory
         IRuntimeEnvironment? parent,
         string ns,
         RuntimeEnvironmentTransactionParticipant participant,
-        ModuleTransaction transaction);
+        ActiveTransaction activeTransaction);
 }

@@ -7,10 +7,10 @@ internal sealed class ScopedRuntime
     IModuleRuntime root,
     RuntimeEnvironmentContext environmentContext,
     ModuleRuntimeServices operations,
-    ModuleTransaction transaction,
+    ActiveTransaction activeTransaction,
     IServiceProvider serviceProvider,
     ModuleInvocationContext invocationContext
-) : ModuleRuntimeBase(environmentContext, operations, transaction, serviceProvider, invocationContext)
+) : ModuleRuntimeBase(environmentContext, operations, activeTransaction, serviceProvider, invocationContext)
 {
     protected override IModuleRuntime Root => root;
 }

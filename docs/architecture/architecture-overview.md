@@ -38,6 +38,7 @@ For detailed reference material, see:
     - [Execution and Result](#execution-and-result)
   - [Runtime Hierarchy](#runtime-hierarchy)
   - [Transactional State](#transactional-state)
+  - [Concurrent Execution Scopes](#concurrent-execution-scopes)
   - [Environment Binding](#environment-binding)
 - [Runtime Environment](#runtime-environment)
   - [Environment Scoping](#environment-scoping)
@@ -245,7 +246,7 @@ The runtime-object hierarchy expresses execution/navigation context, not canonic
 
 Logical execution ancestry is carried separately by the invocation context: every invocation has a stable execution ID and an explicit optional parent execution ID. Runtime views may be replaced or rebound while that identity remains stable, allowing observers such as the debugger topology to model structured execution without treating runtime-object identity as execution identity.
 
-When a module calls `runtime.ExecuteAsync(...)`, the runtime creates the structured child invocation described above, binds the selected logical environment to the child transaction, activates the worker from the child DI scope, and reconciles the completed child before returning to the caller.
+When a module calls `runtime.ExecuteAsync(...)`, the runtime creates the structured child invocation described above, binds the selected logical environment to the child transaction, activates the worker from the child DI scope, and reconciles the completed child before returning to the caller. `OpenConcurrentExecution` opens one fork and lets the caller start those child invocations individually. The caller can await each result, cancel one child, and keep writing transactional state before the scope reconciles. See [Concurrent Execution Scopes](#concurrent-execution-scopes).
 
 ### Transactional State
 
@@ -254,6 +255,12 @@ Cyborg-managed workflow state participates in the invocation transaction rather 
 Each root execution owns independent participant state. Forked children observe a stable baseline and record local changes; siblings cannot observe one another before join. Every participant prepares a detached candidate before the coordinator publishes a single aggregate state bundle, so a conflict in one participant leaves all owner-visible participant state unchanged for that fork generation.
 
 See [Transactional Execution](transactions.md) for the complete state and extension model.
+
+### Concurrent Execution Scopes
+
+`IConcurrentExecutionScope` is the runtime primitive for scoped concurrent child execution. `Parallel` is the fixed form of it: start every declared branch, wait for every branch, then reconcile an empty continuation. A scope opened directly keeps the owning invocation on the fork continuation for the whole time the scope is open. Owner writes, nested sequential calls, and nested scopes made during that interval are continuation changes. Each child is a normal invocation with its own transaction, DI scope, and lifecycle, and its result is awaitable before the scope closes.
+
+The runtime does not assign meaning to which child is primary. Cancellation of one child does not cancel its siblings unless the caller asks. `CloseAsync` is the only publication point. Disposal without close discards the fork. Modules such as `cyborg.modules.sidecar.v1` put lifetime policy on top of this primitive instead of reimplementing join, rollback, or scope disposal.
 
 ### Environment Binding
 

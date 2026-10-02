@@ -9,5 +9,5 @@ internal interface ITransactionalRuntimeEnvironment
 
     IRuntimeEnvironment BindTransaction(
         RuntimeEnvironmentTransactionParticipant participant,
-        ModuleTransaction transaction);
+        ActiveTransaction activeTransaction);
 }

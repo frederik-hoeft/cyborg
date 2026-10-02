@@ -11,7 +11,7 @@ internal abstract class ModuleRuntimeBase
 (
     RuntimeEnvironmentContext environmentContext,
     ModuleRuntimeServices runtimeServices,
-    ModuleTransaction transaction,
+    ActiveTransaction activeTransaction,
     IServiceProvider? serviceProvider = null,
     ModuleInvocationContext? invocationContext = null
 ) : IModuleRuntime, IModuleExecutionRuntime
@@ -66,65 +66,43 @@ internal abstract class ModuleRuntimeBase
             return [];
         }
 
-        ModuleTransactionForkGroup fork = transaction.Fork();
-        fork.Continuation.Complete();
-        List<ConcurrentExecutionBranch> branches = new(moduleContexts.Count);
+        IConcurrentExecutionScope scope = OpenConcurrentExecution();
         try
         {
+            IConcurrentModuleExecution[] executions = new IConcurrentModuleExecution[moduleContexts.Count];
             for (int i = 0; i < moduleContexts.Count; i++)
             {
                 ModuleContext moduleContext = moduleContexts[i]
                     ?? throw new ArgumentException("Concurrent module contexts cannot contain null entries.", nameof(moduleContexts));
-                ModuleTransaction childTransaction = fork.CreateChild();
-                ModuleInvocationScope invocationScope = await CreateInvocationScopeAsync(
-                    childTransaction,
-                    moduleContext.Module.ModuleId,
-                    moduleContext.Module.Definition,
-                    cancellationToken);
-                branches.Add(new ConcurrentExecutionBranch(invocationScope, moduleContext));
+                executions[i] = await scope.StartAsync(moduleContext, cancellationToken);
             }
 
-            Task<IModuleExecutionResult>[] executions = new Task<IModuleExecutionResult>[branches.Count];
-            for (int i = 0; i < branches.Count; i++)
+            Task<IModuleExecutionResult>[] completions = new Task<IModuleExecutionResult>[executions.Length];
+            for (int i = 0; i < executions.Length; i++)
             {
-                executions[i] = ExecuteConcurrentBranchAsync(branches[i], cancellationToken);
+                completions[i] = executions[i].Completion;
             }
-            IModuleExecutionResult[] results = await Task.WhenAll(executions);
-
-            for (int i = 0; i < branches.Count; i++)
-            {
-                branches[i].Transaction.Complete(_completionPolicy.Resolve(branches[i].ModuleContext.Module.Definition, results[i].Status));
-            }
-            bool joined = fork.TryJoin(out TransactionConflict? conflict);
-            await NotifyConcurrentBranchesClosedAsync(branches, joined);
-            if (!joined)
-            {
-                throw CreateReconciliationException(conflict!);
-            }
+            IModuleExecutionResult[] results = await Task.WhenAll(completions);
+            await scope.CloseAsync(cancellationToken);
             return results;
-        }
-        catch
-        {
-            try
-            {
-                if (fork.Lifecycle == ModuleTransactionForkLifecycle.Active)
-                {
-                    fork.Discard();
-                }
-            }
-            finally
-            {
-                await NotifyConcurrentBranchesClosedAsync(branches, joined: false);
-            }
-            throw;
         }
         finally
         {
-            for (int i = branches.Count - 1; i >= 0; i--)
-            {
-                await branches[i].Scope.DisposeAsync();
-            }
+            await scope.DisposeAsync();
         }
+    }
+
+    public IConcurrentExecutionScope OpenConcurrentExecution()
+    {
+        ModuleTransaction restoreTransaction = activeTransaction.Current;
+        ModuleTransactionForkGroup fork = restoreTransaction.Fork();
+        activeTransaction.Retarget(fork.Continuation);
+        return new ConcurrentExecutionScope(
+            activeTransaction,
+            restoreTransaction,
+            fork,
+            _completionPolicy,
+            CreateInvocationScopeAsync);
     }
 
     Task<IModuleExecutionResult> IModuleExecutionRuntime.ExecuteActivatedWorkerAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken)
@@ -148,7 +126,7 @@ internal abstract class ModuleRuntimeBase
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(configuration);
-        runtimeServices.ModuleRegistry.ApplySeed(transaction, configuration.RegistrySeed);
+        runtimeServices.ModuleRegistry.ApplySeed(activeTransaction.Current, configuration.RegistrySeed);
         return ((IModuleExecutionRuntime)this).ExecuteModuleContextInCurrentScopeAsync(configuration.ModuleContext, environment, cancellationToken);
     }
 
@@ -158,8 +136,11 @@ internal abstract class ModuleRuntimeBase
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(configuration);
-        runtimeServices.ModuleRegistry.ApplySeed(transaction, configuration.RegistrySeed);
-        return ((IModuleExecutionRuntime)this).ExecuteModuleReferenceInCurrentScopeAsync(configuration.ModuleContext.Module, environment, cancellationToken);
+        runtimeServices.ModuleRegistry.ApplySeed(activeTransaction.Current, configuration.RegistrySeed);
+        return ((IModuleExecutionRuntime)this).ExecuteModuleReferenceInCurrentScopeAsync(
+            configuration.ModuleContext.Module,
+            environment,
+            cancellationToken);
     }
 
     Task<IModuleExecutionResult> IModuleExecutionRuntime.ExecuteModuleReferenceInCurrentScopeAsync(ModuleReference moduleReference, IRuntimeEnvironment environment, CancellationToken cancellationToken)
@@ -192,7 +173,7 @@ internal abstract class ModuleRuntimeBase
             Root,
             childEnvironmentContext,
             runtimeServices,
-            transaction,
+            activeTransaction,
             executionServices,
             invocationContext ?? throw new InvalidOperationException("A worker runtime requires an active module invocation context."));
         return runtimeServices.Dispatcher.ExecuteAsync(module, runtime, boundEnvironment, executionServices, cancellationToken);
@@ -200,7 +181,7 @@ internal abstract class ModuleRuntimeBase
 
     private async Task<IModuleExecutionResult> ExecuteInNewScopeAsync(ModuleExecutionRequest request)
     {
-        ModuleTransactionForkGroup fork = transaction.Fork();
+        ModuleTransactionForkGroup fork = activeTransaction.Current.Fork();
         ModuleTransaction childTransaction = fork.CreateChild();
         fork.Continuation.Complete();
         ModuleInvocationScope? invocationScope = null;
@@ -219,7 +200,7 @@ internal abstract class ModuleRuntimeBase
             await invocationScope.CloseAsync(joined);
             if (!joined)
             {
-                throw CreateReconciliationException(conflict!);
+                throw conflict!.ToException();
             }
             return result;
         }
@@ -261,15 +242,16 @@ internal abstract class ModuleRuntimeBase
         AsyncServiceScope executionScope = scopeFactory.CreateAsyncScope();
         try
         {
-            runtimeServices.ModuleRegistry.BindExecutionScope(executionScope.ServiceProvider, childTransaction);
-            runtimeServices.Transactional.BindExecutionScope(executionScope.ServiceProvider, childTransaction);
-            RuntimeEnvironmentContext childEnvironmentContext = environmentContext.CreateTransactionView(childTransaction);
+            ActiveTransaction childActiveTransaction = new(childTransaction);
+            runtimeServices.ModuleRegistry.BindExecutionScope(executionScope.ServiceProvider, childActiveTransaction);
+            runtimeServices.Transactional.BindExecutionScope(executionScope.ServiceProvider, childActiveTransaction);
+            RuntimeEnvironmentContext childEnvironmentContext = environmentContext.CreateTransactionView(childActiveTransaction);
             ModuleInvocationContext childInvocation = CreateInvocationContext(moduleId, module);
             ScopedRuntime scopedRuntime = new(
                 Root,
                 childEnvironmentContext,
                 runtimeServices,
-                childTransaction,
+                childActiveTransaction,
                 executionScope.ServiceProvider,
                 childInvocation);
             ModuleInvocationScope invocationScope = new(childTransaction, executionScope, scopedRuntime, childEnvironmentContext, childInvocation);
@@ -283,71 +265,9 @@ internal abstract class ModuleRuntimeBase
         }
     }
 
-    private static async Task<IModuleExecutionResult> ExecuteConcurrentBranchAsync(ConcurrentExecutionBranch branch, CancellationToken cancellationToken)
-    {
-        IRuntimeEnvironment environment = branch.Scope.Runtime.PrepareEnvironment(branch.ModuleContext.Environment ?? ModuleEnvironment.Default);
-        IModuleExecutionResult result = await branch.Scope.Runtime.ExecuteModuleContextInCurrentScopeAsync(branch.ModuleContext, environment, cancellationToken);
-        await branch.Scope.NotifyCompletedAsync(result);
-        return result;
-    }
-
-    private static async ValueTask NotifyConcurrentBranchesClosedAsync(IReadOnlyList<ConcurrentExecutionBranch> branches, bool joined)
-    {
-        foreach (ConcurrentExecutionBranch branch in branches)
-        {
-            await branch.Scope.CloseAsync(joined);
-        }
-    }
-
     private ModuleInvocationContext CreateInvocationContext(string moduleId, IModule module) =>
         new(ModuleExecutionId.Create(), invocationContext?.ExecutionId, moduleId, module.Name, module.Group, module);
 
-    private static InvalidOperationException CreateReconciliationException(TransactionConflict conflict) =>
-        new($"Module transaction reconciliation failed due to a conflict in participant '{conflict.Participant.GetType().Name}' for logical key '{conflict.LogicalKey}'.");
-
     private IServiceProvider RequireExecutionServices() =>
         serviceProvider ?? throw new InvalidOperationException("Module execution requires a service provider capable of creating execution scopes.");
-
-    private sealed class ModuleInvocationScope(
-        ModuleTransaction transaction,
-        AsyncServiceScope serviceScope,
-        IModuleExecutionRuntime runtime,
-        RuntimeEnvironmentContext environmentContext,
-        ModuleInvocationContext invocation) : IAsyncDisposable
-    {
-        private bool _closed;
-
-        public ModuleTransaction Transaction { get; } = transaction;
-
-        public IModuleExecutionRuntime Runtime { get; } = runtime;
-
-        public IRuntimeEnvironment BindEnvironment(IRuntimeEnvironment environment) => environmentContext.BindEnvironment(environment);
-
-        public ValueTask NotifyStartedAsync(CancellationToken cancellationToken) =>
-            ModuleExecutionLifecycle.NotifyStartedAsync(serviceScope.ServiceProvider, invocation, Runtime, cancellationToken);
-
-        public ValueTask NotifyCompletedAsync(IModuleExecutionResult result) =>
-            ModuleExecutionLifecycle.NotifyCompletedAsync(serviceScope.ServiceProvider, invocation, Runtime, result);
-
-        public async ValueTask CloseAsync(bool joined)
-        {
-            if (_closed)
-            {
-                return;
-            }
-            _closed = true;
-            await ModuleExecutionLifecycle.NotifyClosedAsync(serviceScope.ServiceProvider, invocation, Runtime, joined);
-        }
-
-        public ValueTask DisposeAsync() => serviceScope.DisposeAsync();
-    }
-
-    private sealed class ConcurrentExecutionBranch(ModuleInvocationScope scope, ModuleContext moduleContext)
-    {
-        public ModuleInvocationScope Scope { get; } = scope;
-
-        public ModuleTransaction Transaction => Scope.Transaction;
-
-        public ModuleContext ModuleContext { get; } = moduleContext;
-    }
 }

@@ -10,16 +10,16 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
 {
     private protected override IRuntimeEnvironment BindTransactionCore(
         RuntimeEnvironmentTransactionParticipant participant,
-        ModuleTransaction transaction)
+        ActiveTransaction activeTransaction)
     {
         ArgumentNullException.ThrowIfNull(participant);
-        ArgumentNullException.ThrowIfNull(transaction);
+        ArgumentNullException.ThrowIfNull(activeTransaction);
         return this with
         {
             Parent = Parent is ITransactionalRuntimeEnvironment transactionalParent
-                ? transactionalParent.BindTransaction(participant, transaction)
+                ? transactionalParent.BindTransaction(participant, activeTransaction)
                 : throw new InvalidOperationException($"Runtime environment type '{Parent.GetType().FullName}' does not expose transactional environment identity."),
-            VariableStore = new TransactionalEnvironmentVariableStore(EnvironmentId, participant, transaction)
+            VariableStore = new TransactionalEnvironmentVariableStore(EnvironmentId, participant, activeTransaction)
         };
     }
 
@@ -30,16 +30,16 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
         VariableSyntaxBuilder syntaxFactory,
         string ns,
         RuntimeEnvironmentTransactionParticipant participant,
-        ModuleTransaction transaction)
+        ActiveTransaction activeTransaction)
         : this(node.Name, parent, node.IsTransient, syntaxFactory, ns)
     {
         ArgumentNullException.ThrowIfNull(node);
         ArgumentNullException.ThrowIfNull(parent);
         ArgumentNullException.ThrowIfNull(syntaxFactory);
         ArgumentNullException.ThrowIfNull(participant);
-        ArgumentNullException.ThrowIfNull(transaction);
+        ArgumentNullException.ThrowIfNull(activeTransaction);
         EnvironmentId = environmentId;
-        VariableStore = new TransactionalEnvironmentVariableStore(environmentId, participant, transaction);
+        VariableStore = new TransactionalEnvironmentVariableStore(environmentId, participant, activeTransaction);
     }
 
     internal protected override bool TryGetStoredVariableRecursiveCore(string name, [NotNullWhen(true)] out object? value)

@@ -20,16 +20,16 @@ internal sealed class DefaultRuntimeEnvironmentFactory(
     public IRuntimeEnvironment BindTransaction(
         IRuntimeEnvironment environment,
         RuntimeEnvironmentTransactionParticipant participant,
-        ModuleTransaction transaction)
+        ActiveTransaction activeTransaction)
     {
         ArgumentNullException.ThrowIfNull(environment);
         ArgumentNullException.ThrowIfNull(participant);
-        ArgumentNullException.ThrowIfNull(transaction);
+        ArgumentNullException.ThrowIfNull(activeTransaction);
         if (environment is not ITransactionalRuntimeEnvironment transactionalEnvironment)
         {
             throw new InvalidOperationException($"Runtime environment type '{environment.GetType().FullName}' does not expose transactional environment identity.");
         }
-        IRuntimeEnvironment boundEnvironment = transactionalEnvironment.BindTransaction(participant, transaction);
+        IRuntimeEnvironment boundEnvironment = transactionalEnvironment.BindTransaction(participant, activeTransaction);
         if (boundEnvironment is not RuntimeEnvironment runtimeEnvironment)
         {
             throw new InvalidOperationException($"Runtime environment type '{boundEnvironment.GetType().FullName}' cannot receive Cyborg runtime services.");
@@ -43,16 +43,16 @@ internal sealed class DefaultRuntimeEnvironmentFactory(
         IRuntimeEnvironment? parent,
         string ns,
         RuntimeEnvironmentTransactionParticipant participant,
-        ModuleTransaction transaction)
+        ActiveTransaction activeTransaction)
     {
         ArgumentNullException.ThrowIfNull(node);
         ArgumentNullException.ThrowIfNull(ns);
         ArgumentNullException.ThrowIfNull(participant);
-        ArgumentNullException.ThrowIfNull(transaction);
+        ArgumentNullException.ThrowIfNull(activeTransaction);
 
         RuntimeEnvironment environment = parent is null
-            ? new RuntimeEnvironment(environmentId, node, syntaxFactory, ns, participant, transaction)
-            : new InheritedRuntimeEnvironment(environmentId, node, parent, syntaxFactory, ns, participant, transaction);
+            ? new RuntimeEnvironment(environmentId, node, syntaxFactory, ns, participant, activeTransaction)
+            : new InheritedRuntimeEnvironment(environmentId, node, parent, syntaxFactory, ns, participant, activeTransaction);
         return AttachRuntimeServices(environment);
     }
 

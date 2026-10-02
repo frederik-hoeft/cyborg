@@ -31,7 +31,7 @@ internal sealed class RootModuleRuntime : ModuleRuntimeBase
     }
 
     private RootModuleRuntime(RootRuntimeState state, ModuleRuntimeServices operations, IServiceProvider? serviceProvider)
-        : base(state.EnvironmentContext, operations, state.Transaction, serviceProvider)
+        : base(state.EnvironmentContext, operations, state.ActiveTransaction, serviceProvider)
     {
     }
 
@@ -65,11 +65,12 @@ internal sealed class RootModuleRuntime : ModuleRuntimeBase
         RuntimeEnvironmentTransactionSeed environmentSeed = new(defaultEnvironment.EnvironmentId, [globalSeed]);
         TransactionRootSeed seed = new TransactionRootSeed().With(environments, environmentSeed);
         ModuleTransaction transaction = coordinator.CreateRoot(seed);
-        RuntimeEnvironmentContext environmentContext = RuntimeEnvironmentContext.CreateRoot(defaultEnvironment, environmentFactory, environments, transaction, loggerFactory);
-        return new RootRuntimeState(transaction, environmentContext);
+        ActiveTransaction activeTransaction = new(transaction);
+        RuntimeEnvironmentContext environmentContext = RuntimeEnvironmentContext.CreateRoot(defaultEnvironment, environmentFactory, environments, activeTransaction, loggerFactory);
+        return new RootRuntimeState(activeTransaction, environmentContext);
     }
 
     private sealed record RootRuntimeComposition(RootRuntimeState State, ModuleRuntimeServices Operations);
 
-    private sealed record RootRuntimeState(ModuleTransaction Transaction, RuntimeEnvironmentContext EnvironmentContext);
+    private sealed record RootRuntimeState(ActiveTransaction ActiveTransaction, RuntimeEnvironmentContext EnvironmentContext);
 }

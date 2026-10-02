@@ -24,6 +24,12 @@ public interface IModuleRuntime
 
     Task<IReadOnlyList<IModuleExecutionResult>> ExecuteConcurrentlyAsync(IReadOnlyList<ModuleContext> moduleContexts, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Opens a concurrent child-execution scope on this invocation.
+    /// The invocation keeps executing against the scope's continuation until the scope is closed or disposed.
+    /// </summary>
+    IConcurrentExecutionScope OpenConcurrentExecution();
+
     IRuntimeEnvironment PrepareEnvironment(ModuleEnvironment moduleEnvironment, IReadOnlyCollection<string>? overrideResolutionTags = null);
 
     IRuntimeEnvironment? ResolveEnvironmentReference(ModuleEnvironmentReference environmentReference);

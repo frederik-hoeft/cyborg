@@ -9,5 +9,5 @@ internal interface IRuntimeModuleRegistry
 
     void ApplySeed(ModuleTransaction transaction, ModuleRegistrySeed seed);
 
-    void BindExecutionScope(IServiceProvider services, ModuleTransaction transaction);
+    void BindExecutionScope(IServiceProvider services, ActiveTransaction activeTransaction);
 }

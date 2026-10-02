@@ -173,7 +173,7 @@ The built-in participants are:
 
 Participant boundaries follow state semantics rather than runtime ownership. Unrelated concerns remain separate because the coordinator already provides aggregate atomic publication. A composite participant is appropriate only when preparing a valid candidate for one part intrinsically depends on the candidate state of another part. The environment subsystem uses this pattern because binding lifetime depends on the reconciled environment graph; the named-module registry remains separate because its state is independent. Successful semantics must not depend on participant registration or preparation order because participants cannot publish owner-visible state during preparation.
 
-The debugger participant carries execution-control state rather than module data. Its merge is deliberately conflict-free: children inherit the owner's step flag, sibling decisions remain isolated while the fork is open, and after join the owner remains stepping when any non-stale child remains stepping. The frozen owner continuation is ignored when real child contributors exist so pre-fork step state cannot resurrect after every child explicitly continued. A debugger-session generation fences state copied into branches before `detach`; only the newest represented generation may restore stepping.
+The debugger participant carries execution-control state rather than module data. Its merge is deliberately conflict-free: children inherit the owner's step flag, sibling decisions remain isolated while the fork is open, and after join the owner remains stepping when any non-stale child remains stepping. An untouched pre-fork owner continuation is ignored when real child contributors exist so that copy cannot resurrect stepping after every child explicitly continued. A continuation that changes its generation or step flag while the fork is open is an owner decision and participates in that same merge. A debugger-session generation fences state copied into branches before `detach`; only the newest represented generation may restore stepping.
 
 ### Prepare, then publish
 
@@ -285,6 +285,24 @@ Branch scopes remain alive through reconciliation and are disposed only after th
 
 For the module's JSON contract and exit-status aggregation rules, see [Module Reference](modules-reference.md#parallel-cyborgmodulesparallelv1).
 
+## Concurrent Execution Scopes
+
+`ExecuteConcurrentlyAsync` is the fixed join used by `Parallel`: every child starts before any result is returned, and the continuation is empty. Some callers need the same fork while the owning invocation keeps running. `IModuleRuntime.OpenConcurrentExecution` opens that scope.
+
+```text
+fork baseline
+  +-- contributor 0: owner continuation, still active
+  +-- contributor 1..N: children started individually
+```
+
+`StartAsync` runs one ordinary nested invocation and returns a handle whose result can be awaited before the scope closes. `Cancel` cancels that child only. The runtime does not rank children or interpret exit status. Sidecar lifetime, and any later policy of the same shape, stays in the module that opened the scope.
+
+While the scope is open, the invocation's active transaction points at the continuation. Environment views, the module registry, and transaction-aware services that were bound to the invocation follow that pointer, so the owner can keep reading and writing. Those writes are continuation changes. Children forked at start do not see them, and the owner does not see child writes. A nested `ExecuteAsync` or a nested scope forks from the continuation, so that nested work does see the owner's writes; its join becomes part of the continuation and meets the other children only when the outer scope reconciles. Scopes close from the inside out. A scope cannot close while its continuation still has an open nested fork.
+
+`CloseAsync` waits until every started child has terminated, completes each child under that module's failure-publication policy, completes the continuation, and reconciles. `Completed` is already visible on a child before this join. `Closed`, scope disposal, and publication happen together with the join. Disposing a scope that was not closed cancels every child, waits for termination, and discards the fork, leaving the owner at its pre-fork state.
+
+The owner transaction object stays frozen for direct access for the whole time the fork is open. Retargeting is how the invocation reaches the continuation without a second state model, and the active transaction is restored to the owner after the fork publishes or discards.
+
 ## Transaction-Aware DI Services
 
 DI lifetime and transaction participation are orthogonal. Services generally fall into three categories:
@@ -344,14 +362,15 @@ The steady-state model establishes these guarantees:
 - default conflict handling is deterministic and based on explicit write/write conflicts;
 - DI lifetime never implicitly enables transaction participation;
 - debugger step state inherits, isolates, and reconciles through the same structured branch model without introducing transaction conflicts;
-- external/process state remains outside the transaction model unless it explicitly participates.
+- external/process state remains outside the transaction model unless it explicitly participates;
+- an open concurrent execution scope keeps the owning invocation on the fork continuation, isolates each child until close, and reconciles owner writes with those children as one fork.
 
 The model does not currently provide:
 
 - compensating actions for external side effects;
 - serializable read-set conflict detection;
 - deep transactional semantics for arbitrary object graphs stored as values;
-- managed background or sidecar execution policy;
+- background work that outlives the invocation which started it;
 - richer merge policies beyond the existing conflict-strategy boundary;
 - interactive selection or switching of the active debugger frontend among already-queued pause points;
 - persistence or export policy for final root transaction state.

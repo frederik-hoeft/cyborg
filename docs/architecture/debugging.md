@@ -71,7 +71,7 @@ There is no process-wide `IsEnabled` mirror for branch stepping. The pre-executi
 
 Step state is transaction-aware execution-control state. A child invocation inherits the step state of the transaction branch from which it forks. Sibling branches receive isolated copies and can independently choose `Step` or `Continue`.
 
-When a fork generation reconciles, the restored owner state is derived from the child contributors rather than from the frozen pre-fork owner continuation:
+When a fork generation reconciles, an untouched pre-fork owner continuation is ignored once real child contributors exist:
 
 ```text
 owner stepping after join = any non-stale child remains stepping

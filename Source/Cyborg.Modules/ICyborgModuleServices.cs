@@ -25,6 +25,7 @@ using Cyborg.Modules.Network.WakeOnLan;
 using Cyborg.Modules.Parallel;
 using Cyborg.Modules.Retry;
 using Cyborg.Modules.Sequence;
+using Cyborg.Modules.Sidecar;
 using Cyborg.Modules.Subprocess;
 using Cyborg.Modules.Switch;
 using Cyborg.Modules.Template;
@@ -41,6 +42,7 @@ namespace Cyborg.Modules;
 [Singleton<JsonNamingPolicy>(Factory = nameof(GetModuleJsonNamingPolicy))]
 [Singleton<IModuleLoader, ParallelModuleLoader>]
 [Singleton<IModuleLoader, SequenceModuleLoader>]
+[Singleton<IModuleLoader, SidecarModuleLoader>]
 [Singleton<IModuleLoader, SubprocessModuleLoader>]
 [Singleton<IModuleLoader, SwitchModuleLoader>]
 [Singleton<IModuleLoader, ConfigMapModuleLoader>]
