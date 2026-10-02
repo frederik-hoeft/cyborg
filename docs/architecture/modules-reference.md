@@ -169,12 +169,12 @@ Runs one primary module concurrently with zero or more sidecar modules. Sidecars
 | Property | Type | Required | Constraints | Description |
 |----------|------|----------|-------------|-------------|
 | `module` | module context | Yes | -- | Primary module. Its terminal status ends the lifetime of sidecars that are still running. |
-| `sidecars` | array of module contexts | No | Null elements are rejected at execution | Companion modules started with the primary. Omitted or empty runs the primary alone inside the same scope. |
+| `sidecars` | array of module contexts | No | Elements must be non-null | Companion modules started with the primary. Omitted or empty runs the primary alone inside the same scope. |
 
 **Behavior:**
 
 - Starts the primary and every sidecar as normal nested invocations from one fork baseline. Siblings cannot observe each other, or continuation writes made by an owning scope, until the group reconciles.
-- When the primary reaches any terminal status (`Success`, `Failed`, `Skipped`, or `Canceled`), sidecars that are still running are canceled.
+- When the primary reaches any terminal status (`Success`, `Failed`, `Skipped`, or `Canceled`), sidecars that are still running are canceled. A structural primary fault before a definite result exists also cancels the sidecars before the group unwinds.
 - A sidecar result of `Failed`, or a sidecar invocation that faults before it has a definite result, is unexpected. The module cancels the primary and the other sidecars.
 - `Success`, `Skipped`, and `Canceled` sidecars are not failures. `Canceled` is the expected result of stopping a companion because the primary finished, and of caller cancellation flowing into the group. A sidecar that finishes successfully before the primary does not cancel the primary.
 - The module does not return until every child has terminated and the scope has reconciled. Each child's `Transaction.OnError` still decides whether that child's workflow writes are published. A conflict publishes nothing and fails the invocation.

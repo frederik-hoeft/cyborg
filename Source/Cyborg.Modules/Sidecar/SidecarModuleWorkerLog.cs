@@ -11,7 +11,7 @@ internal static partial class SidecarModuleWorkerLog
     [ZLoggerMessage(LogLevel.Debug, "Sidecar primary completed with status '{status}'")]
     public static partial void LogSidecarPrimaryCompleted(this ILogger logger, string status);
 
-    [ZLoggerMessage(LogLevel.Error, "Sidecar {sidecarIndex} failed with status '{status}' — terminating the group")]
+    [ZLoggerMessage(LogLevel.Error, "Sidecar {sidecarIndex} failed with status '{status}' \u2014 terminating the group")]
     public static partial void LogSidecarFailed(this ILogger logger, int sidecarIndex, string status);
 
     [ZLoggerMessage(LogLevel.Debug, "Sidecar group completed with primary status '{status}'")]

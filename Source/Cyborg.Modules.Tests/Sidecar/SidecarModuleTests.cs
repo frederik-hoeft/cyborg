@@ -48,6 +48,23 @@ public sealed class SidecarModuleTests : ModuleTestBase
             });
 
     [TestMethod]
+    public Task TestValidationAsync_NullSidecarElement_IsInvalidAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        SidecarModule module = new(
+            CreateProbe("primary", SidecarProbeAction.Succeed),
+            [null!]);
+
+        IValidationResult<SidecarModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
+
+        MSAssert.IsFalse(result.IsValid);
+        MSAssert.Contains(
+            error => error.Rule == "required"
+                && error.PropertyName.Equals("Sidecars[0]", StringComparison.Ordinal),
+            result.Errors);
+    }, ConfigureProbeServices);
+
+    [TestMethod]
     public Task TestExecutionAsync_PrimaryFailureCancelsCompanionAndReturnsFailedAsync() =>
         TestExecutionAsync(
             """
@@ -114,6 +131,24 @@ public sealed class SidecarModuleTests : ModuleTestBase
         MSAssert.AreEqual(ModuleExitStatus.Canceled, recorder.SidecarStatus);
         MSAssert.AreEqual("primary", RequireVariable(runtime, "primary_value"));
         MSAssert.AreEqual("lease", RequireVariable(runtime, "lease_value"));
+    }, ConfigureProbeServices);
+
+    [TestMethod]
+    public Task ExecuteAsync_StructuralPrimaryFailureCancelsPendingSidecarAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        SidecarProbeRecorder recorder = services.GetRequiredService<SidecarProbeRecorder>();
+        ModuleContext primary = CreateProbe("primary", SidecarProbeAction.Succeed) with
+        {
+            Requires = new ModuleRequirements(ArgumentNamespace: null, Arguments: ["missing"]),
+        };
+
+        IModuleExecutionResult result = await runtime.ExecuteAsync(
+            CreateSidecar(primary, [CreateProbe("lease", SidecarProbeAction.WaitForCancel)]),
+            cancellationToken: TestContext.CancellationToken);
+
+        MSAssert.AreEqual(ModuleExitStatus.Failed, result.Status);
+        MSAssert.AreEqual(ModuleExitStatus.Canceled, recorder.SidecarStatus);
     }, ConfigureProbeServices);
 
     [TestMethod]

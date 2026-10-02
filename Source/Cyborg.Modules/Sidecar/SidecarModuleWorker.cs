@@ -16,8 +16,7 @@ public sealed class SidecarModuleWorker(IWorkerContext<SidecarModule> context) :
         IConcurrentModuleExecution[] sidecarExecutions = new IConcurrentModuleExecution[sidecars.Count];
         for (int i = 0; i < sidecars.Count; i++)
         {
-            ModuleContext sidecar = sidecars[i] ?? throw new InvalidOperationException("Sidecar module contexts cannot contain null entries.");
-            sidecarExecutions[i] = await scope.StartAsync(sidecar, cancellationToken);
+            sidecarExecutions[i] = await scope.StartAsync(sidecars[i], cancellationToken);
         }
 
         Task<IModuleExecutionResult>[] watches = new Task<IModuleExecutionResult>[sidecarExecutions.Length + 1];
@@ -43,10 +42,16 @@ public sealed class SidecarModuleWorker(IWorkerContext<SidecarModule> context) :
 
     private async Task<IModuleExecutionResult> WatchPrimaryAsync(IConcurrentModuleExecution primary, IReadOnlyList<IConcurrentModuleExecution> sidecars)
     {
-        IModuleExecutionResult result = await primary.Completion;
-        Logger.LogSidecarPrimaryCompleted(result.Status.ToString());
-        CancelAll(sidecars);
-        return result;
+        try
+        {
+            IModuleExecutionResult result = await primary.Completion;
+            Logger.LogSidecarPrimaryCompleted(result.Status.ToString());
+            return result;
+        }
+        finally
+        {
+            CancelAll(sidecars);
+        }
     }
 
     private async Task<IModuleExecutionResult> WatchSidecarAsync(

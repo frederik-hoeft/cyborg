@@ -66,30 +66,23 @@ internal abstract class ModuleRuntimeBase
             return [];
         }
 
-        IConcurrentExecutionScope scope = OpenConcurrentExecution();
-        try
+        await using IConcurrentExecutionScope scope = OpenConcurrentExecution();
+        IConcurrentModuleExecution[] executions = new IConcurrentModuleExecution[moduleContexts.Count];
+        for (int i = 0; i < moduleContexts.Count; i++)
         {
-            IConcurrentModuleExecution[] executions = new IConcurrentModuleExecution[moduleContexts.Count];
-            for (int i = 0; i < moduleContexts.Count; i++)
-            {
-                ModuleContext moduleContext = moduleContexts[i]
-                    ?? throw new ArgumentException("Concurrent module contexts cannot contain null entries.", nameof(moduleContexts));
-                executions[i] = await scope.StartAsync(moduleContext, cancellationToken);
-            }
+            ModuleContext moduleContext = moduleContexts[i]
+                ?? throw new ArgumentException("Concurrent module contexts cannot contain null entries.", nameof(moduleContexts));
+            executions[i] = await scope.StartAsync(moduleContext, cancellationToken);
+        }
 
-            Task<IModuleExecutionResult>[] completions = new Task<IModuleExecutionResult>[executions.Length];
-            for (int i = 0; i < executions.Length; i++)
-            {
-                completions[i] = executions[i].Completion;
-            }
-            IModuleExecutionResult[] results = await Task.WhenAll(completions);
-            await scope.CloseAsync(cancellationToken);
-            return results;
-        }
-        finally
+        Task<IModuleExecutionResult>[] completions = new Task<IModuleExecutionResult>[executions.Length];
+        for (int i = 0; i < executions.Length; i++)
         {
-            await scope.DisposeAsync();
+            completions[i] = executions[i].Completion;
         }
+        IModuleExecutionResult[] results = await Task.WhenAll(completions);
+        await scope.CloseAsync(cancellationToken);
+        return results;
     }
 
     public IConcurrentExecutionScope OpenConcurrentExecution()

@@ -295,7 +295,7 @@ fork baseline
   +-- contributor 1..N: children started individually
 ```
 
-`StartAsync` runs one ordinary nested invocation and returns a handle whose result can be awaited before the scope closes. `Cancel` cancels that child only. The runtime does not rank children or interpret exit status. Sidecar lifetime, and any later policy of the same shape, stays in the module that opened the scope.
+`StartAsync` runs one ordinary nested invocation and returns a handle whose result can be awaited before the scope closes. A structural failure before the child has a definite result faults that completion task; a failure while establishing the child aborts the scope because its fork can no longer join normally. `Cancel` cancels that child only. The runtime does not rank children or interpret exit status. Sidecar lifetime, and any later policy of the same shape, stays in the module that opened the scope.
 
 While the scope is open, the invocation's active transaction points at the continuation. Environment views, the module registry, and transaction-aware services that were bound to the invocation follow that pointer, so the owner can keep reading and writing. Those writes are continuation changes. Children forked at start do not see them, and the owner does not see child writes. A nested `ExecuteAsync` or a nested scope forks from the continuation, so that nested work does see the owner's writes; its join becomes part of the continuation and meets the other children only when the outer scope reconciles. Scopes close from the inside out. A scope cannot close while its continuation still has an open nested fork.
 

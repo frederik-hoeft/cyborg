@@ -10,6 +10,7 @@ public interface IConcurrentExecutionScope : IAsyncDisposable
 {
     /// <summary>
     /// Starts one nested module invocation. Its <see cref="IConcurrentModuleExecution.Completion"/> task can be observed before <see cref="CloseAsync"/>.
+    /// A structural failure while establishing the child aborts this scope because the fork can no longer be reconciled normally.
     /// </summary>
     ValueTask<IConcurrentModuleExecution> StartAsync(ModuleContext moduleContext, CancellationToken cancellationToken = default);
 

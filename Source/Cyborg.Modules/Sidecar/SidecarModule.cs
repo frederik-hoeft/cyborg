@@ -8,7 +8,7 @@ namespace Cyborg.Modules.Sidecar;
 [GeneratedModuleValidation]
 public sealed partial record SidecarModule(
     [property: Required] ModuleContext Module,
-    IReadOnlyList<ModuleContext>? Sidecars
+    [property: Required(TargetsElements = true)] IReadOnlyList<ModuleContext>? Sidecars
 ) : ModuleBase, IModule
 {
     public static string ModuleId => "cyborg.modules.sidecar.v1";

@@ -6,7 +6,8 @@
 public interface IConcurrentModuleExecution
 {
     /// <summary>
-    /// Completes when the child has a definite execution result. The owning scope stays open and unreconciled.
+    /// Completes when the child has a definite execution result. The task faults if structural execution fails before a result exists.
+    /// The owning scope stays open and unreconciled in either case.
     /// </summary>
     Task<IModuleExecutionResult> Completion { get; }
 

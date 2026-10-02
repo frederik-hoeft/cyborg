@@ -37,32 +37,33 @@ internal sealed class ConcurrentExecutionScope : IConcurrentExecutionScope
     public async ValueTask<IConcurrentModuleExecution> StartAsync(ModuleContext moduleContext, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(moduleContext);
-        if (_state != ScopeState.Open)
-        {
-            throw new InvalidOperationException("A concurrent execution scope cannot start children after it has started to close.");
-        }
+        EnsureOpen();
 
         ModuleTransaction childTransaction = _fork.CreateChild();
         CancellationTokenSource childCancellation = CancellationTokenSource.CreateLinkedTokenSource(_scopeCancellation.Token, cancellationToken);
         _childCancellations.Add(childCancellation);
-        ModuleInvocationScope invocationScope = await _createInvocationScopeAsync(
-            childTransaction,
-            moduleContext.Module.ModuleId,
-            moduleContext.Module.Definition,
-            childCancellation.Token);
-        ConcurrentModuleExecution execution = new(invocationScope, moduleContext.Module.Definition, moduleContext, childCancellation);
-        _executions.Add(execution);
-        execution.Start();
-        return execution;
+        try
+        {
+            ModuleInvocationScope invocationScope = await _createInvocationScopeAsync(
+                childTransaction,
+                moduleContext.Module.ModuleId,
+                moduleContext.Module.Definition,
+                childCancellation.Token);
+            ConcurrentModuleExecution execution = new(invocationScope, moduleContext.Module.Definition, moduleContext, childCancellation);
+            _executions.Add(execution);
+            execution.Start();
+            return execution;
+        }
+        catch
+        {
+            await CancelAndAbandonAsync();
+            throw;
+        }
     }
 
     public async Task CloseAsync(CancellationToken cancellationToken = default)
     {
-        if (_state != ScopeState.Open)
-        {
-            throw new InvalidOperationException("The concurrent execution scope is not open.");
-        }
-
+        EnsureOpen();
         _state = ScopeState.Closing;
         using CancellationTokenRegistration registration = cancellationToken.Register(static state => ((ConcurrentExecutionScope)state!).CancelChildren(), this);
         IModuleExecutionResult[] results;
@@ -118,17 +119,7 @@ internal sealed class ConcurrentExecutionScope : IConcurrentExecutionScope
                 return;
             }
 
-            CancelChildren();
-            try
-            {
-                await WaitForChildrenAsync();
-            }
-            catch (Exception)
-            {
-                // Child faults are observed by abandonment. Disposal must still release the fork.
-            }
-
-            await AbandonAsync();
+            await CancelAndAbandonAsync();
         }
         finally
         {
@@ -167,6 +158,27 @@ internal sealed class ConcurrentExecutionScope : IConcurrentExecutionScope
         }
 
         return false;
+    }
+
+    private async Task CancelAndAbandonAsync()
+    {
+        if (_state == ScopeState.Closed)
+        {
+            return;
+        }
+
+        _state = ScopeState.Closing;
+        CancelChildren();
+        try
+        {
+            await WaitForChildrenAsync();
+        }
+        catch
+        {
+            // Structural child faults are observed here so abandonment can still release the fork.
+        }
+
+        await AbandonAsync();
     }
 
     private async Task AbandonAsync()
@@ -218,11 +230,6 @@ internal sealed class ConcurrentExecutionScope : IConcurrentExecutionScope
         catch (ObjectDisposedException)
         {
         }
-
-        for (int i = 0; i < _executions.Count; i++)
-        {
-            _executions[i].Cancel();
-        }
     }
 
     private async ValueTask DisposeResourcesAsync()
@@ -241,6 +248,14 @@ internal sealed class ConcurrentExecutionScope : IConcurrentExecutionScope
         for (int i = 0; i < _childCancellations.Count; i++)
         {
             _childCancellations[i].Dispose();
+        }
+    }
+
+    private void EnsureOpen()
+    {
+        if (_state != ScopeState.Open)
+        {
+            throw new InvalidOperationException("The concurrent execution scope is not open.");
         }
     }
 
@@ -292,7 +307,15 @@ internal sealed class ConcurrentModuleExecution : IConcurrentModuleExecution
 
     public Task<IModuleExecutionResult> Completion => _completion ?? throw new InvalidOperationException("The concurrent child execution has not been started.");
 
-    public void Start() => _completion = ExecuteAsync();
+    public void Start()
+    {
+        if (_completion is not null)
+        {
+            throw new InvalidOperationException("The concurrent child execution has already been started.");
+        }
+
+        _completion = ExecuteAsync();
+    }
 
     public void Cancel()
     {
