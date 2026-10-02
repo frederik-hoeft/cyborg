@@ -7,7 +7,7 @@ namespace Cyborg.Core.Runtime.Engine.Environments;
 internal sealed class TransactionalEnvironmentVariableStore(
     RuntimeEnvironmentId environmentId,
     RuntimeEnvironmentTransactionParticipant participant,
-    ModuleTransaction transaction) : IEnvironmentVariableStore
+    ActiveTransaction activeTransaction) : IEnvironmentVariableStore
 {
     public bool TryGetValue(string name, out object? value)
     {
@@ -31,5 +31,5 @@ internal sealed class TransactionalEnvironmentVariableStore(
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    private RuntimeEnvironmentTransactionState GetState() => transaction.GetParticipantState(participant);
+    private RuntimeEnvironmentTransactionState GetState() => activeTransaction.Current.GetParticipantState(participant);
 }

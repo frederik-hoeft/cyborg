@@ -24,6 +24,7 @@ using Cyborg.Modules.Network.WakeOnLan;
 using Cyborg.Modules.Parallel;
 using Cyborg.Modules.Retry;
 using Cyborg.Modules.Sequence;
+using Cyborg.Modules.Sidecar;
 using Cyborg.Modules.Subprocess;
 using Cyborg.Modules.Switch;
 using Cyborg.Modules.Template;
@@ -36,6 +37,7 @@ namespace Cyborg.Modules;
 [JsonSourceGenerationOptions(ReadCommentHandling = JsonCommentHandling.Skip, UseStringEnumConverter = true, PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower, IncludeFields = true)]
 [JsonSerializable(typeof(ParallelModule))]
 [JsonSerializable(typeof(SequenceModule))]
+[JsonSerializable(typeof(SidecarModule))]
 [JsonSerializable(typeof(SubprocessModule))]
 [JsonSerializable(typeof(SwitchModule))]
 [JsonSerializable(typeof(ConfigMapModule))]

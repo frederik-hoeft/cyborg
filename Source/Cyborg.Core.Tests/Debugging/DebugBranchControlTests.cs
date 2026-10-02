@@ -226,6 +226,24 @@ public sealed class DebugBranchControlTests : CyborgCoreTestBase
         Assert.IsFalse(conflictResolver.WasCalled);
     }
 
+    [TestMethod]
+    public void BranchControlFork_ChangedOwnerContinuationParticipatesWhenChildrenExist()
+    {
+        DebugBranchControlState owner = new(sessionGeneration: 7, isStepping: false);
+        DebugBranchControlFork fork = new(owner);
+        DebugBranchControlState continuation = fork.CreateBranch();
+        DebugBranchControlState child = fork.CreateBranch();
+        continuation.IsStepping = true;
+        child.IsStepping = false;
+
+        bool merged = fork.TryPrepareMerge([continuation, child], new ThrowingConflictResolver(), out DebugBranchControlState? candidate);
+
+        Assert.IsTrue(merged);
+        Assert.IsNotNull(candidate);
+        Assert.AreEqual(7, candidate.SessionGeneration);
+        Assert.IsTrue(candidate.IsStepping);
+    }
+
     private sealed class DebugControlHarness
     {
         public DebugControlHarness()
@@ -247,7 +265,7 @@ public sealed class DebugBranchControlTests : CyborgCoreTestBase
         public IDebugBranchControl CreateControl(ModuleTransaction transaction)
         {
             TransactionalServiceContext context = new();
-            ((ITransactionBoundTransactionalServiceContext)context).Bind(Services, transaction);
+            ((ITransactionBoundTransactionalServiceContext)context).Bind(Services, new ActiveTransaction(transaction));
             return new DebugBranchControl(context, Session);
         }
     }

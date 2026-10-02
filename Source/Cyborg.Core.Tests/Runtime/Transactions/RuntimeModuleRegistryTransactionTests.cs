@@ -118,7 +118,7 @@ public sealed class RuntimeModuleRegistryTransactionTests
         using ServiceProvider provider = services.BuildServiceProvider();
         using IServiceScope scope = provider.CreateScope();
 
-        moduleRegistry.BindExecutionScope(scope.ServiceProvider, transaction);
+        moduleRegistry.BindExecutionScope(scope.ServiceProvider, new ActiveTransaction(transaction));
         IModuleRegistry registry = scope.ServiceProvider.GetRequiredService<IModuleRegistry>();
         ModuleContext module = CreateModuleContext("module");
 

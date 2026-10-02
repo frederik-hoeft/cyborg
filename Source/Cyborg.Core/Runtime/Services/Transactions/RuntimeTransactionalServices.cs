@@ -31,10 +31,10 @@ internal sealed class RuntimeTransactionalServices
 
     public ImmutableArray<ITransactionParticipant> Participants { get; }
 
-    public void BindExecutionScope(IServiceProvider services, ModuleTransaction transaction)
+    public void BindExecutionScope(IServiceProvider services, ActiveTransaction activeTransaction)
     {
         ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(transaction);
+        ArgumentNullException.ThrowIfNull(activeTransaction);
         ITransactionalServiceContext? context = services.GetService<ITransactionalServiceContext>();
         if (context is null)
         {
@@ -49,7 +49,7 @@ internal sealed class RuntimeTransactionalServices
             throw new InvalidOperationException(
                 $"Configured transactional service context '{context.GetType().FullName}' does not support execution-transaction binding.");
         }
-        transactionBoundContext.Bind(this, transaction);
+        transactionBoundContext.Bind(this, activeTransaction);
     }
 
     public TState GetState<TParticipant, TState>(ModuleTransaction transaction)

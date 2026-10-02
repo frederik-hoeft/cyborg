@@ -5,7 +5,7 @@ namespace Cyborg.Core.Runtime.Configuration;
 
 public sealed class DefaultModuleRegistry : IModuleRegistry, ITransactionBoundModuleRegistry
 {
-    private RuntimeModuleRegistryTransactionState? _state;
+    private Func<RuntimeModuleRegistryTransactionState>? _stateAccessor;
 
     public bool TryAddModule(string name, ModuleContext module) => RequireState().TryAddModule(name, module);
 
@@ -13,16 +13,16 @@ public sealed class DefaultModuleRegistry : IModuleRegistry, ITransactionBoundMo
 
     public bool TryRemoveModule(string name) => RequireState().TryRemoveModule(name);
 
-    void ITransactionBoundModuleRegistry.Bind(RuntimeModuleRegistryTransactionState state)
+    void ITransactionBoundModuleRegistry.Bind(Func<RuntimeModuleRegistryTransactionState> stateAccessor)
     {
-        ArgumentNullException.ThrowIfNull(state);
-        if (_state is not null)
+        ArgumentNullException.ThrowIfNull(stateAccessor);
+        if (_stateAccessor is not null)
         {
             throw new InvalidOperationException("The module registry is already bound to an execution transaction.");
         }
-        _state = state;
+        _stateAccessor = stateAccessor;
     }
 
     private RuntimeModuleRegistryTransactionState RequireState() =>
-        _state ?? throw new InvalidOperationException("The module registry can only be used from a module execution scope.");
+        _stateAccessor?.Invoke() ?? throw new InvalidOperationException("The module registry can only be used from a module execution scope.");
 }

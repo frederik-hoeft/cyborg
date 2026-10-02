@@ -22,10 +22,13 @@ internal sealed class DebugBranchControlFork(DebugBranchControlState ownerState)
             throw new InvalidOperationException("Debugger branch-control reconciliation requires at least the owner continuation contributor.");
         }
 
-        // Contributor 0 is the frozen owner continuation. When children exist it carries the pre-fork
-        // step state, not a debugger decision made after the fork. Including it would resurrect stale
-        // stepping after every child explicitly continued.
-        int firstContributor = contributors.Count > 1 ? 1 : 0;
+        // Contributor 0 starts as the pre-fork owner continuation. When children exist, that untouched
+        // copy must not resurrect stepping after every child explicitly continued. A continuation whose
+        // generation or step flag differs from the fork baseline is a decision made while the fork was
+        // open, and it participates like any other contributor.
+        bool continuationChanged = contributors.Count > 1
+            && (contributors[0].SessionGeneration != _sessionGeneration || contributors[0].IsStepping != _isStepping);
+        int firstContributor = contributors.Count > 1 && !continuationChanged ? 1 : 0;
         long newestGeneration = contributors[firstContributor].SessionGeneration;
         for (int i = firstContributor + 1; i < contributors.Count; i++)
         {

@@ -18,6 +18,7 @@ For details on the execution model, environment scoping semantics, variable reso
 - [Control Flow Modules](#control-flow-modules)
   - [Sequence (`cyborg.modules.sequence.v1`)](#sequence-cyborgmodulessequencev1)
   - [Parallel (`cyborg.modules.parallel.v1`)](#parallel-cyborgmodulesparallelv1)
+  - [Sidecar (`cyborg.modules.sidecar.v1`)](#sidecar-cyborgmodulessidecarv1)
   - [ForEach (`cyborg.modules.foreach.v1`)](#foreach-cyborgmodulesforeachv1)
   - [Guard (`cyborg.modules.guard.v1`)](#guard-cyborgmodulesguardv1)
   - [If (`cyborg.modules.if.v1`)](#if-cyborgmodulesifv1)
@@ -156,6 +157,28 @@ Executes multiple module contexts concurrently from one stable workflow-state ba
 - After successful reconciliation, returns the first `Canceled` or `Failed` status encountered in declaration order. If neither occurs, returns `Success` when at least one branch succeeded and `Skipped` when every branch was skipped.
 
 Nested `Parallel` modules use the same transaction model: an inner join becomes part of its branch's transaction-local change set, and those changes participate in the outer join normally. See [Transactional Execution](transactions.md#sequential-and-parallel-composition) for the isolation and reconciliation model.
+
+---
+
+### Sidecar (`cyborg.modules.sidecar.v1`)
+
+Runs one primary module concurrently with zero or more sidecar modules. Sidecars are ordinary nested invocations whose lifetime is owned by the primary module. The runtime primitive underneath is a concurrent execution scope; this module only supplies the lifetime policy. See [Concurrent Execution Scopes](transactions.md#concurrent-execution-scopes).
+
+**Properties:**
+
+| Property | Type | Required | Constraints | Description |
+|----------|------|----------|-------------|-------------|
+| `module` | module context | Yes | -- | Primary module. Its terminal status ends the lifetime of sidecars that are still running. |
+| `sidecars` | array of module contexts | No | Elements must be non-null | Companion modules started with the primary. Omitted or empty runs the primary alone inside the same scope. |
+
+**Behavior:**
+
+- Starts the primary and every sidecar as normal nested invocations from one fork baseline. Siblings cannot observe each other, or continuation writes made by an owning scope, until the group reconciles.
+- When the primary reaches any terminal status (`Success`, `Failed`, `Skipped`, or `Canceled`), sidecars that are still running are canceled. A structural primary fault before a definite result exists also cancels the sidecars before the group unwinds.
+- A sidecar result of `Failed`, or a sidecar invocation that faults before it has a definite result, is unexpected. The module cancels the primary and the other sidecars.
+- `Success`, `Skipped`, and `Canceled` sidecars are not failures. `Canceled` is the expected result of stopping a companion because the primary finished, and of caller cancellation flowing into the group. A sidecar that finishes successfully before the primary does not cancel the primary.
+- The module does not return until every child has terminated and the scope has reconciled. Each child's `Transaction.OnError` still decides whether that child's workflow writes are published. A conflict publishes nothing and fails the invocation.
+- If any sidecar result is `Failed`, the sidecar module returns `Failed`. Otherwise it returns the primary status. Child artifacts are not copied onto the sidecar module; they become visible through reconciliation.
 
 ---
 

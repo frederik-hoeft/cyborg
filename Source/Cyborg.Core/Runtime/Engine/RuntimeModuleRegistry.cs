@@ -19,10 +19,10 @@ internal sealed class RuntimeModuleRegistry : IRuntimeModuleRegistry
         state.ApplySeed(seed);
     }
 
-    public void BindExecutionScope(IServiceProvider services, ModuleTransaction transaction)
+    public void BindExecutionScope(IServiceProvider services, ActiveTransaction activeTransaction)
     {
         ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(transaction);
+        ArgumentNullException.ThrowIfNull(activeTransaction);
         IModuleRegistry? registry = services.GetService<IModuleRegistry>();
         if (registry is null)
         {
@@ -33,6 +33,6 @@ internal sealed class RuntimeModuleRegistry : IRuntimeModuleRegistry
             throw new InvalidOperationException(
                 $"Configured module registry '{registry.GetType().FullName}' does not support execution-transaction binding.");
         }
-        transactionBoundRegistry.Bind(transaction.GetParticipantState(_participant));
+        transactionBoundRegistry.Bind(() => activeTransaction.Current.GetParticipantState(_participant));
     }
 }

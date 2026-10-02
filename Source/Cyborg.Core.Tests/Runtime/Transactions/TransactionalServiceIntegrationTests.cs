@@ -25,7 +25,7 @@ public sealed class TransactionalServiceIntegrationTests : CyborgCoreTestBase
         RuntimeTransactionalServices transactionalServices = new(participants);
         ModuleTransaction transaction = new TransactionCoordinator(transactionalServices.Participants).CreateRoot();
         using IServiceScope scope = services.CreateScope();
-        transactionalServices.BindExecutionScope(scope.ServiceProvider, transaction);
+        transactionalServices.BindExecutionScope(scope.ServiceProvider, new ActiveTransaction(transaction));
 
         Assert.Contains(static participant => participant is TransactionalProbeParticipant, participants);
         TransactionalServiceParticipant participant = participants.Single(static participant => participant is TransactionalProbeParticipant);
@@ -155,7 +155,7 @@ public sealed class TransactionalServiceIntegrationTests : CyborgCoreTestBase
         RuntimeTransactionalServices services = new([descriptor]);
         ModuleTransaction root = new TransactionCoordinator(services.Participants).CreateRoot();
         TransactionalServiceContext context = new();
-        ((ITransactionBoundTransactionalServiceContext)context).Bind(services, root);
+        ((ITransactionBoundTransactionalServiceContext)context).Bind(services, new ActiveTransaction(root));
         ITransactionalServiceState<TransactionalCounterState> state =
             context.GetState<TransactionalCounterParticipant, TransactionalCounterState>();
         ModuleTransactionForkGroup fork = root.Fork();
@@ -221,7 +221,7 @@ public sealed class TransactionalServiceIntegrationTests : CyborgCoreTestBase
         using IServiceScope scope = serviceProvider.CreateScope();
         RuntimeTransactionalServices services = new([]);
         ModuleTransaction root = new TransactionCoordinator(services.Participants).CreateRoot();
-        services.BindExecutionScope(scope.ServiceProvider, root);
+        services.BindExecutionScope(scope.ServiceProvider, new ActiveTransaction(root));
         ITransactionalServiceContext context = scope.ServiceProvider.GetRequiredService<ITransactionalServiceContext>();
         ITransactionalServiceState<TransactionalCounterState> state =
             context.GetState<TransactionalCounterParticipant, TransactionalCounterState>();

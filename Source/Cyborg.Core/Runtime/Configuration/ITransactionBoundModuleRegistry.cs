@@ -4,5 +4,5 @@ namespace Cyborg.Core.Runtime.Configuration;
 
 internal interface ITransactionBoundModuleRegistry
 {
-    void Bind(RuntimeModuleRegistryTransactionState state);
+    void Bind(Func<RuntimeModuleRegistryTransactionState> stateAccessor);
 }

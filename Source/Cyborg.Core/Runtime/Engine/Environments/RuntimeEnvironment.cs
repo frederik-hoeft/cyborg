@@ -203,18 +203,18 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
 
     IRuntimeEnvironment ITransactionalRuntimeEnvironment.BindTransaction(
         RuntimeEnvironmentTransactionParticipant participant,
-        ModuleTransaction transaction) =>
-        BindTransactionCore(participant, transaction);
+        ActiveTransaction activeTransaction) =>
+        BindTransactionCore(participant, activeTransaction);
 
     private protected virtual IRuntimeEnvironment BindTransactionCore(
         RuntimeEnvironmentTransactionParticipant participant,
-        ModuleTransaction transaction)
+        ActiveTransaction activeTransaction)
     {
         ArgumentNullException.ThrowIfNull(participant);
-        ArgumentNullException.ThrowIfNull(transaction);
+        ArgumentNullException.ThrowIfNull(activeTransaction);
         return this with
         {
-            VariableStore = new TransactionalEnvironmentVariableStore(EnvironmentId, participant, transaction)
+            VariableStore = new TransactionalEnvironmentVariableStore(EnvironmentId, participant, activeTransaction)
         };
     }
 
@@ -224,15 +224,15 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         VariableSyntaxBuilder syntaxFactory,
         string ns,
         RuntimeEnvironmentTransactionParticipant participant,
-        ModuleTransaction transaction)
+        ActiveTransaction activeTransaction)
         : this(node.Name, node.IsTransient, syntaxFactory, ns)
     {
         ArgumentNullException.ThrowIfNull(node);
         ArgumentNullException.ThrowIfNull(syntaxFactory);
         ArgumentNullException.ThrowIfNull(participant);
-        ArgumentNullException.ThrowIfNull(transaction);
+        ArgumentNullException.ThrowIfNull(activeTransaction);
         EnvironmentId = environmentId;
-        VariableStore = new TransactionalEnvironmentVariableStore(environmentId, participant, transaction);
+        VariableStore = new TransactionalEnvironmentVariableStore(environmentId, participant, activeTransaction);
     }
 
     public IRuntimeEnvironment WithOverrideResolutionTags(IReadOnlyCollection<string> tags) => this with
