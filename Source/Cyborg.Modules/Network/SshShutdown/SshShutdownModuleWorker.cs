@@ -17,12 +17,16 @@ public sealed class SshShutdownModuleWorker(IWorkerContext<SshShutdownModule> co
             { MatchPrompt: null } sshPass => (sshPass.Executable, [$"-f{sshPass.FilePath}", Module.Executable, .. sshArguments]),
             _ => (Module.Executable, sshArguments),
         };
-        ChildProcessInvocation invocation = new(executable, arguments);
+        ChildProcessInvocation invocation = new(executable, arguments)
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
         ChildProcessResult processResult = await dispatcher.ExecuteAsync(invocation, cancellationToken);
         SshShutdownModuleResult result = new(processResult.ExitCode, processResult.StandardOutput, processResult.StandardError);
         if (result.ExitCode != 0)
         {
-            Logger.LogSshShutdownFailed(Module.Hostname, result.ExitCode);
+            Logger.LogSshShutdownFailed(Module.Hostname, result.ExitCode, result.StandardError);
             return runtime.Exit(Failed(result));
         }
         Logger.LogSshShutdownSucceeded(Module.Hostname);

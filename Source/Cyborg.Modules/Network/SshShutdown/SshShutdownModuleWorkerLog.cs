@@ -11,6 +11,6 @@ internal static partial class SshShutdownModuleWorkerLog
     [ZLoggerMessage(LogLevel.Information, "SSH shutdown command completed successfully on '{hostname}'")]
     public static partial void LogSshShutdownSucceeded(this ILogger logger, string hostname);
 
-    [ZLoggerMessage(LogLevel.Warning, "SSH shutdown command failed on '{hostname}' with exit code {exitCode}")]
-    public static partial void LogSshShutdownFailed(this ILogger logger, string hostname, int exitCode);
+    [ZLoggerMessage(LogLevel.Warning, "SSH shutdown command failed on '{hostname}' with exit code {exitCode}: {standardError}")]
+    public static partial void LogSshShutdownFailed(this ILogger logger, string hostname, int exitCode, string? standardError);
 }
