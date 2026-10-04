@@ -789,9 +789,11 @@ Shuts down a remote host by executing a command over SSH.
 
 **Behavior:**
 
-- Constructs an SSH command: `ssh <username>@<hostname>:<port> <shutdown_command>`.
+- Constructs an SSH command: `ssh -p <port> <username>@<hostname> <shutdown_command>`.
 - If `ssh_pass` is configured, wraps the command with sshpass for non-interactive authentication.
-- Returns `Failed` on non-zero exit code, `Success` otherwise.
+- Captures SSH stdout and stderr. Failed invocations include stderr in the module warning log and publish both streams in the result for diagnostics.
+- Returns `Failed` on any non-zero exit code, including OpenSSH exit code `255`, and `Success` only for exit code `0`. Exit code `255` is intentionally not treated as success because OpenSSH uses it for authentication, name-resolution, routing, host-key, and transport failures as well as disconnects that can occur during shutdown.
+- If the configured shutdown command tears down SSH before the remote command can return its exit status, schedule the actual shutdown asynchronously or with a short delay so the SSH command can return `0` first.
 
 **Result:** Publishes an `SshShutdownModuleResult` with `exit_code`, `standard_output`, and `standard_error` properties.
 
