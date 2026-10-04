@@ -13,7 +13,8 @@
           "cyborg.types.module.context.v1": {
             "environment": {
               "scope": "inherit_parent",
-              "name": "smb_jobs"
+              "name": "smb_jobs",
+              "transient": true
             },
             "module": {
               "cyborg.modules.sequence.v1": {
