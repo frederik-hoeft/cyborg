@@ -12,6 +12,9 @@ public sealed partial class VariableSyntaxBuilder(JsonNamingPolicy namingPolicy)
     [GeneratedRegex(VariableGrammar.IDENTIFIER_PATTERN)]
     internal partial Regex IdentifierRegex { get; }
 
+    [GeneratedRegex(VariableGrammar.VARIABLE_NAME_PATTERN)]
+    internal partial Regex VariableNameRegex { get; }
+
     [GeneratedRegex(VariableGrammar.INDIRECTION_PATTERN)]
     internal partial Regex IndirectionRegex { get; }
 
@@ -40,17 +43,23 @@ public sealed partial class VariableSyntaxBuilder(JsonNamingPolicy namingPolicy)
     }
 
     /// <summary>
+    /// Returns whether <paramref name="name"/> is a valid ordinary variable or module-override address.
+    /// </summary>
+    internal bool IsValidVariableName([NotNullWhen(true)] string? name) =>
+        name is not null && VariableNameRegex.IsMatch(name);
+
+    /// <summary>
     /// Returns whether <paramref name="name"/> can be assigned with <c>SetVariable</c>.
-    /// Ordinary identifiers are included. Virtual-collection assignments <c>name[]</c> and <c>name[]+</c> are included.
+    /// Ordinary variables, override addresses, and virtual-collection assignments <c>name[]</c> and <c>name[]+</c> are included.
     /// The live view <c>name[+]</c> is not an assignment target.
     /// </summary>
     public bool IsValidAssignmentTarget([NotNullWhen(true)] string? name) =>
-        IsValidIdentifier(name) || IsCollectionAssignment(name);
+        IsValidVariableName(name) || IsCollectionAssignment(name);
 
     /// <summary>
     /// Returns whether <paramref name="name"/> assigns a virtual collection (<c>name[]</c> or <c>name[]+</c>).
     /// </summary>
-    public bool IsCollectionAssignment([NotNullWhen(true)] string? name) =>
+    internal bool IsCollectionAssignment([NotNullWhen(true)] string? name) =>
         VariableCollectionAccess.TryParse(this, name, out VariableCollectionAccess access)
         && access.Kind is VariableCollectionAccessKind.Append or VariableCollectionAccessKind.Snapshot;
 

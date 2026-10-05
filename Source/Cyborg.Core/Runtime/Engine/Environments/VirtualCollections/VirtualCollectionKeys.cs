@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Runtime.Engine.Environments.VirtualCollections;
+﻿namespace Cyborg.Core.Runtime.Engine.Environments.VirtualCollections;
 
 /// <summary>
 /// Storage keys for virtual-collection markers and elements.
@@ -17,10 +17,10 @@ internal static class VirtualCollectionKeys
     public static string Marker(string collectionName) =>
         string.Concat(PREFIX, collectionName, SEPARATOR, MARKER_TAIL);
 
-    public static string Element(string collectionName, string orderToken)
+    public static string Element(string collectionName, string elementId)
     {
-        ArgumentException.ThrowIfNullOrEmpty(orderToken);
-        return string.Concat(PREFIX, collectionName, SEPARATOR, ELEMENT_TAIL, SEPARATOR, orderToken);
+        ArgumentException.ThrowIfNullOrEmpty(elementId);
+        return string.Concat(PREFIX, collectionName, SEPARATOR, ELEMENT_TAIL, SEPARATOR, elementId);
     }
 
     public static bool TryGetCollectionName(string key, out string collectionName)
@@ -34,29 +34,32 @@ internal static class VirtualCollectionKeys
         return false;
     }
 
-    public static bool TryParseElement(string key, string collectionName, out string orderToken)
+    public static bool TryParseElement(string key, string collectionName, out string elementId)
     {
-        if (TryParse(key, out string parsedName, out bool isElement, out orderToken)
+        if (TryParse(key, out string parsedName, out bool isElement, out elementId)
             && isElement
             && parsedName.Equals(collectionName, StringComparison.Ordinal))
         {
             return true;
         }
 
-        orderToken = string.Empty;
+        elementId = string.Empty;
         return false;
     }
+
+    public static bool IsMarker(string key) =>
+        TryParse(key, out _, out bool isElement, out _) && !isElement;
 
     public static bool IsMarker(string key, string collectionName) =>
         TryParse(key, out string parsedName, out bool isElement, out _)
         && !isElement
         && parsedName.Equals(collectionName, StringComparison.Ordinal);
 
-    private static bool TryParse(string key, out string collectionName, out bool isElement, out string orderToken)
+    private static bool TryParse(string key, out string collectionName, out bool isElement, out string elementId)
     {
         collectionName = string.Empty;
         isElement = false;
-        orderToken = string.Empty;
+        elementId = string.Empty;
         if (!key.StartsWith(PREFIX, StringComparison.Ordinal))
         {
             return false;
@@ -84,7 +87,7 @@ internal static class VirtualCollectionKeys
         }
 
         isElement = true;
-        orderToken = tail[elementPrefix.Length..];
+        elementId = tail[elementPrefix.Length..];
         return true;
     }
 }

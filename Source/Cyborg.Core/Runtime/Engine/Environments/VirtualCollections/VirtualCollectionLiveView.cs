@@ -1,10 +1,10 @@
-using System.Collections;
+﻿using System.Collections;
 
 namespace Cyborg.Core.Runtime.Engine.Environments.VirtualCollections;
 
 /// <summary>
 /// Live view of one virtual collection.
-/// MoveNext observes elements that are already visible and stops at the current end. It does not wait for later appends.
+/// Each visibility snapshot is consumed once before the view refreshes. The enumerator stops when a refresh exposes no new elements and never waits for later appends.
 /// </summary>
 internal sealed class VirtualCollectionLiveView(IEnvironmentVariableStore store, string collectionName) : IReadOnlyCollection<object?>
 {
@@ -12,14 +12,25 @@ internal sealed class VirtualCollectionLiveView(IEnvironmentVariableStore store,
 
     public IEnumerator<object?> GetEnumerator()
     {
-        for (int index = 0; ; index++)
+        HashSet<string> yieldedIds = new(StringComparer.Ordinal);
+        while (VirtualCollectionElements.TryReadEntries(store, collectionName, out List<(string Id, object? Value)> entries))
         {
-            if (!VirtualCollectionElements.TryGetElement(store, collectionName, index, out object? element))
+            bool yieldedAny = false;
+            foreach ((string elementId, object? value) in entries)
+            {
+                if (!yieldedIds.Add(elementId))
+                {
+                    continue;
+                }
+
+                yieldedAny = true;
+                yield return value;
+            }
+
+            if (!yieldedAny)
             {
                 yield break;
             }
-
-            yield return element;
         }
     }
 

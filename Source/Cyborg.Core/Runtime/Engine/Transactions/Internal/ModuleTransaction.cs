@@ -5,8 +5,7 @@ internal sealed class ModuleTransaction
     TransactionCoordinator coordinator,
     ModuleTransaction? parent,
     ModuleTransactionForkGroup? ownerFork,
-    TransactionStateBundle state,
-    string orderPrefix = ""
+    TransactionStateBundle state
 )
 {
     private readonly ModuleTransactionForkGroup? _ownerFork = ownerFork;
@@ -15,23 +14,9 @@ internal sealed class ModuleTransaction
 
     private TransactionStateBundle _state = state;
 
-    private int _nextOrderSlot;
-
     public ModuleTransaction? Parent { get; } = parent;
 
     public bool IsRoot => Parent is null;
-
-    /// <summary>
-    /// Allocates the next order scope for a virtual-collection element or a nested fork.
-    /// Scopes from one transaction sort in allocation order. A fork scope sorts between earlier and later allocations on this transaction.
-    /// </summary>
-    internal string AllocateCollectionOrderToken() => QualifyOrderScope(orderPrefix, _nextOrderSlot++);
-
-    internal static string QualifyOrderScope(string prefix, int slot)
-    {
-        string segment = slot.ToString("D10");
-        return prefix.Length == 0 ? segment : string.Concat(prefix, "/", segment);
-    }
 
     public ModuleTransactionLifecycle Lifecycle { get; private set; } = ModuleTransactionLifecycle.Active;
 

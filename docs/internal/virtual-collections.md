@@ -10,7 +10,7 @@ Collections still have to participate in the existing environment model: variabl
 
 ## Collection names
 
-A virtual collection is addressed by suffixes on a normal variable identifier. The identifier grammar is unchanged. These suffixes are part of variable-reference syntax, not of identifiers, namespaces, or override tags.
+A virtual collection is addressed by suffixes on a normal variable path. The identifier grammar is unchanged. The suffixes are collection operations rather than part of an identifier or namespace. They also compose with module-property override addresses, so `@module.items[]+` appends to a virtual collection that can supply the `items` override.
 
 | Name | Write | Read |
 |------|-------|------|
@@ -18,7 +18,7 @@ A virtual collection is addressed by suffixes on a normal variable identifier. T
 | `myCollection[]` | Define or replace the collection. | Stable snapshot taken when the name is resolved. |
 | `myCollection[+]` | Not assignable. | Live enumeration of the same collection. |
 
-`myCollection` remains an ordinary variable. A CLR collection stored there is untouched, so existing workflows keep working. The virtual collection of the same identifier is a different binding.
+`myCollection` remains an ordinary variable. A CLR collection stored there is untouched, so existing workflows keep working. The virtual collection of the same path is a different binding. Ordinary override values follow the same rule: `@module.items` remains the existing whole-value override, while `@module.items[]` addresses a virtual collection at that override path.
 
 Defining `myCollection[]` makes the collection present even when the definition has no elements. `null`, or any empty non-string sequence, is an empty definition. A successful read of an empty collection returns an empty sequence. A read of a name that was never defined and has no elements fails, which is the same result as an undefined variable. Removing `myCollection[]` or `myCollection[+]` removes that collection from the current environment.
 
@@ -28,7 +28,7 @@ Append stores the assigned object as the element. It does not enumerate it and i
 
 Both readable names resolve through `TryResolveVariable`. Snapshot resolution returns the elements copied at that call. Live resolution returns an enumeration that reads the collection again as it moves forward.
 
-The live enumeration is not a subscription. Each step looks at the elements currently visible to that environment. An element appended after the enumerator has passed it is not replayed. An element appended before the enumerator reaches the end is returned. When the enumerator is already at the end, it stops. It does not wait for a later append. A new resolution sees the collection as it is at that later call.
+The live enumeration is not a subscription. It consumes the currently visible, not-yet-yielded elements as one ordered batch, then refreshes the environment before deciding whether another batch exists. Elements that become visible during enumeration are therefore visited after the current batch, while identities that were already yielded are never replayed even if reconciliation later exposes an element with an earlier internal identity. When a refresh contains no new elements, enumeration stops and does not wait for a later append. A new resolution sees the collection as it is at that later call.
 
 Elements are returned as they were stored. The collection read does not interpolate them, cast them, or rebuild them from decomposed leaves. Recomposition is out of scope. A typed consumer casts at binding time. `ResolveCollection` materializes a virtual collection into the property's element type while the module is prepared, so a mismatch fails in the existing validation pipeline. `Foreach` resolves `IEnumerable<object>` and binds each element into the iteration environment; the iteration body then validates whatever it reads. Append does not check element types, and a virtual collection does not require one CLR element type.
 
@@ -44,21 +44,16 @@ Publishing a decomposable value whose root is already a collection assignment st
 
 ## Transactions
 
-An append allocates a new binding. The binding key contains an order scope from the writing transaction plus a slot in that scope, so two appends never share a logical key.
+Each append allocates a process-local monotonic element identity and stores the element as a separate hidden environment binding. Sequential appends therefore retain their allocation order, while concurrently executing branches may interleave according to scheduling. No total semantic order is assigned to simultaneous sibling writes. The identity exists only to keep element bindings distinct and sortable; it is not transaction state.
 
-The scope is a path of fixed-width slots:
+Because different appends change different environment bindings, the existing environment transaction participant combines parallel additions without collection-specific logic in the generic transaction engine. Siblings still observe the same fork baseline and cannot see one another's additions until reconciliation. Rollback withholds a branch's element bindings together with its other workflow-data writes.
 
-- each transaction has one counter;
-- an append and a nested fork each take the next slot;
-- a fork reserves one slot on the owner, then gives the continuation branch `0` and each child the next index in creation order;
-- a nested transaction extends its own prefix.
+Explicit collection definition uses one hidden presence marker. Empty definitions use a merge-compatible marker, so branches that independently establish the same empty collection can reconcile when their other changes are compatible. Competing non-empty definitions remain replacement writes and conflict rather than being combined accidentally. A definition in one branch and independent appends in another can reconcile because the marker and appended elements occupy different bindings.
 
-Fixed width keeps the path order equal to causal order. Elements written before a fork sort before that fork's elements. Elements of an earlier sequential child sort before a later child's. Inside one fork, the continuation sorts before children, and children sort in the order they were started. Parallel appends to one collection therefore merge with the existing conflict rule instead of requiring a special merge. Two definitions of the same collection still conflict, because the presence marker is one shared binding. A definition in one branch and appends in another do not conflict; the joined view contains the marker and every appended element.
-
-Rollback publishes the fork baseline for workflow data, so a rolled-back branch contributes none of its new element bindings. Commit publishes them in the order above. The collection code does not have its own commit path.
-
-Mutable environments that are not bound to a transaction, such as an artifact collection before it is published, use the same element representation and a local counter. Publication replays the visible snapshot into the target environment, which allocates that environment's own order scopes.
+The environment participant owns these collection-specific merge semantics. `ModuleTransaction` and the generic transaction coordinator treat virtual-collection element and marker keys as opaque participant state and contain no collection-ordering policy.
 
 ## Compatibility
 
-`SetVariable`, `TryResolveVariable`, `TryRemoveVariable`, enumeration, and `Publish` keep their signatures. CLR collections assigned to ordinary names still resolve as those objects. Virtual collections are opt-in by name. Module workers that already iterate `IEnumerable<object>` or bind `IReadOnlyCollection<T>` do not branch on how the collection was assembled.
+`SetVariable`, `TryResolveVariable`, `TryRemoveVariable`, enumeration, and `Publish` keep their signatures. Public variable operations validate ordinary paths, override addresses, the artifact exit-status leaf, and collection operators instead of accepting arbitrary storage keys. CLR collections assigned to ordinary names still resolve as those objects. Virtual collections are opt-in by name. Module workers that already iterate `IEnumerable<object>` or bind `IReadOnlyCollection<T>` do not branch on how the collection was assembled.
+
+Generated collection-property overrides first honor an existing ordinary override such as `@module.items`. If none exists, the same address may be assembled as a virtual collection through `@module.items[]` and `@module.items[]+`; binding materializes a snapshot into the declared element type. Direct `@module.items[+]` resolution remains a live environment view, but prepared `IReadOnlyCollection<T>` module properties are snapshots at binding time. In interpolation syntax, `${@items[]}` keeps the pre-existing meaning of an entry-point reference to `items[]`; the `@` inside `${...}` is not an override-address prefix.

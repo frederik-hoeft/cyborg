@@ -27,8 +27,6 @@ internal sealed class TransactionalEnvironmentVariableStore(
         return GetState().TryRemove(environmentId, name);
     }
 
-    public string AllocateCollectionOrderToken() => activeTransaction.Current.AllocateCollectionOrderToken();
-
     public IEnumerator<KeyValuePair<string, object?>> GetEnumerator() => GetState().EnumerateValues(environmentId).GetEnumerator();
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();

@@ -59,7 +59,9 @@ Resolution remains late-bound: the referenced value and applicable scope are det
 Generated preparation treats string and non-string properties differently:
 
 - **String properties:** the generated validation support context selects the first matching stored override without evaluating its contents.
-- **Non-string properties:** the context performs full typed resolution, including exact-reference indirection.
+- **Non-string properties:** the context performs full typed resolution, including exact-reference indirection. Collection properties first check the ordinary override address and then a virtual collection at that same address; virtual collection overrides are materialized as binding-time snapshots of the declared element type.
+
+A virtual collection can therefore be assembled directly at an override address, for example by writing elements to `@my_module.items[]+`. Direct environment resolution of `@my_module.items[]` and `@my_module.items[+]` exposes the snapshot and live collection views respectively. This use of `@` is distinct from interpolation syntax: inside `${@items[]}`, the at-sign retains its existing entry-point-reference meaning and resolves `items[]`, not an override key named `@items[]`.
 
 Raw string selection is required so `[IgnoreInterpolation]` applies to the effective value regardless of whether it came from JSON, a default, or an override. It also prevents override lookup from performing an accidental interpolation pass before generated interpolation.
 

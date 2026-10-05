@@ -18,7 +18,22 @@ internal static class VariableGrammar
     private const string IDENTIFIER = $@"{IDENTIFIER_PREFIX}{IDENTIFIER_CHARS}*(?:{DELIMITER_CHARS}{IDENTIFIER_CHARS}+)*";
 
     [StringSyntax(StringSyntaxAttribute.Regex)]
+    private const string EXIT_STATUS_NAME = @"\$\?";
+
+    [StringSyntax(StringSyntaxAttribute.Regex)]
+    private const string VARIABLE_PATH = $@"(?:{IDENTIFIER}(?:\.{EXIT_STATUS_NAME})?|{EXIT_STATUS_NAME})";
+
+    [StringSyntax(StringSyntaxAttribute.Regex)]
+    private const string VARIABLE_NAME = $@"@?{VARIABLE_PATH}";
+
+    [StringSyntax(StringSyntaxAttribute.Regex)]
+    private const string COLLECTION_NAME = $@"@?{IDENTIFIER}";
+
+    [StringSyntax(StringSyntaxAttribute.Regex)]
     public const string IDENTIFIER_PATTERN = $@"\A{IDENTIFIER}\z";
+
+    [StringSyntax(StringSyntaxAttribute.Regex)]
+    public const string VARIABLE_NAME_PATTERN = $@"\A{VARIABLE_NAME}\z";
 
     [StringSyntax(StringSyntaxAttribute.Regex)]
     // currently the same as IDENTIFIER_PATTERN, but may diverge in the future
@@ -29,7 +44,7 @@ internal static class VariableGrammar
     public const string COLLECTION_SUFFIX = @"(?:\[\]\+|\[\+\]|\[\])";
 
     [StringSyntax(StringSyntaxAttribute.Regex)]
-    public const string COLLECTION_ACCESS_PATTERN = $@"\A(?<name>{IDENTIFIER})(?<suffix>{COLLECTION_SUFFIX})\z";
+    public const string COLLECTION_ACCESS_PATTERN = $@"\A(?<name>{COLLECTION_NAME})(?<suffix>{COLLECTION_SUFFIX})\z";
 
     [StringSyntax(StringSyntaxAttribute.Regex)]
     // allow ${@@} for late self references, ${@} for self references, ${@identifier} for late refs, and ${identifier} for normal references.

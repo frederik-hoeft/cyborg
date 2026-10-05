@@ -1,17 +1,18 @@
-using System.Collections;
+﻿using System.Collections;
 
 namespace Cyborg.Core.Runtime.Engine.Environments.VirtualCollections;
 
 internal static class VirtualCollectionElements
 {
-    private static readonly object DefinitionMarker = new();
+    private static readonly object s_definitionMarker = new();
+    private static readonly object s_emptyDefinitionMarker = new();
 
     public static void Append(IEnvironmentVariableStore store, string collectionName, object? element)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentException.ThrowIfNullOrEmpty(collectionName);
-        string orderToken = store.AllocateCollectionOrderToken();
-        store.SetValue(VirtualCollectionKeys.Element(collectionName, orderToken), element);
+        string elementId = VirtualCollectionElementId.Allocate();
+        store.SetValue(VirtualCollectionKeys.Element(collectionName, elementId), element);
     }
 
     public static void Define(IEnvironmentVariableStore store, string collectionName, object? value)
@@ -20,7 +21,7 @@ internal static class VirtualCollectionElements
         ArgumentException.ThrowIfNullOrEmpty(collectionName);
         object?[] elements = Materialize(value);
         RemoveKeys(store, collectionName);
-        store.SetValue(VirtualCollectionKeys.Marker(collectionName), DefinitionMarker);
+        store.SetValue(VirtualCollectionKeys.Marker(collectionName), elements.Length == 0 ? s_emptyDefinitionMarker : s_definitionMarker);
         foreach (object? element in elements)
         {
             Append(store, collectionName, element);
@@ -36,10 +37,26 @@ internal static class VirtualCollectionElements
 
     public static bool TryRead(IEnvironmentVariableStore store, string collectionName, out object?[] elements)
     {
+        if (!TryReadEntries(store, collectionName, out List<(string Id, object? Value)> entries))
+        {
+            elements = [];
+            return false;
+        }
+
+        elements = new object?[entries.Count];
+        for (int index = 0; index < entries.Count; index++)
+        {
+            elements[index] = entries[index].Value;
+        }
+        return true;
+    }
+
+    internal static bool TryReadEntries(IEnvironmentVariableStore store, string collectionName, out List<(string Id, object? Value)> entries)
+    {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentException.ThrowIfNullOrEmpty(collectionName);
         bool defined = false;
-        List<(string Token, object? Value)> found = [];
+        entries = [];
         foreach ((string key, object? value) in store)
         {
             if (VirtualCollectionKeys.IsMarker(key, collectionName))
@@ -48,42 +65,25 @@ internal static class VirtualCollectionElements
                 continue;
             }
 
-            if (VirtualCollectionKeys.TryParseElement(key, collectionName, out string orderToken))
+            if (VirtualCollectionKeys.TryParseElement(key, collectionName, out string elementId))
             {
-                found.Add((orderToken, value));
+                entries.Add((elementId, value));
             }
         }
 
-        if (!defined && found.Count == 0)
+        if (!defined && entries.Count == 0)
         {
-            elements = [];
             return false;
         }
 
-        found.Sort(static (left, right) => string.CompareOrdinal(left.Token, right.Token));
-        elements = new object?[found.Count];
-        for (int index = 0; index < found.Count; index++)
-        {
-            elements[index] = found[index].Value;
-        }
-
-        return true;
-    }
-
-    public static bool TryGetElement(IEnvironmentVariableStore store, string collectionName, int index, out object? element)
-    {
-        if (index < 0 || !TryRead(store, collectionName, out object?[] elements) || index >= elements.Length)
-        {
-            element = null;
-            return false;
-        }
-
-        element = elements[index];
+        entries.Sort(static (left, right) => string.CompareOrdinal(left.Id, right.Id));
         return true;
     }
 
     public static int Count(IEnvironmentVariableStore store, string collectionName) =>
         TryRead(store, collectionName, out object?[] elements) ? elements.Length : 0;
+
+    internal static bool IsMergeCompatibleDefinitionMarker(object? value) => ReferenceEquals(value, s_emptyDefinitionMarker);
 
     private static bool RemoveKeys(IEnvironmentVariableStore store, string collectionName)
     {

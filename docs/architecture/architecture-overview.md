@@ -372,11 +372,11 @@ host_port = 8080
 @host.port = "${host_port}"
 ```
 
-**Override keys** begin with an at-sign (`@`) followed by a valid identifier, for example `@backup.target`. The leading at-sign is override syntax and is not part of the identifier itself.
+**Stored variable addresses** are validated before environment reads and writes. Ordinary addresses use identifier paths. Override keys begin with an at-sign (`@`) followed by an identifier path, for example `@backup.target`. Artifact status may use the reserved `$?` leaf, such as `backup.$?`. Virtual-collection operators are valid only on identifier paths and may follow either an ordinary path or an override address. Internal collection-storage keys are outside this public grammar.
 
 Structured values published through [decomposition](#decomposable-objects) are addressed using the same identifier and dotted-path syntax. Override lookup uses these rules when constructing the candidates described in [Module Property Overrides](#module-property-overrides).
 
-**Full grammar** for identifiers, namespaces, variable expressions, and override keys is as follows (ANTLR4 syntax):
+**Full grammar** for identifiers, namespaces, stored variable addresses, and variable expressions is as follows (ANTLR4 syntax):
 
 ```antlr
 grammar VariableGrammar;
@@ -387,6 +387,12 @@ identifier
 
 namespaceName
     : IDENTIFIER EOF
+    ;
+
+variableAddress
+    : '@'? IDENTIFIER collectionSuffix? EOF
+    | '@'? IDENTIFIER '.' EXIT_STATUS EOF
+    | '@'? EXIT_STATUS EOF
     ;
 
 indirection
@@ -407,6 +413,10 @@ collectionSuffix
     : '[]+'
     | '[+]'
     | '[]'
+    ;
+
+EXIT_STATUS
+    : '$?'
     ;
 
 IDENTIFIER
@@ -438,7 +448,7 @@ The `DecompositionStrategy` controls how deeply nested objects are flattened:
 
 #### Virtual Collections
 
-A virtual collection is assembled by assignment instead of being stored as one CLR collection. The collection name is an ordinary identifier plus a suffix. The suffix is not part of the identifier grammar, so module names, namespaces, and override tags are unchanged. The plain name remains an ordinary variable: a CLR collection stored at `items` is not the virtual collection `items[]`.
+A virtual collection is assembled by assignment instead of being stored as one CLR collection. A collection operator follows an ordinary identifier path or a module-property override address; it is not part of the identifier grammar, so module names, namespaces, and override tags are unchanged. The plain name remains an ordinary variable: a CLR collection stored at `items` is not the virtual collection `items[]`.
 
 | Assignment or read | Meaning |
 |--------------------|---------|
@@ -448,7 +458,7 @@ A virtual collection is assembled by assignment instead of being stored as one C
 
 Appending stores the assigned value itself. The value is not enumerated and it is not decomposed, so a virtual collection has no shared CLR element type. Assigning a sequence to `items[]` replaces the collection with a copy of that sequence. `string` stays one element. Assigning `null`, or any other empty non-string sequence, defines an empty collection. An empty collection resolves successfully and enumerates nothing. A name that was never defined and has no elements does not resolve, which is the same result as an undefined variable. Removing `items[]` or `items[+]` removes the collection from the current environment. Removing `items[]+` does nothing.
 
-The snapshot does not change while it is enumerated. The live enumeration reads the collection as it moves forward. An element appended before the enumeration reaches the end is returned. When the enumeration is already at the last visible element, it stops and does not wait for a later append. A later resolution sees elements appended after the previous enumeration finished. Elements are returned as stored. The collection read does not interpolate them or rebuild objects from decomposed leaves.
+The snapshot does not change while it is enumerated. The live enumeration consumes currently visible elements, refreshes after that batch, and then visits elements that became visible in the meantime without replaying elements already yielded. When a refresh exposes no new elements, enumeration stops and does not wait for a later append. A later resolution sees elements appended after the previous enumeration finished. Elements are returned as stored. The collection read does not interpolate them or rebuild objects from decomposed leaves.
 
 Exact indirection preserves the collection. A stored value whose entire text is `${items[]}` or `${items[+]}` resolves to the snapshot or the live view. The same expression inside a larger string is ordinary interpolation.
 
@@ -458,7 +468,7 @@ A read uses the nearest environment that already has the collection. An append o
 
 Publishing a decomposable value whose root is already a collection assignment stores that value as one element. `LeavesOnly`, `Shallow`, and `FullHierarchy` do not flatten that root. Publishing any other root is unchanged.
 
-Enumerating an environment does not surface element storage. A present virtual collection appears once, as `name[]`, with a snapshot of the elements stored in that environment. Copying those entries back through `SetVariable`, including artifact publication, defines the collection on the target. Parallel appends are separate bindings and join in contributor order: earlier sequential writes, then the continuation, then child branches in start order, with each branch keeping its own append order. Two definitions of the same collection are writes of one shared binding and conflict. A definition in one branch and appends in another do not. Rollback withholds a branch's new elements with the rest of its workflow data.
+Enumerating an environment does not surface element storage. A present virtual collection appears once, as `name[]`, with a snapshot of the elements stored in that environment. Copying those entries back through `SetVariable`, including artifact publication, defines the collection on the target. Each append is a distinct hidden binding with a process-local monotonic identity, so parallel branches can reconcile additions without sharing one mutable collection binding. Sequential appends retain their allocation order; relative order between truly concurrent branches is scheduling-dependent and is not a transaction semantic. Concurrent empty definitions are idempotent, while competing non-empty replacements remain conflicts. Rollback withholds a branch's new elements with the rest of its workflow data.
 
 ### Module Property Overrides
 
@@ -471,7 +481,7 @@ Generated override preparation resolves module properties through `ModuleValidat
 1. The generator supplies the module and property expressions used to derive the snake_case property path.
 2. Override keys are constructed using every identifier that can address the module instance: first `@{name}.{property_name}`, then `@{group}.{property_name}` when a group is set, then `@{module_id}.{property_name}`, and finally `@{tag}.{property_name}` for each override resolution tag attached to the environment.
 3. The environment is checked for each override key in that order. The first matching override wins, so more specific identifiers take priority (`name` > `group` > `module_id` > tags).
-4. Textual properties (`string` and `TaggedString`) select the raw stored override without interpolation. This preserves late-bound expressions and, for `TaggedString`, any tags attached to the selected value. Non-text properties use typed resolution, including exact-reference indirection, and collections use a collection-specific resolver before generated code materializes the declared collection shape.
+4. Textual properties (`string` and `TaggedString`) select the raw stored override without interpolation. This preserves late-bound expressions and, for `TaggedString`, any tags attached to the selected value. Non-text properties use typed resolution, including exact-reference indirection. Collection properties first resolve the ordinary override address and, when it is absent, a virtual collection assembled at the same address (for example `@my_module.items[]+`); generated preparation materializes that virtual collection as a snapshot of the declared element type.
 5. The later generated `ApplyInterpolationAsync` phase recursively interpolates every eligible string, including strings for which no override was applied and strings inside nested records and collections. `[IgnoreInterpolation]` skips this phase, so a raw string selected from an override remains available for worker-controlled interpolation.
 
 `[IgnoreOverride]` disables resolution of the annotated node without disabling the later interpolation phase. With the default `recurse: false`, eligible descendants may still resolve overrides; `recurse: true` suppresses the complete subtree. `[IgnoreInterpolation]` is a separate string-only control for values that must remain raw until worker execution.

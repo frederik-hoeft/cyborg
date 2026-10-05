@@ -409,12 +409,36 @@ public sealed class VariableSyntaxTests
     }
 
     [TestMethod]
+    [DataRow("items", true)]
+    [DataRow("@module.items", true)]
+    [DataRow("$?", true)]
+    [DataRow("probe.$?", true)]
+    [DataRow("@probe.$?", true)]
+    [DataRow("items[]", false)]
+    [DataRow("@module.items[]", false)]
+    [DataRow("@", false)]
+    [DataRow("items[0]", false)]
+    public void Test_IsValidVariableName_AcceptsOrdinaryAndOverrideAddresses(string value, bool expected)
+    {
+        VariableSyntaxBuilder builder = CreateBuilder();
+
+        Assert.AreEqual(expected, builder.IsValidVariableName(value));
+    }
+
+    [TestMethod]
     [DataRow("items", false, true)]
+    [DataRow("@module.items", false, true)]
+    [DataRow("$?", false, true)]
+    [DataRow("probe.$?", false, true)]
     [DataRow("items[]", true, true)]
     [DataRow("items[]+", true, true)]
     [DataRow("items[+]", false, false)]
+    [DataRow("@module.items[]", true, true)]
+    [DataRow("@module.items[]+", true, true)]
+    [DataRow("@module.items[+]", false, false)]
     [DataRow("a.b[]", true, true)]
     [DataRow("items[", false, false)]
+    [DataRow("@items[", false, false)]
     [DataRow("", false, false)]
     public void Test_IsValidAssignmentTarget_AcceptsCollectionAssignmentsOnly(string value, bool isCollectionAssignment, bool isAssignmentTarget)
     {

@@ -8,15 +8,13 @@ internal sealed class ModuleTransactionForkGroup
     private readonly ImmutableDictionary<ITransactionParticipant, ITransactionParticipantFork> _participantForks;
     private readonly List<ModuleTransaction> _children = [];
     private readonly ModuleTransaction _owner;
-    private readonly string _forkOrderPrefix;
 
     public ModuleTransactionForkGroup(ModuleTransaction owner, TransactionCoordinator coordinator, TransactionStateBundle ownerState)
     {
         _owner = owner;
         _coordinator = coordinator;
         _participantForks = CreateParticipantForks(coordinator.Participants, ownerState);
-        _forkOrderPrefix = owner.AllocateCollectionOrderToken();
-        Continuation = CreateBranch(branchIndex: 0);
+        Continuation = CreateBranch();
         Lifecycle = ModuleTransactionForkLifecycle.Active;
     }
 
@@ -29,7 +27,7 @@ internal sealed class ModuleTransactionForkGroup
     public ModuleTransaction CreateChild()
     {
         EnsureActive();
-        ModuleTransaction child = CreateBranch(branchIndex: _children.Count + 1);
+        ModuleTransaction child = CreateBranch();
         _children.Add(child);
         return child;
     }
@@ -97,7 +95,7 @@ internal sealed class ModuleTransactionForkGroup
         Lifecycle = ModuleTransactionForkLifecycle.Discarded;
     }
 
-    private ModuleTransaction CreateBranch(int branchIndex)
+    private ModuleTransaction CreateBranch()
     {
         ImmutableDictionary<ITransactionParticipant, ITransactionParticipantState>.Builder states =
             ImmutableDictionary.CreateBuilder<ITransactionParticipant, ITransactionParticipantState>(ReferenceEqualityComparer.Instance);
@@ -107,8 +105,7 @@ internal sealed class ModuleTransactionForkGroup
                 ?? throw new InvalidOperationException("A transaction participant returned a null branch state.");
             states.Add(participant, state);
         }
-        string orderPrefix = ModuleTransaction.QualifyOrderScope(_forkOrderPrefix, branchIndex);
-        return new ModuleTransaction(_coordinator, _owner, this, new TransactionStateBundle(states.ToImmutable()), orderPrefix);
+        return new ModuleTransaction(_coordinator, _owner, this, new TransactionStateBundle(states.ToImmutable()));
     }
 
     private void CloseFork(IReadOnlyCollection<ModuleTransaction> contributors, ModuleTransactionForkLifecycle lifecycle)

@@ -1,4 +1,4 @@
-using Cyborg.Core.Configuration.Model;
+﻿using Cyborg.Core.Configuration.Model;
 using Cyborg.Core.Runtime;
 using Cyborg.Core.Runtime.Engine;
 using Cyborg.Core.Runtime.Engine.Environments;
@@ -105,6 +105,23 @@ public sealed class VirtualCollectionTests : CyborgCoreTestBase
     });
 
     [TestMethod]
+    public void LiveView_LateVisibleEarlierElement_IsYieldedOnceAfterCurrentBatch()
+    {
+        MutableEnvironmentVariableStore store = new();
+        store.SetValue(VirtualCollectionKeys.Element("items", "00000000000000000002"), "second");
+        VirtualCollectionLiveView view = new(store, "items");
+        using IEnumerator<object?> enumerator = view.GetEnumerator();
+
+        Assert.IsTrue(enumerator.MoveNext());
+        Assert.AreEqual("second", enumerator.Current);
+
+        store.SetValue(VirtualCollectionKeys.Element("items", "00000000000000000001"), "first");
+        Assert.IsTrue(enumerator.MoveNext());
+        Assert.AreEqual("first", enumerator.Current);
+        Assert.IsFalse(enumerator.MoveNext());
+    }
+
+    [TestMethod]
     public Task Enumeration_HidesStorageAndExposesSnapshotAsync() => TestWithDIAsync(services =>
     {
         IRuntimeEnvironment environment = services.GetRequiredService<IModuleRuntime>().GlobalEnvironment;
@@ -163,6 +180,22 @@ public sealed class VirtualCollectionTests : CyborgCoreTestBase
     });
 
     [TestMethod]
+    public Task VariableOperations_RejectMalformedNamesButAcceptOverrideAddressesAsync() => TestWithDIAsync(services =>
+    {
+        IRuntimeEnvironment environment = services.GetRequiredService<IModuleRuntime>().GlobalEnvironment;
+
+        environment.SetVariable("@probe.value", 7);
+        Assert.IsTrue(environment.TryResolveVariable("@probe.value", out int overrideValue));
+        Assert.AreEqual(7, overrideValue);
+
+        Assert.ThrowsExactly<ArgumentException>(() => environment.SetVariable("items[0]", "invalid"));
+        Assert.ThrowsExactly<ArgumentException>(() => environment.SetVariable("items[]garbage", "invalid"));
+        Assert.ThrowsExactly<ArgumentException>(() => environment.SetVariable("@probe.items[]garbage", "invalid"));
+        Assert.ThrowsExactly<ArgumentException>(() => environment.TryResolveVariable("items[0]", out object? _));
+        Assert.ThrowsExactly<ArgumentException>(() => environment.TryRemoveVariable("items[0]"));
+    });
+
+    [TestMethod]
     public Task ResolveCollection_MaterializesElementTypeAtBindingTimeAsync() => TestWithDIAsync(services =>
     {
         IRuntimeEnvironment environment = services.GetRequiredService<IModuleRuntime>().GlobalEnvironment;
@@ -182,6 +215,54 @@ public sealed class VirtualCollectionTests : CyborgCoreTestBase
     });
 
     [TestMethod]
+    public Task ResolveCollection_DirectVirtualOverrideSnapshotsAtBindingTimeAsync() => TestWithDIAsync(services =>
+    {
+        IRuntimeEnvironment environment = services.GetRequiredService<IModuleRuntime>().GlobalEnvironment;
+        CollectionProbeModule module = new() { Name = "probe" };
+        environment.SetVariable("@probe.items[]+", "one");
+        environment.SetVariable("@probe.items[]+", "two");
+        Assert.ThrowsExactly<ArgumentException>(() => environment.SetVariable("@probe.items[+]", "invalid"));
+
+        Assert.IsTrue(environment.TryResolveVariable("@probe.items[]", out IEnumerable<object>? snapshot));
+        Assert.IsNotNull(snapshot);
+        Assert.AreSequenceEqual(new object[] { "one", "two" }, snapshot);
+        Assert.IsTrue(environment.TryResolveVariable("@probe.items[+]", out IEnumerable<object>? live));
+        Assert.IsNotNull(live);
+        Assert.IsInstanceOfType<VirtualCollectionLiveView>(live);
+
+        IReadOnlyCollection<string>? resolved = environment.ResolveCollection(module, (IReadOnlyCollection<string>?)null, "module", "module.Items");
+        Assert.IsNotNull(resolved);
+        Assert.AreEqual(2, resolved.Count);
+        Assert.AreEqual("one", resolved.ElementAt(0));
+        Assert.AreEqual("two", resolved.ElementAt(1));
+
+        environment.SetVariable("@probe.items[]+", "three");
+        Assert.AreEqual(2, resolved.Count);
+        IReadOnlyCollection<string>? rebound = environment.ResolveCollection(module, (IReadOnlyCollection<string>?)null, "module", "module.Items");
+        Assert.IsNotNull(rebound);
+        Assert.AreEqual(3, rebound.Count);
+        Assert.AreEqual("one", rebound.ElementAt(0));
+        Assert.AreEqual("two", rebound.ElementAt(1));
+        Assert.AreEqual("three", rebound.ElementAt(2));
+    });
+
+    [TestMethod]
+    public Task ResolveCollection_OrdinaryOverrideTakesPrecedenceOverVirtualOverrideAsync() => TestWithDIAsync(services =>
+    {
+        IRuntimeEnvironment environment = services.GetRequiredService<IModuleRuntime>().GlobalEnvironment;
+        CollectionProbeModule module = new() { Name = "probe" };
+        environment.SetVariable("@probe.items[]+", "virtual");
+        string[] ordinaryOverride = ["ordinary"];
+        environment.SetVariable("@probe.items", ordinaryOverride);
+
+        IReadOnlyCollection<string>? resolved = environment.ResolveCollection(module, (IReadOnlyCollection<string>?)null, "module", "module.Items");
+
+        Assert.IsNotNull(resolved);
+        Assert.AreEqual(1, resolved.Count);
+        Assert.AreEqual("ordinary", resolved.Single());
+    });
+
+    [TestMethod]
     [DataRow(DecompositionStrategy.LeavesOnly)]
     [DataRow(DecompositionStrategy.Shallow)]
     [DataRow(DecompositionStrategy.FullHierarchy)]
@@ -196,7 +277,7 @@ public sealed class VirtualCollectionTests : CyborgCoreTestBase
         SampleHost published = Assert.IsInstanceOfType<SampleHost>(hosts.Single());
         Assert.AreSame(host, published);
         Assert.IsFalse(environment.TryResolveVariable("hosts.hostname", out string? _));
-        Assert.IsFalse(environment.TryResolveVariable("hosts[]+.hostname", out string? _));
+        Assert.ThrowsExactly<ArgumentException>(() => environment.TryResolveVariable("hosts[]+.hostname", out string? _));
         Assert.IsFalse(environment.Any(static pair => pair.Key.Contains("hostname", StringComparison.Ordinal)));
     });
 

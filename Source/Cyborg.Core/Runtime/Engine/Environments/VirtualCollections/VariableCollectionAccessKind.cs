@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Runtime.Engine.Environments.VirtualCollections;
+﻿namespace Cyborg.Core.Runtime.Engine.Environments.VirtualCollections;
 
 internal enum VariableCollectionAccessKind
 {

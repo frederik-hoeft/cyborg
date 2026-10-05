@@ -1,4 +1,4 @@
-using Cyborg.Core.Runtime.Engine;
+﻿using Cyborg.Core.Runtime.Engine;
 using Cyborg.Core.Runtime.Engine.Environments;
 using Cyborg.Core.TestAdapter;
 
@@ -49,7 +49,7 @@ public sealed class VirtualCollectionModuleTests : ModuleTestBase
         });
 
     [TestMethod]
-    public Task TestExecutionAsync_ParallelAppends_MergeInBranchOrderAsync() => TestModuleContextAsync(
+    public Task TestExecutionAsync_ParallelAppends_MergeWithoutConflictsAsync() => TestModuleContextAsync(
         """
         {
           "environment": { "scope": "global" },
@@ -87,9 +87,103 @@ public sealed class VirtualCollectionModuleTests : ModuleTestBase
         (result, scope) =>
         {
             MSAssert.AreEqual(ModuleExitStatus.Success, result.Status);
-            MSAssert.AreSequenceEqual(new object?[] { "a1", "a2", "b1" }, ReadSnapshot(scope.GlobalEnvironment, "items[]"));
+            object?[] items = ReadSnapshot(scope.GlobalEnvironment, "items[]");
+            MSAssert.HasCount(3, items);
+            MSAssert.IsTrue(items.Contains("a1"));
+            MSAssert.IsTrue(items.Contains("a2"));
+            MSAssert.IsTrue(items.Contains("b1"));
+            MSAssert.IsTrue(Array.IndexOf(items, "a1") < Array.IndexOf(items, "a2"));
             return Task.CompletedTask;
         });
+
+    [TestMethod]
+    public Task TestExecutionAsync_ParallelEmptyDefinitions_MergeAsync() => TestModuleContextAsync(
+        """
+        {
+          "environment": { "scope": "global" },
+          "module": {
+            "cyborg.modules.parallel.v1": {
+              "branches": [
+                {
+                  "environment": { "scope": "current" },
+                  "module": {
+                    "cyborg.modules.config.map.v1": {
+                      "name": "first_empty_definition",
+                      "entries": [
+                        { "key": "items[]", "collection<string>": [] }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "environment": { "scope": "current" },
+                  "module": {
+                    "cyborg.modules.config.map.v1": {
+                      "name": "second_empty_definition",
+                      "entries": [
+                        { "key": "items[]", "collection<string>": [] }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+        """,
+        (result, scope) =>
+        {
+            MSAssert.AreEqual(ModuleExitStatus.Success, result.Status);
+            MSAssert.IsTrue(scope.GlobalEnvironment.TryResolveVariable("items[]", out IEnumerable<object>? items));
+            MSAssert.IsNotNull(items);
+            MSAssert.IsEmpty(items);
+            return Task.CompletedTask;
+        });
+
+    [TestMethod]
+    public Task TestExecutionAsync_ParallelEmptyDefinitions_ReplaceExistingCollectionWithoutConflictAsync() => TestModuleContextAsync(
+        """
+        {
+          "environment": { "scope": "global" },
+          "module": {
+            "cyborg.modules.parallel.v1": {
+              "branches": [
+                {
+                  "environment": { "scope": "current" },
+                  "module": {
+                    "cyborg.modules.config.map.v1": {
+                      "name": "first_empty_replacement",
+                      "entries": [
+                        { "key": "items[]", "collection<string>": [] }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "environment": { "scope": "current" },
+                  "module": {
+                    "cyborg.modules.config.map.v1": {
+                      "name": "second_empty_replacement",
+                      "entries": [
+                        { "key": "items[]", "collection<string>": [] }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+        """,
+        (result, scope) =>
+        {
+            MSAssert.AreEqual(ModuleExitStatus.Success, result.Status);
+            MSAssert.IsTrue(scope.GlobalEnvironment.TryResolveVariable("items[]", out IEnumerable<object>? items));
+            MSAssert.IsNotNull(items);
+            MSAssert.IsEmpty(items);
+            return Task.CompletedTask;
+        },
+        environment => environment.SetVariable("items[]+", "baseline"));
 
     [TestMethod]
     public Task TestExecutionAsync_ParallelDefinitions_ConflictAndPublishNothingAsync() => TestModuleContextAsync(
@@ -216,7 +310,7 @@ public sealed class VirtualCollectionModuleTests : ModuleTestBase
         });
 
     [TestMethod]
-    public Task TestExecutionAsync_ForeachLiveView_VisitsElementsVisibleAtEachStepAsync() => TestModuleContextAsync(
+    public Task TestExecutionAsync_ForeachLiveView_VisitsElementsAppendedDuringIterationAsync() => TestModuleContextAsync(
         """
         {
           "environment": { "scope": "global" },
@@ -227,9 +321,40 @@ public sealed class VirtualCollectionModuleTests : ModuleTestBase
               "body": {
                 "environment": { "scope": "parent" },
                 "module": {
-                  "cyborg.modules.config.map.v1": {
-                    "entries": [
-                      { "key": "seen[]+", "string": "x" }
+                  "cyborg.modules.sequence.v1": {
+                    "steps": [
+                      {
+                        "environment": { "scope": "current" },
+                        "module": {
+                          "cyborg.modules.if.v1": {
+                            "invert_condition": true,
+                            "condition": {
+                              "cyborg.modules.condition.is_set.v1": { "variable": "expanded" }
+                            },
+                            "then": {
+                              "environment": { "scope": "current" },
+                              "module": {
+                                "cyborg.modules.config.map.v1": {
+                                  "entries": [
+                                    { "key": "expanded", "bool": true },
+                                    { "key": "items[]+", "string": "extra" }
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "environment": { "scope": "current" },
+                        "module": {
+                          "cyborg.modules.config.map.v1": {
+                            "entries": [
+                              { "key": "seen[]+", "string": "x" }
+                            ]
+                          }
+                        }
+                      }
                     ]
                   }
                 }
@@ -241,7 +366,8 @@ public sealed class VirtualCollectionModuleTests : ModuleTestBase
         (result, scope) =>
         {
             MSAssert.AreEqual(ModuleExitStatus.Success, result.Status);
-            MSAssert.AreSequenceEqual(new object?[] { "x", "x" }, ReadSnapshot(scope.GlobalEnvironment, "seen[]"));
+            MSAssert.AreSequenceEqual(new object?[] { "a", "b", "extra" }, ReadSnapshot(scope.GlobalEnvironment, "items[]"));
+            MSAssert.AreSequenceEqual(new object?[] { "x", "x", "x" }, ReadSnapshot(scope.GlobalEnvironment, "seen[]"));
             return Task.CompletedTask;
         },
         environment =>

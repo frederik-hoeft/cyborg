@@ -32,7 +32,8 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         foreach (string identifier in EnumerateOverrideIdentifiers(module.Name, module.Group, TModule.ModuleId))
         {
             string overridePath = SyntaxFactory.Path(identifier, valuePath).Override();
-            if (!TryResolveVariable(overridePath, entryPoint, out IEnumerable? resolvedValue))
+            if (!TryResolveVariable(overridePath, entryPoint, out IEnumerable? resolvedValue)
+                && !TryResolveVariable(overridePath + "[]", entryPoint, out resolvedValue))
             {
                 continue;
             }
