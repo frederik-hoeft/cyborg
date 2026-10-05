@@ -365,4 +365,63 @@ public sealed class VariableSyntaxTests
 
         Assert.AreEqual(expected, actual);
     }
+
+    [TestMethod]
+    [DataRow("${items[]}", true, "items[]")]
+    [DataRow("${items[+]}", true, "items[+]")]
+    [DataRow("${items[]+}", true, "items[]+")]
+    [DataRow("${@items[]}", true, "@items[]")]
+    [DataRow("${a.b[]+}", true, "a.b[]+")]
+    [DataRow("${items[]extra}", false, "")]
+    [DataRow("${[]}", false, "")]
+    public void Test_IndirectionRegex_AcceptsCollectionAccess(string value, bool expected, string expectedExpression)
+    {
+        VariableSyntaxBuilder builder = CreateBuilder();
+
+        System.Text.RegularExpressions.Match match = builder.IndirectionRegex.Match(value);
+
+        Assert.AreEqual(expected, match.Success);
+        if (expected)
+        {
+            Assert.AreEqual(expectedExpression, match.Groups["expression"].Value);
+        }
+    }
+
+    [TestMethod]
+    [DataRow("${items[]}", 1, "items[]")]
+    [DataRow("${items[]+}", 1, "items[]+")]
+    [DataRow("x ${items[+]} y", 1, "items[+]")]
+    [DataRow("${@items[]}", 1, "@items[]")]
+    [DataRow("${items[0]}", 0, "")]
+    public void Test_InterpolationRegex_AcceptsCollectionAccess(string value, int expectedCount, string expectedExpressions)
+    {
+        VariableSyntaxBuilder builder = CreateBuilder();
+
+        System.Text.RegularExpressions.MatchCollection matches = builder.InterpolationRegex.Matches(value);
+        List<string> actualExpressions = [];
+        foreach (System.Text.RegularExpressions.Match match in matches)
+        {
+            actualExpressions.Add(match.Groups["expression"].Value);
+        }
+
+        Assert.HasCount(expectedCount, matches);
+        Assert.AreEqual(expectedExpressions, string.Join("|", actualExpressions));
+    }
+
+    [TestMethod]
+    [DataRow("items", false, true)]
+    [DataRow("items[]", true, true)]
+    [DataRow("items[]+", true, true)]
+    [DataRow("items[+]", false, false)]
+    [DataRow("a.b[]", true, true)]
+    [DataRow("items[", false, false)]
+    [DataRow("", false, false)]
+    public void Test_IsValidAssignmentTarget_AcceptsCollectionAssignmentsOnly(string value, bool isCollectionAssignment, bool isAssignmentTarget)
+    {
+        VariableSyntaxBuilder builder = CreateBuilder();
+
+        Assert.AreEqual(isCollectionAssignment, builder.IsCollectionAssignment(value));
+        Assert.AreEqual(isAssignmentTarget, builder.IsValidAssignmentTarget(value));
+        Assert.IsFalse(builder.IsValidIdentifier(value) && value.Contains('[', StringComparison.Ordinal));
+    }
 }

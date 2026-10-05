@@ -25,8 +25,16 @@ internal static class VariableGrammar
     public const string NAMESPACE_PATTERN = $@"\A{IDENTIFIER}\z";
 
     [StringSyntax(StringSyntaxAttribute.Regex)]
-    // allow ${@@} for late self references, ${@} for self references, ${@identifier} for late refs, and ${identifier} for normal references
-    public const string INTERPOLATION_PATTERN = $@"\$\{{(?<expression>@@|@(?:{IDENTIFIER})?|{IDENTIFIER})\}}";
+    // Longest suffix first so []+ is not consumed as [].
+    public const string COLLECTION_SUFFIX = @"(?:\[\]\+|\[\+\]|\[\])";
+
+    [StringSyntax(StringSyntaxAttribute.Regex)]
+    public const string COLLECTION_ACCESS_PATTERN = $@"\A(?<name>{IDENTIFIER})(?<suffix>{COLLECTION_SUFFIX})\z";
+
+    [StringSyntax(StringSyntaxAttribute.Regex)]
+    // allow ${@@} for late self references, ${@} for self references, ${@identifier} for late refs, and ${identifier} for normal references.
+    // A reference may also carry a virtual-collection suffix ([] , [+], or []+).
+    public const string INTERPOLATION_PATTERN = $@"\$\{{(?<expression>@@|@(?:{IDENTIFIER}{COLLECTION_SUFFIX}?)?|{IDENTIFIER}{COLLECTION_SUFFIX}?)\}}";
 
     [StringSyntax(StringSyntaxAttribute.Regex)]
     public const string HASH_LITERAL_PATTERN = @"\$\{(?<hashes>#+)(?<content>[^}]*)\}";

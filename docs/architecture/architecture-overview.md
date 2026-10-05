@@ -51,6 +51,7 @@ For detailed reference material, see:
     - [Cycle Detection](#cycle-detection)
     - [Variable Name Syntax](#variable-name-syntax)
     - [Decomposable Objects](#decomposable-objects)
+    - [Virtual Collections](#virtual-collections)
   - [Module Property Overrides](#module-property-overrides)
     - [Override Resolution](#override-resolution)
     - [Override Use Case](#override-use-case)
@@ -308,7 +309,7 @@ When `TryResolveVariable<T>(name)` is called, the runtime captures the environme
 
 1. **Current-scope self-reference** — The special name `@` resolves to the environment namespace in the environment tree where resolution is currently occurring.
 2. **Entry-point self-reference** — The special name `@@` resolves to the namespace of the environment that initiated the current resolution or interpolation chain, effectively resetting the resolution scope back to the entry point for any lookups within that chain. This allows for late-bound references to the entry-point scope even when resolution has propagated into parent environments.
-3. **Direct lookup** — The variable name is looked up in the local dictionary.
+3. **Direct lookup** — The variable name is looked up in the local dictionary. Names that use [virtual-collection syntax](#virtual-collections) resolve to that collection instead of a single stored value.
 4. **Indirection** — If the stored value is a string matching the pattern `${...}`, the referenced expression is resolved recursively. `${name}` resolves relative to the current resolution scope, `${@name}` resolves relative to the entry-point scope, `${@}` resolves the current scope namespace, and `${@@}` resolves the entry-point namespace.
 5. **Interpolation** — If the stored value is a string or `TaggedString` containing `${...}` placeholders mixed with literal text, all placeholders are replaced with their resolved values using the same scope rules. Unresolvable placeholders are left as-is. Tags from the template and from every successfully resolved operand are unioned onto the result so values such as `"hello ${mySecret}"` cannot leak into an untagged string.
 6. **Parent fallback** — In an `InheritedRuntimeEnvironment`, if the variable is not found locally, the lookup is delegated to the parent chain.
@@ -358,7 +359,7 @@ Invalid identifiers include `.host`, `host.`, `host..port`, `host port`, and `${
 - `${@}` resolves to the namespace of the current resolution scope.
 - `${@@}` resolves to the namespace of the entry-point scope.
 
-The `name` portion must be a valid identifier. Forms such as `${}`, `${1name}`, `${name.}`, `${@1name}`, and `${@@name}` are not valid variable expressions.
+The `name` portion must be a valid identifier. It may also carry a virtual-collection suffix (`[]`, `[+]`, or `[]+`), for example `${items[]}` or `${@items[+]}`. Forms such as `${}`, `${1name}`, `${name.}`, `${@1name}`, and `${@@name}` are not valid variable expressions. The append suffix is write-only, so `${items[]+}` does not resolve and is left unchanged.
 
 **Interpolation** occurs when one or more valid variable expressions appear within a larger string. Each recognized expression is resolved independently while surrounding text remains unchanged. For example, `backup-${host.name}-${date}` contains two interpolation expressions.
 
@@ -398,8 +399,14 @@ interpolation
 
 expression
     : '@@'
-    | '@' IDENTIFIER?
-    | IDENTIFIER
+    | '@' (IDENTIFIER collectionSuffix?)?
+    | IDENTIFIER collectionSuffix?
+    ;
+
+collectionSuffix
+    : '[]+'
+    | '[+]'
+    | '[]'
     ;
 
 IDENTIFIER
@@ -428,6 +435,30 @@ The `DecompositionStrategy` controls how deeply nested objects are flattened:
 | `LeavesOnly` | Only leaf (non-decomposable) values are published as variables |
 | `Shallow` | Top-level properties are published; nested decomposables become single entries |
 | `FullHierarchy` | The root and all nested decomposables are published at every level, allowing access to complex-typed intermediate nodes |
+
+#### Virtual Collections
+
+A virtual collection is assembled by assignment instead of being stored as one CLR collection. The collection name is an ordinary identifier plus a suffix. The suffix is not part of the identifier grammar, so module names, namespaces, and override tags are unchanged. The plain name remains an ordinary variable: a CLR collection stored at `items` is not the virtual collection `items[]`.
+
+| Assignment or read | Meaning |
+|--------------------|---------|
+| `items[]+` | Append the assigned value as one element, creating the collection if needed. The name cannot be read. |
+| `items[]` | Define or replace the collection. A read returns a snapshot taken at resolution. |
+| `items[+]` | Read a live enumeration of the same collection. The name cannot be assigned. |
+
+Appending stores the assigned value itself. The value is not enumerated and it is not decomposed, so a virtual collection has no shared CLR element type. Assigning a sequence to `items[]` replaces the collection with a copy of that sequence. `string` stays one element. Assigning `null`, or any other empty non-string sequence, defines an empty collection. An empty collection resolves successfully and enumerates nothing. A name that was never defined and has no elements does not resolve, which is the same result as an undefined variable. Removing `items[]` or `items[+]` removes the collection from the current environment. Removing `items[]+` does nothing.
+
+The snapshot does not change while it is enumerated. The live enumeration reads the collection as it moves forward. An element appended before the enumeration reaches the end is returned. When the enumeration is already at the last visible element, it stops and does not wait for a later append. A later resolution sees elements appended after the previous enumeration finished. Elements are returned as stored. The collection read does not interpolate them or rebuild objects from decomposed leaves.
+
+Exact indirection preserves the collection. A stored value whose entire text is `${items[]}` or `${items[+]}` resolves to the snapshot or the live view. The same expression inside a larger string is ordinary interpolation.
+
+Element types are checked when a consumer binds them, not when they are appended. Collection override resolution materializes a virtual collection into the property element type during module preparation, so a mismatch fails in the normal validation pipeline. `Foreach` resolves the collection as a sequence of elements and lets the iteration body validate what it reads. Callers use `TryResolveVariable` for both CLR collections and virtual collections.
+
+A read uses the nearest environment that already has the collection. An append or definition in a child environment creates that child's own collection and hides the parent collection of the same name. It does not extend the parent. Writers that should add to one collection select the same logical environment (`current`, `parent`, `global`, or one named environment).
+
+Publishing a decomposable value whose root is already a collection assignment stores that value as one element. `LeavesOnly`, `Shallow`, and `FullHierarchy` do not flatten that root. Publishing any other root is unchanged.
+
+Enumerating an environment does not surface element storage. A present virtual collection appears once, as `name[]`, with a snapshot of the elements stored in that environment. Copying those entries back through `SetVariable`, including artifact publication, defines the collection on the target. Parallel appends are separate bindings and join in contributor order: earlier sequential writes, then the continuation, then child branches in start order, with each branch keeping its own append order. Two definitions of the same collection are writes of one shared binding and conflict. A definition in one branch and appends in another do not. Rollback withholds a branch's new elements with the rest of its workflow data.
 
 ### Module Property Overrides
 

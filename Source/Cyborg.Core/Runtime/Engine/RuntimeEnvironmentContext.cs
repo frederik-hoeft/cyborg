@@ -267,7 +267,19 @@ internal sealed class RuntimeEnvironmentContext
             environment.Name,
             environment.IsTransient,
             parent);
-        state.AddEnvironment(environmentId, node, environment);
+        // Replay the consumer-visible entries so virtual collections are adopted as definitions rather than storage keys.
+        KeyValuePair<string, object?>[] values = [.. environment];
+        state.AddEnvironment(environmentId, node, values: []);
+        if (values.Length == 0)
+        {
+            return;
+        }
+
+        IRuntimeEnvironment view = CreateEnvironmentView(environmentId, environment.Namespace, environment.OverrideResolutionTags, active);
+        foreach ((string key, object? value) in values)
+        {
+            view.SetVariable(key, value);
+        }
     }
 
     private bool TryGetEnvironment(string name, [NotNullWhen(true)] out IRuntimeEnvironment? environment)

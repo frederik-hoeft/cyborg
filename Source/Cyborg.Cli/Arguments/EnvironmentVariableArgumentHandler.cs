@@ -28,9 +28,9 @@ internal sealed class EnvironmentVariableArgumentHandler
                 logger.LogInvalidEnvironmentVariable(definition, parseError);
                 return false;
             }
-            if (!environment.SyntaxFactory.IsValidIdentifier(parsed.Key))
+            if (!environment.SyntaxFactory.IsValidAssignmentTarget(parsed.Key))
             {
-                logger.LogInvalidEnvironmentVariable(definition, $"'{parsed.Key}' is not a valid variable identifier.");
+                logger.LogInvalidEnvironmentVariable(definition, $"'{parsed.Key}' is not a valid variable name.");
                 return false;
             }
 

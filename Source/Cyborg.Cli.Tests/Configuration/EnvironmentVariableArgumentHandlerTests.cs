@@ -28,4 +28,18 @@ public sealed class EnvironmentVariableArgumentHandlerTests : CyborgCliTestBase
         Assert.IsFalse(handler.TryProcessArgument(["port:int=not-json"], environment));
         Assert.IsFalse(environment.TryResolveVariable("port", out int _));
     });
+
+    [TestMethod]
+    public Task Test_TryProcessArgument_CollectionAppend_DefinesVirtualCollectionAsync() => TestWithDIAsync(services =>
+    {
+        IEnvironmentVariableArgumentHandler handler = services.GetRequiredService<IEnvironmentVariableArgumentHandler>();
+        IRuntimeEnvironment environment = services.GetRequiredService<IModuleRuntime>().GlobalEnvironment;
+
+        Assert.IsTrue(handler.TryProcessArgument(["items[]+=alpha", "items[]+=beta"], environment));
+        Assert.IsFalse(handler.TryProcessArgument(["items[+]=nope"], environment));
+
+        Assert.IsTrue(environment.TryResolveVariable("items[]", out IEnumerable<object>? items));
+        Assert.IsNotNull(items);
+        Assert.AreSequenceEqual(new object[] { "alpha", "beta" }, items);
+    });
 }

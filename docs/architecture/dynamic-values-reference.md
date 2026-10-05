@@ -339,7 +339,7 @@ Represents metrics output configuration.
 
 ### `collection<T>`
 
-Represents a typed read-only collection. `T` can be any registered dynamic value type, including another generic type.
+Represents a typed read-only collection stored as one CLR value. `T` can be any registered dynamic value type, including another generic type. This is the materialized collection form. A workflow can instead assemble a [virtual collection](architecture-overview.md#virtual-collections) by assigning elements to `name[]+` and reading `name[]` or `name[+]`. Virtual collections do not use `collection<T>` and do not require one element type at the point of assignment.
 
 Common examples:
 
