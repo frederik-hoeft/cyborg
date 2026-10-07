@@ -11,32 +11,39 @@ internal sealed class TransactionalServiceParticipantFork(TransactionalServicePa
 
     public bool TryPrepareMerge(
         ITransactionParticipant participant,
-        IReadOnlyList<ITransactionParticipantState> contributors,
+        ITransactionParticipantState ownerContinuation,
+        IReadOnlyList<ITransactionParticipantState> children,
         ITransactionConflictStrategy conflictStrategy,
         [NotNullWhen(true)] out ITransactionParticipantState? candidate,
         [NotNullWhen(false)] out TransactionConflict? conflict)
     {
         ArgumentNullException.ThrowIfNull(participant);
-        ArgumentNullException.ThrowIfNull(contributors);
+        ArgumentNullException.ThrowIfNull(ownerContinuation);
+        ArgumentNullException.ThrowIfNull(children);
         ArgumentNullException.ThrowIfNull(conflictStrategy);
         if (!ReferenceEquals(participant, _participant))
         {
             throw new InvalidOperationException("Transactional service fork was asked to reconcile a different participant descriptor.");
         }
-
-        object[] values = new object[contributors.Count];
-        for (int i = 0; i < contributors.Count; i++)
+        if (ownerContinuation is not TransactionalServiceParticipantState typedOwnerContinuation
+            || !ReferenceEquals(typedOwnerContinuation.Participant, _participant))
         {
-            if (contributors[i] is not TransactionalServiceParticipantState contributor
-                || !ReferenceEquals(contributor.Participant, _participant))
-            {
-                throw new InvalidOperationException("Transactional service contributor state does not belong to this participant.");
-            }
-            values[i] = contributor.Value;
+            throw new InvalidOperationException("Transactional service owner-continuation state does not belong to this participant.");
         }
 
-        TransactionalServiceConflictResolver resolver = new(_participant, conflictStrategy, contributors.Count);
-        if (!_fork.TryPrepareMerge(values, resolver, out object? candidateValue))
+        object[] childValues = new object[children.Count];
+        for (int i = 0; i < children.Count; i++)
+        {
+            if (children[i] is not TransactionalServiceParticipantState child
+                || !ReferenceEquals(child.Participant, _participant))
+            {
+                throw new InvalidOperationException("Transactional service child state does not belong to this participant.");
+            }
+            childValues[i] = child.Value;
+        }
+
+        TransactionalServiceConflictResolver resolver = new(_participant, conflictStrategy, children.Count + 1);
+        if (!_fork.TryPrepareMerge(typedOwnerContinuation.Value, childValues, resolver, out object? candidateValue))
         {
             conflict = resolver.UnresolvedConflict
                 ?? throw new InvalidOperationException(

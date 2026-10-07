@@ -24,7 +24,7 @@ A `next` resume with no execution id cannot name a subtree. The built-in debugge
 
 ## Mechanism
 
-Branch state gains one nullable anchor beside the existing step flag and session generation, plus reconciliation metadata for control-command ordering. Step-into and step-over remain mutually exclusive for the built-in control: stepping with no anchor, an anchor and not stepping, or neither. Reads apply the session generation first, so stale step and anchor state is not visible. The command sequence is reconciliation metadata only and does not make sibling state visible while a fork is open.
+Branch state gains one nullable anchor beside the existing step flag and session generation, plus a monotonic control-command sequence used for reconciliation. Step-into and step-over remain mutually exclusive for the built-in control: stepping with no anchor, an anchor and not stepping, or neither. Reads apply the session generation first, so stale step and anchor state is not visible. The command sequence is reconciliation metadata only and does not make sibling state visible while a fork is open.
 
 The pre-execution hook already decides to pause before it asks for the frontend. The decision becomes:
 
@@ -36,15 +36,15 @@ should pause = breakpoint decision
 
 Ancestor checks use the live execution topology. `Started` records a node before preparation, and `Closed` removes it after join, before the caller runs another module. A child of `M` still sees `M` in its open parent chain. The following sibling, or a module started after `M` has closed, does not. No module id is predicted in advance, so dynamic, looping, and conditional children need no special cases.
 
-Join stays conflict-free, but step-over makes command ordering significant:
+Join stays conflict-free, but a pending step-over makes command ordering significant:
 
-- An untouched pre-fork continuation is ignored once real child contributors exist. A continuation that issues a command while the fork is open participates even when that command leaves the same visible step/anchor state.
+- The transaction layer presents the owner continuation separately from child contributors. If children exist, an unchanged continuation carries no new debugger decision; a command issued on the continuation participates even when it leaves the same visible step/anchor state because its command sequence changes.
 - Session generation remains the outer fence. Only contributors from the newest represented debugger session can restore control state.
-- Every `step`, `next`, and `continue` command receives a monotonic control-command sequence. Once `next` has participated on a branch, that branch retains ordered reconciliation for the remainder of the current debugger session. At a join, the newest command among current-generation contributors wins, regardless of contributor creation order.
-- The ordered mode is sticky because `next` may be replaced before an enclosing fork joins. For example, a breakpoint can replace an inherited `next` with `continue`; the resulting null anchor still has to outrank an older inherited anchor in a sibling branch.
-- If `next` has never participated, reconciliation uses the pre-existing step-only rule: the owner resumes stepping when any non-stale considered child remains stepping. This preserves observable `step`/`continue` behavior for sessions that do not use step-over.
+- Every `step`, `next`, and `continue` command receives a monotonic control-command sequence. A join uses command ordering when its fork baseline contains a step-over anchor or a current-generation contributor still contains one. The newest current-generation command then wins regardless of contributor creation order.
+- The fork baseline is part of this decision because a newer `continue` may clear its local anchor while a sibling still carries the inherited anchor. Ordering remains active until that fork resolves the inherited step-over copies.
+- Once a fork has neither a baseline nor a current step-over anchor, reconciliation returns to the pre-existing step-only rule: the owner resumes stepping when any non-stale child remains stepping. A `next` that was fully resolved inside one branch therefore does not permanently change how later independent step/continue decisions combine.
 
-`Detach` invalidates the debugger session before clearing the current branch. A command written into the new generation resets ordered step-over reconciliation unless that command is itself `next`, so stale anchors and command ordering from the detached session cannot reappear.
+`Detach` invalidates the debugger session before clearing the current branch. Only the newest session generation participates in reconciliation, so stale anchors and commands from the detached session cannot reappear.
 
 ## Compatibility
 

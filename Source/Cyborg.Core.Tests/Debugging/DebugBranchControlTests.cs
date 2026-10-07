@@ -216,7 +216,8 @@ public sealed class DebugBranchControlTests : CyborgCoreTestBase
         ThrowingConflictResolver conflictResolver = new();
 
         bool merged = fork.TryPrepareMerge(
-            [continuation, first, second],
+            continuation,
+            [first, second],
             conflictResolver,
             out DebugBranchControlState? candidate);
 
@@ -235,9 +236,10 @@ public sealed class DebugBranchControlTests : CyborgCoreTestBase
         DebugBranchControlState continuation = fork.CreateBranch();
         DebugBranchControlState child = fork.CreateBranch();
         continuation.IsStepping = true;
+        continuation.ControlCommandSequence = 1;
         child.IsStepping = false;
 
-        bool merged = fork.TryPrepareMerge([continuation, child], new ThrowingConflictResolver(), out DebugBranchControlState? candidate);
+        bool merged = fork.TryPrepareMerge(continuation, [child], new ThrowingConflictResolver(), out DebugBranchControlState? candidate);
 
         Assert.IsTrue(merged);
         Assert.IsNotNull(candidate);
@@ -396,6 +398,30 @@ public sealed class DebugBranchControlTests : CyborgCoreTestBase
     }
 
     [TestMethod]
+    public void ParallelJoin_ResolvedBranchLocalNextDoesNotOverrideIndependentStep()
+    {
+        DebugControlHarness harness = new();
+        IDebugBranchControl rootControl = harness.CreateControl(harness.Root);
+        ModuleTransactionForkGroup fork = harness.Root.Fork();
+        ModuleTransaction first = fork.CreateChild();
+        ModuleTransaction second = fork.CreateChild();
+        fork.Continuation.Complete();
+        IDebugBranchControl firstControl = harness.CreateControl(first);
+        IDebugBranchControl secondControl = harness.CreateControl(second);
+
+        firstControl.Step();
+        secondControl.Next(new ModuleExecutionId(Guid.NewGuid()));
+        secondControl.Continue();
+        first.Complete();
+        second.Complete();
+        Assert.IsTrue(fork.TryJoin(out TransactionConflict? conflict));
+
+        Assert.IsNull(conflict);
+        Assert.IsTrue(rootControl.IsStepping);
+        Assert.IsNull(rootControl.StepOverAnchor);
+    }
+
+    [TestMethod]
     public void ParallelJoin_PendingNextSurvivesWhenNoChildRemainsStepping()
     {
         DebugControlHarness harness = new();
@@ -513,8 +539,7 @@ public sealed class DebugBranchControlTests : CyborgCoreTestBase
             sessionGeneration: 7,
             isStepping: false,
             stepOverAnchor: originalAnchor,
-            controlCommandSequence: 1,
-            requiresCommandOrdering: true);
+            controlCommandSequence: 1);
         DebugBranchControlFork fork = new(owner);
         DebugBranchControlState continuation = fork.CreateBranch();
         DebugBranchControlState child = fork.CreateBranch();
@@ -523,7 +548,7 @@ public sealed class DebugBranchControlTests : CyborgCoreTestBase
         child.StepOverAnchor = null;
         child.ControlCommandSequence = 2;
 
-        bool merged = fork.TryPrepareMerge([continuation, child], new ThrowingConflictResolver(), out DebugBranchControlState? candidate);
+        bool merged = fork.TryPrepareMerge(continuation, [child], new ThrowingConflictResolver(), out DebugBranchControlState? candidate);
 
         Assert.IsTrue(merged);
         Assert.IsNotNull(candidate);
@@ -539,8 +564,7 @@ public sealed class DebugBranchControlTests : CyborgCoreTestBase
             sessionGeneration: 7,
             isStepping: false,
             stepOverAnchor: anchor,
-            controlCommandSequence: 1,
-            requiresCommandOrdering: true);
+            controlCommandSequence: 1);
         DebugBranchControlFork fork = new(owner);
         DebugBranchControlState continuation = fork.CreateBranch();
         DebugBranchControlState child = fork.CreateBranch();
@@ -548,7 +572,7 @@ public sealed class DebugBranchControlTests : CyborgCoreTestBase
         child.StepOverAnchor = null;
         child.ControlCommandSequence = 2;
 
-        bool merged = fork.TryPrepareMerge([continuation, child], new ThrowingConflictResolver(), out DebugBranchControlState? candidate);
+        bool merged = fork.TryPrepareMerge(continuation, [child], new ThrowingConflictResolver(), out DebugBranchControlState? candidate);
 
         Assert.IsTrue(merged);
         Assert.IsNotNull(candidate);
@@ -565,8 +589,7 @@ public sealed class DebugBranchControlTests : CyborgCoreTestBase
             sessionGeneration: 4,
             isStepping: false,
             stepOverAnchor: originalAnchor,
-            controlCommandSequence: 1,
-            requiresCommandOrdering: true);
+            controlCommandSequence: 1);
         DebugBranchControlFork fork = new(owner);
         DebugBranchControlState continuation = fork.CreateBranch();
         DebugBranchControlState first = fork.CreateBranch();
@@ -577,7 +600,7 @@ public sealed class DebugBranchControlTests : CyborgCoreTestBase
         second.StepOverAnchor = null;
         second.ControlCommandSequence = 3;
 
-        bool merged = fork.TryPrepareMerge([continuation, first, second], new ThrowingConflictResolver(), out DebugBranchControlState? candidate);
+        bool merged = fork.TryPrepareMerge(continuation, [first, second], new ThrowingConflictResolver(), out DebugBranchControlState? candidate);
 
         Assert.IsTrue(merged);
         Assert.IsNotNull(candidate);
@@ -598,9 +621,8 @@ public sealed class DebugBranchControlTests : CyborgCoreTestBase
         first.ControlCommandSequence = 1;
         second.StepOverAnchor = anchor;
         second.ControlCommandSequence = 2;
-        second.RequiresCommandOrdering = true;
 
-        bool merged = fork.TryPrepareMerge([continuation, first, second], new ThrowingConflictResolver(), out DebugBranchControlState? candidate);
+        bool merged = fork.TryPrepareMerge(continuation, [first, second], new ThrowingConflictResolver(), out DebugBranchControlState? candidate);
 
         Assert.IsTrue(merged);
         Assert.IsNotNull(candidate);

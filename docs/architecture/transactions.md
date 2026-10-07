@@ -142,17 +142,9 @@ For map-like state, multiple local operations may be compacted to the final `Set
 
 Opening a fork group captures one stable effective baseline for every contributor in that generation. The owner itself is frozen for direct state mutation while the group is open; work performed after the fork belongs to an explicit continuation branch.
 
-Contributor order is structural:
+Fork roles are structural. Participant merge logic receives the owner continuation separately from the child contributors, so it does not need to infer branch roles from list position. Conflict reporting still uses a stable flattened index space: index `0` identifies the owner continuation and child index `i` maps to conflict contributor index `i + 1`.
 
-```text
-fork baseline
-  +-- contributor 0: owner continuation
-  +-- contributor 1: child A
-  +-- contributor 2: child B
-  +-- ...
-```
-
-All contributors start from the same baseline. Siblings cannot observe each other's changes, and they cannot observe continuation changes before reconciliation. Task-completion timing therefore cannot change visibility or contributor ordering.
+All contributors start from the same baseline. Siblings cannot observe each other's changes, and they cannot observe continuation changes before reconciliation. Task-completion timing therefore cannot change visibility or child ordering.
 
 Nested fork groups are structured lifetime scopes. A branch must close its own nested groups before it can complete, and an owner cannot terminate while one of its fork groups remains open. This prevents runtime-owned child work from outliving the transaction and DI scope that own it.
 
@@ -173,7 +165,7 @@ The built-in participants are:
 
 Participant boundaries follow state semantics rather than runtime ownership. Unrelated concerns remain separate because the coordinator already provides aggregate atomic publication. A composite participant is appropriate only when preparing a valid candidate for one part intrinsically depends on the candidate state of another part. The environment subsystem uses this pattern because binding lifetime depends on the reconciled environment graph; the named-module registry remains separate because its state is independent. Successful semantics must not depend on participant registration or preparation order because participants cannot publish owner-visible state during preparation.
 
-The debugger participant carries execution-control state rather than module data. Its merge is deliberately conflict-free: children inherit the owner's step and step-over state, sibling decisions remain isolated while the fork is open, and an untouched pre-fork continuation is ignored once real child contributors exist. Pure step/continue execution retains the existing rule that any non-stale stepping child restores parent stepping. Once `next` participates on a logical branch, explicit control commands carry a monotonic command sequence and the newest `step`, `next`, or `continue` decision in the newest debugger-session generation controls the restored parent. This keeps a newer inner step-over or continue from being overwritten by an inherited outer anchor merely because that sibling was created first. The ordered mode follows the reconciled branch for the rest of the current debugger session; `detach` advances the separate session generation, fencing all older branch state.
+The debugger participant carries execution-control state rather than module data. Its merge is deliberately conflict-free: children inherit the owner's step and step-over state, sibling decisions remain isolated while the fork is open, and an untouched owner continuation does not count as an additional debugger decision merely because the runtime keeps that structural branch alive. Pure step/continue execution retains the existing rule that any non-stale stepping child restores parent stepping. A fork that starts with a pending step-over, or whose current contributors still contain one, instead reconciles explicit control commands by their monotonic command sequence so the newest `step`, `next`, or `continue` decision in the newest debugger-session generation controls the restored parent. This keeps a newer inner step-over or continue from being overwritten by an inherited outer anchor merely because that sibling was created first, without changing later independent step/continue forks after the step-over has been fully resolved. `detach` advances the separate session generation, fencing all older branch state.
 
 ### Prepare, then publish
 
@@ -291,8 +283,8 @@ For the module's JSON contract and exit-status aggregation rules, see [Module Re
 
 ```text
 fork baseline
-  +-- contributor 0: owner continuation, still active
-  +-- contributor 1..N: children started individually
+  +-- owner continuation, still active
+  +-- children started individually
 ```
 
 `StartAsync` runs one ordinary nested invocation and returns a handle whose result can be awaited before the scope closes. A structural failure before the child has a definite result faults that completion task; a failure while establishing the child aborts the scope because its fork can no longer join normally. `Cancel` cancels that child only. The runtime does not rank children or interpret exit status. Sidecar lifetime, and any later policy of the same shape, stays in the module that opened the scope.
@@ -318,7 +310,7 @@ Making a service scoped does not make its state transactional, and making a sing
 A custom workflow-state service opts in through the typed transaction-aware service API:
 
 - a singleton `TransactionalServiceParticipant<TState>` defines fresh root-state construction and stable fork semantics without storing shared mutable workflow state itself;
-- its `TransactionalServiceFork<TState>` creates isolated branch state and prepares detached merge candidates;
+- its `TransactionalServiceFork<TState>` creates isolated branch state and prepares detached merge candidates from an explicit owner-continuation state plus the child states;
 - an ordinary scoped or transient service facade obtains an `ITransactionalServiceState<TState>` handle from the scoped `ITransactionalServiceContext`;
 - each handle operation resolves the participant state currently owned by that invocation transaction;
 - logical conflicts are reported through `ITransactionalServiceConflictResolver`, so the runtime's conflict strategy remains authoritative.

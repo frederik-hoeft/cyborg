@@ -9,24 +9,32 @@ internal sealed class TransactionalServiceForkAdapter<TState>(TransactionalServi
         _fork.CreateBranch() ?? throw new InvalidOperationException("A transactional service fork returned a null branch state.");
 
     public bool TryPrepareMerge(
-        IReadOnlyList<object> contributors,
+        object ownerContinuation,
+        IReadOnlyList<object> children,
         ITransactionalServiceConflictResolver conflictResolver,
         [NotNullWhen(true)] out object? candidate)
     {
-        ArgumentNullException.ThrowIfNull(contributors);
+        ArgumentNullException.ThrowIfNull(ownerContinuation);
+        ArgumentNullException.ThrowIfNull(children);
         ArgumentNullException.ThrowIfNull(conflictResolver);
-        TState[] typedContributors = new TState[contributors.Count];
-        for (int i = 0; i < contributors.Count; i++)
+        if (ownerContinuation is not TState typedOwnerContinuation)
         {
-            if (contributors[i] is not TState typedContributor)
-            {
-                throw new InvalidOperationException(
-                    $"Transactional service contributor state type '{contributors[i].GetType().FullName}' does not match expected type '{typeof(TState).FullName}'.");
-            }
-            typedContributors[i] = typedContributor;
+            throw new InvalidOperationException(
+                $"Transactional service owner-continuation state type '{ownerContinuation.GetType().FullName}' does not match expected type '{typeof(TState).FullName}'.");
         }
 
-        if (!_fork.TryPrepareMerge(typedContributors, conflictResolver, out TState? typedCandidate))
+        TState[] typedChildren = new TState[children.Count];
+        for (int i = 0; i < children.Count; i++)
+        {
+            if (children[i] is not TState typedChild)
+            {
+                throw new InvalidOperationException(
+                    $"Transactional service child state type '{children[i].GetType().FullName}' does not match expected type '{typeof(TState).FullName}'.");
+            }
+            typedChildren[i] = typedChild;
+        }
+
+        if (!_fork.TryPrepareMerge(typedOwnerContinuation, typedChildren, conflictResolver, out TState? typedCandidate))
         {
             candidate = null;
             return false;

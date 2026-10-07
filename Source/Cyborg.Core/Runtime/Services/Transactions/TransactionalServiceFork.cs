@@ -16,6 +16,42 @@ public abstract class TransactionalServiceFork<TState> where TState : class
     public abstract TState CreateBranch();
 
     /// <summary>
+    /// Prepares a detached candidate state from the completed owner continuation and child branches.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <paramref name="ownerContinuation"/> is the explicit continuation branch owned by the transaction that opened
+    /// the fork. <paramref name="children"/> contains child branches in fork creation order.
+    /// </para>
+    /// <para>
+    /// Conflict contributor index <c>0</c> identifies <paramref name="ownerContinuation"/>. Child index <c>i</c>
+    /// maps to conflict contributor index <c>i + 1</c>.
+    /// </para>
+    /// <para>
+    /// The default implementation adapts these explicit roles to the flattened contributor overload. Override this
+    /// overload when reconciliation semantics depend on distinguishing the owner continuation from child branches.
+    /// </para>
+    /// </remarks>
+    public virtual bool TryPrepareMerge(
+        TState ownerContinuation,
+        IReadOnlyList<TState> children,
+        ITransactionalServiceConflictResolver conflictResolver,
+        [NotNullWhen(true)] out TState? candidate)
+    {
+        ArgumentNullException.ThrowIfNull(ownerContinuation);
+        ArgumentNullException.ThrowIfNull(children);
+        ArgumentNullException.ThrowIfNull(conflictResolver);
+
+        TState[] contributors = new TState[children.Count + 1];
+        contributors[0] = ownerContinuation;
+        for (int i = 0; i < children.Count; i++)
+        {
+            contributors[i + 1] = children[i];
+        }
+        return TryPrepareMerge(contributors, conflictResolver, out candidate);
+    }
+
+    /// <summary>
     /// Prepares a detached candidate state from the completed contributor branches.
     /// </summary>
     /// <remarks>

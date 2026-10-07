@@ -49,10 +49,8 @@ internal sealed class DebugBranchControl : IDebugBranchControl
         long commandSequence = _sessionState.AdvanceControlCommandSequence();
         _state.Mutate(state =>
         {
-            bool requiresCommandOrdering = state.SessionGeneration == sessionGeneration && state.RequiresCommandOrdering;
             state.SessionGeneration = sessionGeneration;
             state.ControlCommandSequence = commandSequence;
-            state.RequiresCommandOrdering = requiresCommandOrdering || stepOverAnchor is not null;
             state.IsStepping = isStepping;
             state.StepOverAnchor = stepOverAnchor;
         });
