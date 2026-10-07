@@ -45,6 +45,24 @@ public readonly record struct PathSyntax : IChildSyntaxProvider<PathSyntax>
         return new LateRefSyntax(NamingPolicy, Value);
     }
 
+    public IndirectSyntax Indirect()
+    {
+        VariableSyntaxHelpers.ThrowIfEmpty(Value, "Cannot create an indirection from an empty path.");
+        return new IndirectSyntax(Value);
+    }
+
+    public LateIndirectSyntax LateIndirect()
+    {
+        VariableSyntaxHelpers.ThrowIfEmpty(Value, "Cannot create an indirection from an empty path.");
+        return new LateIndirectSyntax(Value);
+    }
+
+    public CaptureSyntax Capture()
+    {
+        VariableSyntaxHelpers.ThrowIfEmpty(Value, "Cannot create a capture from an empty path.");
+        return new CaptureSyntax(Value);
+    }
+
     public override string ToString() => Value;
 
     public static implicit operator string(PathSyntax value) => value.ToString();

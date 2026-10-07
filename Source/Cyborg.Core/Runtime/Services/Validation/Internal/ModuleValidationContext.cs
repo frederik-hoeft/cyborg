@@ -45,21 +45,29 @@ public sealed class ModuleValidationContext
     public string? Render(TaggedString? value) => value is { } tagged ? Render(tagged) : null;
 
     [return: NotNullIfNotNull(nameof(value))]
-    public string? SelectRawStringOverride<TModule>(TModule module, string? value, string moduleExpression, string valueExpression) where TModule : ModuleBase, IModuleDefinition =>
-        Runtime.Environment.SelectRawStringOverride(module, value, moduleExpression, valueExpression);
+    public string? SelectRawStringOverride<TModule>(TModule module, string? value, string moduleExpression, string valueExpression, bool shieldCapturedText)
+        where TModule : ModuleBase, IModuleDefinition =>
+        Runtime.Environment.SelectRawStringOverride(module, value, moduleExpression, valueExpression, shieldCapturedText);
 
-    public TaggedString SelectRawTaggedStringOverride<TModule>(TModule module, TaggedString value, string moduleExpression, string valueExpression) where TModule : ModuleBase, IModuleDefinition =>
-        Runtime.Environment.SelectRawTaggedStringOverride(module, value, moduleExpression, valueExpression);
+    public TaggedString SelectRawTaggedStringOverride<TModule>(TModule module, TaggedString value, string moduleExpression, string valueExpression, bool shieldCapturedText)
+        where TModule : ModuleBase, IModuleDefinition =>
+        Runtime.Environment.SelectRawTaggedStringOverride(module, value, moduleExpression, valueExpression, shieldCapturedText);
 
     [return: NotNullIfNotNull(nameof(value))]
-    public TaggedString? SelectRawTaggedStringOverride<TModule>(TModule module, TaggedString? value, string moduleExpression, string valueExpression) where TModule : ModuleBase, IModuleDefinition =>
-        Runtime.Environment.SelectRawTaggedStringOverride(module, value, moduleExpression, valueExpression);
+    public TaggedString? SelectRawTaggedStringOverride<TModule>(TModule module, TaggedString? value, string moduleExpression, string valueExpression, bool shieldCapturedText)
+        where TModule : ModuleBase, IModuleDefinition =>
+        Runtime.Environment.SelectRawTaggedStringOverride(module, value, moduleExpression, valueExpression, shieldCapturedText);
 
     [return: NotNullIfNotNull(nameof(value))]
     public T? ResolveOverride<TModule, T>(TModule module, T? value, string moduleExpression, string valueExpression) where TModule : ModuleBase, IModuleDefinition =>
         Runtime.Environment.Resolve(module, value, moduleExpression, valueExpression);
 
     [return: NotNullIfNotNull(nameof(value))]
-    public IReadOnlyCollection<T>? ResolveCollectionOverride<TModule, T>(TModule module, IReadOnlyCollection<T>? value, string moduleExpression, string valueExpression) where TModule : ModuleBase, IModuleDefinition =>
-        Runtime.Environment.ResolveCollection(module, value, moduleExpression, valueExpression);
+    public IReadOnlyCollection<T>? ResolveCollectionOverride<TModule, T>(
+        TModule module,
+        IReadOnlyCollection<T>? value,
+        string moduleExpression,
+        string valueExpression,
+        bool shieldCapturedText) where TModule : ModuleBase, IModuleDefinition =>
+        Runtime.Environment.ResolveCollection(module, value, moduleExpression, valueExpression, shieldCapturedText);
 }

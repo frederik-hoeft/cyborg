@@ -398,6 +398,33 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
     });
 
     [TestMethod]
+    public Task TestValidationAsync_CapturedTextOverrideSurvivesGeneratedInterpolationAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        ValidationPipelineTestModule module = new(
+            RequiredItems: [],
+            OptionalItems: [],
+            NullableItems: null,
+            InterpolatedValue: "fallback",
+            DeferredValue: "fallback",
+            Tags: null)
+        {
+            Name = "validation",
+        };
+        runtime.Environment.SetVariable("template", "${#name}");
+        runtime.Environment.SetVariable("name", "resolved-name");
+        runtime.Environment.SetVariable("snapshot", "*{template}");
+        runtime.Environment.SetVariable("@validation.interpolated_value", "*{snapshot}");
+        runtime.Environment.SetVariable("@validation.deferred_value", "*{snapshot}");
+
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
+
+        MSAssert.IsTrue(result.IsValid);
+        MSAssert.AreEqual("${name}", result.Module.InterpolatedValue);
+        MSAssert.AreEqual("${name}", result.Module.DeferredValue);
+    });
+
+    [TestMethod]
     public Task TestValidationAsync_InterpolatedIdentifiersAreRejectedAsync() => TestWithDIAsync(async services =>
     {
         IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();

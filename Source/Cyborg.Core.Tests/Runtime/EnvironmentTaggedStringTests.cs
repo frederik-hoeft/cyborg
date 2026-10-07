@@ -138,7 +138,7 @@ public sealed class EnvironmentTaggedStringTests : CyborgCoreTestBase
     {
         IRuntimeEnvironment environment = services.GetRequiredService<IModuleRuntime>().Environment;
         environment.SetVariable("secret", new TaggedString("s3cret", [WellKnownTags.SECRET]));
-        environment.SetVariable("alias", new TaggedString("${secret}", ["wrapper"]));
+        environment.SetVariable("alias", new TaggedString("&{secret}", ["wrapper"]));
 
         Assert.IsTrue(environment.TryResolveVariable("alias", out TaggedString tagged));
         Assert.AreEqual("s3cret", tagged.Value);

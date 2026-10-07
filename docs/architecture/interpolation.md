@@ -1,65 +1,71 @@
 # Interpolation and Override Resolution
 
-This document defines the runtime contract for storing expressions, resolving variables, selecting module-property overrides, applying generated interpolation, and explicitly interpolating deferred values. It also defines the escape syntax for preserving literal `${...}` expressions.
+This document defines the runtime contract for storing value expressions, resolving variables, selecting module-property overrides, applying generated interpolation, and explicitly interpolating deferred values. It also defines the escape syntax for preserving literal operator expressions.
 
-The design separates **selection** from **evaluation**. Stored values remain late-bound, generated module preparation may select string overrides without evaluating them, and explicit resolution APIs remain complete materialization boundaries.
+The design separates **selection** from **evaluation**, and separates **text** from **typed values**. Stored text stays late-bound. An exact `&{...}` value stays a typed reference until it is read. An exact `*{...}` value is snapshotted when the variable is defined. Generated module preparation may select string overrides without evaluating them, and explicit resolution APIs remain complete materialization boundaries.
+
+Key grammar is not value grammar. Override addresses and other keys continue to support only interpolation, for example `@${my_module}.property`. Lazy indirection and eager capture are rejected in keys and in any other textual interpolation.
 
 ## Expression Syntax
 
-Cyborg recognizes the following ordinary interpolation expressions:
-
 | Syntax | Meaning |
 |--------|---------|
-| `${identifier}` | Resolve `identifier` relative to the scope where the expression is encountered. |
-| `${@identifier}` | Resolve `identifier` relative to the original resolution entry point. |
-| `${@}` | Resolve the current scope's namespace. |
-| `${@@}` | Resolve the original entry point's namespace. |
+| `${identifier}` | Interpolate `identifier` relative to the scope where the expression is encountered. The result is text. |
+| `${@identifier}` | Interpolate `identifier` relative to the original resolution entry point. |
+| `${@}` | Interpolate the current scope's namespace. |
+| `${@@}` | Interpolate the original entry point's namespace. |
+| `&{identifier}` | Lazy typed indirection. The entire value is a reference; each read yields the target's current type and value. |
+| `&{@identifier}` | Lazy typed indirection resolved from the original entry point. |
+| `&{@}` / `&{@@}` | Lazy typed references to the current scope namespace and the entry-point namespace. |
+| `*{identifier}` | Eager typed capture. The target is resolved once when the variable is defined, and the variable stores that value. |
 
-An exact ordinary expression may resolve to a non-string value. This enables typed indirection such as an `int` module property overridden through `${host.port}`. Composite strings always remain strings.
+`&{...}` and `*{...}` are valid only when they are the entire value. `*{@...}` is reserved and invalid. `${@}` and `${@@}` remain string interpolation, including inside larger text.
 
-Unresolved ordinary expressions remain unchanged. Cyclic references fail with `InvalidOperationException` rather than recursing indefinitely.
+Unresolved `${...}` placeholders remain unchanged. Undefined targets of `&{...}` and `*{...}` fail with `InvalidOperationException`. Cyclic references fail with `InvalidOperationException`. A value whose CLR type is not the requested type fails with `InvalidCastException`.
 
 ## Literal Escape Syntax
 
-A `#` immediately after `${` marks a final-phase literal:
+A `#` immediately after `${`, `&{`, or `*{` marks a final-phase literal. Each evaluation pass removes exactly one leading `#` and does not rescan the expression that removal reveals.
 
-| Input | Result after one interpolation pass |
-|-------|-------------------------------------|
+| Input | Result after one pass |
+|-------|------------------------|
 | `${#HOME}` | `${HOME}` |
 | `${##HOME}` | `${#HOME}` |
-| `${###HOME}` | `${##HOME}` |
+| `&{#port}` | `&{port}` |
+| `*{#port}` | `*{port}` |
+| `*{#@port}` | `*{@port}` |
 
-Each interpolation pass removes exactly one leading `#`. The expression exposed by that removal is **not rescanned during the same pass**. For example, even when an environment variable named `HOME` exists, interpolating `${#HOME}` produces the literal `${HOME}` rather than resolving it.
-
-This syntax is intentionally outside the ordinary interpolation grammar. Lazy variable resolution therefore ignores escaped expressions until an explicit or generated interpolation boundary is reached.
+`&{#port}` and `*{#port}` are not indirection or capture. They are ordinary text until a pass finalizes them. An unescaped `&{...}` or `*{...}` with leading or trailing text is a syntax error (`FormatException`), not a literal.
 
 ## Runtime Phases
 
 ### 1. Storage
 
-`SetVariable(...)` stores values unchanged. String expressions are not evaluated when defined.
+`SetVariable(...)` is the definition boundary.
 
-This preserves:
+- `*{identifier}` resolves the target immediately and stores a snapshot of its type and value. The expression text is not retained. The snapshot is the reference returned by that resolution; Cyborg does not deep-clone it. A missing target fails the write. `*{@...}` is rejected.
+- `&{...}` is stored unchanged. It is an opaque reference.
+- Other strings are stored unchanged after rejecting embedded unescaped `&{...}` and `*{...}`. `${...}` inside them is not evaluated yet.
 
-- unresolved and forward references;
-- references whose value changes after definition;
-- entry-point-sensitive `${@...}` and `${@@}` behavior;
-- inherited-scope lookup;
-- typed exact-reference indirection;
-- escaped literals.
+This preserves forward references and entry-point-sensitive `${@...}` / `${@@}` behavior for interpolation, and keeps indirection late-bound.
 
 ### 2. Variable resolution
 
-`TryResolveVariable(...)` evaluates a variable from the caller's entry point. Ordinary references are resolved recursively and composite strings are interpolated. String results then remove one escape layer.
+`TryResolveVariable(...)` evaluates a variable from the caller's entry point.
 
-Resolution remains late-bound: the referenced value and applicable scope are determined when the variable is read, not when it was stored.
+- A captured snapshot is returned as stored. It is not interpolated again, and a further escape layer is not removed.
+- An exact `&{...}` reference is resolved recursively to the target's current value. Tags on a `TaggedString` wrapper are unioned onto a textual target.
+- Other strings are interpolated. `${...}` references are resolved with the same scope rules. Missing interpolation targets stay in the result. String results then remove one escape layer.
+- Non-string values are returned as stored.
+
+An exact `${port}` whose target is an `int` therefore becomes the text `"22"` (or whatever `ToString` produces). The integer is available only through `&{port}` or through a capture of `port`.
 
 ### 3. Module-property override selection
 
 Generated preparation treats string and non-string properties differently:
 
-- **String properties:** the generated validation support context selects the first matching stored override without evaluating its contents.
-- **Non-string properties:** the context performs full typed resolution, including exact-reference indirection.
+- **String properties:** the generated validation support context selects the first matching stored override without evaluating its contents. A captured textual snapshot that the later interpolation pass will visit is shielded so that pass restores the snapshot, including characters that look like expressions. `[IgnoreInterpolation]` selects the unshielded snapshot or the raw template, because no generated pass runs.
+- **Non-string properties:** the context performs full typed resolution. `&{...}` yields the current target. A capture yields the snapshot taken at definition.
 
 Raw string selection is required so `[IgnoreInterpolation]` applies to the effective value regardless of whether it came from JSON, a default, or an override. It also prevents override lookup from performing an accidental interpolation pass before generated interpolation.
 
@@ -77,9 +83,9 @@ The generated validation pipeline performs:
 4. interpolate eligible strings through the generated validation context;
 5. validate constraints.
 
-The generated interpolation operation first resolves ordinary expressions and then removes one escape layer. It is applied recursively to eligible string properties in nested `[Validatable]` records and supported collections.
+The generated interpolation operation resolves ordinary `${...}` expressions and then removes one escape layer. It is applied recursively to eligible string properties in nested `[Validatable]` records and supported collections. It rejects `&{...}` and `*{...}`. Textual properties use `${...}` when they need text, including an exact `${name}`.
 
-Properties marked `[IgnoreInterpolation]` skip this phase. Their effective value remains unchanged for worker-controlled interpolation, including values supplied through defaults or overrides.
+Properties marked `[IgnoreInterpolation]` skip this phase. Their effective value remains unchanged for worker-controlled interpolation, including values supplied through defaults or overrides. A worker that later calls `Interpolate` starts a new textual pass.
 
 ### 5. Explicit and deferred interpolation
 
@@ -90,7 +96,7 @@ TaggedString result = runtime.Environment.Interpolate(value);
 string raw = result.Value; // execution-facing raw string
 ```
 
-`Interpolate(...)` and `TryResolveVariable(...)` are complete evaluation boundaries. They resolve ordinary expressions recursively and remove one escape layer in string results. Interpolation returns a `TaggedString` whose tags are the union of the template's tags and the tags of every successfully resolved interpolation operand. Retrieving a tagged result as `string` still yields the raw value for compatibility, but discards tags; prefer `TryResolveVariable(..., out TaggedString)`.
+`Interpolate(...)` and `TryResolveVariable(...)` are complete evaluation boundaries for text. They resolve ordinary expressions recursively and remove one escape layer in string results. Interpolation returns a `TaggedString` whose tags are the union of the template's tags and the tags of every successfully resolved interpolation operand. Retrieving a tagged result as `string` still yields the raw value for compatibility, but discards tags; prefer `TryResolveVariable(..., out TaggedString)`.
 
 A worker should manually interpolate only when evaluation was intentionally deferred until worker execution, normally through `[IgnoreInterpolation]`. Eligible properties processed by the generated pipeline are already interpolated before the worker receives the validated module and should not be interpolated again.
 
@@ -108,7 +114,7 @@ The environment API exposed to module authors includes operations that are meani
 
 - `Interpolate(...)` for intentionally deferred string evaluation (returns `TaggedString` so tags union);
 - `TryResolveVariable(...)` for typed variable reads, preferably as `TaggedString`;
-- `SetVariable(...)` and `TryRemoveVariable(...)` for environment state.
+- `SetVariable(...)` and `TryRemoveVariable(...)` for environment state. `SetVariable` evaluates eager capture and rejects illegal value syntax.
 
 Generated preparation additionally requires raw string override selection, typed scalar and collection override materialization, and access to the runtime and service provider shared by every preparation phase. These operations are grouped on `ModuleValidationContext` rather than exposed as public members of `IRuntimeEnvironment`. The context must be public because generated code is compiled into consuming assemblies, but it has a private constructor, lives in an `Internal` namespace, and is marked as editor-hidden; it is not a client-code contract.
 
@@ -123,7 +129,7 @@ Raw string selection and typed resolution use the same override lookup order:
 3. module ID;
 4. environment override-resolution tags, in order.
 
-The first matching override wins. Separating raw selection from evaluation does not change precedence or path construction.
+The first matching override wins. A present override whose `&{...}` or `*{...}` target is undefined fails resolution instead of falling through to a less specific override. Separating raw selection from evaluation does not change precedence or path construction.
 
 ## Examples
 
@@ -153,6 +159,15 @@ Given `prefix = "resolved"`:
 ```text
 ${prefix}/${#HOME} -> resolved/${HOME}
 ```
+
+### Typed port override
+
+```text
+host.port = 22
+@my_module.liveness_probe_port = "&{host.port}"
+```
+
+Generated typed resolution reads the current integer. `"${host.port}"` is text and does not satisfy an `int` property. `"*{host.port}"` instead stores `22` at the moment the override variable is defined, so a later change to `host.port` does not affect it. `*{@host.port}` is invalid; entry-point selection is expressed with `&{@host.port}`.
 
 ### Deferred override
 

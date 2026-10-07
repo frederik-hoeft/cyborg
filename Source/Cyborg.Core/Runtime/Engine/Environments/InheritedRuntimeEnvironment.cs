@@ -56,74 +56,106 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
         return false;
     }
 
-    internal protected override bool TryResolveVariableRecursiveCore(ResolutionContext context, [NotNullWhen(true)] out object? value)
+    internal override bool TryResolveVariableRecursiveCore(ResolutionContext context, out Evaluation evaluation)
     {
-        if (TryResolveVariableInCurrentScopeCore(context, out value))
+        if (TryResolveVariableInCurrentScopeCore(context, out evaluation))
         {
             return true;
         }
         if (Parent is EnvironmentLike parent)
         {
-            return parent.TryResolveVariableRecursiveCore(context, out value);
+            return parent.TryResolveVariableRecursiveCore(context, out evaluation);
         }
-        return Parent.TryResolveVariable(context.Name, out value);
+        if (Parent.TryResolveVariable(context.Name, out object? value))
+        {
+            // The public parent read already finalized textual escapes.
+            evaluation = Evaluation.TerminalValue(value);
+            return true;
+        }
+        evaluation = default;
+        return false;
     }
 
-    internal protected override bool TrySelectRawStringOverrideCore<TModule>(EnvironmentLike entryPoint, TModule module, string? moduleExpression, string? valueExpression, [NotNullWhen(true)] out string? value)
+    internal protected override bool TrySelectRawStringOverrideCore<TModule>(
+        EnvironmentLike entryPoint,
+        TModule module,
+        string? moduleExpression,
+        string? valueExpression,
+        bool shieldCapturedText,
+        [NotNullWhen(true)] out string? value)
     {
-        if (base.TrySelectRawStringOverrideCore(entryPoint, module, moduleExpression, valueExpression, out value))
+        if (base.TrySelectRawStringOverrideCore(entryPoint, module, moduleExpression, valueExpression, shieldCapturedText, out value))
         {
             return true;
         }
         if (Parent is RuntimeEnvironment runtimeParent)
         {
-            return runtimeParent.TrySelectRawStringOverrideCore(entryPoint, module, moduleExpression, valueExpression, out value);
+            return runtimeParent.TrySelectRawStringOverrideCore(entryPoint, module, moduleExpression, valueExpression, shieldCapturedText, out value);
         }
         value = default;
         return false;
     }
 
-    internal protected override bool TrySelectRawTaggedStringOverrideCore<TModule>(EnvironmentLike entryPoint, TModule module, string? moduleExpression, string? valueExpression, out TaggedString value)
+    internal protected override bool TrySelectRawTaggedStringOverrideCore<TModule>(
+        EnvironmentLike entryPoint,
+        TModule module,
+        string? moduleExpression,
+        string? valueExpression,
+        bool shieldCapturedText,
+        out TaggedString value)
     {
-        if (base.TrySelectRawTaggedStringOverrideCore(entryPoint, module, moduleExpression, valueExpression, out value))
+        if (base.TrySelectRawTaggedStringOverrideCore(entryPoint, module, moduleExpression, valueExpression, shieldCapturedText, out value))
         {
             return true;
         }
         if (Parent is RuntimeEnvironment runtimeParent)
         {
-            return runtimeParent.TrySelectRawTaggedStringOverrideCore(entryPoint, module, moduleExpression, valueExpression, out value);
+            return runtimeParent.TrySelectRawTaggedStringOverrideCore(entryPoint, module, moduleExpression, valueExpression, shieldCapturedText, out value);
         }
         value = default;
         return false;
     }
 
     [return: NotNullIfNotNull(nameof(value))]
-    internal protected override IReadOnlyCollection<T>? ResolveCollectionCore<TModule, T>(EnvironmentLike entryPoint, TModule module, IReadOnlyCollection<T>? value, string? moduleExpression, string? valueExpression)
+    internal protected override IReadOnlyCollection<T>? ResolveCollectionCore<TModule, T>(
+        EnvironmentLike entryPoint,
+        TModule module,
+        IReadOnlyCollection<T>? value,
+        string? moduleExpression,
+        string? valueExpression,
+        bool shieldCapturedText)
     {
-        IReadOnlyCollection<T>? resolvedValue = base.ResolveCollectionCore(entryPoint, module, value, moduleExpression, valueExpression);
+        IReadOnlyCollection<T>? resolvedValue = base.ResolveCollectionCore(entryPoint, module, value, moduleExpression, valueExpression, shieldCapturedText);
         if (resolvedValue is not null && !resolvedValue.Equals(value))
         {
             return resolvedValue;
         }
         if (Parent is RuntimeEnvironment runtimeParent)
         {
-            return runtimeParent.ResolveCollectionCore(entryPoint, module, value, moduleExpression, valueExpression);
+            return runtimeParent.ResolveCollectionCore(entryPoint, module, value, moduleExpression, valueExpression, shieldCapturedText);
         }
         return Parent.Resolve(module, value, moduleExpression, valueExpression);
     }
 
     [return: NotNullIfNotNull(nameof(value))]
-    internal protected override T? ResolveCore<TModule, T>(EnvironmentLike entryPoint, TModule module, T? value, string? moduleExpression, string? valueExpression) where T : default
+    internal protected override T? ResolveCore<TModule, T>(
+        EnvironmentLike entryPoint,
+        TModule module,
+        T? value,
+        string? moduleExpression,
+        string? valueExpression,
+        out bool terminal) where T : default
     {
-        T? resolvedValue = base.ResolveCore(entryPoint, module, value, moduleExpression, valueExpression);
-        if (resolvedValue is not null && !resolvedValue.Equals(value))
+        T? resolvedValue = base.ResolveCore(entryPoint, module, value, moduleExpression, valueExpression, out terminal);
+        if (terminal || (resolvedValue is not null && !resolvedValue.Equals(value)))
         {
             return resolvedValue;
         }
         if (Parent is RuntimeEnvironment runtimeParent)
         {
-            return runtimeParent.ResolveCore(entryPoint, module, value, moduleExpression, valueExpression);
+            return runtimeParent.ResolveCore(entryPoint, module, value, moduleExpression, valueExpression, out terminal);
         }
+        terminal = true;
         return Parent.Resolve(module, value, moduleExpression, valueExpression);
     }
 }

@@ -172,6 +172,28 @@ public sealed class TransactionalRuntimeEnvironmentTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_CaptureAndIndirectionCommitWithTheTransactionAsync()
+    {
+        GlobalRuntimeEnvironment globalEnvironment = new(JsonNamingPolicy.SnakeCaseLower);
+        using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
+        using ServiceProvider serviceProvider = new ServiceCollection()
+            .AddSingleton<IModuleWorkerFactory>(new EnvironmentProbeWorkerFactory())
+            .BuildServiceProvider();
+        RootModuleRuntime runtime = new(globalEnvironment, loggerFactory, serviceProvider);
+        ModuleReference rootModule = new(new EnvironmentProbeModule { Name = "capture" }, EnvironmentProbeModule.ModuleId);
+
+        IModuleExecutionResult result = await runtime.ExecuteAsync(rootModule, cancellationToken: TestContext.CancellationToken);
+
+        Assert.AreEqual(ModuleExitStatus.Success, result.Status);
+        Assert.IsTrue(runtime.GlobalEnvironment.TryResolveVariable("snapshot", out int snapshot));
+        Assert.AreEqual(22, snapshot);
+        Assert.IsTrue(runtime.GlobalEnvironment.TryResolveVariable("alias", out int alias));
+        Assert.AreEqual(23, alias);
+        Assert.IsTrue(runtime.GlobalEnvironment.TryResolveVariable("port", out int port));
+        Assert.AreEqual(23, port);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_NestedEnvironmentChangesComposeIntoRootTransactionAsync()
     {
         GlobalRuntimeEnvironment globalEnvironment = new(JsonNamingPolicy.SnakeCaseLower);
@@ -473,6 +495,16 @@ public sealed class TransactionalRuntimeEnvironmentTests
                 case "canceled":
                     runtime.GlobalEnvironment.SetVariable("canceled-write", "dropped");
                     return new EnvironmentProbeExecutionResult(module, ModuleExitStatus.Canceled, runtime.Environment.CreateTestArtifactCollection());
+                case "capture":
+                    runtime.GlobalEnvironment.SetVariable("port", 22);
+                    runtime.GlobalEnvironment.SetVariable("snapshot", "*{port}");
+                    runtime.GlobalEnvironment.SetVariable("alias", "&{port}");
+                    runtime.GlobalEnvironment.SetVariable("port", 23);
+                    Assert.IsTrue(runtime.GlobalEnvironment.TryResolveVariable("snapshot", out int snapshot));
+                    Assert.AreEqual(22, snapshot);
+                    Assert.IsTrue(runtime.GlobalEnvironment.TryResolveVariable("alias", out int alias));
+                    Assert.AreEqual(23, alias);
+                    return new EnvironmentProbeExecutionResult(module, ModuleExitStatus.Success, runtime.Environment.CreateTestArtifactCollection());
                 case "artifact":
                     IEnvironmentLike artifactValues = runtime.Environment.CreateTestArtifactCollection();
                     artifactValues.SetVariable("artifact-value", 42);

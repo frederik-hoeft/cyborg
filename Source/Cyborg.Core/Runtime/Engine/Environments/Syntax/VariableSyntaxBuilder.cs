@@ -14,11 +14,17 @@ public sealed partial class VariableSyntaxBuilder(JsonNamingPolicy namingPolicy)
     [GeneratedRegex(VariableGrammar.INDIRECTION_PATTERN)]
     internal partial Regex IndirectionRegex { get; }
 
+    [GeneratedRegex(VariableGrammar.CAPTURE_PATTERN)]
+    internal partial Regex CaptureRegex { get; }
+
     [GeneratedRegex(VariableGrammar.INTERPOLATION_PATTERN)]
     internal partial Regex InterpolationRegex { get; }
 
     [GeneratedRegex(VariableGrammar.HASH_LITERAL_PATTERN)]
     internal partial Regex HashLiteralRegex { get; }
+
+    [GeneratedRegex(VariableGrammar.ACTIVE_REFERENCE_PATTERN)]
+    internal partial Regex ActiveReferenceRegex { get; }
 
     [GeneratedRegex(VariableGrammar.NAMESPACE_PATTERN)]
     internal partial Regex NamespaceRegex { get; }

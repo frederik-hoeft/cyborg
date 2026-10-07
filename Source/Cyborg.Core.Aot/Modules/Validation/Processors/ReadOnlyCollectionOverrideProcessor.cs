@@ -18,7 +18,13 @@ internal sealed class ReadOnlyCollectionOverrideProcessor : IDynamicPropertyProc
 
     private sealed class ReadOnlyCollectionOverridesAspect : IPropertyOverrideAspect
     {
-        public string RewriteOverrideResolutionExpression(PropertyRewriteContext context, string currentExpression, string rootPathExpression) =>
-            $"{context.ContextVariable}.ResolveCollectionOverride({context.ModuleVariable}, {context.PropertyAccessExpression}, moduleExpression: \"{context.ModuleVariable}\", valueExpression: \"{rootPathExpression}\")";
+        public string RewriteOverrideResolutionExpression(PropertyRewriteContext context, string currentExpression, string rootPathExpression)
+        {
+            string shieldArgument = context.Property.HasAspect<IgnoreInterpolationAspect>() ? "false" : "true";
+            return $"{context.ContextVariable}.ResolveCollectionOverride(" +
+                $"{context.ModuleVariable}, {context.PropertyAccessExpression}, " +
+                $"moduleExpression: \"{context.ModuleVariable}\", valueExpression: \"{rootPathExpression}\", " +
+                $"shieldCapturedText: {shieldArgument})";
+        }
     }
 }

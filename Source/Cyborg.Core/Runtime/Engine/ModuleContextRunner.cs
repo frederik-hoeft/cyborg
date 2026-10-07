@@ -72,9 +72,13 @@ internal sealed class ModuleContextRunner(VariableSyntaxBuilder syntaxFactory, I
             throw new InvalidOperationException(errorMessage);
         }
 
+        if (environment is not EnvironmentLike environmentLike)
+        {
+            throw new InvalidOperationException($"Runtime environment type '{environment.GetType().FullName}' cannot store resolved arguments.");
+        }
         foreach ((string argument, object value) in resolvedArguments)
         {
-            environment.SetVariable(argument, value);
+            environmentLike.SetResolvedVariable(argument, value);
         }
     }
 }

@@ -106,13 +106,13 @@ For each current `host`, the template injects ambient Borg overrides under the `
 
 | Override key | Effective value |
 |--------------|-----------------|
-| `@borg_tasks.remote_shell` | `${@host.remote_shell}` |
+| `@borg_tasks.remote_shell` | `&{@host.remote_shell}` |
 | `@borg_tasks.passphrase` | `${@borg_passphrase}` |
 | `@borg_tasks.remote_repository` | Borg repository object built from the current host and `container_name` |
-| `@borg_tasks.remote_repository.port` | `${@host.port}` |
-| `@borg_create.target` | `${borg_create}` |
-| `@borg_prune.target` | `${borg_prune}` |
-| `@borg_compact.target` | `${borg_compact}` |
+| `@borg_tasks.remote_repository.port` | `&{@host.port}` |
+| `@borg_create.target` | `&{borg_create}` |
+| `@borg_prune.target` | `&{borg_prune}` |
+| `@borg_compact.target` | `&{borg_compact}` |
 
 The Borg operation contexts are therefore expected to define what to do, while the template injects where to do it for the current host.
 
@@ -163,13 +163,13 @@ This template does not derive Docker-specific path variables.
 
 | Override key | Effective value |
 |--------------|-----------------|
-| `@borg_tasks.remote_shell` | `${@host.remote_shell}` |
+| `@borg_tasks.remote_shell` | `&{@host.remote_shell}` |
 | `@borg_tasks.passphrase` | `${@borg_passphrase}` |
 | `@borg_tasks.remote_repository` | Borg repository object built from the current host and `repository_name` |
-| `@borg_tasks.remote_repository.port` | `${@host.port}` |
-| `@borg_create.target` | `${borg_create}` |
-| `@borg_prune.target` | `${borg_prune}` |
-| `@borg_compact.target` | `${borg_compact}` |
+| `@borg_tasks.remote_repository.port` | `&{@host.port}` |
+| `@borg_create.target` | `&{borg_create}` |
+| `@borg_prune.target` | `&{borg_prune}` |
+| `@borg_compact.target` | `&{borg_compact}` |
 
 ### Exposed Internal Override Targets
 
@@ -208,7 +208,7 @@ Unlike the backup-specific templates, it does not know anything about Borg. It i
 
 | Override key | Effective value |
 |--------------|-----------------|
-| `@body_task.target` | `${body_task}` |
+| `@body_task.target` | `&{body_task}` |
 
 ### Exposed Internal Override Targets
 

@@ -149,10 +149,13 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
     private string CreateOverrideResolutionExpression(PropertyRewriteContext context, string rootPathExpression)
     {
         string arguments = $"{context.ModuleVariable}, {context.PropertyAccessExpression}, moduleExpression: \"{context.ModuleVariable}\", valueExpression: \"{rootPathExpression}\"";
+        bool isTextual = context.Property.Symbol.Type.EqualsIgnoreNullability(SpecialType.System_String)
+            || context.Property.Symbol.Type.EqualsIgnoreNullability(ContractInfo.TaggedString);
+        string shieldArgument = isTextual && !context.Property.HasAspect<IgnoreInterpolationAspect>() ? "true" : "false";
         string expression = context.Property.Symbol.Type.EqualsIgnoreNullability(SpecialType.System_String)
-            ? $"{ContextVariable}.SelectRawStringOverride({arguments})"
+            ? $"{ContextVariable}.SelectRawStringOverride({arguments}, shieldCapturedText: {shieldArgument})"
             : context.Property.Symbol.Type.EqualsIgnoreNullability(ContractInfo.TaggedString)
-                ? $"{ContextVariable}.SelectRawTaggedStringOverride({arguments})"
+                ? $"{ContextVariable}.SelectRawTaggedStringOverride({arguments}, shieldCapturedText: {shieldArgument})"
                 : $"{ContextVariable}.ResolveOverride({arguments})";
         foreach (IPropertyOverrideAspect aspect in context.Property.Aspects<IPropertyOverrideAspect>())
         {

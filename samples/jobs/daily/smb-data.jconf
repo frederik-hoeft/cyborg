@@ -46,7 +46,7 @@
                                 {
                                   "cyborg.modules.config.map.v1": {
                                     "entries": [
-                                      { "key": "@borg_jobs.remote_shell", "string": "${host.remote_shell}"},
+                                      { "key": "@borg_jobs.remote_shell", "string": "&{host.remote_shell}"},
                                       { "key": "@borg_jobs.passphrase", "string": "${@borg_passphrase}"},
                                       {
                                         "key": "@borg_jobs.remote_repository",
@@ -57,7 +57,7 @@
                                           "repository_name": "${@smb_repository_name}"
                                         }
                                       },
-                                      { "key": "@borg_jobs.remote_repository.port", "string": "${host.port}" }
+                                      { "key": "@borg_jobs.remote_repository.port", "string": "&{host.port}" }
                                     ]
                                   }
                                 },

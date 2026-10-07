@@ -18,23 +18,44 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
     RuntimeEnvironmentId ITransactionalRuntimeEnvironment.EnvironmentId => EnvironmentId;
 
     [return: NotNullIfNotNull(nameof(value))]
-    IReadOnlyCollection<T>? IRuntimeEnvironment.ResolveCollection<TModule, T>(TModule module, IReadOnlyCollection<T>? value, string moduleExpression, string valueExpression) =>
-        ResolveCollectionCore(this, module, value, moduleExpression, valueExpression);
+    IReadOnlyCollection<T>? IRuntimeEnvironment.ResolveCollection<TModule, T>(
+        TModule module,
+        IReadOnlyCollection<T>? value,
+        string moduleExpression,
+        string valueExpression,
+        bool shieldCapturedText) =>
+        ResolveCollectionCore(this, module, value, moduleExpression, valueExpression, shieldCapturedText);
 
     [return: NotNullIfNotNull(nameof(value))]
-    internal protected virtual IReadOnlyCollection<T>? ResolveCollectionCore<TModule, T>(EnvironmentLike entryPoint, TModule module, IReadOnlyCollection<T>? value, string? moduleExpression, string? valueExpression)
+    internal protected virtual IReadOnlyCollection<T>? ResolveCollectionCore<TModule, T>(
+        EnvironmentLike entryPoint,
+        TModule module,
+        IReadOnlyCollection<T>? value,
+        string? moduleExpression,
+        string? valueExpression,
+        bool shieldCapturedText)
         where TModule : ModuleBase, IModuleDefinition
     {
         ArgumentNullException.ThrowIfNull(entryPoint);
         ArgumentNullException.ThrowIfNull(module);
         string valuePath = ConstructValueResolutionPath(value, moduleExpression, valueExpression);
+        bool shieldElements = shieldCapturedText && IsTextualElement<T>();
 
         foreach (string identifier in EnumerateOverrideIdentifiers(module.Name, module.Group, TModule.ModuleId))
         {
             string overridePath = SyntaxFactory.Path(identifier, valuePath).Override();
-            if (!TryResolveVariable(overridePath, entryPoint, out IEnumerable? resolvedValue))
+            if (!TryResolveEvaluation(overridePath, entryPoint, out Evaluation evaluation) || evaluation.Value is null)
             {
                 continue;
+            }
+            if (evaluation.Value is not IEnumerable resolvedValue)
+            {
+                throw new InvalidCastException($"Attempted to resolve variable '{overridePath}' as type {typeof(IEnumerable).FullName}, but it is of type {evaluation.Value.GetType().FullName}.");
+            }
+            if (shieldElements && evaluation.Terminal)
+            {
+                value = MaterializeShieldedElements<T>(resolvedValue);
+                break;
             }
             if (resolvedValue is IReadOnlyCollection<T> typedCollection)
             {
@@ -52,7 +73,11 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
     public virtual T? Resolve<TModule, T>(TModule module, T? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
         where TModule : ModuleBase, IModuleDefinition
     {
-        T? resolvedValue = ResolveCore(this, module, value, moduleExpression, valueExpression);
+        T? resolvedValue = ResolveCore(this, module, value, moduleExpression, valueExpression, out bool terminal);
+        if (terminal)
+        {
+            return resolvedValue;
+        }
         if (resolvedValue is string stringValue)
         {
             TaggedString interpolated = InterpolateCore(stringValue, entryPoint: this);
@@ -67,37 +92,55 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
     }
 
     [return: NotNullIfNotNull(nameof(value))]
-    internal protected virtual T? ResolveCore<TModule, T>(EnvironmentLike entryPoint, TModule module, T? value, string? moduleExpression, string? valueExpression) where TModule : ModuleBase, IModuleDefinition
+    internal protected virtual T? ResolveCore<TModule, T>(
+        EnvironmentLike entryPoint,
+        TModule module,
+        T? value,
+        string? moduleExpression,
+        string? valueExpression,
+        out bool terminal) where TModule : ModuleBase, IModuleDefinition
     {
         ArgumentNullException.ThrowIfNull(entryPoint);
         ArgumentNullException.ThrowIfNull(module);
+        terminal = false;
         string valuePath = ConstructValueResolutionPath(value, moduleExpression, valueExpression);
 
         foreach (string identifier in EnumerateOverrideIdentifiers(module.Name, module.Group, TModule.ModuleId))
         {
             string overridePath = SyntaxFactory.Path(identifier, valuePath).Override();
-            if (TryResolveVariable(overridePath, entryPoint, out T? resolvedValue))
+            if (!TryResolveEvaluation(overridePath, entryPoint, out Evaluation evaluation) || evaluation.Value is null)
             {
-                value = resolvedValue;
-                break;
+                continue;
             }
+            if (!TryConvertResolvedValue(evaluation.Value, overridePath, notifyImplicitConversion: true, out T? resolvedValue))
+            {
+                throw new InvalidCastException($"Attempted to resolve variable '{overridePath}' as type {typeof(T).FullName}, but it is of type {evaluation.Value.GetType().FullName}.");
+            }
+            terminal = evaluation.Terminal;
+            return resolvedValue;
         }
 
         return value;
     }
 
     [return: NotNullIfNotNull(nameof(value))]
-    string? IRuntimeEnvironment.SelectRawStringOverride<TModule>(TModule module, string? value, string moduleExpression, string valueExpression) =>
-        TrySelectRawStringOverrideCore(this, module, moduleExpression, valueExpression, out string? selectedValue) ? selectedValue : value;
+    string? IRuntimeEnvironment.SelectRawStringOverride<TModule>(TModule module, string? value, string moduleExpression, string valueExpression, bool shieldCapturedText) =>
+        TrySelectRawStringOverrideCore(this, module, moduleExpression, valueExpression, shieldCapturedText, out string? selectedValue) ? selectedValue : value;
 
-    TaggedString IRuntimeEnvironment.SelectRawTaggedStringOverride<TModule>(TModule module, TaggedString value, string moduleExpression, string valueExpression) =>
-        TrySelectRawTaggedStringOverrideCore(this, module, moduleExpression, valueExpression, out TaggedString selectedValue) ? selectedValue : value;
+    TaggedString IRuntimeEnvironment.SelectRawTaggedStringOverride<TModule>(TModule module, TaggedString value, string moduleExpression, string valueExpression, bool shieldCapturedText) =>
+        TrySelectRawTaggedStringOverrideCore(this, module, moduleExpression, valueExpression, shieldCapturedText, out TaggedString selectedValue) ? selectedValue : value;
 
     [return: NotNullIfNotNull(nameof(value))]
-    TaggedString? IRuntimeEnvironment.SelectRawTaggedStringOverride<TModule>(TModule module, TaggedString? value, string moduleExpression, string valueExpression) =>
-        TrySelectRawTaggedStringOverrideCore(this, module, moduleExpression, valueExpression, out TaggedString selectedValue) ? selectedValue : value;
+    TaggedString? IRuntimeEnvironment.SelectRawTaggedStringOverride<TModule>(TModule module, TaggedString? value, string moduleExpression, string valueExpression, bool shieldCapturedText) =>
+        TrySelectRawTaggedStringOverrideCore(this, module, moduleExpression, valueExpression, shieldCapturedText, out TaggedString selectedValue) ? selectedValue : value;
 
-    internal protected virtual bool TrySelectRawTaggedStringOverrideCore<TModule>(EnvironmentLike entryPoint, TModule module, string? moduleExpression, string? valueExpression, out TaggedString value)
+    internal protected virtual bool TrySelectRawTaggedStringOverrideCore<TModule>(
+        EnvironmentLike entryPoint,
+        TModule module,
+        string? moduleExpression,
+        string? valueExpression,
+        bool shieldCapturedText,
+        out TaggedString value)
         where TModule : ModuleBase, IModuleDefinition
     {
         ArgumentNullException.ThrowIfNull(entryPoint);
@@ -107,7 +150,7 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         foreach (string identifier in EnumerateOverrideIdentifiers(module.Name, module.Group, TModule.ModuleId))
         {
             string overridePath = SyntaxFactory.Path(identifier, valuePath).Override();
-            if (TryGetStoredVariable(overridePath, out TaggedString selectedValue))
+            if (TryGetStoredVariable(overridePath, shieldCapturedText, out TaggedString selectedValue))
             {
                 value = selectedValue;
                 return true;
@@ -118,7 +161,13 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         return false;
     }
 
-    internal protected virtual bool TrySelectRawStringOverrideCore<TModule>(EnvironmentLike entryPoint, TModule module, string? moduleExpression, string? valueExpression, [NotNullWhen(true)] out string? value)
+    internal protected virtual bool TrySelectRawStringOverrideCore<TModule>(
+        EnvironmentLike entryPoint,
+        TModule module,
+        string? moduleExpression,
+        string? valueExpression,
+        bool shieldCapturedText,
+        [NotNullWhen(true)] out string? value)
         where TModule : ModuleBase, IModuleDefinition
     {
         ArgumentNullException.ThrowIfNull(entryPoint);
@@ -128,7 +177,7 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         foreach (string identifier in EnumerateOverrideIdentifiers(module.Name, module.Group, TModule.ModuleId))
         {
             string overridePath = SyntaxFactory.Path(identifier, valuePath).Override();
-            if (TryGetStoredVariable(overridePath, out value))
+            if (TryGetStoredVariable(overridePath, shieldCapturedText, out value))
             {
                 return true;
             }
@@ -136,6 +185,27 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
 
         value = default;
         return false;
+    }
+
+    private static bool IsTextualElement<T>() => typeof(T) == typeof(string) || typeof(T) == typeof(TaggedString);
+
+    private static IReadOnlyCollection<T> MaterializeShieldedElements<T>(IEnumerable sequence)
+    {
+        ImmutableArray<T>.Builder builder = ImmutableArray.CreateBuilder<T>();
+        foreach (object? item in sequence)
+        {
+            if (item is null)
+            {
+                throw new InvalidCastException($"Cannot shield a null collection element as type {typeof(T).FullName}.");
+            }
+            object shielded = InterpolationShield.ShieldText(item);
+            if (shielded is not T typed)
+            {
+                throw new InvalidCastException($"Cannot shield collection element of type {item.GetType().FullName} as type {typeof(T).FullName}.");
+            }
+            builder.Add(typed);
+        }
+        return builder.ToImmutable();
     }
 
     private string ConstructValueResolutionPath<T>(T? value, string? moduleExpression, string? valueExpression)

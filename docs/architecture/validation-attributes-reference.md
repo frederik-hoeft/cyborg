@@ -268,7 +268,7 @@ Prevents environment-driven override resolution for the annotated property.
 
 ### IgnoreInterpolation
 
-Prevents the generated interpolation phase from calling `runtime.Environment.Interpolate(...)` for the annotated string or `TaggedString` property. The value is preserved so a worker can interpolate it later, after context-specific variables or child artifacts exist.
+Prevents the generated interpolation phase from calling `runtime.Environment.Interpolate(...)` for the annotated string or `TaggedString` property. The value is preserved so a worker can interpolate it later, after context-specific variables or child artifacts exist. The attribute suppresses textual `${...}` interpolation only. Lazy indirection and eager capture are value operations and are not deferred by this attribute; a captured textual override contributes the snapshot taken when that variable was defined.
 
 **Applies to:** `string` and `TaggedString` properties.
 

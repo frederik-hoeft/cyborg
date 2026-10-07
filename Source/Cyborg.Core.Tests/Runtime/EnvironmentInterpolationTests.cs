@@ -189,7 +189,7 @@ public sealed class EnvironmentInterpolationTests : CyborgCoreTestBase
         IRuntimeEnvironment environment = runtime.Environment;
         ProbeModule module = new(Value: null, Port: 0) { Name = "probe" };
         environment.SetVariable("port", 22);
-        environment.SetVariable("@probe.port", "${port}");
+        environment.SetVariable("@probe.port", "&{port}");
 
         int actual = environment.Resolve(module, module.Port);
 
