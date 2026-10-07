@@ -23,92 +23,39 @@ internal sealed class DebugBranchControlFork(DebugBranchControlState ownerState)
         ArgumentNullException.ThrowIfNull(conflictResolver);
         if (contributors.Count == 0)
         {
-            throw new InvalidOperationException("Debugger branch-control reconciliation requires at least the owner continuation contributor.");
+            throw new InvalidOperationException("Debugger branch-control reconciliation requires at least one contributor.");
         }
 
-        // Compatibility path for the flattened public API. Runtime reconciliation calls the role-aware overload below.
-        DebugBranchControlState[] children = new DebugBranchControlState[contributors.Count - 1];
+        long newestSessionGeneration = contributors[0].SessionGeneration;
         for (int i = 1; i < contributors.Count; i++)
         {
-            children[i - 1] = contributors[i];
-        }
-        return TryPrepareMerge(contributors[0], children, conflictResolver, out candidate);
-    }
-
-    public override bool TryPrepareMerge(
-        DebugBranchControlState ownerContinuation,
-        IReadOnlyList<DebugBranchControlState> children,
-        ITransactionalServiceConflictResolver conflictResolver,
-        [NotNullWhen(true)] out DebugBranchControlState? candidate)
-    {
-        ArgumentNullException.ThrowIfNull(ownerContinuation);
-        ArgumentNullException.ThrowIfNull(children);
-        ArgumentNullException.ThrowIfNull(conflictResolver);
-
-        long newestSessionGeneration = ownerContinuation.SessionGeneration;
-        for (int i = 0; i < children.Count; i++)
-        {
-            newestSessionGeneration = Math.Max(newestSessionGeneration, children[i].SessionGeneration);
+            newestSessionGeneration = Math.Max(newestSessionGeneration, contributors[i].SessionGeneration);
         }
 
-        if (RequiresCommandOrdering(ownerContinuation, children, newestSessionGeneration))
-        {
-            candidate = MergeOrderedCommands(ownerContinuation, children, newestSessionGeneration);
-            return true;
-        }
-
-        candidate = MergeStepping(ownerContinuation, children, newestSessionGeneration);
-        return true;
-    }
-
-    private bool RequiresCommandOrdering(
-        DebugBranchControlState ownerContinuation,
-        IReadOnlyList<DebugBranchControlState> children,
-        long sessionGeneration)
-    {
-        if (_sessionGeneration == sessionGeneration && _stepOverAnchor is not null)
-        {
-            return true;
-        }
-        if (ownerContinuation.SessionGeneration == sessionGeneration && ownerContinuation.StepOverAnchor is not null)
-        {
-            return true;
-        }
-        for (int i = 0; i < children.Count; i++)
-        {
-            DebugBranchControlState child = children[i];
-            if (child.SessionGeneration == sessionGeneration && child.StepOverAnchor is not null)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private DebugBranchControlState MergeOrderedCommands(
-        DebugBranchControlState ownerContinuation,
-        IReadOnlyList<DebugBranchControlState> children,
-        long sessionGeneration)
-    {
         DebugBranchControlState? selected = null;
         long latestCommandSequence = long.MinValue;
-        if (ShouldIncludeOwnerContinuation(ownerContinuation, children.Count)
-            && ownerContinuation.SessionGeneration == sessionGeneration)
+        for (int i = 0; i < contributors.Count; i++)
         {
-            selected = ownerContinuation;
-            latestCommandSequence = ownerContinuation.ControlCommandSequence;
-        }
-
-        for (int i = 0; i < children.Count; i++)
-        {
-            DebugBranchControlState child = children[i];
-            if (child.SessionGeneration != sessionGeneration || child.ControlCommandSequence <= latestCommandSequence)
+            DebugBranchControlState contributor = contributors[i];
+            if (contributor.SessionGeneration != newestSessionGeneration)
             {
                 continue;
             }
+            if (contributor.ControlCommandSequence < latestCommandSequence)
+            {
+                continue;
+            }
+            if (contributor.ControlCommandSequence == latestCommandSequence)
+            {
+                if (selected is not null && !HasEquivalentControlState(selected, contributor))
+                {
+                    throw new InvalidOperationException("Debugger branch-control contributors with the same command sequence have divergent control state.");
+                }
+                continue;
+            }
 
-            selected = child;
-            latestCommandSequence = child.ControlCommandSequence;
+            selected = contributor;
+            latestCommandSequence = contributor.ControlCommandSequence;
         }
 
         if (selected is null)
@@ -116,48 +63,14 @@ internal sealed class DebugBranchControlFork(DebugBranchControlState ownerState)
             throw new InvalidOperationException("Debugger branch-control reconciliation found no contributor in the newest session generation.");
         }
 
-        return new DebugBranchControlState(sessionGeneration, selected.IsStepping, selected.StepOverAnchor, latestCommandSequence);
+        candidate = new DebugBranchControlState(
+            newestSessionGeneration,
+            selected.IsStepping,
+            selected.StepOverAnchor,
+            selected.ControlCommandSequence);
+        return true;
     }
 
-    private DebugBranchControlState MergeStepping(
-        DebugBranchControlState ownerContinuation,
-        IReadOnlyList<DebugBranchControlState> children,
-        long sessionGeneration)
-    {
-        bool hasContributor = false;
-        bool isStepping = false;
-        long latestCommandSequence = long.MinValue;
-        if (ShouldIncludeOwnerContinuation(ownerContinuation, children.Count)
-            && ownerContinuation.SessionGeneration == sessionGeneration)
-        {
-            hasContributor = true;
-            isStepping = ownerContinuation.IsStepping;
-            latestCommandSequence = ownerContinuation.ControlCommandSequence;
-        }
-
-        for (int i = 0; i < children.Count; i++)
-        {
-            DebugBranchControlState child = children[i];
-            if (child.SessionGeneration != sessionGeneration)
-            {
-                continue;
-            }
-
-            hasContributor = true;
-            isStepping |= child.IsStepping;
-            latestCommandSequence = Math.Max(latestCommandSequence, child.ControlCommandSequence);
-        }
-
-        if (!hasContributor)
-        {
-            throw new InvalidOperationException("Debugger branch-control reconciliation found no contributor in the newest session generation.");
-        }
-
-        return new DebugBranchControlState(sessionGeneration, isStepping, stepOverAnchor: null, latestCommandSequence);
-    }
-
-    private bool ShouldIncludeOwnerContinuation(DebugBranchControlState ownerContinuation, int childCount) =>
-        childCount == 0
-        || ownerContinuation.SessionGeneration != _sessionGeneration
-        || ownerContinuation.ControlCommandSequence != _controlCommandSequence;
+    private static bool HasEquivalentControlState(DebugBranchControlState first, DebugBranchControlState second) =>
+        first.IsStepping == second.IsStepping && first.StepOverAnchor == second.StepOverAnchor;
 }

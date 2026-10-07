@@ -12,29 +12,23 @@ internal sealed class RuntimeEnvironmentTransactionFork
 {
     public ITransactionParticipantState CreateBranch() => new RuntimeEnvironmentTransactionState(owner.GlobalEnvironmentId, graph.CreateBranch(), bindings.CreateBranch());
 
-    public bool TryPrepareMerge(
-        ITransactionParticipant participant,
-        ITransactionParticipantState ownerContinuation,
-        IReadOnlyList<ITransactionParticipantState> children,
+    public bool TryPrepareMerge(ITransactionParticipant participant,
+        IReadOnlyList<ITransactionParticipantState> contributors,
         ITransactionConflictStrategy conflictStrategy,
         [NotNullWhen(true)] out ITransactionParticipantState? candidate,
         [NotNullWhen(false)] out TransactionConflict? conflict)
     {
         ArgumentNullException.ThrowIfNull(participant);
-        ArgumentNullException.ThrowIfNull(ownerContinuation);
-        ArgumentNullException.ThrowIfNull(children);
+        ArgumentNullException.ThrowIfNull(contributors);
         ArgumentNullException.ThrowIfNull(conflictStrategy);
 
-        RuntimeEnvironmentGraphState[] graphContributors = new RuntimeEnvironmentGraphState[children.Count + 1];
-        RuntimeEnvironmentBindingState[] bindingContributors = new RuntimeEnvironmentBindingState[children.Count + 1];
-        RuntimeEnvironmentTransactionState continuation = (RuntimeEnvironmentTransactionState)ownerContinuation;
-        graphContributors[0] = continuation.Graph;
-        bindingContributors[0] = continuation.Bindings;
-        for (int i = 0; i < children.Count; i++)
+        RuntimeEnvironmentGraphState[] graphContributors = new RuntimeEnvironmentGraphState[contributors.Count];
+        RuntimeEnvironmentBindingState[] bindingContributors = new RuntimeEnvironmentBindingState[contributors.Count];
+        for (int i = 0; i < contributors.Count; i++)
         {
-            RuntimeEnvironmentTransactionState child = (RuntimeEnvironmentTransactionState)children[i];
-            graphContributors[i + 1] = child.Graph;
-            bindingContributors[i + 1] = child.Bindings;
+            RuntimeEnvironmentTransactionState contributor = (RuntimeEnvironmentTransactionState)contributors[i];
+            graphContributors[i] = contributor.Graph;
+            bindingContributors[i] = contributor.Bindings;
         }
 
         if (!graph.TryPrepareMerge(participant, graphContributors, conflictStrategy, out RuntimeEnvironmentGraphState? graphCandidate, out HashSet<RuntimeEnvironmentId>? retainedEnvironmentIds, out conflict)

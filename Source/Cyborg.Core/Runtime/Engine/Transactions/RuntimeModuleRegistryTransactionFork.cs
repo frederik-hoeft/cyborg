@@ -10,23 +10,20 @@ internal sealed class RuntimeModuleRegistryTransactionFork(TransactionalDictiona
 
     public bool TryPrepareMerge(
         ITransactionParticipant participant,
-        ITransactionParticipantState ownerContinuation,
-        IReadOnlyList<ITransactionParticipantState> children,
+        IReadOnlyList<ITransactionParticipantState> contributors,
         ITransactionConflictStrategy conflictStrategy,
         [NotNullWhen(true)] out ITransactionParticipantState? candidate,
         [NotNullWhen(false)] out TransactionConflict? conflict)
     {
         ArgumentNullException.ThrowIfNull(participant);
-        ArgumentNullException.ThrowIfNull(ownerContinuation);
-        ArgumentNullException.ThrowIfNull(children);
+        ArgumentNullException.ThrowIfNull(contributors);
         ArgumentNullException.ThrowIfNull(conflictStrategy);
 
-        TransactionalDictionary<string, ModuleContext>[] moduleContributors = new TransactionalDictionary<string, ModuleContext>[children.Count + 1];
-        moduleContributors[0] = ((RuntimeModuleRegistryTransactionState)ownerContinuation).Modules;
-        for (int i = 0; i < children.Count; i++)
+        TransactionalDictionary<string, ModuleContext>[] moduleContributors = new TransactionalDictionary<string, ModuleContext>[contributors.Count];
+        for (int i = 0; i < contributors.Count; i++)
         {
-            RuntimeModuleRegistryTransactionState child = (RuntimeModuleRegistryTransactionState)children[i];
-            moduleContributors[i + 1] = child.Modules;
+            RuntimeModuleRegistryTransactionState contributor = (RuntimeModuleRegistryTransactionState)contributors[i];
+            moduleContributors[i] = contributor.Modules;
         }
 
         if (!modules.TrySelectChanges(

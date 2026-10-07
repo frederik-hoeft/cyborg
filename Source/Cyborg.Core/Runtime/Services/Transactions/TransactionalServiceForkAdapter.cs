@@ -9,32 +9,24 @@ internal sealed class TransactionalServiceForkAdapter<TState>(TransactionalServi
         _fork.CreateBranch() ?? throw new InvalidOperationException("A transactional service fork returned a null branch state.");
 
     public bool TryPrepareMerge(
-        object ownerContinuation,
-        IReadOnlyList<object> children,
+        IReadOnlyList<object> contributors,
         ITransactionalServiceConflictResolver conflictResolver,
         [NotNullWhen(true)] out object? candidate)
     {
-        ArgumentNullException.ThrowIfNull(ownerContinuation);
-        ArgumentNullException.ThrowIfNull(children);
+        ArgumentNullException.ThrowIfNull(contributors);
         ArgumentNullException.ThrowIfNull(conflictResolver);
-        if (ownerContinuation is not TState typedOwnerContinuation)
+        TState[] typedContributors = new TState[contributors.Count];
+        for (int i = 0; i < contributors.Count; i++)
         {
-            throw new InvalidOperationException(
-                $"Transactional service owner-continuation state type '{ownerContinuation.GetType().FullName}' does not match expected type '{typeof(TState).FullName}'.");
-        }
-
-        TState[] typedChildren = new TState[children.Count];
-        for (int i = 0; i < children.Count; i++)
-        {
-            if (children[i] is not TState typedChild)
+            if (contributors[i] is not TState typedContributor)
             {
                 throw new InvalidOperationException(
-                    $"Transactional service child state type '{children[i].GetType().FullName}' does not match expected type '{typeof(TState).FullName}'.");
+                    $"Transactional service contributor state type '{contributors[i].GetType().FullName}' does not match expected type '{typeof(TState).FullName}'.");
             }
-            typedChildren[i] = typedChild;
+            typedContributors[i] = typedContributor;
         }
 
-        if (!_fork.TryPrepareMerge(typedOwnerContinuation, typedChildren, conflictResolver, out TState? typedCandidate))
+        if (!_fork.TryPrepareMerge(typedContributors, conflictResolver, out TState? typedCandidate))
         {
             candidate = null;
             return false;

@@ -36,11 +36,10 @@ internal sealed class ModuleTransactionForkGroup
     {
         EnsureActive();
         List<ModuleTransaction> contributors = [Continuation, .. _children];
-        TransactionStateBundle continuationState = Continuation.GetStateForReconciliation(this);
-        TransactionStateBundle[] childStates = new TransactionStateBundle[_children.Count];
-        for (int i = 0; i < _children.Count; i++)
+        List<TransactionStateBundle> contributorStates = new(contributors.Count);
+        foreach (ModuleTransaction contributor in contributors)
         {
-            childStates[i] = _children[i].GetStateForReconciliation(this);
+            contributorStates.Add(contributor.GetStateForReconciliation(this));
         }
 
         ImmutableDictionary<ITransactionParticipant, ITransactionParticipantState>.Builder candidates =
@@ -52,15 +51,13 @@ internal sealed class ModuleTransactionForkGroup
             try
             {
                 ITransactionParticipantContributionPolicy contributionPolicy = participant.ContributionPolicy;
-                ITransactionParticipantState continuationContribution =
-                    contributionPolicy.SelectContribution(Continuation.Publication, participantFork, continuationState.Get(participant));
-                ITransactionParticipantState[] childContributions = new ITransactionParticipantState[childStates.Length];
-                for (int i = 0; i < childStates.Length; i++)
+                ITransactionParticipantState[] participantContributors = new ITransactionParticipantState[contributorStates.Count];
+                for (int i = 0; i < contributorStates.Count; i++)
                 {
-                    childContributions[i] = contributionPolicy.SelectContribution(_children[i].Publication, participantFork, childStates[i].Get(participant));
+                    participantContributors[i] = contributionPolicy.SelectContribution(contributors[i].Publication, participantFork, contributorStates[i].Get(participant));
                 }
 
-                if (!participantFork.TryPrepareMerge(participant, continuationContribution, childContributions, _coordinator.ConflictStrategy, out candidate, out conflict))
+                if (!participantFork.TryPrepareMerge(participant, participantContributors, _coordinator.ConflictStrategy, out candidate, out conflict))
                 {
                     CloseFork(contributors, ModuleTransactionForkLifecycle.Conflict);
                     return false;

@@ -11,39 +11,32 @@ internal sealed class TransactionalServiceParticipantFork(TransactionalServicePa
 
     public bool TryPrepareMerge(
         ITransactionParticipant participant,
-        ITransactionParticipantState ownerContinuation,
-        IReadOnlyList<ITransactionParticipantState> children,
+        IReadOnlyList<ITransactionParticipantState> contributors,
         ITransactionConflictStrategy conflictStrategy,
         [NotNullWhen(true)] out ITransactionParticipantState? candidate,
         [NotNullWhen(false)] out TransactionConflict? conflict)
     {
         ArgumentNullException.ThrowIfNull(participant);
-        ArgumentNullException.ThrowIfNull(ownerContinuation);
-        ArgumentNullException.ThrowIfNull(children);
+        ArgumentNullException.ThrowIfNull(contributors);
         ArgumentNullException.ThrowIfNull(conflictStrategy);
         if (!ReferenceEquals(participant, _participant))
         {
             throw new InvalidOperationException("Transactional service fork was asked to reconcile a different participant descriptor.");
         }
-        if (ownerContinuation is not TransactionalServiceParticipantState typedOwnerContinuation
-            || !ReferenceEquals(typedOwnerContinuation.Participant, _participant))
-        {
-            throw new InvalidOperationException("Transactional service owner-continuation state does not belong to this participant.");
-        }
 
-        object[] childValues = new object[children.Count];
-        for (int i = 0; i < children.Count; i++)
+        object[] values = new object[contributors.Count];
+        for (int i = 0; i < contributors.Count; i++)
         {
-            if (children[i] is not TransactionalServiceParticipantState child
-                || !ReferenceEquals(child.Participant, _participant))
+            if (contributors[i] is not TransactionalServiceParticipantState contributor
+                || !ReferenceEquals(contributor.Participant, _participant))
             {
-                throw new InvalidOperationException("Transactional service child state does not belong to this participant.");
+                throw new InvalidOperationException("Transactional service contributor state does not belong to this participant.");
             }
-            childValues[i] = child.Value;
+            values[i] = contributor.Value;
         }
 
-        TransactionalServiceConflictResolver resolver = new(_participant, conflictStrategy, children.Count + 1);
-        if (!_fork.TryPrepareMerge(typedOwnerContinuation.Value, childValues, resolver, out object? candidateValue))
+        TransactionalServiceConflictResolver resolver = new(_participant, conflictStrategy, contributors.Count);
+        if (!_fork.TryPrepareMerge(values, resolver, out object? candidateValue))
         {
             conflict = resolver.UnresolvedConflict
                 ?? throw new InvalidOperationException(

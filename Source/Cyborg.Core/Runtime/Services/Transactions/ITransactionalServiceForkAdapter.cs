@@ -5,8 +5,7 @@ internal interface ITransactionalServiceForkAdapter
     object CreateBranch();
 
     bool TryPrepareMerge(
-        object ownerContinuation,
-        IReadOnlyList<object> children,
+        IReadOnlyList<object> contributors,
         ITransactionalServiceConflictResolver conflictResolver,
         [NotNullWhen(true)] out object? candidate);
 }

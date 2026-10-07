@@ -70,24 +70,19 @@ There is no process-wide `IsEnabled` mirror for branch stepping or step-over. Th
 
 ### Step propagation
 
-Step state is transaction-aware execution-control state. A child invocation inherits the step state of the transaction branch from which it forks. Sibling branches receive isolated copies and can independently choose `Step`, `Next`, or `Continue`.
+Step state is transaction-aware execution-control state. A child invocation inherits the control state of the transaction branch from which it forks. Sibling branches receive isolated copies and can independently choose `Step`, `Next`, or `Continue` while the fork remains open.
 
-When a fork generation reconciles, the transaction layer supplies the owner continuation separately from the child contributors. An untouched continuation does not add a synthetic debugger decision once children exist:
-
-```text
-owner stepping after join = any non-stale child remains stepping
-```
+Each explicit stateful debugger command receives a monotonically increasing control-command sequence. When branches later converge, reconciliation first ignores state from older debugger-session generations, then restores the control state carrying the highest command sequence in the newest generation. The continuation and child branches are ordinary contributors to this rule; branch creation order has no semantic meaning. Untouched branches carry the same inherited sequence and state, so they cannot override a newer explicit command.
 
 This gives the following behavior:
 
 - stepping a sequential child causes the next child invocation on that branch to pause;
 - a workflow rollback still reconciles step and step-over state, because branch control is execution-control state rather than workflow data;
 - stepping into a nested or dynamic module follows that structured descendant;
-- stepping one parallel branch does not implicitly step unrelated siblings;
-- `Continue` clears stepping only for the branch represented by that pause;
-- if every child of a parallel generation continues, stepping is cleared when the owner resumes after join;
-- if any current-generation child remains stepping, the owner resumes in step mode and the next invocation on that restored branch pauses;
-- persistent breakpoint matches remain global and can pause an unrelated branch without consuming another branch's step state.
+- stepping one parallel branch does not immediately change unrelated siblings while the fork is open;
+- when parallel branches converge, the most recently issued stateful debugger command determines the restored parent control state;
+- a later `Continue` therefore overrides an earlier sibling `Step`, and a later `Step` likewise overrides an earlier sibling `Continue`;
+- persistent breakpoint matches remain global and can pause an unrelated branch without consuming another branch's local control state before convergence.
 
 ### Next
 
@@ -95,11 +90,11 @@ This gives the following behavior:
 
 While the anchored invocation is open, its descendants are inside the subtree and do not pause for `next`. The anchor stays armed across those joins. The first boundary that is not in the subtree is the next logical module: the following sibling when the caller runs one, or a module on an ancestor's branch after the anchored invocation has joined and closed. No successor module id is chosen in advance, so dynamic, looping, and conditional children use the same rule. `next` on a loop pauses at that loop's next child invocation; `next` on the loop module itself runs the loop's children without step-over pauses and stops after the loop.
 
-Parallel siblings are separate fork branches. `next` mutates only the branch that issued it, so it does not resume on a sibling branch. When branches later join, command ordering is required while that fork is reconciling a pending step-over: this is true when the fork baseline carries an anchor or a current-generation contributor still carries one. In that case, the latest `step`, `next`, or `continue` command in the newest debugger-session generation controls the restored parent branch. This prevents an inherited outer anchor from overriding a newer command issued at a breakpoint in another child. Once no step-over remains relevant to a fork, reconciliation returns to the existing step/continue rule, so independent sibling stepping remains additive and any non-stale stepping child can restore parent stepping.
+Parallel siblings are separate fork branches. `next` mutates only the branch that issued it, so it does not resume on a sibling branch while the fork remains open. At convergence, the same latest-command rule used for `step` and `continue` selects the restored parent state. This prevents an inherited outer anchor from overriding a newer command issued at a breakpoint in another child without introducing step-over-specific merge semantics.
 
 Breakpoints stay independent of the anchor. A breakpoint inside the stepped-over subtree still pauses, and the anchor remains until the resume command replaces it. `step`, `next`, and `continue` each replace the other two on the branch that issues them. `continue` and `cancel` clear the step flag and the anchor. A `next` resume that has no execution id clears the branch instead of arming step-into, because there is no subtree to name; production pauses have an execution id.
 
-The debugger session has a monotonically increasing generation used as a fencing token for branch-control state. `Detach` advances the generation so transactional state already copied into live branches becomes stale without requiring the debugger to discover and mutate every transaction instance. A separate monotonically increasing control-command sequence orders same-session decisions while a fork has pending step-over semantics. `Detach` therefore wins across sessions, while the command sequence preserves latest-command authority where step-over reconciliation needs it.
+The debugger session has a monotonically increasing generation used as a fencing token for branch-control state. `Detach` advances the generation so transactional state already copied into live branches becomes stale without requiring the debugger to discover and mutate every transaction instance. A separate monotonically increasing control-command sequence orders all same-session `step`, `next`, and `continue` decisions at branch convergence. `Detach` therefore wins across sessions, while the command sequence provides a total order for stateful debugger commands within a session.
 
 ## Pause Coordination
 
@@ -301,6 +296,6 @@ This split keeps runtime observation/control, module-description serialization, 
 
 Debugger tests should preserve architectural boundaries rather than merely command implementations. Core coverage owns execution identity/lifecycle ordering, topology snapshot semantics, branch-control fork/join rules for both step-into and step-over, pause-coordinator FIFO/cancellation/session invalidation, breakpoint evaluation diagnostics, and workflow-debugger action application. CLI coverage owns command registration, aliases/tokenization, tree/stack rendering, prompt-aware I/O, semantic output categories, inspection, and EOF behavior.
 
-Production-flow integration coverage should exercise the same model through real control-flow modules: sequential and dynamic nested calls, parallel descendant stepping, independent sibling step/continue/next decisions, global breakpoint hits alongside branch-local stepping and step-over, join restoration after all/some descendants continue, `next` stopping at a sibling or at an ancestor's successor, breakpoints inside a stepped-over subtree, detach overriding a pending `next`, failures before the main debugger boundary, and forced queued-pause detach/cancellation scenarios. Sessions that never issue `next` keep the previous step and breakpoint behavior.
+Production-flow integration coverage should exercise the same model through real control-flow modules: sequential and dynamic nested calls, parallel descendant stepping, independent sibling step/continue/next decisions, global breakpoint hits alongside branch-local stepping and step-over, join restoration after all/some descendants continue, `next` stopping at a sibling or at an ancestor's successor, breakpoints inside a stepped-over subtree, detach overriding a pending `next`, failures before the main debugger boundary, and forced queued-pause detach/cancellation scenarios. Fork/join coverage should explicitly verify that the newest stateful debugger command wins across sibling branches, including pure `step`/`continue` cases that do not involve `next`.
 
 Module-description coverage should exercise generated scalar/nested/collection traversal, nullable and default collection shapes, hint preservation, tagged-value rendering, custom serializer registration, and cancellation.

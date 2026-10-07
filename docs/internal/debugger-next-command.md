@@ -36,16 +36,18 @@ should pause = breakpoint decision
 
 Ancestor checks use the live execution topology. `Started` records a node before preparation, and `Closed` removes it after join, before the caller runs another module. A child of `M` still sees `M` in its open parent chain. The following sibling, or a module started after `M` has closed, does not. No module id is predicted in advance, so dynamic, looping, and conditional children need no special cases.
 
-Join stays conflict-free, but a pending step-over makes command ordering significant:
+Join stays conflict-free and uses one rule for all stateful debugger commands:
 
-- The transaction layer presents the owner continuation separately from child contributors. If children exist, an unchanged continuation carries no new debugger decision; a command issued on the continuation participates even when it leaves the same visible step/anchor state because its command sequence changes.
 - Session generation remains the outer fence. Only contributors from the newest represented debugger session can restore control state.
-- Every `step`, `next`, and `continue` command receives a monotonic control-command sequence. A join uses command ordering when its fork baseline contains a step-over anchor or a current-generation contributor still contains one. The newest current-generation command then wins regardless of contributor creation order.
-- The fork baseline is part of this decision because a newer `continue` may clear its local anchor while a sibling still carries the inherited anchor. Ordering remains active until that fork resolves the inherited step-over copies.
-- Once a fork has neither a baseline nor a current step-over anchor, reconciliation returns to the pre-existing step-only rule: the owner resumes stepping when any non-stale child remains stepping. A `next` that was fully resolved inside one branch therefore does not permanently change how later independent step/continue decisions combine.
+- Every `step`, `next`, and `continue` command receives a globally monotonic control-command sequence.
+- Continuation and child branches are equivalent contributors. Untouched branches inherit the same sequence and control state from the frozen fork baseline; any explicit command receives a newer sequence.
+- The contributor with the highest command sequence in the newest session generation supplies the joined control state. Contributor creation order does not participate in selection.
+- Equal sequence values must describe equivalent control state. Divergence at the same sequence indicates an internal invariant violation rather than an ambiguity to resolve by ordering.
+
+This general rule also fixes the older step-only behavior where an inherited or earlier sibling `Step` could survive a later `Continue` merely because stepping states were OR-combined at join. The latest explicit command now has authority consistently across `step`, `next`, and `continue`.
 
 `Detach` invalidates the debugger session before clearing the current branch. Only the newest session generation participates in reconciliation, so stale anchors and commands from the detached session cannot reappear.
 
 ## Compatibility
 
-Existing `step`, breakpoint, cancel, and detach behavior is unchanged when `next` is not used. The anchor defaults to empty, children still inherit the step flag, and join still restores stepping from any non-stale stepping child. The console command is `next` (`n`). It returns `DebugResumeAction.Next`; `WorkflowDebugger` applies it to the current branch. Frontends still do not mutate transaction state themselves.
+The existing breakpoint, cancel, detach, and branch-local stepping behavior remains unchanged. Fork convergence intentionally corrects the previous step-only OR merge: when sibling branches issue conflicting stateful commands, the latest explicit `step`, `next`, or `continue` now wins even if `next` was never used. The console command is `next` (`n`). It returns `DebugResumeAction.Next`; `WorkflowDebugger` applies it to the current branch. Frontends still do not mutate transaction state themselves.

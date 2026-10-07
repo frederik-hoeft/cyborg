@@ -495,8 +495,7 @@ public sealed class ExecutionTransactionTests
 
         public bool TryPrepareMerge(
             ITransactionParticipant participant,
-            ITransactionParticipantState ownerContinuation,
-            IReadOnlyList<ITransactionParticipantState> children,
+            IReadOnlyList<ITransactionParticipantState> contributors,
             ITransactionConflictStrategy conflictStrategy,
             [NotNullWhen(true)] out ITransactionParticipantState? candidate,
             [NotNullWhen(false)] out TransactionConflict? conflict)
@@ -506,11 +505,10 @@ public sealed class ExecutionTransactionTests
                 throw new InvalidOperationException("Synthetic preparation failure.");
             }
 
-            TransactionalDictionary<string, int>[] contributorValues = new TransactionalDictionary<string, int>[children.Count + 1];
-            contributorValues[0] = ((DictionaryParticipantState)ownerContinuation).Values;
-            for (int i = 0; i < children.Count; i++)
+            TransactionalDictionary<string, int>[] contributorValues = new TransactionalDictionary<string, int>[contributors.Count];
+            for (int i = 0; i < contributors.Count; i++)
             {
-                contributorValues[i + 1] = ((DictionaryParticipantState)children[i]).Values;
+                contributorValues[i] = ((DictionaryParticipantState)contributors[i]).Values;
             }
 
             if (!_values.TrySelectChanges(
