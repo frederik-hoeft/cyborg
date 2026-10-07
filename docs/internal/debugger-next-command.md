@@ -24,7 +24,7 @@ A `next` resume with no execution id cannot name a subtree. The built-in debugge
 
 ## Mechanism
 
-Branch state gains one nullable anchor beside the existing step flag and session generation. The three fields stay mutually exclusive for the built-in control: stepping with no anchor, an anchor and not stepping, or neither. Reads apply the session generation first, so a stale anchor is not visible.
+Branch state gains one nullable anchor beside the existing step flag and session generation, plus reconciliation metadata for control-command ordering. Step-into and step-over remain mutually exclusive for the built-in control: stepping with no anchor, an anchor and not stepping, or neither. Reads apply the session generation first, so stale step and anchor state is not visible. The command sequence is reconciliation metadata only and does not make sibling state visible while a fork is open.
 
 The pre-execution hook already decides to pause before it asks for the frontend. The decision becomes:
 
@@ -36,14 +36,15 @@ should pause = breakpoint decision
 
 Ancestor checks use the live execution topology. `Started` records a node before preparation, and `Closed` removes it after join, before the caller runs another module. A child of `M` still sees `M` in its open parent chain. The following sibling, or a module started after `M` has closed, does not. No module id is predicted in advance, so dynamic, looping, and conditional children need no special cases.
 
-Join stays conflict-free:
+Join stays conflict-free, but step-over makes command ordering significant:
 
-- An untouched pre-fork continuation is ignored once real child contributors exist, including when the difference is only the anchor. A continuation that changes generation, step flag, or anchor participates.
-- Only the newest session generation can restore stepping or an anchor.
-- If any considered contributor is stepping, the parent is stepping and the anchor is cleared. Step-into already pauses at the next boundary, and it must keep pausing inside whatever follows.
-- Otherwise the parent keeps one anchor from those contributors. After join, every contributed anchor names an invocation that has completed. The next module on the parent is outside those subtrees, so any one of them resumes the pending `next`. A child that issued a new `step`, `next`, or `continue` replaced the anchor it inherited; the skipped continuation does not put the old one back.
+- An untouched pre-fork continuation is ignored once real child contributors exist. A continuation that issues a command while the fork is open participates even when that command leaves the same visible step/anchor state.
+- Session generation remains the outer fence. Only contributors from the newest represented debugger session can restore control state.
+- Every `step`, `next`, and `continue` command receives a monotonic control-command sequence. Once `next` has participated on a branch, that branch retains ordered reconciliation for the remainder of the current debugger session. At a join, the newest command among current-generation contributors wins, regardless of contributor creation order.
+- The ordered mode is sticky because `next` may be replaced before an enclosing fork joins. For example, a breakpoint can replace an inherited `next` with `continue`; the resulting null anchor still has to outrank an older inherited anchor in a sibling branch.
+- If `next` has never participated, reconciliation uses the pre-existing step-only rule: the owner resumes stepping when any non-stale considered child remains stepping. This preserves observable `step`/`continue` behavior for sessions that do not use step-over.
 
-`Continue`, `Step`, and `Next` write the current session generation. `Detach` invalidates the session before clearing the current branch, so the clear is the newest generation.
+`Detach` invalidates the debugger session before clearing the current branch. A command written into the new generation resets ordered step-over reconciliation unless that command is itself `next`, so stale anchors and command ordering from the detached session cannot reappear.
 
 ## Compatibility
 

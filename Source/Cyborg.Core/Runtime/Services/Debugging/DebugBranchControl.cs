@@ -5,13 +5,14 @@ namespace Cyborg.Core.Runtime.Services.Debugging;
 
 internal sealed class DebugBranchControl : IDebugBranchControl
 {
-    private readonly IDebugSessionState _sessionState;
+    private readonly IDebugSessionStateController _sessionState;
     private readonly ITransactionalServiceState<DebugBranchControlState> _state;
 
     public DebugBranchControl(ITransactionalServiceContext context, IDebugSessionState sessionState)
     {
         ArgumentNullException.ThrowIfNull(context);
-        _sessionState = sessionState ?? throw new ArgumentNullException(nameof(sessionState));
+        _sessionState = sessionState as IDebugSessionStateController
+            ?? throw new ArgumentException("The debugger session service must expose controller operations.", nameof(sessionState));
         _state = context.GetState<DebugBranchControlParticipant, DebugBranchControlState>();
     }
 
@@ -44,10 +45,14 @@ internal sealed class DebugBranchControl : IDebugBranchControl
 
     private void SetExecutionControl(bool isStepping, ModuleExecutionId? stepOverAnchor)
     {
-        long generation = _sessionState.Generation;
+        long sessionGeneration = _sessionState.Generation;
+        long commandSequence = _sessionState.AdvanceControlCommandSequence();
         _state.Mutate(state =>
         {
-            state.SessionGeneration = generation;
+            bool requiresCommandOrdering = state.SessionGeneration == sessionGeneration && state.RequiresCommandOrdering;
+            state.SessionGeneration = sessionGeneration;
+            state.ControlCommandSequence = commandSequence;
+            state.RequiresCommandOrdering = requiresCommandOrdering || stepOverAnchor is not null;
             state.IsStepping = isStepping;
             state.StepOverAnchor = stepOverAnchor;
         });

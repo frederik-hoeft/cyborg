@@ -368,6 +368,28 @@ public sealed class DebuggerProductionFlowTests : ModuleTestBase
     });
 
     [TestMethod]
+    public Task Test_Parallel_LaterNextInsideSteppedOverParentWinsAtJoinAsync() => TestWithDIAsync(async services =>
+    {
+        ScriptedFrontend frontend = UseFrontend(services, static (context, _) =>
+            ValueTask.FromResult(context.ValidationResult.Module.Name switch
+            {
+                "outer" => DebugResumeAction.Next,
+                "b" => DebugResumeAction.Next,
+                _ => DebugResumeAction.Continue,
+            }));
+        IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
+        breakpoints.Add("^outer$");
+        breakpoints.Add("^b$");
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        ModuleConfigurationLoadResult configuration = await LoadContextAsync(services, NestedParallelStepOverWorkflowJson);
+
+        IModuleExecutionResult result = await runtime.ExecuteAsync(configuration, TestContext.CancellationToken);
+
+        MSAssert.AreEqual(ModuleExitStatus.Success, result.Status);
+        MSAssert.AreSequenceEqual(["outer", "b", "c"], frontend.Names);
+    });
+
+    [TestMethod]
     public Task Test_Sequence_BreakpointInsideStepOverStillPausesAsync() => TestWithDIAsync(async services =>
     {
         ScriptedFrontend frontend = UseFrontend(services, static (context, _) =>
@@ -701,6 +723,42 @@ public sealed class DebuggerProductionFlowTests : ModuleTestBase
                   }
                 },
                 { "module": { "cyborg.modules.empty.v1": { "name": "after" } } }
+              ]
+            }
+          }
+        }
+        """;
+
+    private const string NestedParallelStepOverWorkflowJson =
+        """
+        {
+          "environment": { "scope": "global" },
+          "module": {
+            "cyborg.modules.sequence.v1": {
+              "name": "root",
+              "steps": [
+                {
+                  "module": {
+                    "cyborg.modules.sequence.v1": {
+                      "name": "outer",
+                      "steps": [
+                        {
+                          "module": {
+                            "cyborg.modules.parallel.v1": {
+                              "name": "fanout",
+                              "branches": [
+                                { "module": { "cyborg.modules.empty.v1": { "name": "a" } } },
+                                { "module": { "cyborg.modules.empty.v1": { "name": "b" } } }
+                              ]
+                            }
+                          }
+                        },
+                        { "module": { "cyborg.modules.empty.v1": { "name": "c" } } }
+                      ]
+                    }
+                  }
+                },
+                { "module": { "cyborg.modules.empty.v1": { "name": "d" } } }
               ]
             }
           }
