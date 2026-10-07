@@ -182,6 +182,26 @@ public sealed class ConsoleDebugFrontendTests : CyborgCliTestBase
     });
 
     [TestMethod]
+    public Task Test_PauseAsync_Next_ReturnsNextWithoutMutatingBreakpointsAsync() => TestWithDIAsync(async services =>
+    {
+        (DebugResumeAction action, _) = await RunReplAsync(services, "next\n", ["probe"]);
+        IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
+
+        Assert.AreEqual(DebugResumeAction.Next, action);
+        Assert.AreEqual(1, breakpoints.Count);
+        Assert.DoesNotContain(static breakpoint => breakpoint.IsOneShot, breakpoints.ToList());
+    });
+
+    [TestMethod]
+    public Task Test_PauseAsync_NextAlias_ReturnsNextAsync() => TestWithDIAsync(async services =>
+    {
+        (DebugResumeAction action, string output) = await RunReplAsync(services, "help\nn\n");
+
+        Assert.AreEqual(DebugResumeAction.Next, action);
+        Assert.Contains("next", output, StringComparison.OrdinalIgnoreCase);
+    });
+
+    [TestMethod]
     public Task Test_PauseAsync_Detach_ReturnsDetachWithoutMutatingBreakpointsAsync() => TestWithDIAsync(async services =>
     {
         (DebugResumeAction action, _) = await RunReplAsync(services, "detach\n", ["probe", "other"]);

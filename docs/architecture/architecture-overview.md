@@ -11,7 +11,7 @@ For detailed reference material, see:
 - [Source Generators](source-generators.md) — Roslyn source generators for AOT-compatible code generation
 - [Validation Attributes Reference](validation-attributes-reference.md) — Validation, defaulting, override, and interpolation control attributes
 - [Module Testing](module-testing.md) — Production-backed test infrastructure and generator regression fixtures
-- [Workflow Debugging](debugging.md) — Breakpoints, branch-scoped stepping, live execution topology, pause coordination, and interactive inspection
+- [Workflow Debugging](debugging.md) — Breakpoints, branch-scoped stepping and step-over, live execution topology, pause coordination, and interactive inspection
 
 **Table of Contents**
 

@@ -168,12 +168,12 @@ The built-in participants are:
 
 - the runtime environment subsystem;
 - the runtime named-module registry;
-- debugger branch-control state used for transaction-aware per-branch stepping;
+- debugger branch-control state used for transaction-aware per-branch stepping and step-over;
 - any custom DI service that explicitly opts into transaction participation.
 
 Participant boundaries follow state semantics rather than runtime ownership. Unrelated concerns remain separate because the coordinator already provides aggregate atomic publication. A composite participant is appropriate only when preparing a valid candidate for one part intrinsically depends on the candidate state of another part. The environment subsystem uses this pattern because binding lifetime depends on the reconciled environment graph; the named-module registry remains separate because its state is independent. Successful semantics must not depend on participant registration or preparation order because participants cannot publish owner-visible state during preparation.
 
-The debugger participant carries execution-control state rather than module data. Its merge is deliberately conflict-free: children inherit the owner's step flag, sibling decisions remain isolated while the fork is open, and after join the owner remains stepping when any non-stale child remains stepping. An untouched pre-fork owner continuation is ignored when real child contributors exist so that copy cannot resurrect stepping after every child explicitly continued. A continuation that changes its generation or step flag while the fork is open is an owner decision and participates in that same merge. A debugger-session generation fences state copied into branches before `detach`; only the newest represented generation may restore stepping.
+The debugger participant carries execution-control state rather than module data. Its merge is deliberately conflict-free: children inherit the owner's step flag and step-over anchor, sibling decisions remain isolated while the fork is open, and after join the owner remains stepping when any non-stale child remains stepping. A pending step-over anchor is kept when no considered child is stepping, so `next` continues on the parent after the anchored subtree joins. Step-into outranks that anchor. An untouched pre-fork owner continuation is ignored when real child contributors exist so that copy cannot resurrect stepping or an anchor after every child explicitly continued. A continuation that changes its generation, step flag, or anchor while the fork is open is an owner decision and participates in that same merge. A debugger-session generation fences state copied into branches before `detach`; only the newest represented generation may restore stepping or a step-over anchor.
 
 ### Prepare, then publish
 
@@ -361,7 +361,7 @@ The steady-state model establishes these guarantees:
 - failure publication is selected per invocation by `Transaction.OnError` or the global default, and workflow rollback still reconciles control participants;
 - default conflict handling is deterministic and based on explicit write/write conflicts;
 - DI lifetime never implicitly enables transaction participation;
-- debugger step state inherits, isolates, and reconciles through the same structured branch model without introducing transaction conflicts;
+- debugger step-into and step-over state inherits, isolates, and reconciles through the same structured branch model without introducing transaction conflicts;
 - external/process state remains outside the transaction model unless it explicitly participates;
 - an open concurrent execution scope keeps the owning invocation on the fork continuation, isolates each child until close, and reconciles owner writes with those children as one fork.
 

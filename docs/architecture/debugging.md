@@ -11,7 +11,7 @@ Cyborg debugging operates at prepared module execution boundaries. A breakpoint 
 The debugger combines four kinds of state with deliberately different ownership:
 
 - persistent breakpoint expressions are process-wide debugger-session state;
-- step state follows the transaction branch of the paused invocation;
+- step and step-over state follow the transaction branch of the paused invocation;
 - the live execution topology is a Core-owned projection of currently open structured module invocations;
 - frontend ownership is serialized by a debugger pause coordinator so only one interactive frontend session is active at a time.
 
@@ -43,7 +43,7 @@ invocation scope created
 
 `Started` is early enough to observe invocations that fail before the module pre-execution boundary. `Completed` records a definite module result while the invocation may still be structurally open, and `Closed` marks the point after reconciliation or discard when that invocation no longer belongs in a current-state execution topology. Lifecycle observers are isolated from workflow execution: an observer failure is logged and does not change the module result, reconciliation, or delivery to later observers.
 
-The workflow debugger itself participates through the normal pre-execution hook. The validation result carried into the debugger always contains the prepared module. Returning `Continue` resumes the normal lifecycle; returning `Cancel` lets the debugging hook produce a canceled module result without invoking the worker. `Step` and `Detach` are debugger control actions interpreted centrally by the workflow debugger rather than mutations performed by the frontend.
+The workflow debugger itself participates through the normal pre-execution hook. The validation result carried into the debugger always contains the prepared module. Returning `Continue` resumes the normal lifecycle; returning `Cancel` lets the debugging hook produce a canceled module result without invoking the worker. `Step`, `Next`, and `Detach` are debugger control actions interpreted centrally by the workflow debugger rather than mutations performed by the frontend.
 
 ## Breakpoints and Branch-Scoped Stepping
 
@@ -63,13 +63,14 @@ At each prepared module boundary, the debugger evaluates two independent inputs:
 ```text
 should pause = persistent/one-shot breakpoint decision
                OR current branch is stepping
+               OR current branch has a step-over anchor that is not an open ancestor of this invocation
 ```
 
-There is no process-wide `IsEnabled` mirror for branch stepping. The pre-execution hook resolves the transaction-scoped `IDebugBranchControl` from the current invocation provider and performs the cheap branch-state/breakpoint check directly.
+There is no process-wide `IsEnabled` mirror for branch stepping or step-over. The pre-execution hook resolves the transaction-scoped `IDebugBranchControl` from the current invocation provider and performs the cheap branch-state/breakpoint check directly. The anchor check consults the live execution topology only when a step-over anchor is present, so sessions that never issue `next` do not take that path.
 
 ### Step propagation
 
-Step state is transaction-aware execution-control state. A child invocation inherits the step state of the transaction branch from which it forks. Sibling branches receive isolated copies and can independently choose `Step` or `Continue`.
+Step state is transaction-aware execution-control state. A child invocation inherits the step state of the transaction branch from which it forks. Sibling branches receive isolated copies and can independently choose `Step`, `Next`, or `Continue`.
 
 When a fork generation reconciles, an untouched pre-fork owner continuation is ignored once real child contributors exist:
 
@@ -80,7 +81,7 @@ owner stepping after join = any non-stale child remains stepping
 This gives the following behavior:
 
 - stepping a sequential child causes the next child invocation on that branch to pause;
-- a workflow rollback still reconciles step state, because branch control is execution-control state rather than workflow data;
+- a workflow rollback still reconciles step and step-over state, because branch control is execution-control state rather than workflow data;
 - stepping into a nested or dynamic module follows that structured descendant;
 - stepping one parallel branch does not implicitly step unrelated siblings;
 - `Continue` clears stepping only for the branch represented by that pause;
@@ -88,7 +89,17 @@ This gives the following behavior:
 - if any current-generation child remains stepping, the owner resumes in step mode and the next invocation on that restored branch pauses;
 - persistent breakpoint matches remain global and can pause an unrelated branch without consuming another branch's step state.
 
-The debugger session has a monotonically increasing generation used as a fencing token for branch-control state. `Detach` advances the generation so transactional state already copied into live branches becomes stale without requiring the debugger to discover and mutate every transaction instance. During reconciliation, only contributors from the newest represented generation can restore step state.
+### Next
+
+`next` is step-over for the same branch-local control state. It clears step-into and records the paused invocation's `ModuleExecutionId` as a step-over anchor. Forks inherit that anchor. A later boundary on the branch pauses for `next` only when the anchor is not an open strict ancestor of that boundary.
+
+While the anchored invocation is open, its descendants are inside the subtree and do not pause for `next`. The anchor stays armed across those joins. The first boundary that is not in the subtree is the next logical module: the following sibling when the caller runs one, or a module on an ancestor's branch after the anchored invocation has joined and closed. No successor module id is chosen in advance, so dynamic, looping, and conditional children use the same rule. `next` on a loop pauses at that loop's next child invocation; `next` on the loop module itself runs the loop's children without step-over pauses and stops after the loop.
+
+Parallel siblings are separate fork branches. `next` mutates only the branch that issued it, so it does not resume on a sibling branch. When the fork joins, an unsatisfied anchor is reconciled onto the parent and the next boundary on that parent pauses. If any newest-generation contributor is still stepping, step-into wins and the anchor is cleared, because stepping already pauses at every following boundary. If every considered child cleared both the step flag and the anchor, the parent resumes without either.
+
+Breakpoints stay independent of the anchor. A breakpoint inside the stepped-over subtree still pauses, and the anchor remains until the resume command replaces it. `step`, `next`, and `continue` each replace the other two on the branch that issues them. `continue` and `cancel` clear the step flag and the anchor. A `next` resume that has no execution id clears the branch instead of arming step-into, because there is no subtree to name; production pauses have an execution id.
+
+The debugger session has a monotonically increasing generation used as a fencing token for branch-control state. `Detach` advances the generation so transactional state already copied into live branches becomes stale without requiring the debugger to discover and mutate every transaction instance. During reconciliation, only contributors from the newest represented generation can restore step-into or a step-over anchor. `Detach` therefore wins over a pending `next` on every branch.
 
 ## Pause Coordination
 
@@ -108,7 +119,7 @@ branch decides to pause
 
 Only one frontend session is active. Other decided pauses remain logically paused and visible in the execution topology while they wait. Admission and release share one coordinator synchronization boundary, so a pause arriving while another session resumes is either queued before release or acquires the newly free slot; it is not lost between a separate queue check and resume decision.
 
-Deleting a breakpoint does not un-pause a branch that already matched it. `Detach` has stronger semantics because it invalidates the debugger session itself: it clears global breakpoints, advances the session generation, clears the current branch's effective step state, and suppresses queued pauses that belong to the invalidated generation. Cancellation of a queued execution removes its queue request and restores its topology state without preventing later valid requests from acquiring the frontend.
+Deleting a breakpoint does not un-pause a branch that already matched it. `Detach` has stronger semantics because it invalidates the debugger session itself: it clears global breakpoints, advances the session generation, clears the current branch's effective step and step-over state, and suppresses queued pauses that belong to the invalidated generation. Cancellation of a queued execution removes its queue request and restores its topology state without preventing later valid requests from acquiring the frontend.
 
 ## Live Execution Topology
 
@@ -142,13 +153,14 @@ public interface IDebugFrontend : IKeyedService
 
 Frontend selection uses the keyed-service setting `cyborg.core.debug.frontend`. Core has no implicit frontend (`DebugOptions.Default.Frontend` is `null`) because presentation policy belongs to the host. `Cyborg.Cli.Debugging` registers the built-in `console` frontend, while the CLI composition root supplies `console` as its host default; ordinary configuration sources can replace that selection.
 
-A frontend returns one of four dispositions:
+A frontend returns one of five dispositions:
 
 | Action | Meaning |
 |---|---|
-| `Continue` | Clear stepping on the current branch and resume |
-| `Step` | Resume with the current branch left in step mode |
-| `Cancel` | Clear stepping and cancel the current module before worker execution |
+| `Continue` | Clear step-into and step-over on the current branch and resume |
+| `Step` | Clear step-over and resume with the current branch left in step-into mode |
+| `Next` | Clear step-into, arm step-over at the paused invocation, and resume |
+| `Cancel` | Clear step-into and step-over, and cancel the current module before worker execution |
 | `Detach` | End the debugger session, clear breakpoints, invalidate branch-local debugger state, and resume |
 
 `IDebugPauseContext` exposes the state that is valid while the frontend owns a pause:
@@ -193,8 +205,9 @@ This isolation prevents debugger help and routing from exposing or recursively i
 
 | Command | Aliases | Behavior |
 |---|---|---|
-| `continue` | `c`, `resume` | Clear step mode on this branch and resume until another breakpoint/step boundary |
-| `step` | `s` | Resume with this execution branch in step mode |
+| `continue` | `c`, `resume` | Clear step-into and step-over on this branch and resume until another breakpoint or step boundary |
+| `step` | `s` | Resume with this execution branch in step-into mode |
+| `next` | `n` | Execute the paused module without stepping into its nested modules, then break at the next module on this branch |
 | `detach` | none | End the debugger session and resume execution |
 | `cancel` | `q`, `quit` | Cancel the paused module before its worker executes |
 | `inspect` | `i` | Serialize the prepared module descriptor and print associated validation errors |
@@ -286,8 +299,8 @@ This split keeps runtime observation/control, module-description serialization, 
 
 ## Testing Expectations
 
-Debugger tests should preserve architectural boundaries rather than merely command implementations. Core coverage owns execution identity/lifecycle ordering, topology snapshot semantics, branch-control fork/join rules, pause-coordinator FIFO/cancellation/session invalidation, breakpoint evaluation diagnostics, and workflow-debugger action application. CLI coverage owns command registration, aliases/tokenization, tree/stack rendering, prompt-aware I/O, semantic output categories, inspection, and EOF behavior.
+Debugger tests should preserve architectural boundaries rather than merely command implementations. Core coverage owns execution identity/lifecycle ordering, topology snapshot semantics, branch-control fork/join rules for both step-into and step-over, pause-coordinator FIFO/cancellation/session invalidation, breakpoint evaluation diagnostics, and workflow-debugger action application. CLI coverage owns command registration, aliases/tokenization, tree/stack rendering, prompt-aware I/O, semantic output categories, inspection, and EOF behavior.
 
-Production-flow integration coverage should exercise the same model through real control-flow modules: sequential and dynamic nested calls, parallel descendant stepping, independent sibling step/continue decisions, global breakpoint hits alongside branch-local stepping, join restoration after all/some descendants continue, failures before the main debugger boundary, and forced queued-pause detach/cancellation scenarios.
+Production-flow integration coverage should exercise the same model through real control-flow modules: sequential and dynamic nested calls, parallel descendant stepping, independent sibling step/continue/next decisions, global breakpoint hits alongside branch-local stepping and step-over, join restoration after all/some descendants continue, `next` stopping at a sibling or at an ancestor's successor, breakpoints inside a stepped-over subtree, detach overriding a pending `next`, failures before the main debugger boundary, and forced queued-pause detach/cancellation scenarios. Sessions that never issue `next` keep the previous step and breakpoint behavior.
 
 Module-description coverage should exercise generated scalar/nested/collection traversal, nullable and default collection shapes, hint preservation, tagged-value rendering, custom serializer registration, and cancellation.

@@ -14,4 +14,7 @@ internal static partial class WorkflowDebuggerLog
 
     [ZLoggerMessage(LogLevel.Debug, "Stepped to module '{moduleIdentity}'")]
     public static partial void LogStepPause(this ILogger logger, string moduleIdentity);
+
+    [ZLoggerMessage(LogLevel.Debug, "Stepped over to module '{moduleIdentity}'")]
+    public static partial void LogNextPause(this ILogger logger, string moduleIdentity);
 }

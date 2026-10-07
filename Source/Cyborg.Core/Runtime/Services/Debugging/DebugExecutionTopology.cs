@@ -121,6 +121,27 @@ internal sealed class DebugExecutionTopology : IDebugExecutionTopologyController
         }
     }
 
+    public bool IsOpenAncestor(ModuleExecutionId executionId, ModuleExecutionId ancestorId)
+    {
+        lock (_lock)
+        {
+            if (!_nodes.TryGetValue(executionId, out LiveExecutionNode? node))
+            {
+                return false;
+            }
+
+            for (LiveExecutionNode? cursor = node.Parent; cursor is not null; cursor = cursor.Parent)
+            {
+                if (cursor.ExecutionId == ancestorId)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+    }
+
     public void EnrichPreparedModule(ModuleExecutionId executionId, IModule module)
     {
         ArgumentNullException.ThrowIfNull(module);
