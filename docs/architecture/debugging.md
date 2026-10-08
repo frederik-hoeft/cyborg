@@ -244,7 +244,7 @@ Description properties and values may carry `ImmutableArray<string>` hints. Hint
 
 ### Source-generated traversal
 
-The module-validation generator emits rich descriptor traversal from the same property model used for validation, defaults, overrides, and interpolation. Nested `[Validatable]` records and supported collections are therefore described with the same structural classification used by the preparation pipeline, without runtime reflection.
+The module-validation generator emits rich descriptor traversal from the same property model used for validation, defaults, overrides, typed value expressions, and interpolation. Nested `[Validatable]` records and supported collections are therefore described with the same structural classification used by the preparation pipeline, without runtime reflection.
 
 The shared collection rules matter for descriptor correctness as well as validation: `string` remains a scalar despite implementing `IEnumerable<char>`; absent nullable collections are not enumerated; and a default `ImmutableArray<T>` remains distinct from an initialized empty array. Accessibility checks are evaluated relative to the lexical context of the generated partial module, including recursively reached nested or inherited properties.
 

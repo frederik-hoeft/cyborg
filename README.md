@@ -1,6 +1,6 @@
 # Cyborg Workflow Engine
 
-Cyborg is a .NET 10 workflow engine for declarative, unattended orchestration on Linux. Workflows are immutable JSON module trees that are prepared through source-generated defaults, runtime overrides, interpolation, and validation before execution. The application publishes as a self-contained native AOT binary, and the included Borg module library provides a production-oriented backup orchestration stack on top of the domain-agnostic core.
+Cyborg is a .NET 10 workflow engine for declarative, unattended orchestration on Linux. Workflows are immutable JSON module trees that are prepared through source-generated defaults, runtime overrides, typed value expressions, interpolation, and validation before execution. The application publishes as a self-contained native AOT binary, and the included Borg module library provides a production-oriented backup orchestration stack on top of the domain-agnostic core.
 
 ## Overview
 

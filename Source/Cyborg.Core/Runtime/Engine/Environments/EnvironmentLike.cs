@@ -1,4 +1,4 @@
-using Cyborg.Core.Configuration.Model;
+﻿using Cyborg.Core.Configuration.Model;
 using Cyborg.Core.Runtime.Engine.Environments.Artifacts;
 using Cyborg.Core.Runtime.Engine.Environments.Syntax;
 using Cyborg.Core.Text;
@@ -38,7 +38,7 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
             if (TryParseVariableReference(expression, out VariableReference reference) && TryResolveVariableReference(context, reference, out Evaluation resolved))
             {
                 object? splice = resolved.Terminal && resolved.Value is not null
-                    ? InterpolationShield.ShieldText(resolved.Value)
+                    ? ExpressionShield.ShieldText(resolved.Value)
                     : resolved.Value;
                 AppendResolvedInterpolationValue(sb, tags, splice);
             }
@@ -96,7 +96,7 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         return builder.ToString();
     }
 
-    internal virtual bool TryResolveVariableInCurrentScopeCore(ResolutionContext context, out Evaluation evaluation)
+    internal protected virtual bool TryResolveVariableInCurrentScopeCore(ResolutionContext context, out Evaluation evaluation)
     {
         ArgumentNullException.ThrowIfNull(context);
         if (context.Name.Equals(SyntaxFactory.Self(), StringComparison.Ordinal))
@@ -140,7 +140,7 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
     internal protected virtual bool TryGetStoredVariableRecursiveCore(string name, [NotNullWhen(true)] out object? value) =>
         TryGetStoredVariableInCurrentScopeCore(name, out value);
 
-    internal virtual bool TryResolveVariableRecursiveCore(ResolutionContext context, out Evaluation evaluation) =>
+    internal protected virtual bool TryResolveVariableRecursiveCore(ResolutionContext context, out Evaluation evaluation) =>
         TryResolveVariableInCurrentScopeCore(context, out evaluation);
 
     private bool TryResolveVariableReference(ResolutionContext context, VariableReference reference, out Evaluation evaluation)
@@ -172,22 +172,6 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
     }
 
     public virtual void SetVariable<T>(string name, T value) => VariableStore.SetValue(name, PrepareStoredValue(value));
-
-    internal void SetResolvedVariable(string name, object? value)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        if (value is string text && !IsPassiveText(text))
-        {
-            VariableStore.SetValue(name, new CapturedValue(text));
-            return;
-        }
-        if (value is TaggedString tagged && !IsPassiveText(tagged.Value))
-        {
-            VariableStore.SetValue(name, new CapturedValue(tagged));
-            return;
-        }
-        SetVariable(name, value);
-    }
 
     public virtual bool TryRemoveVariable(string name) => VariableStore.TryRemove(name);
 
@@ -243,7 +227,7 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    private protected bool TryGetStoredVariable<T>(string name, bool shieldCapturedText, [NotNullWhen(true)] out T? value)
+    private protected bool TryGetStoredVariable<T>(string name, bool shieldInterpolation, [NotNullWhen(true)] out T? value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         if (TryGetStoredVariableRecursiveCore(name, out object? objectValue))
@@ -255,7 +239,9 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
                     value = default;
                     return false;
                 }
-                objectValue = shieldCapturedText ? InterpolationShield.ShieldText(captured.Value) : captured.Value;
+                objectValue = shieldInterpolation
+                    ? ExpressionShield.ShieldText(captured.Value)
+                    : ExpressionShield.ShieldValueExpressions(captured.Value);
             }
             if (TryConvertResolvedValue(objectValue, name, notifyImplicitConversion: true, out value))
             {
@@ -418,16 +404,48 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         return new CapturedValue(stored);
     }
 
-    private bool IsPassiveText(string text)
+    private protected string ResolveValueExpressionCore(string value, bool willInterpolate)
     {
-        try
+        Evaluation evaluation = EvaluateStandaloneValueExpression(value, wrapperTags: null, willInterpolate);
+        if (evaluation.Value is null || !TryConvertResolvedValue(evaluation.Value, "value expression", notifyImplicitConversion: true, out string? resolved))
         {
-            return ValueExpressionParser.Parse(SyntaxFactory, text).Kind == ValueExpressionKind.Text;
+            throw new InvalidCastException($"Value expression '{value}' did not resolve to {typeof(string).FullName}.");
         }
-        catch (FormatException)
+        return evaluation.Terminal && willInterpolate ? (string)ExpressionShield.ShieldText(resolved) : resolved;
+    }
+
+    private protected TaggedString ResolveValueExpressionCore(TaggedString value, bool willInterpolate)
+    {
+        Evaluation evaluation = EvaluateStandaloneValueExpression(value.Value, value.Tags, willInterpolate);
+        if (evaluation.Value is null || !TryConvertResolvedValue(evaluation.Value, "value expression", notifyImplicitConversion: true, out TaggedString resolved))
         {
-            return false;
+            throw new InvalidCastException($"Value expression '{value.Value}' did not resolve to {typeof(TaggedString).FullName}.");
         }
+        return evaluation.Terminal && willInterpolate ? (TaggedString)ExpressionShield.ShieldText(resolved) : resolved;
+    }
+
+    private Evaluation EvaluateStandaloneValueExpression(string text, ImmutableHashSet<string>? wrapperTags, bool willInterpolate)
+    {
+        ValueExpression expression = ValueExpressionParser.Parse(SyntaxFactory, text);
+        if (expression.Kind == ValueExpressionKind.Text)
+        {
+            string preparedText = willInterpolate ? text : ExpressionShield.FinalizeValueExpressionLiterals(text);
+            object prepared = wrapperTags is null ? preparedText : new TaggedString(preparedText, wrapperTags);
+            return Evaluation.Of(prepared);
+        }
+
+        if (!TryParseVariableReference(expression.Expression, out VariableReference reference)
+            || !TryResolveVariableReference(ResolutionContext.CreateRoot(this), reference, out Evaluation target)
+            || target.Value is null)
+        {
+            string operation = expression.Kind == ValueExpressionKind.LazyIndirection ? "indirection" : "capture";
+            char symbol = expression.Kind == ValueExpressionKind.LazyIndirection ? '&' : '*';
+            throw new InvalidOperationException($"Failed to resolve {operation} '{symbol}{{{expression.Expression}}}' because the target is not defined.");
+        }
+
+        Evaluation taggedTarget = WithWrapperTags(target, wrapperTags);
+        object resolved = taggedTarget.Terminal ? taggedTarget.Value! : FinalizeIfText(taggedTarget.Value!);
+        return Evaluation.TerminalValue(resolved);
     }
 
     private void EnsureTextual(string text)
@@ -461,6 +479,18 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
             return target;
         }
         return target.WithValue(UnionResolvedValue(target.Value, tags));
+    }
+
+    /// <summary>
+    /// A resolved environment value. Terminal values have already completed their logical expression evaluation and must not be evaluated again.
+    /// </summary>
+    internal protected readonly record struct Evaluation(object? Value, bool Terminal)
+    {
+        public static Evaluation Of(object? value) => new(value, Terminal: false);
+
+        public static Evaluation TerminalValue(object? value) => new(value, Terminal: true);
+
+        public Evaluation WithValue(object? value) => new(value, Terminal);
     }
 
     protected readonly record struct VariableReference(string Name, ResolutionOrigin Origin);

@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Runtime.Engine.Environments.Syntax;
+﻿namespace Cyborg.Core.Runtime.Engine.Environments.Syntax;
 
 public readonly record struct CaptureSyntax
 {

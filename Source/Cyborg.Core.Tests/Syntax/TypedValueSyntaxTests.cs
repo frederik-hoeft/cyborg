@@ -1,4 +1,4 @@
-using Cyborg.Core.Runtime.Engine.Environments.Syntax;
+﻿using Cyborg.Core.Runtime.Engine.Environments.Syntax;
 using System.Text.Json;
 
 namespace Cyborg.Core.Tests.Syntax;
@@ -58,11 +58,27 @@ public sealed class TypedValueSyntaxTests
     [TestMethod]
     public void Test_Shield_InsertsOneHashPerOperatorBrace()
     {
-        Assert.AreEqual("hello ${#name}", InterpolationShield.Shield("hello ${name}"));
-        Assert.AreEqual("${##name}", InterpolationShield.Shield("${#name}"));
-        Assert.AreEqual("&{#port}", InterpolationShield.Shield("&{port}"));
-        Assert.AreEqual("*{#port}", InterpolationShield.Shield("*{port}"));
-        Assert.AreEqual("plain", InterpolationShield.Shield("plain"));
+        Assert.AreEqual("hello ${#name}", ExpressionShield.Shield("hello ${name}"));
+        Assert.AreEqual("${##name}", ExpressionShield.Shield("${#name}"));
+        Assert.AreEqual("&{#port}", ExpressionShield.Shield("&{port}"));
+        Assert.AreEqual("*{#port}", ExpressionShield.Shield("*{port}"));
+        Assert.AreEqual("plain", ExpressionShield.Shield("plain"));
+    }
+
+    [TestMethod]
+    public void Test_ShieldValueExpressions_LeavesInterpolationUntouched()
+    {
+        object shielded = ExpressionShield.ShieldValueExpressions("${name} &{port} *{other}");
+
+        Assert.AreEqual("${name} &{#port} *{#other}", shielded);
+    }
+
+    [TestMethod]
+    public void Test_FinalizeValueExpressionLiterals_LeavesInterpolationEscapesUntouched()
+    {
+        string finalized = ExpressionShield.FinalizeValueExpressionLiterals("${#name} &{#port} *{#other}");
+
+        Assert.AreEqual("${#name} &{port} *{other}", finalized);
     }
 
     private static VariableSyntaxBuilder CreateBuilder() => new(JsonNamingPolicy.SnakeCaseLower);

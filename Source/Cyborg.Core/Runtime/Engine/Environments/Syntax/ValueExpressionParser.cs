@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 
 namespace Cyborg.Core.Runtime.Engine.Environments.Syntax;
 

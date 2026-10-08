@@ -56,7 +56,7 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
         return false;
     }
 
-    internal override bool TryResolveVariableRecursiveCore(ResolutionContext context, out Evaluation evaluation)
+    internal protected override bool TryResolveVariableRecursiveCore(ResolutionContext context, out Evaluation evaluation)
     {
         if (TryResolveVariableInCurrentScopeCore(context, out evaluation))
         {
@@ -81,16 +81,16 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
         TModule module,
         string? moduleExpression,
         string? valueExpression,
-        bool shieldCapturedText,
+        bool shieldInterpolation,
         [NotNullWhen(true)] out string? value)
     {
-        if (base.TrySelectRawStringOverrideCore(entryPoint, module, moduleExpression, valueExpression, shieldCapturedText, out value))
+        if (base.TrySelectRawStringOverrideCore(entryPoint, module, moduleExpression, valueExpression, shieldInterpolation, out value))
         {
             return true;
         }
         if (Parent is RuntimeEnvironment runtimeParent)
         {
-            return runtimeParent.TrySelectRawStringOverrideCore(entryPoint, module, moduleExpression, valueExpression, shieldCapturedText, out value);
+            return runtimeParent.TrySelectRawStringOverrideCore(entryPoint, module, moduleExpression, valueExpression, shieldInterpolation, out value);
         }
         value = default;
         return false;
@@ -101,16 +101,16 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
         TModule module,
         string? moduleExpression,
         string? valueExpression,
-        bool shieldCapturedText,
+        bool shieldInterpolation,
         out TaggedString value)
     {
-        if (base.TrySelectRawTaggedStringOverrideCore(entryPoint, module, moduleExpression, valueExpression, shieldCapturedText, out value))
+        if (base.TrySelectRawTaggedStringOverrideCore(entryPoint, module, moduleExpression, valueExpression, shieldInterpolation, out value))
         {
             return true;
         }
         if (Parent is RuntimeEnvironment runtimeParent)
         {
-            return runtimeParent.TrySelectRawTaggedStringOverrideCore(entryPoint, module, moduleExpression, valueExpression, shieldCapturedText, out value);
+            return runtimeParent.TrySelectRawTaggedStringOverrideCore(entryPoint, module, moduleExpression, valueExpression, shieldInterpolation, out value);
         }
         value = default;
         return false;
@@ -122,17 +122,16 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
         TModule module,
         IReadOnlyCollection<T>? value,
         string? moduleExpression,
-        string? valueExpression,
-        bool shieldCapturedText)
+        string? valueExpression)
     {
-        IReadOnlyCollection<T>? resolvedValue = base.ResolveCollectionCore(entryPoint, module, value, moduleExpression, valueExpression, shieldCapturedText);
+        IReadOnlyCollection<T>? resolvedValue = base.ResolveCollectionCore(entryPoint, module, value, moduleExpression, valueExpression);
         if (resolvedValue is not null && !resolvedValue.Equals(value))
         {
             return resolvedValue;
         }
         if (Parent is RuntimeEnvironment runtimeParent)
         {
-            return runtimeParent.ResolveCollectionCore(entryPoint, module, value, moduleExpression, valueExpression, shieldCapturedText);
+            return runtimeParent.ResolveCollectionCore(entryPoint, module, value, moduleExpression, valueExpression);
         }
         return Parent.Resolve(module, value, moduleExpression, valueExpression);
     }

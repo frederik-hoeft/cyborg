@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Runtime.Engine.Environments.Syntax;
+﻿namespace Cyborg.Core.Runtime.Engine.Environments.Syntax;
 
 internal readonly record struct ValueExpression(ValueExpressionKind Kind, string Expression)
 {

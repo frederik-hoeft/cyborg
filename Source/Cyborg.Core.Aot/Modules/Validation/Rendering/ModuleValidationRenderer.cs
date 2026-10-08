@@ -22,6 +22,8 @@ internal static class ModuleValidationRenderer
 
     public static string ResolveOverridesAsync => "ResolveOverridesAsync";
 
+    public static string ResolveValueExpressionsAsync => "ResolveValueExpressionsAsync";
+
     public static string ValidateAsync => "ValidateAsync";
 
     public static string Render(ModuleModel model, ValidationContractInfo contractInfo, DiagnosticsReporter diagnosticsReporter)
@@ -31,6 +33,7 @@ internal static class ModuleValidationRenderer
         [
             new DefaultsSectionRenderer(contractInfo, visibilityContext, diagnosticsReporter),
             new OverrideSectionRenderer(contractInfo, visibilityContext, diagnosticsReporter),
+            new ValueExpressionSectionRenderer(contractInfo, visibilityContext, diagnosticsReporter),
             new InterpolationSectionRenderer(contractInfo, visibilityContext, diagnosticsReporter),
             new ValidationSectionRenderer(contractInfo, visibilityContext, diagnosticsReporter),
             new InspectionSectionRenderer(contractInfo, visibilityContext, diagnosticsReporter),

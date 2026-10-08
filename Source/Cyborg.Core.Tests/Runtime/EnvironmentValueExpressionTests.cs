@@ -1,6 +1,7 @@
-using Cyborg.Core.Runtime;
+﻿using Cyborg.Core.Runtime;
 using Cyborg.Core.Runtime.Engine;
 using Cyborg.Core.Runtime.Engine.Environments;
+using Cyborg.Core.Runtime.Engine.Environments.Syntax;
 using Cyborg.Core.Text;
 using Microsoft.Extensions.DependencyInjection;
 using System.Text.Json;
@@ -191,14 +192,13 @@ public sealed class EnvironmentValueExpressionTests : CyborgCoreTestBase
     });
 
     [TestMethod]
-    public Task Test_SetResolvedVariable_PreservesFinalizedIndirectionTextAsync() => TestWithDIAsync(services =>
+    public Task Test_ShieldedResolvedValue_PreservesFinalizedIndirectionTextAsync() => TestWithDIAsync(services =>
     {
         IRuntimeEnvironment environment = Environment(services);
         environment.SetVariable("literal", "&{#port}");
         Assert.IsTrue(environment.TryResolveVariable("literal", out string? finalized));
         Assert.AreEqual("&{port}", finalized);
-        Assert.IsInstanceOfType<EnvironmentLike>(environment);
-        ((EnvironmentLike)environment).SetResolvedVariable("copied", finalized);
+        environment.SetVariable("copied", ExpressionShield.Shield(finalized));
         environment.SetVariable("port", 22);
 
         Assert.IsTrue(environment.TryResolveVariable("copied", out string? copied));

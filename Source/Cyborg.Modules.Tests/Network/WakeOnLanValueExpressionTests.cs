@@ -1,4 +1,4 @@
-using Cyborg.Modules.Network.WakeOnLan;
+﻿using Cyborg.Modules.Network.WakeOnLan;
 
 namespace Cyborg.Modules.Tests.Network;
 

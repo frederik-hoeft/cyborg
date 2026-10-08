@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Runtime.Engine.Environments.Syntax;
+﻿namespace Cyborg.Core.Runtime.Engine.Environments.Syntax;
 
 /// <summary>
 /// Defines the grammar for variable identifiers, namespaces, and value expressions used in the environment.

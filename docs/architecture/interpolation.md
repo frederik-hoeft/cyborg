@@ -62,32 +62,41 @@ An exact `${port}` whose target is an `int` therefore becomes the text `"22"` (o
 
 ### 3. Module-property override selection
 
-Generated preparation treats string and non-string properties differently:
+Generated preparation separates override selection from value-expression evaluation:
 
-- **String properties:** the generated validation support context selects the first matching stored override without evaluating its contents. A captured textual snapshot that the later interpolation pass will visit is shielded so that pass restores the snapshot, including characters that look like expressions. `[IgnoreInterpolation]` selects the unshielded snapshot or the raw template, because no generated pass runs.
-- **Non-string properties:** the context performs full typed resolution. `&{...}` yields the current target. A capture yields the snapshot taken at definition.
+- **Textual properties:** the generated validation support context selects the first matching stored override without evaluating its contents. This preserves late-bound `${...}` templates and, for `TaggedString`, any tags attached to the selected value. Captured textual snapshots are shielded only for the later phases that could otherwise reinterpret their contents.
+- **Non-text properties:** the context performs full typed resolution. `&{...}` yields the current target and a capture yields the snapshot taken at definition. Collections use the collection-specific resolver before generated code materializes the declared collection shape. Capture of a collection is shallow; its elements are not recursively terminalized.
 
-Raw string selection is required so `[IgnoreInterpolation]` applies to the effective value regardless of whether it came from JSON, a default, or an override. It also prevents override lookup from performing an accidental interpolation pass before generated interpolation.
+Raw textual selection is required so `[IgnoreInterpolation]` applies to the effective value regardless of whether it came from JSON, a default, or an override. It also keeps override precedence/selection independent from the semantics of the selected text.
 
 These operations are not part of the normal worker-facing environment API. Source-generated preparation code accesses them through `ModuleValidationContext` in the `Cyborg.Core.Runtime.Services.Validation.Internal` namespace. This IntelliSense-hidden CLR bridge carries the runtime and service provider required by the generated phases, while the corresponding environment operations remain internal interface members.
 
 Typed override resolution is therefore a generated-pipeline concern rather than a client-code API. Module workers use the ordinary environment operations described under [API Boundaries](#api-boundaries).
 
-### 4. Generated interpolation
+### 4. Generated value-expression preparation
+
+After override selection, generated preparation recursively visits textual properties and textual elements in supported collections. A whole-value `&{...}` or `*{...}` is resolved as a typed value expression; `${...}` remains untouched for the later textual phase. The same pass applies to directly configured values and values supplied through overrides, so string-valued properties do not have a separate indirection model.
+
+The pass is independent from `[IgnoreInterpolation]`: suppressing `${...}` interpolation does not suppress typed indirection or capture. Destination preparation invariants are applied again after this phase, so attributes such as `[Secret]` cannot be bypassed when a reference replaces the effective property value.
+
+`ModuleBase.Name` and `ModuleBase.Group` opt out through `[IgnoreValueExpression]`. Their structural identity is consumed when the runtime binds the module environment before generated validation begins; rewriting those fields afterward would make the prepared module disagree with the namespace already selected for execution.
+
+### 5. Generated interpolation
 
 The generated validation pipeline performs:
 
-1. apply defaults;
+1. apply defaults and preparation invariants;
 2. select or resolve overrides;
-3. reapply defaults;
-4. interpolate eligible strings through the generated validation context;
-5. validate constraints.
+3. resolve typed value expressions in textual properties;
+4. reapply defaults and destination preparation invariants;
+5. interpolate eligible strings through the generated validation context;
+6. validate constraints.
 
-The generated interpolation operation resolves ordinary `${...}` expressions and then removes one escape layer. It is applied recursively to eligible string properties in nested `[Validatable]` records and supported collections. It rejects `&{...}` and `*{...}`. Textual properties use `${...}` when they need text, including an exact `${name}`.
+The generated interpolation operation resolves ordinary `${...}` expressions and then removes one escape layer. It is applied recursively to eligible string properties in nested `[Validatable]` records and supported collections. It rejects active `&{...}` and `*{...}` because those belong to the preceding value-expression phase.
 
-Properties marked `[IgnoreInterpolation]` skip this phase. Their effective value remains unchanged for worker-controlled interpolation, including values supplied through defaults or overrides. A worker that later calls `Interpolate` starts a new textual pass.
+Properties marked `[IgnoreInterpolation]` skip only this phase. A `${...}` template therefore remains available for worker-controlled interpolation, while a whole-value `&{...}` still resolves during value-expression preparation. A worker that later calls `Interpolate` starts a new textual pass.
 
-### 5. Explicit and deferred interpolation
+### 6. Explicit and deferred interpolation
 
 Module workers and other handwritten consumers use one interpolation API:
 
@@ -118,7 +127,7 @@ The environment API exposed to module authors includes operations that are meani
 
 Generated preparation additionally requires raw string override selection, typed scalar and collection override materialization, and access to the runtime and service provider shared by every preparation phase. These operations are grouped on `ModuleValidationContext` rather than exposed as public members of `IRuntimeEnvironment`. The context must be public because generated code is compiled into consuming assemblies, but it has a private constructor, lives in an `Internal` namespace, and is marked as editor-hidden; it is not a client-code contract.
 
-`IModule<TModule>` exposes only `ValidateAsync(...)`. The generated defaulting, override-resolution, and interpolation phases are private async instance helpers invoked by that public orchestrator.
+`IModule<TModule>` exposes only `ValidateAsync(...)`. The generated defaulting, override-selection, value-expression, and interpolation phases are private async instance helpers invoked by that public orchestrator.
 
 ## Override Precedence
 
