@@ -112,6 +112,37 @@ public sealed class DebugExecutionTopologyTests : CyborgCoreTestBase
         Assert.IsFalse(topology.MarkRunning(executionId));
     }
 
+    [TestMethod]
+    public async Task Test_Topology_OpenAncestorWalkIgnoresSelfSiblingsAndClosedNodesAsync()
+    {
+        DebugExecutionTopology topology = new();
+        ModuleExecutionId rootId = CreateExecutionId();
+        ModuleExecutionId parentId = CreateExecutionId();
+        ModuleExecutionId childId = CreateExecutionId();
+        ModuleExecutionId siblingId = CreateExecutionId();
+        ModuleExecutionId missingId = CreateExecutionId();
+        await StartAsync(topology, rootId, parentExecutionId: null, "root");
+        await StartAsync(topology, parentId, rootId, "parent");
+        await StartAsync(topology, childId, parentId, "child");
+        await StartAsync(topology, siblingId, parentId, "sibling");
+
+        Assert.IsTrue(topology.IsOpenAncestor(childId, parentId));
+        Assert.IsTrue(topology.IsOpenAncestor(childId, rootId));
+        Assert.IsTrue(topology.IsOpenAncestor(siblingId, rootId));
+        Assert.IsFalse(topology.IsOpenAncestor(childId, childId));
+        Assert.IsFalse(topology.IsOpenAncestor(childId, siblingId));
+        Assert.IsFalse(topology.IsOpenAncestor(siblingId, childId));
+        Assert.IsFalse(topology.IsOpenAncestor(missingId, rootId));
+        Assert.IsFalse(topology.IsOpenAncestor(rootId, childId));
+
+        TestLifecycleContext childContext = CreateContext(childId, parentId, new TestModule { Name = "child" });
+        childContext.Joined = true;
+        await topology.OnClosedAsync(childContext, CancellationToken.None);
+
+        Assert.IsFalse(topology.IsOpenAncestor(childId, parentId));
+        Assert.IsTrue(topology.IsOpenAncestor(siblingId, parentId));
+    }
+
 
     [TestMethod]
     public Task Test_Topology_DebuggingHookEnrichesPreparedMetadataBeforeLaterPreExecutionHooksAsync() => TestWithDIAsync(async services =>

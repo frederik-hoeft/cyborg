@@ -13,7 +13,11 @@ internal sealed class DebugExecutionCommands(DebugCommandResult result)
     [Command("step|s")]
     public void Step() => result.Resume(DebugResumeAction.Step);
 
-    /// <summary>Remove all breakpoints and debugger step state, then continue workflow execution.</summary>
+    /// <summary>Execute the paused module without stepping into nested modules, then break at the next module on this branch.</summary>
+    [Command("next|n")]
+    public void Next() => result.Resume(DebugResumeAction.Next);
+
+    /// <summary>Remove all breakpoints and pending step or next state, then continue workflow execution.</summary>
     [Command("detach")]
     public void Detach() => result.Resume(DebugResumeAction.Detach);
 

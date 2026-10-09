@@ -6,7 +6,7 @@ internal sealed class DebugBranchControlParticipant(IDebugSessionState sessionSt
 {
     private readonly IDebugSessionState _sessionState = sessionState ?? throw new ArgumentNullException(nameof(sessionState));
 
-    /// <summary>Step state is execution control, not workflow data, so failure rollback still reconciles it.</summary>
+    /// <summary>Step and step-over state are execution control, not workflow data, so failure rollback still reconciles them.</summary>
     public override TransactionParticipantRole Role => TransactionParticipantRole.Control;
 
     protected override DebugBranchControlState CreateRootState() => new(_sessionState.Generation, isStepping: false);
