@@ -87,10 +87,11 @@ The generated validation pipeline performs:
 
 1. apply defaults and preparation invariants;
 2. select or resolve overrides;
-3. resolve typed value expressions in textual properties;
-4. reapply defaults and destination preparation invariants;
-5. interpolate eligible strings through the generated validation context;
-6. validate constraints.
+3. apply defaults again to values introduced by overrides;
+4. resolve typed value expressions in textual properties;
+5. re-establish destination preparation invariants without applying more defaults;
+6. interpolate eligible strings through the generated validation context;
+7. validate constraints.
 
 The generated interpolation operation resolves ordinary `${...}` expressions and then removes one escape layer. It is applied recursively to eligible string properties in nested `[Validatable]` records and supported collections. It rejects active `&{...}` and `*{...}` because those belong to the preceding value-expression phase.
 

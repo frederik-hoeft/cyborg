@@ -11,20 +11,20 @@ namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
 
 internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
 {
-    public bool AppendPreparationForObject(IndentedStringBuilder builder, ImmutableArray<PropertyModel> properties, string targetVariable, string diagnosticsPhase)
+    public bool AppendPreparationForObject(IndentedStringBuilder builder, ImmutableArray<PropertyModel> properties, string targetVariable, string diagnosticsPhase, bool applyDefaults = true)
     {
         List<(string PropertyName, string LocalName)> assignments = [];
         foreach (PropertyModel property in properties)
         {
             string propertyAccessExpression = $"{targetVariable}.{property.Name}";
             PropertyRewriteContext rewriteContext = new(property, parent, propertyAccessExpression);
-            string? directExpression = CreatePreparedValueExpression(rewriteContext);
+            string? directExpression = CreatePreparedValueExpression(rewriteContext, applyDefaults);
             bool hasDirectAssignment = !string.IsNullOrEmpty(directExpression);
             bool hasNestedValidatableAssignments = property.Object is { HasChildren: true } objectModel
-                && objectModel.Children.Any(child => HasPreparationWork(child, rewriteContext));
+                && objectModel.Children.Any(child => HasPreparationWork(child, rewriteContext, applyDefaults));
             bool hasCollectionElementAssignments = property.Collection is { Shape.SupportsElementRewrite: true } collection
                 && property.HasCollectionElementChildren
-                && HasCollectionPreparationWork(collection, rewriteContext);
+                && HasCollectionPreparationWork(collection, rewriteContext, applyDefaults);
 
             if (!hasDirectAssignment && !hasNestedValidatableAssignments && !hasCollectionElementAssignments)
             {
@@ -46,12 +46,12 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
 
             if (hasNestedValidatableAssignments)
             {
-                AppendNestedPreparationForProperty(builder, rewriteContext, localName, diagnosticsPhase);
+                AppendNestedPreparationForProperty(builder, rewriteContext, localName, diagnosticsPhase, applyDefaults);
             }
 
             if (hasCollectionElementAssignments)
             {
-                AppendCollectionPreparationForProperty(builder, property, localName, diagnosticsPhase);
+                AppendCollectionPreparationForProperty(builder, property, localName, diagnosticsPhase, applyDefaults);
             }
 
             assignments.Add((property.Name, localName));
@@ -77,7 +77,7 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
         builder.AppendLine($"{rewriteContext.PropertyAccessExpression} = {preparedExpression};");
     }
 
-    public void AppendCollectionPreparationForProperty(IndentedStringBuilder builder, PropertyModel property, string localName, string diagnosticsPhase)
+    public void AppendCollectionPreparationForProperty(IndentedStringBuilder builder, PropertyModel property, string localName, string diagnosticsPhase, bool applyDefaults = true)
     {
         CollectionModel collection = property.Collection!;
         ValueAccess access = collection.Shape.Renderer.Access(localName);
@@ -90,7 +90,7 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
                 {
                     {{property.NonNullableTypeName}} {{collectionCurrentVariable}} = {{access.ValueExpression}};
                 """);
-            AppendCollectionPreparationBody(builder.IncreaseIndent(), collection, collectionCurrentVariable, diagnosticsPhase);
+            AppendCollectionPreparationBody(builder.IncreaseIndent(), collection, collectionCurrentVariable, diagnosticsPhase, applyDefaults);
             builder.AppendBlock(
                 $$"""
                     {{localName}} = {{collectionCurrentVariable}};
@@ -103,17 +103,17 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
             return;
         }
 
-        AppendCollectionPreparationBody(builder, collection, localName, diagnosticsPhase);
+        AppendCollectionPreparationBody(builder, collection, localName, diagnosticsPhase, applyDefaults);
     }
 
-    public bool HasPreparationWork(PropertyModel property, PropertyRewriteContext rewriteContext)
+    public bool HasPreparationWork(PropertyModel property, PropertyRewriteContext rewriteContext, bool applyDefaults = true)
     {
         MutablePropertyRewriteContext mutableContext = new(property, rewriteContext.ContractInfo, rewriteContext.DiagnosticsReporter, rewriteContext.ModuleVariable,
             rewriteContext.ContextVariable, rewriteContext.PropertyAccessExpression);
-        return HasPreparationWork(mutableContext);
+        return HasPreparationWork(mutableContext, applyDefaults);
     }
 
-    public bool HasCollectionPreparationWork(CollectionModel collection, PropertyRewriteContext rewriteContext)
+    public bool HasCollectionPreparationWork(CollectionModel collection, PropertyRewriteContext rewriteContext, bool applyDefaults = true)
     {
         ObjectModel elementObject = collection.ElementObject
             ?? throw new InvalidOperationException("Collection preparation work detection requires validatable object metadata.");
@@ -121,7 +121,7 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
         {
             MutablePropertyRewriteContext mutableContext = new(child, rewriteContext.ContractInfo, rewriteContext.DiagnosticsReporter, rewriteContext.ModuleVariable,
                 rewriteContext.ContextVariable, rewriteContext.PropertyAccessExpression);
-            if (HasPreparationWork(mutableContext))
+            if (HasPreparationWork(mutableContext, applyDefaults))
             {
                 return true;
             }
@@ -130,7 +130,7 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
         return false;
     }
 
-    private void AppendNestedPreparationForProperty(IndentedStringBuilder builder, PropertyRewriteContext rewriteContext, string localName, string diagnosticsPhase)
+    private void AppendNestedPreparationForProperty(IndentedStringBuilder builder, PropertyRewriteContext rewriteContext, string localName, string diagnosticsPhase, bool applyDefaults)
     {
         ObjectModel objectModel = rewriteContext.Property.Object
             ?? throw new InvalidOperationException($"Nested preparation requires object metadata for property '{rewriteContext.Property.Name}'.");
@@ -140,10 +140,10 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
             builder,
             localName,
             nestedVariable,
-            (nestedBuilder, currentVariable) => AppendPreparationForObject(nestedBuilder, objectModel.Children, currentVariable, diagnosticsPhase));
+            (nestedBuilder, currentVariable) => AppendPreparationForObject(nestedBuilder, objectModel.Children, currentVariable, diagnosticsPhase, applyDefaults));
     }
 
-    private void AppendCollectionPreparationBody(IndentedStringBuilder builder, CollectionModel collection, string collectionVariable, string diagnosticsPhase)
+    private void AppendCollectionPreparationBody(IndentedStringBuilder builder, CollectionModel collection, string collectionVariable, string diagnosticsPhase, bool applyDefaults)
     {
         string safeIdentifier = CreateSafeIdentifier(collectionVariable);
         string rewrittenItemsVariable = $"{safeIdentifier}Items";
@@ -166,16 +166,16 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
             loopBuilder,
             elementCurrentVariable,
             elementValueVariable,
-            (elementBuilder, currentVariable) => AppendPreparationForObject(elementBuilder, elementObject.Children, currentVariable, diagnosticsPhase));
+            (elementBuilder, currentVariable) => AppendPreparationForObject(elementBuilder, elementObject.Children, currentVariable, diagnosticsPhase, applyDefaults));
         loopBuilder.AppendLine($"{rewrittenItemsVariable}.Add({elementCurrentVariable});");
 
         builder.AppendLine("}");
         collection.Renderer.AppendMaterialization(builder, collectionVariable, rewrittenItemsVariable);
     }
 
-    private bool HasPreparationWork(MutablePropertyRewriteContext rewriteContext)
+    private bool HasPreparationWork(MutablePropertyRewriteContext rewriteContext, bool applyDefaults)
     {
-        string? expression = CreatePreparedValueExpression(rewriteContext);
+        string? expression = CreatePreparedValueExpression(rewriteContext, applyDefaults);
         if (!string.IsNullOrEmpty(expression))
         {
             return true;
@@ -187,7 +187,7 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
             foreach (PropertyModel child in objectModel.Children)
             {
                 rewriteContext.SetProperty(child);
-                if (HasPreparationWork(rewriteContext))
+                if (HasPreparationWork(rewriteContext, applyDefaults))
                 {
                     return true;
                 }
@@ -199,7 +199,7 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
             foreach (PropertyModel child in elementObject.Children)
             {
                 rewriteContext.SetProperty(child);
-                if (HasPreparationWork(rewriteContext))
+                if (HasPreparationWork(rewriteContext, applyDefaults))
                 {
                     return true;
                 }
@@ -209,12 +209,15 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
         return false;
     }
 
-    private static string? CreatePreparedValueExpression(PropertyRewriteContext context)
+    private static string? CreatePreparedValueExpression(PropertyRewriteContext context, bool applyDefaults = true)
     {
         string? defaultExpression = null;
-        foreach (IPropertyDefaultAspect aspect in context.Property.Aspects<IPropertyDefaultAspect>())
+        if (applyDefaults)
         {
-            defaultExpression = aspect.RewriteDefaultAssignmentExpression(context, defaultExpression);
+            foreach (IPropertyDefaultAspect aspect in context.Property.Aspects<IPropertyDefaultAspect>())
+            {
+                defaultExpression = aspect.RewriteDefaultAssignmentExpression(context, defaultExpression);
+            }
         }
 
         string expression = defaultExpression ?? context.PropertyAccessExpression;

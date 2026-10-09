@@ -307,6 +307,21 @@ public sealed class ValidationPipelineRegressionTests : ModuleTestBase
     });
 
     [TestMethod]
+    public Task TestValidationAsync_OverrideIntroducedDefaultsResolveTypedExpressionsOnceAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        runtime.Environment.SetVariable("source", "resolved-late-default");
+        runtime.Environment.SetVariable("@validation.reference_with_ignored_default", new ValidationPipelineLateDefaultItem(Value: null!, Escaped: null!));
+
+        ValidationPipelineTestModule module = CreateValidModule() with { Name = "validation" };
+        IValidationResult<ValidationPipelineTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
+
+        MSAssert.IsTrue(result.IsValid);
+        MSAssert.AreEqual("resolved-late-default", result.Module.ReferenceWithIgnoredDefault.Value);
+        MSAssert.AreEqual("&{source}", result.Module.ReferenceWithIgnoredDefault.Escaped);
+    });
+
+    [TestMethod]
     public Task TestValidationAsync_DirectLazyStringIndirectionResolvesBeforeInterpolationAsync() => TestWithDIAsync(async services =>
     {
         IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();

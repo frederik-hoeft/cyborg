@@ -9,10 +9,17 @@ internal sealed class DefaultsSectionRenderer(ValidationContractInfo contractInf
 {
     public override void RenderSection(IndentedStringBuilder builder, ModuleModel model)
     {
+        AppendPass(builder, model, ModuleValidationRenderer.ApplyDefaultsAsync, applyDefaults: true);
+        builder.AppendLine();
+        AppendPass(builder, model, ModuleValidationRenderer.ApplyPreparationInvariantsAsync, applyDefaults: false);
+    }
+
+    private void AppendPass(IndentedStringBuilder builder, ModuleModel model, string methodName, bool applyDefaults)
+    {
         string qualifiedType = model.FullyQualifiedTypeName;
         builder.AppendBlock(
             $$"""
-            private async {{KnownTypes.ValueTaskOfT(qualifiedType)}} ApplyDefaultsAsync(
+            private async {{KnownTypes.ValueTaskOfT(qualifiedType)}} {{methodName}}(
                 {{ContractInfo.ModuleValidationContext.RenderGlobal()}} {{ContextVariable}},
                 {{KnownTypes.CancellationToken}} cancellationToken)
             {
@@ -22,7 +29,8 @@ internal sealed class DefaultsSectionRenderer(ValidationContractInfo contractInf
             """);
 
         builder = builder.IncreaseIndent();
-        PropertyPreparationRenderer.AppendPreparationForObject(builder, model.Properties, RootModuleVariable, diagnosticsPhase: "defaults");
+        PropertyPreparationRenderer.AppendPreparationForObject(builder, model.Properties, RootModuleVariable,
+            diagnosticsPhase: applyDefaults ? "defaults" : "preparation invariants", applyDefaults: applyDefaults);
         builder = builder.DecreaseIndent();
         builder.AppendBlock(
             $$"""

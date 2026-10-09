@@ -1,4 +1,4 @@
-﻿# Source Generators
+# Source Generators
 
 This document describes the Roslyn source generators in `Cyborg.Core.Aot`. The generator layer produces the compile-time code that makes the module system, validation pipeline, and decomposition model work without runtime reflection, enabling native AOT compilation and trim safety.
 
@@ -84,7 +84,7 @@ The generator is triggered by the `[GeneratedModuleValidation]` attribute on a `
 
 ### Generated Pipeline
 
-For each annotated record, the generator emits a partial record implementing `IModule<TModule>` and `IModuleDescriptor`. The validation pipeline consists of one public async validation method and four private async instance helpers:
+For each annotated record, the generator emits a partial record implementing `IModule<TModule>` and `IModuleDescriptor`. The validation pipeline consists of one public async validation method and five private async instance helpers:
 
 1. **`ApplyDefaultsAsync`** — Applies declared defaults and property-level preparation invariants through generated `with`-expressions. Default attributes (`[DefaultValue<T>]`, `[DefaultInstance]`, `[DefaultInstanceFactory]`, `[DefaultTimeSpan]`) replace null or zero-valued properties, while aspects such as `[Secret]` rewrite the effective value to re-establish destination metadata. The pass recurses into nested records marked `[Validatable]` and supported collection elements.
 
@@ -92,13 +92,15 @@ For each annotated record, the generator emits a partial record implementing `IM
 
 3. **`ResolveValueExpressionsAsync`** — Recursively rewrites textual properties and textual elements through `ModuleValidationContext.ResolveValueExpression(...)`. Whole-value `&{...}` / `*{...}` expressions are resolved while `${...}` templates are left for the interpolation phase. `[IgnoreValueExpression]` suppresses this stage for structural fields that were consumed before validation. `[IgnoreInterpolation]` does not suppress typed value expressions.
 
-4. **`ApplyInterpolationAsync`** — Recursively rewrites eligible `string` and `TaggedString` properties through `ModuleValidationContext.Interpolate(...)`, including values in nested `[Validatable]` records and supported collections. Tags union across interpolated operands. `[IgnoreInterpolation]` leaves a value untouched for later context-specific interpolation. `[Untagged]` suppresses the diagnostic that recommends migrating remaining string properties to `TaggedString`.
+4. **`ApplyPreparationInvariantsAsync`** — Re-applies property preparation invariants after typed references replace effective values, without selecting defaults again. This prevents newly introduced expression strings from requiring another evaluation pass, while ensuring `[Secret]` metadata remains intrinsic to its destination property.
 
-5. **`ValidateAsync`** — Creates one `ModuleValidationContext` from the runtime and service provider, orchestrates defaults → overrides → value expressions → defaults → interpolation → constraints, collects `ValidationError` instances, and returns `IValidationResult<TModule>` through the shared `ValidationResult.Valid(...)` / `Invalid(...)` factories. The second defaults pass re-establishes destination preparation invariants such as `[Secret]` after a typed expression replaces a value. Invalid generated results retain the fully prepared module so lifecycle hooks, debugger inspection, and diagnostics can observe the same state that would otherwise reach validation enforcement. Validation recurses into nested validatable records and supported collection elements.
+5. **`ApplyInterpolationAsync`** — Recursively rewrites eligible `string` and `TaggedString` properties through `ModuleValidationContext.Interpolate(...)`, including values in nested `[Validatable]` records and supported collections. Tags union across interpolated operands. `[IgnoreInterpolation]` leaves a value untouched for later context-specific interpolation. `[Untagged]` suppresses the diagnostic that recommends migrating remaining string properties to `TaggedString`.
+
+6. **`ValidateAsync`** — Creates one `ModuleValidationContext` from the runtime and service provider, orchestrates defaults → overrides → defaults → value expressions → preparation invariants → interpolation → constraints, collects `ValidationError` instances, and returns `IValidationResult<TModule>` through the shared `ValidationResult.Valid(...)` / `Invalid(...)` factories. The second defaults pass covers values injected by overrides before expression resolution; the final invariant-only pass restores destination metadata such as `[Secret]` without introducing unevaluated defaults. Invalid generated results retain the fully prepared module so lifecycle hooks, debugger inspection, and diagnostics can observe the same state that would otherwise reach validation enforcement. Validation recurses into nested validatable records and supported collection elements.
 
 The generated code uses `with`-expressions throughout, ensuring that each stage produces a new record instance and that the original deserialized module is never mutated.
 
-`ModuleValidationContext` is registered as a generator contract because the generated helpers are compiled into the consuming module assembly. The type is public at the CLR level for that cross-assembly call path, but it lives in an `Internal` namespace, is hidden from IntelliSense, and exposes the internal preparation primitives only to generated code. `IModule<TModule>` itself requires only `ValidateAsync(...)`; the four preparation helpers remain private implementation details of the generated partial record.
+`ModuleValidationContext` is registered as a generator contract because the generated helpers are compiled into the consuming module assembly. The type is public at the CLR level for that cross-assembly call path, but it lives in an `Internal` namespace, is hidden from IntelliSense, and exposes the internal preparation primitives only to generated code. `IModule<TModule>` itself requires only `ValidateAsync(...)`; the five preparation helpers remain private implementation details of the generated partial record.
 
 ### Processor Architecture
 
@@ -145,6 +147,7 @@ The validation generator renders one partial module declaration from a shared pr
 | `ApplyDefaultsAsync` | Apply declared defaults and preparation invariants recursively |
 | `ResolveOverridesAsync` | Select or resolve eligible runtime overrides recursively |
 | `ResolveValueExpressionsAsync` | Resolve whole-value typed expressions in textual properties and elements |
+| `ApplyPreparationInvariantsAsync` | Re-establish destination invariants without introducing more defaults |
 | `ApplyInterpolationAsync` | Interpolate eligible textual values recursively while preserving tags |
 | `ValidateAsync` | Orchestrate preparation and emit constraint checks |
 | `GetDescriptor` / `DescribeAsync` | Expose format-neutral identity and structural description |

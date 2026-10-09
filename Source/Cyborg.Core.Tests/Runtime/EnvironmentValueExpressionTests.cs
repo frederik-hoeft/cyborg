@@ -206,6 +206,32 @@ public sealed class EnvironmentValueExpressionTests : CyborgCoreTestBase
     });
 
     [TestMethod]
+    public void Publish_CapturedTerminalTextAndLazyReferencesPreserveTheirSemantics()
+    {
+        GlobalRuntimeEnvironment source = new(JsonNamingPolicy.SnakeCaseLower);
+        source.SetVariable("template", "${#name}");
+        source.SetVariable("name", "original");
+        source.SetVariable("captured", "*{template}");
+        source.SetVariable("lazy", "&{name}");
+        source.SetVariable("tagged_template", new TaggedString("${#name}", ["source-tag"]));
+        source.SetVariable("captured_tagged", "*{tagged_template}");
+
+        GlobalRuntimeEnvironment destination = new(JsonNamingPolicy.SnakeCaseLower);
+        destination.SetVariable("name", "updated");
+        destination.Publish(source);
+        destination.SetVariable("name", "later");
+        destination.Publish(destination); // A self-publication is a no-op, not a mutation while enumerating.
+
+        Assert.IsTrue(destination.TryResolveVariable("captured", out string? captured));
+        Assert.AreEqual("${name}", captured);
+        Assert.IsTrue(destination.TryResolveVariable("lazy", out string? lazy));
+        Assert.AreEqual("later", lazy);
+        Assert.IsTrue(destination.TryResolveVariable("captured_tagged", out TaggedString capturedTagged));
+        Assert.AreEqual("${name}", capturedTagged.Value);
+        Assert.IsTrue(capturedTagged.HasTag("source-tag"));
+    }
+
+    [TestMethod]
     public Task Test_KeyInterpolation_StillRejectsTypedFormsAsync() => TestWithDIAsync(services =>
     {
         IRuntimeEnvironment environment = Environment(services);

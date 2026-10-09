@@ -227,6 +227,23 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
+    /// <summary>
+    /// Copies stored values without passing them through public value enumeration or parsing. Captured values retain their terminal marker,
+    /// and ordinary expression strings remain unevaluated in the destination environment.
+    /// </summary>
+    internal void CopyStoredVariablesTo(EnvironmentLike destination)
+    {
+        ArgumentNullException.ThrowIfNull(destination);
+        if (ReferenceEquals(this, destination))
+        {
+            return;
+        }
+        foreach ((string key, object? value) in VariableStore)
+        {
+            destination.VariableStore.SetValue(key, value);
+        }
+    }
+
     private protected bool TryGetStoredVariable<T>(string name, bool shieldInterpolation, [NotNullWhen(true)] out T? value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);

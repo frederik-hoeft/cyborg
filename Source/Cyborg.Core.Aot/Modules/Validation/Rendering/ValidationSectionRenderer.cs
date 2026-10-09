@@ -31,10 +31,12 @@ internal sealed class ValidationSectionRenderer(ValidationContractInfo contractI
                 {{qualifiedType}} {{Variables.Module}} = await this.{{ModuleValidationRenderer.ApplyDefaultsAsync}}({{Variables.Context}}, cancellationToken);
                 // resolve any overrides that may have been applied to the module
                 {{Variables.Module}} = await {{Variables.Module}}.{{ModuleValidationRenderer.ResolveOverridesAsync}}({{Variables.Context}}, cancellationToken);
+                // apply defaults to values injected by overrides before evaluating any typed expressions
+                {{Variables.Module}} = await {{Variables.Module}}.{{ModuleValidationRenderer.ApplyDefaultsAsync}}({{Variables.Context}}, cancellationToken);
                 // resolve typed string value expressions before textual interpolation
                 {{Variables.Module}} = await {{Variables.Module}}.{{ModuleValidationRenderer.ResolveValueExpressionsAsync}}({{Variables.Context}}, cancellationToken);
-                // ensure that defaults and destination invariants are also applied to values injected during preparation
-                {{Variables.Module}} = await {{Variables.Module}}.{{ModuleValidationRenderer.ApplyDefaultsAsync}}({{Variables.Context}}, cancellationToken);
+                // typed references can replace values; re-establish destination invariants without introducing more defaults or expressions
+                {{Variables.Module}} = await {{Variables.Module}}.{{ModuleValidationRenderer.ApplyPreparationInvariantsAsync}}({{Variables.Context}}, cancellationToken);
                 // interpolate all string members against the runtime environment
                 {{Variables.Module}} = await {{Variables.Module}}.{{ModuleValidationRenderer.ApplyInterpolationAsync}}({{Variables.Context}}, cancellationToken);
                 {{KnownTypes.ListOfT(ContractInfo.ValidationError.RenderGlobal())}} {{Variables.Errors}} = [];

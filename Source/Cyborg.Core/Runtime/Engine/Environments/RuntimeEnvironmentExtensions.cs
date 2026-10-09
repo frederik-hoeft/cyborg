@@ -40,6 +40,11 @@ public static class RuntimeEnvironmentExtensions
         public void Publish(IEnvironmentLike other)
         {
             ArgumentNullException.ThrowIfNull(other);
+            if (other is EnvironmentLike source && environment is EnvironmentLike destination)
+            {
+                source.CopyStoredVariablesTo(destination);
+                return;
+            }
             foreach ((string key, object? value) in other)
             {
                 environment.SetVariable(key, value);

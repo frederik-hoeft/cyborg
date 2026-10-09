@@ -41,6 +41,8 @@ public sealed partial record ValidationPipelineTestModule
 
     public ValidationPipelineTestItem ReferenceItem { get; init; } = new("literal");
 
+    public ValidationPipelineLateDefaultItem ReferenceWithIgnoredDefault { get; init; } = new("original", "original");
+
     public ValidationPipelineTestItem? NullableReferenceItem { get; init; }
 
     public ValidationPipelineValueItem ValueItem { get; init; } = new("literal");

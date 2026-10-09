@@ -20,6 +20,8 @@ internal static class ModuleValidationRenderer
 
     public static string ApplyInterpolationAsync => "ApplyInterpolationAsync";
 
+    public static string ApplyPreparationInvariantsAsync => "ApplyPreparationInvariantsAsync";
+
     public static string ResolveOverridesAsync => "ResolveOverridesAsync";
 
     public static string ResolveValueExpressionsAsync => "ResolveValueExpressionsAsync";
