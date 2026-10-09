@@ -27,6 +27,7 @@ public sealed class TaggedStringModuleTests : ModuleTestBase
         IValidationResult<TaggedStringTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
 
         MSAssert.IsTrue(result.IsValid);
+        MSAssert.IsNull(result.Module.OptionalSecret);
         MSAssert.AreEqual("default-secret", result.Module.DefaultedSecret.Value);
         MSAssert.IsTrue(result.Module.DefaultedSecret.HasTag(WellKnownTags.SECRET));
     });

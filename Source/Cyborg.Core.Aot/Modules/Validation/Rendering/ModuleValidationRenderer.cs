@@ -34,6 +34,7 @@ internal static class ModuleValidationRenderer
         ReadOnlySpan<ISectionRenderer> renderPipeline =
         [
             new DefaultsSectionRenderer(contractInfo, visibilityContext, diagnosticsReporter),
+            new PreparationInvariantsSectionRenderer(contractInfo, visibilityContext, diagnosticsReporter),
             new OverrideSectionRenderer(contractInfo, visibilityContext, diagnosticsReporter),
             new ValueExpressionSectionRenderer(contractInfo, visibilityContext, diagnosticsReporter),
             new InterpolationSectionRenderer(contractInfo, visibilityContext, diagnosticsReporter),
