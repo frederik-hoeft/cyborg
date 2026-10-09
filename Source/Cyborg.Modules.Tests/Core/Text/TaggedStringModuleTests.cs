@@ -14,6 +14,24 @@ namespace Cyborg.Modules.Tests.Core.Text;
 public sealed class TaggedStringModuleTests : ModuleTestBase
 {
     [TestMethod]
+    public Task TestValidationAsync_SecretTaggingAfterDefaultsPreservesWhenPresentMatchingAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        TaggedStringTestModule module = new(
+            Plain: "visible",
+            Secret: "secret",
+            OptionalSecret: null,
+            IntentionallyUntagged: "id",
+            Values: []);
+
+        IValidationResult<TaggedStringTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
+
+        MSAssert.IsTrue(result.IsValid);
+        MSAssert.AreEqual("default-secret", result.Module.DefaultedSecret.Value);
+        MSAssert.IsTrue(result.Module.DefaultedSecret.HasTag(WellKnownTags.SECRET));
+    });
+
+    [TestMethod]
     public Task TestValidationAsync_SecretAttribute_InjectsSecretTagAsync() => TestWithDIAsync(async services =>
     {
         IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();

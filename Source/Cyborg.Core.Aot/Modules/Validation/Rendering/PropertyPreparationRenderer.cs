@@ -222,11 +222,14 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
 
         string expression = defaultExpression ?? context.PropertyAccessExpression;
         bool hasInvariantRewrite = false;
-        foreach (IPropertyPreparationAspect aspect in context.Property.Aspects<IPropertyPreparationAspect>())
+        if (!applyDefaults)
         {
-            string rewritten = aspect.RewritePreparedValueExpression(context, expression);
-            hasInvariantRewrite |= !string.Equals(rewritten, expression, StringComparison.Ordinal);
-            expression = rewritten;
+            foreach (IPropertyPreparationAspect aspect in context.Property.Aspects<IPropertyPreparationAspect>())
+            {
+                string rewritten = aspect.RewritePreparedValueExpression(context, expression);
+                hasInvariantRewrite |= !string.Equals(rewritten, expression, StringComparison.Ordinal);
+                expression = rewritten;
+            }
         }
 
         return defaultExpression is null && !hasInvariantRewrite ? null : expression;

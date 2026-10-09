@@ -203,7 +203,7 @@ After activation, the `ModuleWorker<TModule>` base class orchestrates the lifecy
 
 Before a worker's `ExecuteAsync` method is invoked, `ModuleWorker<TModule>` calls the source-generated `ValidateAsync` implementation on the module. The generated method orchestrates seven ordered phases:
 
-1. **Apply Defaults / Preparation Invariants** — Fills null or type-default properties from `[DefaultValue<T>]`, `[DefaultInstance]`, `[DefaultInstanceFactory]`, and `[DefaultTimeSpan]`, then applies property-level preparation invariants such as the intrinsic tag established by `[Secret]`. Preparation recurses into nested records marked with `[Validatable]` and supported collection elements.
+1. **Apply Defaults** — Fills null or type-default properties from `[DefaultValue<T>]`, `[DefaultInstance]`, `[DefaultInstanceFactory]`, and `[DefaultTimeSpan]`, without applying destination metadata invariants. Preparation recurses into nested records marked with `[Validatable]` and supported collection elements.
 
 2. **Resolve Overrides** — Substitutes eligible module properties from runtime environment variables using the override subsystem described in [Module Property Overrides](#module-property-overrides). Textual properties select the effective override without evaluating its contents, while non-text properties use typed resolution. `[IgnoreOverride]` suppresses replacement of the annotated property; its optional `recurse` constructor argument also suppresses descendants when `true`.
 
@@ -211,7 +211,7 @@ Before a worker's `ExecuteAsync` method is invoked, `ModuleWorker<TModule>` call
 
 4. **Resolve Typed Value Expressions** — Recursively resolves whole-value `&{...}` / `*{...}` expressions in `string` and `TaggedString` properties and textual collection elements. `${...}` templates are left untouched for the next textual phase. `[IgnoreInterpolation]` does not suppress this phase; `[IgnoreValueExpression]` exists for structural values such as `ModuleBase.Name` and `Group` that were consumed before validation began.
 
-5. **Reapply Preparation Invariants** — Restores destination-level invariants such as `[Secret]` after a typed reference replaces a property value. Unlike default assignment, this pass cannot introduce new expression strings after resolution.
+5. **Apply Preparation Invariants** — Establishes destination-level invariants such as `[Secret]` after a typed reference replaces a property value. Unlike default assignment, this pass cannot introduce new expression strings after resolution.
 
 6. **Interpolate Textual Values** — Recursively applies `runtime.Environment.Interpolate(...)` to eligible `string` and `TaggedString` values on the module, nested `[Validatable]` records, and supported collection elements. `[IgnoreInterpolation]` preserves `${...}` templates that require later context-specific interpolation. `ModuleBase.Name` and `ModuleBase.Group` also opt out because they establish structural identity before validation; `AssertModule.Message` is interpolated by its worker after the assertion child has executed so it can reference child artifacts.
 
@@ -456,7 +456,7 @@ Generated override preparation resolves module properties through `ModuleValidat
 4. Textual properties (`string` and `TaggedString`) select the raw stored override without evaluating its value expression. This preserves late-bound `${...}` templates and, for `TaggedString`, any tags attached to the selected value. Captured textual snapshots are shielded only against later phases that could otherwise reinterpret them. Non-text properties use typed resolution, including lazy `&{...}` indirection and eager `*{...}` snapshots, and collections use a collection-specific resolver before generated code materializes the declared collection shape. Collection capture is shallow; captured elements continue through normal destination preparation.
 5. The generated `ApplyDefaultsAsync` pass fills defaults for any remaining values introduced by overrides, including nested values whose own overrides are suppressed.
 6. The generated `ResolveValueExpressionsAsync` phase then visits textual values regardless of whether they came from configuration, defaults, or overrides. Whole-value `&{...}` / `*{...}` expressions resolve here; `${...}` remains textual input for the next phase.
-7. The generated `ApplyPreparationInvariantsAsync` pass re-establishes destination metadata such as `[Secret]`, but cannot introduce new defaults after expression resolution.
+7. The generated `ApplyPreparationInvariantsAsync` pass establishes destination metadata such as `[Secret]`, but cannot introduce new defaults after expression resolution.
 8. The generated `ApplyInterpolationAsync` phase recursively interpolates every eligible string, including strings inside nested records and collections. `[IgnoreInterpolation]` skips only this phase, so a `${...}` template remains available for worker-controlled interpolation while typed value expressions have already resolved.
 
 `[IgnoreOverride]`, `[IgnoreValueExpression]`, and `[IgnoreInterpolation]` control separate concerns. The first disables environment override selection for the annotated node, the second suppresses generated whole-value `&{...}` / `*{...}` preparation, and the third suppresses `${...}` interpolation. With the default `recurse: false`, `[IgnoreOverride]` still allows eligible descendants to resolve overrides; `recurse: true` suppresses the complete subtree.
@@ -469,7 +469,7 @@ The override subsystem supports any addressable property on the module, includin
 
 Override resolution is applied recursively within module properties, so a complex-typed property instance may have overrides applied to its own properties as well.
 
-The generated pipeline applies defaults before override resolution and again afterward, before the typed expression phase. Overrides must therefore produce values that satisfy the module's constraints, but they can also inject a type-default value to trigger the second defaulting pass. Intrinsic metadata such as `[Secret]` is re-applied after typed-reference resolution, without another default-assignment pass, so changing the value cannot declassify the destination property. Eligible textual values are then processed by the recursive interpolation phase before constraints are evaluated.
+The generated pipeline applies defaults before override resolution and again afterward, before the typed expression phase. Overrides must therefore produce values that satisfy the module's constraints, but they can also inject a type-default value to trigger the second defaulting pass. Intrinsic metadata such as `[Secret]` is applied after typed-reference resolution, without another default-assignment pass, so changing the value cannot declassify the destination property. Eligible textual values are then processed by the recursive interpolation phase before constraints are evaluated.
 
 #### Override Resolution Tags
 

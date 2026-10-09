@@ -16,5 +16,9 @@ public sealed partial record TaggedStringTestModule
     ImmutableArray<TaggedString> Values
 ) : ModuleBase, IModule
 {
+    [Secret]
+    [DefaultValue<string>("default-secret", "unset")]
+    public TaggedString DefaultedSecret { get; init; } = "unset";
+
     public static string ModuleId => "cyborg.test-modules.tagged-string.v1";
 }
