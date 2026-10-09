@@ -23,29 +23,16 @@ Module descriptions remain independent of debugger control. `IModuleDescriptionS
 
 Every runtime-owned module invocation carries a stable `ModuleExecutionId` and an optional parent execution ID. All runtime views that belong to the same invocation reuse that identity. Nested execution creates a child identity from the structured caller rather than inferring ancestry from a CLR thread, `AsyncLocal<T>`, or runtime-object discovery.
 
-The runtime exposes a general-purpose execution-lifecycle observer independently of module validation/pre/post hooks:
+The runtime exposes general-purpose lifecycle events independently of the module validation and execution hooks. An invocation progresses through the following boundaries in order, although validation failures and other early exits may prevent later execution stages from being reached:
 
-```mermaid
-flowchart TD
-    Scope["Invocation scope created"] --> Started["Started: execution identity and parent"]
-    Started --> Work["Environment, configuration, and main module work"]
-    Work --> Preparation["Generated preparation and validation"]
-    Preparation --> Validation["Validation hooks"]
-    Validation --> PreExecution["Pre-execution hooks: debugger may pause"]
-    PreExecution --> Enforce["Enforce validation"]
-    Enforce --> Worker["Worker execution"]
-    Worker --> PostExecution["Post-execution hooks"]
-    PostExecution --> Result{"Definite result?"}
-    Result -->|yes| Completed["Completed: record result"]
-    Result -->|no| Reconcile["Reconcile or discard transaction"]
-    Completed --> Reconcile
-    Reconcile --> Closed["Closed: joined or discarded"]
-    Closed --> Dispose["Dispose invocation scope"]
-```
+1. **Establish the invocation.** Create its transaction and DI scope, assign its execution identity and optional parent ID, and emit `Started` before any module preparation. This allows observers to see invocations that fail before the debugger's pre-execution boundary.
+2. **Prepare and validate.** Resolve the invocation environment, requirements, and any configuration module before preparing the main module through defaults, overrides, interpolation, constraint evaluation, and validation hooks.
+3. **Enter pre-execution hooks.** Give the debugger access to the prepared module and validation result before validity is enforced or the worker runs. A debugger cancellation can end the invocation without executing the worker.
+4. **Execute the module.** Enforce validation and, if execution proceeds, invoke the worker and post-execution hooks.
+5. **Complete and reconcile.** Emit `Completed` if a definite result exists, then reconcile the transaction under its publication policy. An invocation that ends without a definite result is discarded instead; no `Completed` event is emitted.
+6. **Close the invocation.** Emit `Closed` after reconciliation or discard, when the invocation leaves the live topology, and dispose its scope after its structured child work has terminated.
 
-`Started` is early enough to observe invocations that fail before the module pre-execution boundary. `Completed` records a definite module result while the invocation may still be structurally open, and `Closed` marks the point after reconciliation or discard when that invocation no longer belongs in a current-state execution topology. Lifecycle observers are isolated from workflow execution: an observer failure is logged and does not change the module result, reconciliation, or delivery to later observers.
-
-The workflow debugger itself participates through the normal pre-execution hook. The validation result carried into the debugger always contains the prepared module. Returning `Continue` resumes the normal lifecycle; returning `Cancel` lets the debugging hook produce a canceled module result without invoking the worker. `Step`, `Next`, and `Detach` are debugger control actions interpreted centrally by the workflow debugger rather than mutations performed by the frontend.
+Lifecycle-observer failures are logged without changing module results, transaction reconciliation, or delivery to other observers. The debugger participates through the normal pre-execution hook, but frontend actions are applied centrally by `WorkflowDebugger`: `Continue` resumes execution, `Cancel` produces a canceled result, and `Step`, `Next`, and `Detach` update debugger control without requiring the frontend to manipulate transactional state.
 
 ## Breakpoints and Branch-Scoped Stepping
 
@@ -82,23 +69,32 @@ The session generation fences branch control across `detach`. Detaching clears g
 
 ## Pause Coordination
 
-Parallel execution can decide to pause on several branches concurrently. Breakpoint matching and branch-step evaluation happen on the executing branch before frontend ownership is requested. Once a boundary has decided to pause, ordinary breakpoint mutation does not retroactively revoke that decision.
-
-`DebugPauseCoordinator` serializes frontend ownership with FIFO semantics:
+Parallel branches independently evaluate breakpoints and branch-control state at their prepared-module boundaries. Once a branch decides to pause, it requests exclusive frontend ownership; the pause remains visible in the live topology even if another branch currently owns the interactive session.
 
 ```mermaid
-flowchart TD
-    Decide["Branch decides to pause"] --> Paused["Mark invocation paused"]
-    Paused --> Admission["Queue or acquire frontend ownership"]
-    Admission --> Current["Mark active owner current"]
-    Current --> Frontend["Frontend session"]
-    Frontend --> Release["Release ownership"]
-    Release --> Resume["Restore running state; promote next valid pause"]
+sequenceDiagram
+    participant B as Executing branch
+    participant C as Pause coordinator
+    participant T as Live topology
+    participant F as Debug frontend
+
+    B->>C: Acquire pause lease
+    C->>T: Mark paused
+    opt Frontend occupied
+        Note over B,C: Wait in FIFO queue
+    end
+    C->>T: Mark current on admission
+    C-->>B: Lease granted
+    B->>F: Present pause
+    F-->>B: Resume action
+    B->>C: Release lease
+    C->>T: Restore running
+    Note over C: Admit next valid request
 ```
 
-Only one frontend session is active. Other decided pauses remain logically paused and visible in the execution topology while they wait. Admission and release share one coordinator synchronization boundary, so a pause arriving while another session resumes is either queued before release or acquires the newly free slot; it is not lost between a separate queue check and resume decision.
+The coordinator admits requests and releases frontend ownership under the same synchronization boundary, ensuring that a pause arriving during a resume cannot be lost between queue inspection and admission. At most one branch owns the frontend, while other paused branches continue to wait in FIFO order.
 
-Deleting a breakpoint does not un-pause a branch that already matched it. `Detach` has stronger semantics because it invalidates the debugger session itself: it clears global breakpoints, advances the session generation, clears the current branch's effective step and step-over state, and suppresses queued pauses that belong to the invalidated generation. Cancellation of a queued execution removes its queue request and restores its topology state without preventing later valid requests from acquiring the frontend.
+Removing a breakpoint cannot undo a pause already decided by a branch. `Detach` instead invalidates the debugger session, clearing global breakpoints and effective branch-control state while suppressing queued pauses from the old session generation. Cancellation of a queued execution removes that request and restores its running topology state without blocking later requests.
 
 ## Live Execution Topology
 

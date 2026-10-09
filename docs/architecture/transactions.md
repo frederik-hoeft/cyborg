@@ -8,58 +8,64 @@ Transactions cover workflow-semantic state owned by the runtime and by services 
 
 ## Execution Model
 
-Four relationships coexist during execution and serve different purposes:
+Cyborg maintains four distinct relationships during execution. They often describe the same set of invocations, but each answers a different question: who owns nested work, which workflow state is visible, how long services live, and where variables are resolved. Keeping these dimensions separate prevents execution identity, service lifetimes, and environment inheritance from implicitly determining transaction semantics.
 
-- **execution ownership** defines which invocation owns nested work and when that work must terminate;
-- **transaction ancestry** defines inherited workflow state, isolation, and reconciliation;
-- **DI scopes** define service-object lifetime and dependency resolution;
-- **environment topology** defines variable inheritance and named environment identity inside transactional state.
+| Dimension | Governs | Does not imply |
+|---|---|---|
+| Execution ownership | Nested work and structured termination | Shared workflow state |
+| Transaction ancestry | State inheritance, isolation, and reconciliation | DI scope nesting |
+| DI lifetimes | Service resolution and object lifetime | Transaction participation |
+| Environment topology | Variable inheritance and logical environment identity | Transaction ancestry |
 
-Execution ownership is represented by stable `ModuleExecutionId` values with explicit parent execution IDs. The identity follows the logical invocation across its runtime views, while transaction ancestry continues to define state inheritance and reconciliation. Neither relationship is inferred from CLR thread identity or ambient `ExecutionContext` propagation.
+### Execution ownership
+
+Runtime-owned invocations form a logical parent-child structure identified by stable `ModuleExecutionId` values and explicit parent execution IDs. This lets the runtime observe nested work, propagate cancellation, and require children to terminate before their owner closes, independently of CLR threads or ambient `ExecutionContext` propagation.
 
 ```mermaid
 flowchart LR
-    subgraph Execution[Execution ownership]
-        RootExec[Root execution]
-        ParentExec[Parent invocation]
-        ParallelExec[Parallel invocation]
-        BranchA[Branch A]
-        BranchB[Branch B]
-        RootExec --> ParentExec --> ParallelExec
-        ParallelExec --> BranchA
-        ParallelExec --> BranchB
-    end
-
-    subgraph Transactions[Transaction ancestry]
-        RootTx[Root transaction]
-        ParentTx[Parent transaction]
-        Fork[Fork group]
-        BranchTxA[Branch A transaction]
-        BranchTxB[Branch B transaction]
-        RootTx --> ParentTx --> Fork
-        Fork --> BranchTxA
-        Fork --> BranchTxB
-    end
-
-    subgraph DI[DI lifetimes]
-        Provider[Application provider]
-        ParentScope[Parent invocation scope]
-        BranchScopeA[Branch scope A]
-        BranchScopeB[Branch scope B]
-        Provider --> ParentScope
-        Provider --> BranchScopeA
-        Provider --> BranchScopeB
-    end
-
-    subgraph Environments[Environment topology]
-        GlobalEnv[Logical global environment]
-        ParentEnv[Parent environment]
-        ChildEnv[Inherited child environment]
-        GlobalEnv --> ParentEnv --> ChildEnv
-    end
+    Root["Root execution"] --> Parent["Parent invocation"] --> Parallel["Parallel invocation"]
+    Parallel --> A["Branch A"]
+    Parallel --> B["Branch B"]
 ```
 
-The diagram is only an ownership aid. Transaction ancestry is not inferred from DI scope nesting or runtime-object relationships, and environment inheritance is not the transaction tree.
+An invocation keeps the same identity across its runtime views, allowing lifecycle observers such as the debugger's live topology to follow execution without relying on the lifetime or structure of individual runtime objects.
+
+### Transaction ancestry
+
+Each nested invocation executes against an isolated child transaction. A fork group establishes a stable baseline for its contributors, and their changes become visible to the parent only through structured reconciliation; task scheduling cannot cause one sibling to observe another's unjoined writes.
+
+```mermaid
+flowchart LR
+    Root["Root transaction"] --> Parent["Parent transaction"] --> Fork["Fork group"]
+    Fork --> A["Branch A transaction"]
+    Fork --> B["Branch B transaction"]
+```
+
+Unlike execution ownership, this relationship describes state visibility rather than work lifetime. A fork also includes an owner continuation, which participates in reconciliation alongside its children; the full contribution model is described under [Fork Groups and Structured Ownership](#fork-groups-and-structured-ownership).
+
+### DI lifetimes
+
+The application provider supplies a fresh DI scope for each invocation, including concurrent branches. This isolates scoped service instances and ties their lifetime to their invocation, without requiring the scopes themselves to form a parent-child hierarchy.
+
+```mermaid
+flowchart LR
+    Provider["Application provider"] --> Parent["Parent invocation scope"]
+    Provider --> A["Branch A scope"]
+    Provider --> B["Branch B scope"]
+```
+
+A scoped service does not automatically receive transactional state semantics: services that need state inheritance and reconciliation explicitly participate through the transaction-aware service model described [below](#transaction-aware-di-services).
+
+### Environment topology
+
+Variable resolution follows logical environment identities and inheritance links stored within transactional state. An inherited environment can therefore resolve through a logical parent without sharing the parent's transaction or scoped service instances. A typical inheritance chain is:
+
+```mermaid
+flowchart LR
+    Global["Logical global environment"] --> Parent["Parent environment"] --> Child["Inherited child environment"]
+```
+
+The environment relationship depends on the requested scope: an invocation may inherit a parent or global environment, select an existing identity, or create an isolated one. Each root execution owns its own logical global environment, and this topology remains independent of transaction ancestry. See [Environment Scoping](architecture-overview.md#environment-scoping) for the available scope behaviors.
 
 ### Loaded graphs and worker activation
 
