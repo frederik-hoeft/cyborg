@@ -24,6 +24,59 @@ public sealed class EnvironmentValueExpressionTests : CyborgCoreTestBase
     });
 
     [TestMethod]
+    public void Test_TextResolution_PreservesSourceClrTypeThroughTypedReferences()
+    {
+        GlobalRuntimeEnvironment environment = new(JsonNamingPolicy.SnakeCaseLower);
+        environment.SetVariable("plain", "hello");
+        environment.SetVariable("source", new TaggedString("hello"));
+        environment.SetVariable("alias", "&{source}");
+        environment.SetVariable("snapshot", "*{source}");
+        environment.SetVariable("plain_alias", "&{plain}");
+        environment.SetVariable("plain_snapshot", "*{plain}");
+        environment.SetVariable("plain_template", "text: ${plain}");
+        environment.SetVariable("tagged_template", new TaggedString("text: ${plain}"));
+
+        Assert.IsTrue(environment.TryResolveVariable("plain", out object? plain));
+        Assert.AreEqual(typeof(string), plain!.GetType(), $"Plain: {plain.GetType().FullName}");
+        Assert.IsTrue(environment.TryResolveVariable("source", out object? original));
+        Assert.AreEqual(typeof(TaggedString), original!.GetType(), $"Original: {original.GetType().FullName}");
+        Assert.IsTrue(environment.TryResolveVariable("alias", out object? alias));
+        Assert.AreEqual(typeof(TaggedString), alias!.GetType(), $"Alias: {alias.GetType().FullName}");
+        Assert.IsTrue(environment.TryResolveVariable("snapshot", out object? captured));
+        Assert.AreEqual(typeof(TaggedString), captured!.GetType(), $"Captured: {captured.GetType().FullName}");
+        Assert.IsTrue(environment.TryResolveVariable("plain_alias", out object? plainAlias));
+        Assert.IsInstanceOfType<string>(plainAlias);
+        Assert.IsTrue(environment.TryResolveVariable("plain_snapshot", out object? plainSnapshot));
+        Assert.IsInstanceOfType<string>(plainSnapshot);
+        Assert.IsTrue(environment.TryResolveVariable("plain_template", out object? plainTemplate));
+        Assert.IsInstanceOfType<string>(plainTemplate);
+        Assert.AreEqual("text: hello", plainTemplate);
+        Assert.IsTrue(environment.TryResolveVariable("tagged_template", out object? taggedTemplate));
+        Assert.IsInstanceOfType<TaggedString>(taggedTemplate);
+        Assert.AreEqual("text: hello", ((TaggedString)taggedTemplate).Value);
+    }
+
+    [TestMethod]
+    public void Test_TextResolution_InterpolationPromotesToTaggedStringWhenOperandHasTags()
+    {
+        GlobalRuntimeEnvironment environment = new(JsonNamingPolicy.SnakeCaseLower);
+        environment.SetVariable("secret", new TaggedString("s3cret", [WellKnownTags.SECRET]));
+        environment.SetVariable("template", "prefix: ${secret}");
+        environment.SetVariable("alias", "&{template}");
+        environment.SetVariable("snapshot", "*{template}");
+
+        string[] variables = ["template", "alias", "snapshot"];
+        foreach (string name in variables)
+        {
+            Assert.IsTrue(environment.TryResolveVariable(name, out object? value));
+            Assert.IsInstanceOfType<TaggedString>(value);
+            TaggedString tagged = (TaggedString)value;
+            Assert.AreEqual("prefix: s3cret", tagged.Value);
+            Assert.IsTrue(tagged.HasTag(WellKnownTags.SECRET));
+        }
+    }
+
+    [TestMethod]
     public Task Test_LazyIndirection_PreservesTypeAndTracksLatestValueAsync() => TestWithDIAsync(services =>
     {
         IRuntimeEnvironment environment = Environment(services);

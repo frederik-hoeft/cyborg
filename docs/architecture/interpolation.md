@@ -60,6 +60,10 @@ This preserves forward references and entry-point-sensitive `${@...}` / `${@@}` 
 
 An exact `${port}` whose target is an `int` therefore becomes the text `"22"` (or whatever `ToString` produces). The integer is available only through `&{port}` or through a capture of `port`.
 
+For ordinary textual variables, resolution preserves the source CLR type: stored `string` values remain strings, and stored `TaggedString` values remain `TaggedString` even if they have no tags. When interpolation introduces tags from an operand, the result is promoted to `TaggedString`. Typed indirection and capture preserve that resulting type as well as any tags.
+
+When a required argument is resolved and subsequently bound into another environment, already-finalized text must not become a live expression on the second write. Argument binding therefore shields finalized expression syntax for that transfer, preserving the same logical value across the resolution and rebinding boundaries.
+
 ### 3. Module-property override selection
 
 Generated preparation separates override selection from value-expression evaluation:
@@ -139,7 +143,7 @@ Raw string selection and typed resolution use the same override lookup order:
 3. module ID;
 4. environment override-resolution tags, in order.
 
-The first matching override wins. A present override whose `&{...}` or `*{...}` target is undefined fails resolution instead of falling through to a less specific override. Separating raw selection from evaluation does not change precedence or path construction.
+The first matching override wins, including when its resolved value equals the module property's current value or is the same collection instance. Override presence is tracked independently from the resolved value and its terminal-evaluation state; a selected value does not fall through to an inherited environment's override merely because it compares equal. A present override whose `&{...}` or `*{...}` target is undefined fails resolution instead of falling through to a less specific override. Separating raw selection from evaluation does not change precedence or path construction.
 
 ## Examples
 

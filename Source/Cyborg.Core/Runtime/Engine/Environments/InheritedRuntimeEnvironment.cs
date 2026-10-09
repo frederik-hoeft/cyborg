@@ -116,45 +116,45 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
         return false;
     }
 
-    [return: NotNullIfNotNull(nameof(value))]
-    internal protected override IReadOnlyCollection<T>? ResolveCollectionCore<TModule, T>(
+    internal protected override bool TryResolveCollectionCore<TModule, T>(
         EnvironmentLike entryPoint,
         TModule module,
         IReadOnlyCollection<T>? value,
         string? moduleExpression,
-        string? valueExpression)
+        string? valueExpression,
+        [NotNullWhen(true)] out IReadOnlyCollection<T>? resolvedValue)
     {
-        IReadOnlyCollection<T>? resolvedValue = base.ResolveCollectionCore(entryPoint, module, value, moduleExpression, valueExpression);
-        if (resolvedValue is not null && !resolvedValue.Equals(value))
+        if (base.TryResolveCollectionCore(entryPoint, module, value, moduleExpression, valueExpression, out resolvedValue))
         {
-            return resolvedValue;
+            return true;
         }
         if (Parent is RuntimeEnvironment runtimeParent)
         {
-            return runtimeParent.ResolveCollectionCore(entryPoint, module, value, moduleExpression, valueExpression);
+            return runtimeParent.TryResolveCollectionCore(entryPoint, module, value, moduleExpression, valueExpression, out resolvedValue);
         }
-        return Parent.Resolve(module, value, moduleExpression, valueExpression);
+        resolvedValue = Parent.Resolve(module, value, moduleExpression, valueExpression);
+        return resolvedValue is not null;
     }
 
-    [return: NotNullIfNotNull(nameof(value))]
-    internal protected override T? ResolveCore<TModule, T>(
+    internal protected override bool TryResolveCore<TModule, T>(
         EnvironmentLike entryPoint,
         TModule module,
         T? value,
         string? moduleExpression,
         string? valueExpression,
+        [NotNullWhen(true)] out T? resolvedValue,
         out bool terminal) where T : default
     {
-        T? resolvedValue = base.ResolveCore(entryPoint, module, value, moduleExpression, valueExpression, out terminal);
-        if (terminal || (resolvedValue is not null && !resolvedValue.Equals(value)))
+        if (base.TryResolveCore(entryPoint, module, value, moduleExpression, valueExpression, out resolvedValue, out terminal))
         {
-            return resolvedValue;
+            return true;
         }
         if (Parent is RuntimeEnvironment runtimeParent)
         {
-            return runtimeParent.ResolveCore(entryPoint, module, value, moduleExpression, valueExpression, out terminal);
+            return runtimeParent.TryResolveCore(entryPoint, module, value, moduleExpression, valueExpression, out resolvedValue, out terminal);
         }
         terminal = true;
-        return Parent.Resolve(module, value, moduleExpression, valueExpression);
+        resolvedValue = Parent.Resolve(module, value, moduleExpression, valueExpression);
+        return resolvedValue is not null;
     }
 }

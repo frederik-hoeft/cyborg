@@ -23,7 +23,7 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         IReadOnlyCollection<T>? value,
         string moduleExpression,
         string valueExpression) =>
-        ResolveCollectionCore(this, module, value, moduleExpression, valueExpression);
+        TryResolveCollectionCore(this, module, value, moduleExpression, valueExpression, out IReadOnlyCollection<T>? selected) ? selected : value;
 
     string IRuntimeEnvironment.ResolveValueExpression(string value, bool willInterpolate) =>
         ResolveValueExpressionCore(value, willInterpolate);
@@ -34,13 +34,16 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
     TaggedString? IRuntimeEnvironment.ResolveValueExpression(TaggedString? value, bool willInterpolate) =>
         value is { } tagged ? ResolveValueExpressionCore(tagged, willInterpolate) : null;
 
-    [return: NotNullIfNotNull(nameof(value))]
-    internal protected virtual IReadOnlyCollection<T>? ResolveCollectionCore<TModule, T>(
+    /// <summary>
+    /// Reports a selected override (or completed parent resolution), independently of whether its value equals the configured collection.
+    /// </summary>
+    internal protected virtual bool TryResolveCollectionCore<TModule, T>(
         EnvironmentLike entryPoint,
         TModule module,
         IReadOnlyCollection<T>? value,
         string? moduleExpression,
-        string? valueExpression)
+        string? valueExpression,
+        [NotNullWhen(true)] out IReadOnlyCollection<T>? resolvedValue)
         where TModule : ModuleBase, IModuleDefinition
     {
         ArgumentNullException.ThrowIfNull(entryPoint);
@@ -54,27 +57,23 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
             {
                 continue;
             }
-            if (evaluation.Value is not IEnumerable resolvedValue)
+            if (evaluation.Value is not IEnumerable enumerable)
             {
                 throw new InvalidCastException($"Attempted to resolve variable '{overridePath}' as type {typeof(IEnumerable).FullName}, but it is of type {evaluation.Value.GetType().FullName}.");
             }
-            if (resolvedValue is IReadOnlyCollection<T> typedCollection)
-            {
-                value = typedCollection;
-                break;
-            }
-            value = resolvedValue.Cast<T>().ToImmutableArray();
-            break;
+            resolvedValue = enumerable is IReadOnlyCollection<T> typedCollection ? typedCollection : enumerable.Cast<T>().ToImmutableArray();
+            return true;
         }
 
-        return value;
+        resolvedValue = default;
+        return false;
     }
 
     [return: NotNullIfNotNull(nameof(value))]
     public virtual T? Resolve<TModule, T>(TModule module, T? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
         where TModule : ModuleBase, IModuleDefinition
     {
-        T? resolvedValue = ResolveCore(this, module, value, moduleExpression, valueExpression, out bool terminal);
+        T? resolvedValue = TryResolveCore(this, module, value, moduleExpression, valueExpression, out T? selected, out bool terminal) ? selected : value;
         if (terminal)
         {
             return resolvedValue;
@@ -92,13 +91,16 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         return resolvedValue;
     }
 
-    [return: NotNullIfNotNull(nameof(value))]
-    internal protected virtual T? ResolveCore<TModule, T>(
+    /// <summary>
+    /// Reports a selected override (or completed parent resolution). The terminal flag controls text evaluation, not override precedence.
+    /// </summary>
+    internal protected virtual bool TryResolveCore<TModule, T>(
         EnvironmentLike entryPoint,
         TModule module,
         T? value,
         string? moduleExpression,
         string? valueExpression,
+        [NotNullWhen(true)] out T? resolvedValue,
         out bool terminal) where TModule : ModuleBase, IModuleDefinition
     {
         ArgumentNullException.ThrowIfNull(entryPoint);
@@ -113,15 +115,16 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
             {
                 continue;
             }
-            if (!TryConvertResolvedValue(evaluation.Value, overridePath, notifyImplicitConversion: true, out T? resolvedValue))
+            if (!TryConvertResolvedValue(evaluation.Value, overridePath, notifyImplicitConversion: true, out resolvedValue))
             {
                 throw new InvalidCastException($"Attempted to resolve variable '{overridePath}' as type {typeof(T).FullName}, but it is of type {evaluation.Value.GetType().FullName}.");
             }
             terminal = evaluation.Terminal;
-            return resolvedValue;
+            return true;
         }
 
-        return value;
+        resolvedValue = default;
+        return false;
     }
 
     [return: NotNullIfNotNull(nameof(value))]

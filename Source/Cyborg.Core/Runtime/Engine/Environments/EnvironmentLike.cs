@@ -375,7 +375,7 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
             {
                 TaggedString template = wrapperTags is null ? new TaggedString(text) : new TaggedString(text, wrapperTags);
                 TaggedString interpolated = InterpolateString(context, template);
-                object result = interpolated.HasTags ? interpolated : interpolated.Value;
+                object result = wrapperTags is not null || interpolated.HasTags ? (object)interpolated : interpolated.Value;
                 evaluation = Evaluation.Of(result);
                 return true;
             }
