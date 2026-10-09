@@ -113,6 +113,8 @@ public sealed class DebugPauseCoordinatorTests
 
         public IReadOnlyList<IExecutionTreeNode> CaptureAncestry(ModuleExecutionId executionId) => [];
 
+        public bool IsOpenAncestor(ModuleExecutionId executionId, ModuleExecutionId ancestorId) => false;
+
         public ValueTask OnStartedAsync(IModuleExecutionStartedContext context, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
         public ValueTask OnCompletedAsync(IModuleExecutionCompletedContext context, CancellationToken cancellationToken) => ValueTask.CompletedTask;

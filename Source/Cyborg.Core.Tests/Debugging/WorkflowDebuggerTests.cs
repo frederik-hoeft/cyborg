@@ -88,6 +88,48 @@ public sealed class WorkflowDebuggerTests : CyborgCoreTestBase
     }, static services => services.AddSingleton<IDebugFrontend>(new ScriptedFrontend(DebugResumeAction.Cancel)));
 
     [TestMethod]
+    public Task Test_NextWithoutExecutionId_ClearsStepAndDoesNotArmStepOverAsync() => TestWithDIAsync(async services =>
+    {
+        IDebugBranchControl branchControl = services.GetRequiredService<IDebugBranchControl>();
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        IWorkflowDebugger debugger = services.GetRequiredService<IWorkflowDebugger>();
+        branchControl.Step();
+
+        DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(
+            ProbeModule.ModuleId,
+            ValidationResult.Valid(new ProbeModule { Name = "unanchored" }),
+            runtime,
+            services,
+            TestContext.CancellationToken);
+
+        Assert.AreEqual(DebugResumeAction.Continue, action);
+        Assert.IsFalse(branchControl.IsStepping);
+        Assert.IsNull(branchControl.StepOverAnchor);
+    }, static services => services.AddSingleton<IDebugFrontend>(new ScriptedFrontend(DebugResumeAction.Next)));
+
+    [TestMethod]
+    public Task Test_Cancel_ClearsPendingStepOverAsync() => TestWithDIAsync(async services =>
+    {
+        IDebugBranchControl branchControl = services.GetRequiredService<IDebugBranchControl>();
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        IWorkflowDebugger debugger = services.GetRequiredService<IWorkflowDebugger>();
+        IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
+        branchControl.Next(new ModuleExecutionId(Guid.NewGuid()));
+        breakpoints.Add(".*");
+
+        DebugResumeAction action = await debugger.EvaluatePreExecutionAsync(
+            ProbeModule.ModuleId,
+            ValidationResult.Valid(new ProbeModule()),
+            runtime,
+            services,
+            TestContext.CancellationToken);
+
+        Assert.AreEqual(DebugResumeAction.Cancel, action);
+        Assert.IsFalse(branchControl.IsStepping);
+        Assert.IsNull(branchControl.StepOverAnchor);
+    }, static services => services.AddSingleton<IDebugFrontend>(new ScriptedFrontend(DebugResumeAction.Cancel)));
+
+    [TestMethod]
     public Task Test_StepAction_UsesBranchControlWithoutRegisteringWildcardBreakpointAsync() => TestWithDIAsync(
         assertion: async services =>
         {
@@ -323,9 +365,25 @@ public sealed class WorkflowDebuggerTests : CyborgCoreTestBase
     {
         public bool IsStepping { get; private set; }
 
-        public void Step() => IsStepping = true;
+        public ModuleExecutionId? StepOverAnchor { get; private set; }
 
-        public void Continue() => IsStepping = false;
+        public void Step()
+        {
+            IsStepping = true;
+            StepOverAnchor = null;
+        }
+
+        public void Next(ModuleExecutionId anchor)
+        {
+            IsStepping = false;
+            StepOverAnchor = anchor;
+        }
+
+        public void Continue()
+        {
+            IsStepping = false;
+            StepOverAnchor = null;
+        }
     }
 
     private sealed record ProbeModule : ModuleBase, IModule

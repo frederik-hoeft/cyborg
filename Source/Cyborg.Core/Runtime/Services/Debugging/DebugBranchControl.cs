@@ -1,16 +1,18 @@
+using Cyborg.Core.Runtime.Engine;
 using Cyborg.Core.Runtime.Services.Transactions;
 
 namespace Cyborg.Core.Runtime.Services.Debugging;
 
 internal sealed class DebugBranchControl : IDebugBranchControl
 {
-    private readonly IDebugSessionState _sessionState;
+    private readonly IDebugSessionStateController _sessionState;
     private readonly ITransactionalServiceState<DebugBranchControlState> _state;
 
     public DebugBranchControl(ITransactionalServiceContext context, IDebugSessionState sessionState)
     {
         ArgumentNullException.ThrowIfNull(context);
-        _sessionState = sessionState ?? throw new ArgumentNullException(nameof(sessionState));
+        _sessionState = sessionState as IDebugSessionStateController
+            ?? throw new ArgumentException("The debugger session service must expose controller operations.", nameof(sessionState));
         _state = context.GetState<DebugBranchControlParticipant, DebugBranchControlState>();
     }
 
@@ -18,24 +20,41 @@ internal sealed class DebugBranchControl : IDebugBranchControl
     {
         get
         {
-            BranchControlSnapshot snapshot = _state.Read(static state => new BranchControlSnapshot(state.SessionGeneration, state.IsStepping));
+            BranchControlSnapshot snapshot = Read();
             return snapshot.IsStepping && snapshot.SessionGeneration == _sessionState.Generation;
         }
     }
 
-    public void Step() => SetStepping(isStepping: true);
-
-    public void Continue() => SetStepping(isStepping: false);
-
-    private void SetStepping(bool isStepping)
+    public ModuleExecutionId? StepOverAnchor
     {
-        long generation = _sessionState.Generation;
+        get
+        {
+            BranchControlSnapshot snapshot = Read();
+            return snapshot.SessionGeneration == _sessionState.Generation ? snapshot.StepOverAnchor : null;
+        }
+    }
+
+    public void Step() => SetExecutionControl(isStepping: true, stepOverAnchor: null);
+
+    public void Next(ModuleExecutionId anchor) => SetExecutionControl(isStepping: false, stepOverAnchor: anchor);
+
+    public void Continue() => SetExecutionControl(isStepping: false, stepOverAnchor: null);
+
+    private BranchControlSnapshot Read() =>
+        _state.Read(static state => new BranchControlSnapshot(state.SessionGeneration, state.IsStepping, state.StepOverAnchor));
+
+    private void SetExecutionControl(bool isStepping, ModuleExecutionId? stepOverAnchor)
+    {
+        long sessionGeneration = _sessionState.Generation;
+        long commandSequence = _sessionState.AdvanceControlCommandSequence();
         _state.Mutate(state =>
         {
-            state.SessionGeneration = generation;
+            state.SessionGeneration = sessionGeneration;
+            state.ControlCommandSequence = commandSequence;
             state.IsStepping = isStepping;
+            state.StepOverAnchor = stepOverAnchor;
         });
     }
 
-    private readonly record struct BranchControlSnapshot(long SessionGeneration, bool IsStepping);
+    private readonly record struct BranchControlSnapshot(long SessionGeneration, bool IsStepping, ModuleExecutionId? StepOverAnchor);
 }

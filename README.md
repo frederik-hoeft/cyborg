@@ -110,7 +110,7 @@ cyborg run -e target=daily --config 'cyborg.services.logging.minimum_level:cybor
 cyborg run -e target=daily --break-at 'my-step-name'
 ```
 
-When `--break-at` is set, execution pauses after the matching module has been prepared and its constraints evaluated, but before validation is enforced and before the worker runs. With the `console` frontend selected, the debug REPL supports `continue`, `step`, `inspect`, breakpoint management, and `cancel`. See [Workflow Debugging](docs/architecture/debugging.md).
+When `--break-at` is set, execution pauses after the matching module has been prepared and its constraints evaluated, but before validation is enforced and before the worker runs. With the `console` frontend selected, the debug REPL supports `continue`, `step`, `next`, `inspect`, breakpoint management, and `cancel`. See [Workflow Debugging](docs/architecture/debugging.md).
 
 The `target` environment variable selects which job to run (e.g., `daily`, `weekly`). Additional environment variables can be injected via `-e` with optional type annotations (e.g., `-e port:int=2222`). Host configuration can be overridden with `-c` / `--config` using `key[:type]=value`. Configuration hierarchy uses dots, while the optional single-colon suffix identifies a registered dynamic value provider. Untyped values are literal strings; typed values are parsed as JSON. Multiple definitions use the option's array input: comma-separated definitions are convenient for simple values, while JSON-array syntax preserves definitions that themselves contain commas. Structured typed inputs are decomposed into their leaf keys before entering the configuration store.
 

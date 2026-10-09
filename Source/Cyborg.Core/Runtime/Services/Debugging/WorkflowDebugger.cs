@@ -35,7 +35,9 @@ internal sealed class WorkflowDebugger(
 
         IDebugBranchControl branchControl = services.GetRequiredService<IDebugBranchControl>();
         bool stepping = branchControl.IsStepping;
-        if (!stepping && breakpoints.Count == 0)
+        ModuleExecutionId? executionId = (runtime as IModuleExecutionRuntime)?.InvocationContext?.ExecutionId;
+        bool stepOverPause = IsStepOverPause(branchControl.StepOverAnchor, executionId);
+        if (!stepping && !stepOverPause && breakpoints.Count == 0)
         {
             return DebugResumeAction.Continue;
         }
@@ -48,7 +50,7 @@ internal sealed class WorkflowDebugger(
             evaluationResult = breakpoints.EvaluateAndConsume(in breakpointContext);
         }
 
-        if (!stepping && !evaluationResult.ShouldPause)
+        if (!stepping && !stepOverPause && !evaluationResult.ShouldPause)
         {
             return DebugResumeAction.Continue;
         }
@@ -60,7 +62,6 @@ internal sealed class WorkflowDebugger(
 
         cancellationToken.ThrowIfCancellationRequested();
         long sessionGeneration = _sessionState.Generation;
-        ModuleExecutionId? executionId = (runtime as IModuleExecutionRuntime)?.InvocationContext?.ExecutionId;
         using DebugPauseLease? pauseLease = await _pauseCoordinator
             .AcquireAsync(executionId, sessionGeneration, cancellationToken)
             .ConfigureAwait(false);
@@ -86,12 +87,36 @@ internal sealed class WorkflowDebugger(
             evaluationResult.Diagnostics,
             topology);
 
-        LogPause(pauseContext, evaluationResult, stepping);
+        LogPause(pauseContext, evaluationResult, stepping, stepOverPause);
         DebugResumeAction action = await frontend.PauseAsync(pauseContext, cancellationToken).ConfigureAwait(false);
-        return ApplyResumeAction(action, branchControl);
+        return ApplyResumeAction(action, branchControl, executionId);
     }
 
-    private DebugResumeAction ApplyResumeAction(DebugResumeAction action, IDebugBranchControl branchControl)
+    private bool IsStepOverPause(ModuleExecutionId? stepOverAnchor, ModuleExecutionId? executionId)
+    {
+        if (stepOverAnchor is not { } anchor)
+        {
+            return false;
+        }
+
+        // A boundary we cannot place in the execution tree is outside every anchored subtree.
+        if (executionId is not { } current)
+        {
+            return true;
+        }
+
+        if (topology is not IDebugExecutionTopologyController controller)
+        {
+            throw new InvalidOperationException("Step-over requires an execution topology that can resolve open ancestors.");
+        }
+
+        return !controller.IsOpenAncestor(current, anchor);
+    }
+
+    private DebugResumeAction ApplyResumeAction(
+        DebugResumeAction action,
+        IDebugBranchControl branchControl,
+        ModuleExecutionId? executionId)
     {
         switch (action)
         {
@@ -100,6 +125,18 @@ internal sealed class WorkflowDebugger(
                 return DebugResumeAction.Continue;
             case DebugResumeAction.Step:
                 branchControl.Step();
+                return DebugResumeAction.Continue;
+            case DebugResumeAction.Next:
+                // Step-over is anchored at this invocation. Without an id there is no subtree to skip
+                // and no later boundary that can recognize the anchor, so do not fall through to step-into.
+                if (executionId is { } anchor)
+                {
+                    branchControl.Next(anchor);
+                }
+                else
+                {
+                    branchControl.Continue();
+                }
                 return DebugResumeAction.Continue;
             case DebugResumeAction.Cancel:
                 branchControl.Continue();
@@ -114,7 +151,7 @@ internal sealed class WorkflowDebugger(
         }
     }
 
-    private void LogPause(DebugPauseContext pauseContext, BreakpointEvaluationResult evaluationResult, bool stepping)
+    private void LogPause(DebugPauseContext pauseContext, BreakpointEvaluationResult evaluationResult, bool stepping, bool stepOverPause)
     {
         if (evaluationResult.Status is BreakpointEvaluationStatus.Match)
         {
@@ -137,6 +174,12 @@ internal sealed class WorkflowDebugger(
         if (stepping)
         {
             _logger.LogStepPause(pauseContext.GetModuleIdentity());
+            return;
+        }
+
+        if (stepOverPause)
+        {
+            _logger.LogNextPause(pauseContext.GetModuleIdentity());
         }
     }
 }

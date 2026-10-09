@@ -1,3 +1,4 @@
+using Cyborg.Core.Runtime.Engine;
 using Cyborg.Core.Runtime.Services.Transactions;
 using System.Diagnostics.CodeAnalysis;
 
@@ -6,9 +7,12 @@ namespace Cyborg.Core.Runtime.Services.Debugging;
 internal sealed class DebugBranchControlFork(DebugBranchControlState ownerState) : TransactionalServiceFork<DebugBranchControlState>
 {
     private readonly long _sessionGeneration = ownerState?.SessionGeneration ?? throw new ArgumentNullException(nameof(ownerState));
+    private readonly long _controlCommandSequence = ownerState.ControlCommandSequence;
     private readonly bool _isStepping = ownerState.IsStepping;
+    private readonly ModuleExecutionId? _stepOverAnchor = ownerState.StepOverAnchor;
 
-    public override DebugBranchControlState CreateBranch() => new(_sessionGeneration, _isStepping);
+    public override DebugBranchControlState CreateBranch() =>
+        new(_sessionGeneration, _isStepping, _stepOverAnchor, _controlCommandSequence);
 
     public override bool TryPrepareMerge(
         IReadOnlyList<DebugBranchControlState> contributors,
@@ -19,36 +23,54 @@ internal sealed class DebugBranchControlFork(DebugBranchControlState ownerState)
         ArgumentNullException.ThrowIfNull(conflictResolver);
         if (contributors.Count == 0)
         {
-            throw new InvalidOperationException("Debugger branch-control reconciliation requires at least the owner continuation contributor.");
+            throw new InvalidOperationException("Debugger branch-control reconciliation requires at least one contributor.");
         }
 
-        // Contributor 0 starts as the pre-fork owner continuation. When children exist, that untouched
-        // copy must not resurrect stepping after every child explicitly continued. A continuation whose
-        // generation or step flag differs from the fork baseline is a decision made while the fork was
-        // open, and it participates like any other contributor.
-        bool continuationChanged = contributors.Count > 1
-            && (contributors[0].SessionGeneration != _sessionGeneration || contributors[0].IsStepping != _isStepping);
-        int firstContributor = contributors.Count > 1 && !continuationChanged ? 1 : 0;
-        long newestGeneration = contributors[firstContributor].SessionGeneration;
-        for (int i = firstContributor + 1; i < contributors.Count; i++)
+        long newestSessionGeneration = contributors[0].SessionGeneration;
+        for (int i = 1; i < contributors.Count; i++)
         {
-            newestGeneration = Math.Max(newestGeneration, contributors[i].SessionGeneration);
+            newestSessionGeneration = Math.Max(newestSessionGeneration, contributors[i].SessionGeneration);
         }
 
-        // Session invalidation is global and may occur while a fork is open. Only contributors from
-        // the newest represented generation may restore step state; older generations are stale.
-        bool isStepping = false;
-        for (int i = firstContributor; i < contributors.Count; i++)
+        DebugBranchControlState? selected = null;
+        long latestCommandSequence = long.MinValue;
+        for (int i = 0; i < contributors.Count; i++)
         {
             DebugBranchControlState contributor = contributors[i];
-            if (contributor.SessionGeneration == newestGeneration && contributor.IsStepping)
+            if (contributor.SessionGeneration != newestSessionGeneration)
             {
-                isStepping = true;
-                break;
+                continue;
             }
+            if (contributor.ControlCommandSequence < latestCommandSequence)
+            {
+                continue;
+            }
+            if (contributor.ControlCommandSequence == latestCommandSequence)
+            {
+                if (selected is not null && !HasEquivalentControlState(selected, contributor))
+                {
+                    throw new InvalidOperationException("Debugger branch-control contributors with the same command sequence have divergent control state.");
+                }
+                continue;
+            }
+
+            selected = contributor;
+            latestCommandSequence = contributor.ControlCommandSequence;
         }
 
-        candidate = new DebugBranchControlState(newestGeneration, isStepping);
+        if (selected is null)
+        {
+            throw new InvalidOperationException("Debugger branch-control reconciliation found no contributor in the newest session generation.");
+        }
+
+        candidate = new DebugBranchControlState(
+            newestSessionGeneration,
+            selected.IsStepping,
+            selected.StepOverAnchor,
+            selected.ControlCommandSequence);
         return true;
     }
+
+    private static bool HasEquivalentControlState(DebugBranchControlState first, DebugBranchControlState second) =>
+        first.IsStepping == second.IsStepping && first.StepOverAnchor == second.StepOverAnchor;
 }
