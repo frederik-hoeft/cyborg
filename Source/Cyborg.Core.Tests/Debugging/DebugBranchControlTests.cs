@@ -194,6 +194,48 @@ public sealed class DebugBranchControlTests : CyborgCoreTestBase
     }
 
     [TestMethod]
+    public void SessionInvalidation_AllStaleForkInAnotherRuntimeStillJoinsWithoutRestoringControl()
+    {
+        DebugControlHarness harness = new();
+        IDebugBranchControl detachingControl = harness.CreateControl(harness.Root);
+        detachingControl.Step();
+
+        // Both independent roots share the debugger session, but not their transactional branch state.
+        ModuleTransaction otherRoot = new TransactionCoordinator(harness.Services.Participants).CreateRoot();
+        IDebugBranchControl otherControl = harness.CreateControl(otherRoot);
+        ModuleExecutionId anchor = new(Guid.NewGuid());
+        otherControl.Next(anchor);
+        ModuleTransactionForkGroup fork = otherRoot.Fork();
+        ModuleTransaction first = fork.CreateChild();
+        ModuleTransaction second = fork.CreateChild();
+        fork.Continuation.Complete();
+        IDebugBranchControl firstControl = harness.CreateControl(first);
+        IDebugBranchControl secondControl = harness.CreateControl(second);
+        long staleGeneration = harness.Session.Generation;
+
+        Assert.AreEqual(anchor, firstControl.StepOverAnchor);
+        Assert.AreEqual(anchor, secondControl.StepOverAnchor);
+
+        // Detach in the first runtime. No branch of the other runtime receives a new command.
+        long currentGeneration = harness.Session.Invalidate();
+        detachingControl.Continue();
+        Assert.IsGreaterThan(staleGeneration, currentGeneration);
+        Assert.IsNull(firstControl.StepOverAnchor);
+        Assert.IsNull(secondControl.StepOverAnchor);
+
+        first.Complete();
+        second.Complete();
+        Assert.IsTrue(fork.TryJoin(out TransactionConflict? conflict));
+        DebugBranchControlState merged = harness.Services.GetState<DebugBranchControlParticipant, DebugBranchControlState>(otherRoot);
+
+        Assert.IsNull(conflict);
+        Assert.AreEqual(staleGeneration, merged.SessionGeneration);
+        Assert.AreEqual(anchor, merged.StepOverAnchor);
+        Assert.IsFalse(otherControl.IsStepping);
+        Assert.IsNull(otherControl.StepOverAnchor);
+    }
+
+    [TestMethod]
     public void SessionInvalidation_NewGenerationContinueDominatesStaleSteppingSiblingAtJoin()
     {
         DebugControlHarness harness = new();
