@@ -144,12 +144,17 @@ Opening a fork group captures one stable effective baseline for every contributo
 
 Contributor order is structural:
 
-```text
-fork baseline
-  +-- contributor 0: owner continuation
-  +-- contributor 1: child A
-  +-- contributor 2: child B
-  +-- ...
+```mermaid
+flowchart TD
+    Baseline["Stable fork baseline"]
+    Continuation["Contributor 0: owner continuation"]
+    A["Contributor 1: child A"]
+    B["Contributor 2: child B"]
+    More["Contributor N: further children"]
+    Baseline --> Continuation
+    Baseline --> A
+    Baseline --> B
+    Baseline --> More
 ```
 
 All contributors start from the same baseline. Siblings cannot observe each other's changes, and they cannot observe continuation changes before reconciliation. Task-completion timing therefore cannot change visibility or contributor ordering.
@@ -173,7 +178,7 @@ The built-in participants are:
 
 Participant boundaries follow state semantics rather than runtime ownership. Unrelated concerns remain separate because the coordinator already provides aggregate atomic publication. A composite participant is appropriate only when preparing a valid candidate for one part intrinsically depends on the candidate state of another part. The environment subsystem uses this pattern because binding lifetime depends on the reconciled environment graph; the named-module registry remains separate because its state is independent. Successful semantics must not depend on participant registration or preparation order because participants cannot publish owner-visible state during preparation.
 
-The debugger participant carries execution-control state rather than module data. Its merge is deliberately conflict-free: every fork contributor inherits the same branch-control state and control-command sequence, while each explicit `step`, `next`, or `continue` command receives a newer monotonic sequence. At join, only contributors from the newest debugger-session generation are considered, and the contributor with the highest command sequence supplies the restored parent control state. The continuation and child branches have no debugger-specific precedence; contributor creation order is irrelevant. Equal command sequences represent the same inherited control decision. `detach` advances the separate session generation, fencing all older branch state before the current branch is cleared.
+The debugger participant carries execution-control state rather than module data. Its merge is deliberately conflict-free: every fork contributor inherits the same branch-control state and control-command sequence, while each explicit `step`, `next`, or `continue` command receives a newer monotonic sequence. At join, only contributors from the newest debugger-session generation are considered, and the contributor with the highest command sequence supplies the restored parent control state. The continuation and child branches have no debugger-specific precedence; contributor creation order is irrelevant. Equal command sequences represent the same inherited control decision. Equal command sequences denote identical inherited control state; disagreement indicates an internal invariant violation. `detach` advances the separate session generation, fencing all older branch state before the current branch is cleared.
 
 ### Prepare, then publish
 
@@ -221,17 +226,7 @@ Runtime environments are logical transaction-owned state, not mutable CLR object
 
 The environment participant owns two closely related concerns:
 
-```text
-environment participant
-  graph/topology
-    logical environment nodes
-    inheritance relationships
-    named registrations
-    logical global environment
-
-  bindings
-    (environment identity, variable path) -> value / removal
-```
+The environment graph records logical nodes, their inheritance relationships, named registrations, and the execution's global environment, while bindings map each `(environment identity, variable path)` to a value or removal. Both are owned by the same participant.
 
 Graph and binding state are reconciled together because topology determines which newly created environment identities remain reachable after a join. This is an intrinsic dependency within one transactional subsystem, not a general rule that related runtime state should be merged into one participant.
 
@@ -289,11 +284,7 @@ For the module's JSON contract and exit-status aggregation rules, see [Module Re
 
 `ExecuteConcurrentlyAsync` is the fixed join used by `Parallel`: every child starts before any result is returned, and the continuation is empty. Some callers need the same fork while the owning invocation keeps running. `IModuleRuntime.OpenConcurrentExecution` opens that scope.
 
-```text
-fork baseline
-  +-- contributor 0: owner continuation, still active
-  +-- contributor 1..N: children started individually
-```
+Like the fork group above, the concurrent execution scope starts all contributors from one baseline. Its owner continuation (contributor 0) remains active while the child contributors are started individually.
 
 `StartAsync` runs one ordinary nested invocation and returns a handle whose result can be awaited before the scope closes. A structural failure before the child has a definite result faults that completion task; a failure while establishing the child aborts the scope because its fork can no longer join normally. `Cancel` cancels that child only. The runtime does not rank children or interpret exit status. Sidecar lifetime, and any later policy of the same shape, stays in the module that opened the scope.
 
