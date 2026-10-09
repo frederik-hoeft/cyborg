@@ -35,9 +35,12 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
             sb.Append(valueSpan[currentIndex..match.Index]);
             ReadOnlySpan<char> variableSlice = valueSpan.Slice(match.Index, match.Length);
             string expression = variableSlice[2..^1].ToString();
-            if (TryParseVariableReference(expression, out VariableReference reference) && TryResolveVariableReference(context, reference, out object? resolvedValue))
+            if (TryParseVariableReference(expression, out VariableReference reference) && TryResolveVariableReference(context, reference, out Evaluation resolved))
             {
-                AppendResolvedInterpolationValue(sb, tags, resolvedValue);
+                object? splice = resolved.Terminal && resolved.Value is not null
+                    ? ExpressionShield.ShieldText(resolved.Value)
+                    : resolved.Value;
+                AppendResolvedInterpolationValue(sb, tags, splice);
             }
             else
             {
@@ -93,59 +96,33 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         return builder.ToString();
     }
 
-    protected virtual bool TryResolveIndirectionCandidate<T>(ResolutionContext context, string name, [NotNullWhen(true)] out T? value)
+    internal protected virtual bool TryResolveVariableInCurrentScopeCore(ResolutionContext context, out Evaluation evaluation)
     {
         ArgumentNullException.ThrowIfNull(context);
-        ArgumentNullException.ThrowIfNull(name);
-        if (name.StartsWith('$') && SyntaxFactory.IndirectionRegex.Match(name) is { Success: true } match)
-        {
-            string expression = match.Groups["expression"].Value;
-            if (TryParseVariableReference(expression, out VariableReference reference))
-            {
-                return TryResolveVariableReference(context, reference, out value);
-            }
-        }
-        value = default;
-        return false;
-    }
-
-    protected virtual bool TryResolveVariableInCurrentScopeCore(ResolutionContext context, [NotNullWhen(true)] out object? value)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        // handle self-reference
         if (context.Name.Equals(SyntaxFactory.Self(), StringComparison.Ordinal))
         {
-            value = Namespace;
+            evaluation = Evaluation.Of(Namespace);
             return true;
         }
-        if (VariableStore.TryGetValue(context.Name, out object? objValue))
+        if (VariableStore.TryGetValue(context.Name, out object? objValue) && objValue is not null)
         {
+            if (objValue is CapturedValue captured)
+            {
+                evaluation = Evaluation.TerminalValue(captured.Value);
+                return captured.Value is not null;
+            }
             if (objValue is TaggedString tagged)
             {
-                if (TryResolveIndirectionCandidate(context, tagged.Value, out object? redirected))
-                {
-                    value = UnionResolvedValue(redirected, tagged.Tags);
-                    return true;
-                }
-                value = InterpolateString(context, tagged);
-                return true;
+                return TryEvaluateStoredText(context, tagged.Value, tagged.Tags, out evaluation);
             }
-            // might need to resolve indirection via string variables, e.g. var1 = "${var2}", var2 = "actual_value"
-            if (objValue is string s && TryResolveIndirectionCandidate(context, s, out value))
+            if (objValue is string text)
             {
-                return true;
+                return TryEvaluateStoredText(context, text, wrapperTags: null, out evaluation);
             }
-            // handle interpolation within string variables, e.g. var1 = "Value is ${var2}", var2 = "actual_value"
-            if (objValue is string stringValue)
-            {
-                TaggedString interpolated = InterpolateString(context, stringValue);
-                value = interpolated.HasTags ? interpolated : interpolated.Value;
-                return true;
-            }
-            value = objValue;
-            return value is not null;
+            evaluation = Evaluation.Of(objValue);
+            return true;
         }
-        value = default;
+        evaluation = default;
         return false;
     }
 
@@ -163,32 +140,17 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
     internal protected virtual bool TryGetStoredVariableRecursiveCore(string name, [NotNullWhen(true)] out object? value) =>
         TryGetStoredVariableInCurrentScopeCore(name, out value);
 
-    internal protected virtual bool TryResolveVariableRecursiveCore(ResolutionContext context, [NotNullWhen(true)] out object? value) =>
-        TryResolveVariableInCurrentScopeCore(context, out value);
+    internal protected virtual bool TryResolveVariableRecursiveCore(ResolutionContext context, out Evaluation evaluation) =>
+        TryResolveVariableInCurrentScopeCore(context, out evaluation);
 
-    internal protected bool TryResolveVariableRecursiveCore<T>(ResolutionContext context, [NotNullWhen(true)] out T? value)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        if (TryResolveVariableRecursiveCore(context, out object? objValue))
-        {
-            if (TryConvertResolvedValue(objValue, context.Name, notifyImplicitConversion: true, out value))
-            {
-                return true;
-            }
-            throw new InvalidCastException($"Attempted to resolve variable '{context.Name}' as type {typeof(T).FullName}, but it is of type {objValue?.GetType().FullName}.");
-        }
-        value = default;
-        return false;
-    }
-
-    protected bool TryResolveVariableReference<T>(ResolutionContext context, VariableReference reference, [NotNullWhen(true)] out T? value)
+    private bool TryResolveVariableReference(ResolutionContext context, VariableReference reference, out Evaluation evaluation)
     {
         ArgumentNullException.ThrowIfNull(context);
         ResolutionContext nextContext = context.With(reference.Name, reference.Origin);
         return reference.Origin switch
         {
-            ResolutionOrigin.CurrentScope => TryResolveVariableRecursiveCore(nextContext, out value),
-            ResolutionOrigin.EntryPoint => context.EntryPoint.TryResolveVariableRecursiveCore(nextContext, out value),
+            ResolutionOrigin.CurrentScope => TryResolveVariableRecursiveCore(nextContext, out evaluation),
+            ResolutionOrigin.EntryPoint => context.EntryPoint.TryResolveVariableRecursiveCore(nextContext, out evaluation),
             _ => throw new ArgumentOutOfRangeException(nameof(reference))
         };
     }
@@ -196,22 +158,20 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
     public virtual bool TryResolveVariable<T>(string name, [NotNullWhen(true)] out T? value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        if (!TryResolveVariable(name, entryPoint: this, out value))
+        if (!TryResolveEvaluation(name, entryPoint: this, out Evaluation evaluation) || evaluation.Value is null)
         {
+            value = default;
             return false;
         }
-        if (value is string stringValue)
+        object resolved = evaluation.Terminal ? evaluation.Value : FinalizeIfText(evaluation.Value);
+        if (TryConvertResolvedValue(resolved, name, notifyImplicitConversion: true, out value))
         {
-            value = (T)(object)FinalizeInterpolationLiterals(stringValue);
+            return true;
         }
-        else if (value is TaggedString tagged)
-        {
-            value = (T)(object)tagged.WithValue(FinalizeInterpolationLiterals(tagged.Value));
-        }
-        return true;
+        throw new InvalidCastException($"Attempted to resolve variable '{name}' as type {typeof(T).FullName}, but it is of type {resolved.GetType().FullName}.");
     }
 
-    public virtual void SetVariable<T>(string name, T value) => VariableStore.SetValue(name, value);
+    public virtual void SetVariable<T>(string name, T value) => VariableStore.SetValue(name, PrepareStoredValue(value));
 
     public virtual bool TryRemoveVariable(string name) => VariableStore.TryRemove(name);
 
@@ -257,15 +217,49 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         }
     }
 
-    public IEnumerator<KeyValuePair<string, object?>> GetEnumerator() => VariableStore.GetEnumerator();
+    public IEnumerator<KeyValuePair<string, object?>> GetEnumerator()
+    {
+        foreach ((string key, object? value) in VariableStore)
+        {
+            yield return new KeyValuePair<string, object?>(key, value is CapturedValue captured ? captured.Value : value);
+        }
+    }
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    private protected bool TryGetStoredVariable<T>(string name, [NotNullWhen(true)] out T? value)
+    /// <summary>
+    /// Copies stored values without passing them through public value enumeration or parsing. Captured values retain their terminal marker,
+    /// and ordinary expression strings remain unevaluated in the destination environment.
+    /// </summary>
+    internal void CopyStoredVariablesTo(EnvironmentLike destination)
+    {
+        ArgumentNullException.ThrowIfNull(destination);
+        if (ReferenceEquals(this, destination))
+        {
+            return;
+        }
+        foreach ((string key, object? value) in VariableStore)
+        {
+            destination.VariableStore.SetValue(key, value);
+        }
+    }
+
+    private protected bool TryGetStoredVariable<T>(string name, bool shieldInterpolation, [NotNullWhen(true)] out T? value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         if (TryGetStoredVariableRecursiveCore(name, out object? objectValue))
         {
+            if (objectValue is CapturedValue captured)
+            {
+                if (captured.Value is null)
+                {
+                    value = default;
+                    return false;
+                }
+                objectValue = shieldInterpolation
+                    ? ExpressionShield.ShieldText(captured.Value)
+                    : ExpressionShield.ShieldValueExpressions(captured.Value);
+            }
             if (TryConvertResolvedValue(objectValue, name, notifyImplicitConversion: true, out value))
             {
                 return true;
@@ -276,11 +270,11 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         return false;
     }
 
-    private protected bool TryResolveVariable<T>(string name, EnvironmentLike entryPoint, [NotNullWhen(true)] out T? value)
+    private protected bool TryResolveEvaluation(string name, EnvironmentLike entryPoint, out Evaluation evaluation)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(entryPoint);
-        return TryResolveVariableRecursiveCore(ResolutionContext.Create(entryPoint, name), out value);
+        return TryResolveVariableRecursiveCore(ResolutionContext.Create(entryPoint, name), out evaluation);
     }
 
     private protected TaggedString InterpolateCore(string template, EnvironmentLike entryPoint) =>
@@ -289,11 +283,12 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
     private protected TaggedString InterpolateCore(TaggedString template, EnvironmentLike entryPoint)
     {
         ArgumentNullException.ThrowIfNull(entryPoint);
+        EnsureTextual(template.Value);
         TaggedString interpolated = InterpolateString(ResolutionContext.CreateRoot(entryPoint), template);
         return interpolated.WithValue(FinalizeInterpolationLiterals(interpolated.Value));
     }
 
-    private bool TryConvertResolvedValue<T>(object? objValue, string variableName, bool notifyImplicitConversion, [NotNullWhen(true)] out T? value)
+    private protected bool TryConvertResolvedValue<T>(object? objValue, string variableName, bool notifyImplicitConversion, [NotNullWhen(true)] out T? value)
     {
         if (objValue is T typedValue)
         {
@@ -356,6 +351,163 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         }
         reference = new VariableReference(expression, ResolutionOrigin.CurrentScope);
         return true;
+    }
+
+    private bool TryEvaluateStoredText(ResolutionContext context, string text, ImmutableHashSet<string>? wrapperTags, out Evaluation evaluation)
+    {
+        ValueExpression expression = ValueExpressionParser.Parse(SyntaxFactory, text);
+        switch (expression.Kind)
+        {
+            case ValueExpressionKind.LazyIndirection:
+            {
+                if (!TryParseVariableReference(expression.Expression, out VariableReference reference)
+                    || !TryResolveVariableReference(context, reference, out Evaluation target)
+                    || target.Value is null)
+                {
+                    throw new InvalidOperationException($"Failed to resolve indirection '&{{{expression.Expression}}}' for variable '{context.Name}' because the target is not defined.");
+                }
+                evaluation = WithWrapperTags(target, wrapperTags);
+                return true;
+            }
+            case ValueExpressionKind.EagerCapture:
+                throw new InvalidOperationException($"Eager capture '*{{{expression.Expression}}}' in variable '{context.Name}' was not evaluated when the variable was defined.");
+            case ValueExpressionKind.Text:
+            {
+                TaggedString template = wrapperTags is null ? new TaggedString(text) : new TaggedString(text, wrapperTags);
+                TaggedString interpolated = InterpolateString(context, template);
+                object result = wrapperTags is not null || interpolated.HasTags ? (object)interpolated : interpolated.Value;
+                evaluation = Evaluation.Of(result);
+                return true;
+            }
+            default:
+                throw new ArgumentOutOfRangeException(nameof(text), expression.Kind, "Unsupported value expression kind.");
+        }
+    }
+
+    private object? PrepareStoredValue<T>(T value)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+        if (value is string text)
+        {
+            return PrepareStoredText(text, tags: null);
+        }
+        if (value is TaggedString tagged)
+        {
+            return PrepareStoredText(tagged.Value, tagged.Tags);
+        }
+        return value;
+    }
+
+    private object PrepareStoredText(string text, ImmutableHashSet<string>? tags)
+    {
+        ValueExpression expression = ValueExpressionParser.Parse(SyntaxFactory, text);
+        if (expression.Kind != ValueExpressionKind.EagerCapture)
+        {
+            if (tags is not null)
+            {
+                return new TaggedString(text, tags);
+            }
+            return text;
+        }
+
+        if (!TryResolveVariable(expression.Expression, out object? snapshot))
+        {
+            throw new InvalidOperationException($"Failed to capture '*{{{expression.Expression}}}' because '{expression.Expression}' is not defined.");
+        }
+        object stored = tags is { IsEmpty: false } ? UnionResolvedValue(snapshot, tags) : snapshot;
+        return new CapturedValue(stored);
+    }
+
+    private protected string ResolveValueExpressionCore(string value, bool willInterpolate)
+    {
+        Evaluation evaluation = EvaluateStandaloneValueExpression(value, wrapperTags: null, willInterpolate);
+        if (evaluation.Value is null || !TryConvertResolvedValue(evaluation.Value, "value expression", notifyImplicitConversion: true, out string? resolved))
+        {
+            throw new InvalidCastException($"Value expression '{value}' did not resolve to {typeof(string).FullName}.");
+        }
+        return evaluation.Terminal && willInterpolate ? (string)ExpressionShield.ShieldText(resolved) : resolved;
+    }
+
+    private protected TaggedString ResolveValueExpressionCore(TaggedString value, bool willInterpolate)
+    {
+        Evaluation evaluation = EvaluateStandaloneValueExpression(value.Value, value.Tags, willInterpolate);
+        if (evaluation.Value is null || !TryConvertResolvedValue(evaluation.Value, "value expression", notifyImplicitConversion: true, out TaggedString resolved))
+        {
+            throw new InvalidCastException($"Value expression '{value.Value}' did not resolve to {typeof(TaggedString).FullName}.");
+        }
+        return evaluation.Terminal && willInterpolate ? (TaggedString)ExpressionShield.ShieldText(resolved) : resolved;
+    }
+
+    private Evaluation EvaluateStandaloneValueExpression(string text, ImmutableHashSet<string>? wrapperTags, bool willInterpolate)
+    {
+        ValueExpression expression = ValueExpressionParser.Parse(SyntaxFactory, text);
+        if (expression.Kind == ValueExpressionKind.Text)
+        {
+            string preparedText = willInterpolate ? text : ExpressionShield.FinalizeValueExpressionLiterals(text);
+            object prepared = wrapperTags is null ? preparedText : new TaggedString(preparedText, wrapperTags);
+            return Evaluation.Of(prepared);
+        }
+
+        if (!TryParseVariableReference(expression.Expression, out VariableReference reference)
+            || !TryResolveVariableReference(ResolutionContext.CreateRoot(this), reference, out Evaluation target)
+            || target.Value is null)
+        {
+            string operation = expression.Kind == ValueExpressionKind.LazyIndirection ? "indirection" : "capture";
+            char symbol = expression.Kind == ValueExpressionKind.LazyIndirection ? '&' : '*';
+            throw new InvalidOperationException($"Failed to resolve {operation} '{symbol}{{{expression.Expression}}}' because the target is not defined.");
+        }
+
+        Evaluation taggedTarget = WithWrapperTags(target, wrapperTags);
+        object resolved = taggedTarget.Terminal ? taggedTarget.Value! : FinalizeIfText(taggedTarget.Value!);
+        return Evaluation.TerminalValue(resolved);
+    }
+
+    private void EnsureTextual(string text)
+    {
+        ValueExpression expression = ValueExpressionParser.Parse(SyntaxFactory, text);
+        if (expression.Kind == ValueExpressionKind.Text)
+        {
+            return;
+        }
+        throw new FormatException(
+            $"Textual interpolation cannot evaluate '{text}'. Lazy indirection '&{{...}}' and eager capture '*{{...}}' are value operations and cannot appear in text or keys.");
+    }
+
+    private object FinalizeIfText(object value)
+    {
+        if (value is string text)
+        {
+            return FinalizeInterpolationLiterals(text);
+        }
+        if (value is TaggedString tagged)
+        {
+            return tagged.WithValue(FinalizeInterpolationLiterals(tagged.Value));
+        }
+        return value;
+    }
+
+    private static Evaluation WithWrapperTags(Evaluation target, ImmutableHashSet<string>? tags)
+    {
+        if (tags is not { IsEmpty: false } || target.Value is null)
+        {
+            return target;
+        }
+        return target.WithValue(UnionResolvedValue(target.Value, tags));
+    }
+
+    /// <summary>
+    /// A resolved environment value. Terminal values have already completed their logical expression evaluation and must not be evaluated again.
+    /// </summary>
+    internal protected readonly record struct Evaluation(object? Value, bool Terminal)
+    {
+        public static Evaluation Of(object? value) => new(value, Terminal: false);
+
+        public static Evaluation TerminalValue(object? value) => new(value, Terminal: true);
+
+        public Evaluation WithValue(object? value) => new(value, Terminal);
     }
 
     protected readonly record struct VariableReference(string Name, ResolutionOrigin Origin);

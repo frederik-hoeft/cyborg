@@ -38,8 +38,9 @@ For how these attributes are processed by the source generators, see [Source Gen
   - [DefaultInstance](#defaultinstance)
   - [DefaultInstanceFactory](#defaultinstancefactory)
   - [DefaultTimeSpan](#defaulttimespan)
-- [Override and Interpolation Control Attributes](#override-and-interpolation-control-attributes)
+- [Override and Textual Preparation Control Attributes](#override-and-textual-preparation-control-attributes)
   - [IgnoreOverride](#ignoreoverride)
+  - [IgnoreValueExpression](#ignorevalueexpression)
   - [IgnoreInterpolation](#ignoreinterpolation)
   - [Secret](#secret)
   - [Untagged](#untagged)
@@ -55,13 +56,13 @@ These attributes trigger source generation on the annotated type. They are not a
 
 ### GeneratedModuleValidation
 
-Triggers the validation generator on a module record. The target must be a `partial record`. The generator emits private `ApplyDefaultsAsync`, `ResolveOverridesAsync`, and `ApplyInterpolationAsync` preparation helpers together with the public `ValidateAsync` orchestrator, based on the attributes applied to the record's properties.
+Triggers the validation generator on a module record. The target must be a `partial record`. The generator emits private `ApplyDefaultsAsync`, `ResolveOverridesAsync`, `ResolveValueExpressionsAsync`, and `ApplyInterpolationAsync` preparation helpers together with the public `ValidateAsync` orchestrator, based on the attributes applied to the record's properties.
 
 **Target:** `class` (record)
 
 ### Validatable
 
-Marks a nested record type for recursive validation. Record classes and record structs are supported. When a property on a `[GeneratedModuleValidation]` record has a type marked `[Validatable]`, the generated pipeline applies defaults, overrides, interpolation, and validation recursively to that nested record's properties. Nullable record values are treated as absent until a value exists; non-nullable record structs are traversed directly.
+Marks a nested record type for recursive validation. Record classes and record structs are supported. When a property on a `[GeneratedModuleValidation]` record has a type marked `[Validatable]`, the generated pipeline applies defaults, overrides, typed value-expression preparation, interpolation, and validation recursively to that nested record's properties. Nullable record values are treated as absent until a value exists; non-nullable record structs are traversed directly.
 
 **Target:** `class` or `struct` (record)
 
@@ -97,7 +98,7 @@ For validation purposes, a **textual** or **string-like** target means either `s
 
 - `TargetsElements` (optional, default `false`) — When `false`, validates the annotated property. When `true`, validates each immediate element of a supported collection property instead.
 
-Element-targeted validation runs after defaults, overrides, and interpolation, so constraints observe the same final values as ordinary property validation. The containing collection is not constrained by an element-targeted attribute. Null reference collections, absent nullable value-type collections, and default `ImmutableArray<T>` values are not enumerated.
+Element-targeted validation runs after defaults, overrides, typed value-expression preparation, and interpolation, so constraints observe the same final values as ordinary property validation. The containing collection is not constrained by an element-targeted attribute. Null reference collections, absent nullable value-type collections, and default `ImmutableArray<T>` values are not enumerated.
 
 The supporting attributes allow multiple applications, so a collection and its elements can be constrained independently:
 
@@ -254,7 +255,7 @@ Provides a default `TimeSpan` value parsed from a string at compile time. The st
 - `TimeSpan` — String representation of the default duration (e.g., `"00:30:00"` for 30 minutes).
 
 
-## Override and Interpolation Control Attributes
+## Override and Textual Preparation Control Attributes
 
 ### IgnoreOverride
 
@@ -266,17 +267,25 @@ Prevents environment-driven override resolution for the annotated property.
 
 `ModuleBase.Name` and `ModuleBase.Group` use this attribute because environment binding consumes their structural identity before validation begins.
 
-### IgnoreInterpolation
+### IgnoreValueExpression
 
-Prevents the generated interpolation phase from calling `runtime.Environment.Interpolate(...)` for the annotated string or `TaggedString` property. The value is preserved so a worker can interpolate it later, after context-specific variables or child artifacts exist.
+Prevents the generated typed value-expression phase from resolving a whole-value `&{...}` or `*{...}` expression on the annotated textual property. This is separate from interpolation suppression: it does not control `${...}` processing.
 
 **Applies to:** `string` and `TaggedString` properties.
 
-This is used by `AssertModule.Message`, whose placeholders may refer to artifacts produced by the assertion module and therefore cannot be resolved during pre-execution validation. `ModuleBase.Name` and `ModuleBase.Group` also opt out because they define the environment namespace before interpolation runs.
+This attribute is intended for structural values that are consumed before generated validation begins. `ModuleBase.Name` and `ModuleBase.Group` use it because the runtime has already bound the module environment from those values; rewriting them afterward would make the prepared module disagree with its execution namespace. Ordinary textual properties should normally allow value-expression preparation even when they use `[IgnoreInterpolation]`.
+
+### IgnoreInterpolation
+
+Prevents the generated interpolation phase from calling `runtime.Environment.Interpolate(...)` for the annotated string or `TaggedString` property. The value is preserved so a worker can interpolate it later, after context-specific variables or child artifacts exist. The attribute suppresses textual `${...}` interpolation only. Lazy indirection and eager capture are value operations and are not deferred by this attribute; a captured textual override contributes the snapshot taken when that variable was defined.
+
+**Applies to:** `string` and `TaggedString` properties.
+
+This is used by `AssertModule.Message`, whose placeholders may refer to artifacts produced by the assertion module and therefore cannot be resolved during pre-execution validation. `ModuleBase.Name` and `ModuleBase.Group` also use `[IgnoreValueExpression]` because they define the environment namespace before generated textual preparation runs.
 
 ### Secret
 
-Valid only on `TaggedString` properties. Declares `cyborg.secret.v1` as an intrinsic property tag. Generated preparation ensures the tag is present both before and after override selection, so an override may replace the value but cannot declassify the property; final validation asserts the invariant. This is independent of interpolation, including when `[IgnoreInterpolation]` defers evaluation. Cyborg-controlled display surfaces render the resulting tagged value through `ITaggedStringRenderer`, which redacts the built-in secret tag as `[REDACTED]`.
+Valid only on `TaggedString` properties. Declares `cyborg.secret.v1` as an intrinsic property tag. Generated preparation applies the tag after override selection and typed value-expression resolution, before interpolation and constraint validation. An override or typed reference therefore cannot declassify the prepared property; final validation asserts the invariant. This is independent of interpolation, including when `[IgnoreInterpolation]` defers evaluation. Cyborg-controlled display surfaces render the resulting tagged value through `ITaggedStringRenderer`, which redacts the built-in secret tag as `[REDACTED]`.
 
 **Applies to:** `TaggedString` properties only. Combining `[Secret]` with `[Untagged]` is an error.
 

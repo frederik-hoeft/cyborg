@@ -138,7 +138,7 @@ Loading and execution are deliberately separated. Deserialization retains the im
 
 Module-configuration loading also produces immutable load artifacts that are derived from the configuration document but are not part of the structural module graph. Named-module discovery is one such artifact: the loader returns it alongside the root `ModuleContext`, and the runtime applies it transactionally when that loaded configuration is executed. Keeping this metadata at the loading/execution boundary prevents deserialization state from leaking into otherwise immutable module definitions and contexts.
 
-The worker's prepared module, result builder, artifact builder, and scoped dependencies therefore belong to exactly one invocation. Generated preparation copies the immutable definition through defaults, overrides, interpolation, and validation before module-specific execution begins. Repeated or concurrent execution of the same loaded definition never aliases worker fields or scoped constructor dependencies.
+The worker's prepared module, result builder, artifact builder, and scoped dependencies therefore belong to exactly one invocation. Generated preparation copies the immutable definition through defaults, overrides, typed value-expression resolution, interpolation, and validation before module-specific execution begins. Repeated or concurrent execution of the same loaded definition never aliases worker fields or scoped constructor dependencies.
 
 ### ModuleContext Envelope
 
@@ -201,21 +201,25 @@ After activation, the `ModuleWorker<TModule>` base class orchestrates the lifecy
 
 #### Validation Pipeline
 
-Before a worker's `ExecuteAsync` method is invoked, `ModuleWorker<TModule>` calls the source-generated `ValidateAsync` implementation on the module. The generated method orchestrates five ordered phases:
+Before a worker's `ExecuteAsync` method is invoked, `ModuleWorker<TModule>` calls the source-generated `ValidateAsync` implementation on the module. The generated method orchestrates seven ordered phases:
 
-1. **Apply Defaults / Preparation Invariants** — Fills null or type-default properties from `[DefaultValue<T>]`, `[DefaultInstance]`, `[DefaultInstanceFactory]`, and `[DefaultTimeSpan]`, then applies property-level preparation invariants such as the intrinsic tag established by `[Secret]`. Preparation recurses into nested records marked with `[Validatable]` and supported collection elements.
+1. **Apply Defaults** — Fills null or type-default properties from `[DefaultValue<T>]`, `[DefaultInstance]`, `[DefaultInstanceFactory]`, and `[DefaultTimeSpan]`, without applying destination metadata invariants. Preparation recurses into nested records marked with `[Validatable]` and supported collection elements.
 
-2. **Resolve Overrides** — Substitutes eligible module properties from runtime environment variables using the override subsystem described in [Module Property Overrides](#module-property-overrides). `[IgnoreOverride]` suppresses replacement of the annotated property; its optional `recurse` constructor argument also suppresses descendants when `true`.
+2. **Resolve Overrides** — Substitutes eligible module properties from runtime environment variables using the override subsystem described in [Module Property Overrides](#module-property-overrides). Textual properties select the effective override without evaluating its contents, while non-text properties use typed resolution. `[IgnoreOverride]` suppresses replacement of the annotated property; its optional `recurse` constructor argument also suppresses descendants when `true`.
 
-3. **Reapply Defaults / Preparation Invariants** — Runs the same preparation pass again so values introduced by overrides receive declared defaults and destination-level invariants are re-established.
+3. **Apply Defaults to Overridden Values** — Fills remaining defaults in objects or collection elements introduced by overrides, before typed expressions are evaluated. This ensures defaults that themselves contain `&{...}` are resolved once, even when their containing object arrived through an override.
 
-4. **Interpolate Textual Values** — Recursively applies `runtime.Environment.Interpolate(...)` to eligible `string` and `TaggedString` values on the module, nested `[Validatable]` records, and supported collection elements. `[IgnoreInterpolation]` preserves textual values that require later context-specific interpolation. `ModuleBase.Name` and `ModuleBase.Group` opt out because they establish structural identity before validation; `AssertModule.Message` is interpolated by its worker after the assertion child has executed so it can reference child artifacts.
+4. **Resolve Typed Value Expressions** — Recursively resolves whole-value `&{...}` / `*{...}` expressions in `string` and `TaggedString` properties and textual collection elements. `${...}` templates are left untouched for the next textual phase. `[IgnoreInterpolation]` does not suppress this phase; `[IgnoreValueExpression]` exists for structural values such as `ModuleBase.Name` and `Group` that were consumed before validation began.
 
-5. **Validate Constraints** — Checks constraints declared through `[Required]`, `[VariableIdentifier]`, `[Range<T>]`, length, filesystem, path-shape, regex, grammar, enum, and related validation attributes. Produces an `IValidationResult<TModule>` that retains the transformed module and carries any validation errors.
+5. **Apply Preparation Invariants** — Establishes destination-level invariants such as `[Secret]` after a typed reference replaces a property value. Unlike default assignment, this pass cannot introduce new expression strings after resolution.
 
-Each transformation uses `with` expressions, so the original deserialized module is never mutated. The generator emits private async `ApplyDefaultsAsync`, `ResolveOverridesAsync`, and `ApplyInterpolationAsync` instance helpers plus the public `ValidateAsync` orchestrator required by `IModule<TModule>`. `ValidateAsync` creates one editor-hidden `ModuleValidationContext` containing the runtime and service provider and passes it through all generated preparation phases.
+6. **Interpolate Textual Values** — Recursively applies `runtime.Environment.Interpolate(...)` to eligible `string` and `TaggedString` values on the module, nested `[Validatable]` records, and supported collection elements. `[IgnoreInterpolation]` preserves `${...}` templates that require later context-specific interpolation. `ModuleBase.Name` and `ModuleBase.Group` also opt out because they establish structural identity before validation; `AssertModule.Message` is interpolated by its worker after the assertion child has executed so it can reference child artifacts.
 
-Recursive value access is classified once and reused across generated phases. `[Validatable]` record classes and record structs use a shared object-access model, so reference/null guards and nullable-value unwrapping are identical in preparation, overrides, interpolation, validation, and descriptor traversal. Collection behavior is likewise derived once from the generated collection shape. Null reference collections and absent nullable value-type collections are skipped; a default `ImmutableArray<T>` is treated as absent and remains distinct from an initialized empty array. Rewrite-capable shapes carry one materialization strategy, so defaults and interpolation reconstruct collections consistently instead of duplicating shape-specific conversion logic. Selected validation attributes can set `TargetsElements = true` to validate each immediate collection element through the same guarded traversal. Validation carries a user-facing path independently from generated access expressions, so both `ValidationError.PropertyName` and generated messages identify the concrete recursive target, including paths such as `Tags[2]`, `Items[1].Value`, and deeper object/collection combinations.
+7. **Validate Constraints** — Checks constraints declared through `[Required]`, `[VariableIdentifier]`, `[Range<T>]`, length, filesystem, path-shape, regex, grammar, enum, and related validation attributes. Produces an `IValidationResult<TModule>` that retains the transformed module and carries any validation errors.
+
+Each transformation uses `with` expressions, so the original deserialized module is never mutated. The generator emits private async `ApplyDefaultsAsync`, `ResolveOverridesAsync`, `ResolveValueExpressionsAsync`, `ApplyPreparationInvariantsAsync`, and `ApplyInterpolationAsync` instance helpers plus the public `ValidateAsync` orchestrator required by `IModule<TModule>`. `ValidateAsync` creates one editor-hidden `ModuleValidationContext` containing the runtime and service provider and passes it through all generated preparation phases.
+
+Recursive value access is classified once and reused across generated phases. `[Validatable]` record classes and record structs use a shared object-access model, so reference/null guards and nullable-value unwrapping are identical in preparation, overrides, textual value preparation, validation, and descriptor traversal. Collection behavior is likewise derived once from the generated collection shape. Null reference collections and absent nullable value-type collections are skipped; a default `ImmutableArray<T>` is treated as absent and remains distinct from an initialized empty array. Rewrite-capable shapes carry one materialization strategy, so defaults and textual preparation reconstruct collections consistently instead of duplicating shape-specific conversion logic. Selected validation attributes can set `TargetsElements = true` to validate each immediate collection element through the same guarded traversal. Validation carries a user-facing path independently from generated access expressions, so both `ValidationError.PropertyName` and generated messages identify the concrete recursive target, including paths such as `Tags[2]`, `Items[1].Value`, and deeper object/collection combinations.
 
 Generated validation returns `IValidationResult<TModule>`, which always carries the prepared module together with its errors and validity state. This means invalid results remain inspectable without reconstructing or mutating the module. Before the result is enforced, the worker can refine it through the protected `OnValidationAsync` extension point and the ordered validation-hook pipeline described below.
 
@@ -268,7 +272,7 @@ Each module executes within a bound environment — one whose `Namespace` proper
 
 ## Runtime Environment
 
-The runtime environment subsystem manages the hierarchical variable stores that modules use to communicate. It encompasses environment scoping, variable resolution with indirection and interpolation, a property override mechanism for late-binding module configuration, and structured artifact publishing for module outputs. Together, these components form the data flow backbone of the execution model.
+The runtime environment subsystem manages the hierarchical variable stores that modules use to communicate. It encompasses environment scoping, variable resolution with string interpolation, lazy typed indirection, and eager typed capture, a property override mechanism for late-binding module configuration, and structured artifact publishing for module outputs. Together, these components form the data flow backbone of the execution model.
 
 ### Environment Scoping
 
@@ -300,23 +304,24 @@ Transient environments receive a generated logical identity but no named registr
 
 ### Variable Resolution
 
-Variables are the primary communication mechanism between modules. The resolution subsystem supports direct lookup, indirection, interpolation, type-safe access, and cycle detection.
+Variables are the primary communication mechanism between modules. The resolution subsystem supports direct lookup, string interpolation, lazy typed indirection, eager typed capture, type-safe access, and cycle detection.
 
 #### Resolution Semantics
 
 When `TryResolveVariable<T>(name)` is called, the runtime captures the environment where the lookup started as the **entry point**. Resolution proceeds as follows:
 
 1. **Current-scope self-reference** — The special name `@` resolves to the environment namespace in the environment tree where resolution is currently occurring.
-2. **Entry-point self-reference** — The special name `@@` resolves to the namespace of the environment that initiated the current resolution or interpolation chain, effectively resetting the resolution scope back to the entry point for any lookups within that chain. This allows for late-bound references to the entry-point scope even when resolution has propagated into parent environments.
+2. **Entry-point self-reference** — The special name `@@` resolves to the namespace of the environment that initiated the current resolution or interpolation chain. This allows late-bound references to the entry-point scope even when resolution has propagated into parent environments.
 3. **Direct lookup** — The variable name is looked up in the local dictionary.
-4. **Indirection** — If the stored value is a string matching the pattern `${...}`, the referenced expression is resolved recursively. `${name}` resolves relative to the current resolution scope, `${@name}` resolves relative to the entry-point scope, `${@}` resolves the current scope namespace, and `${@@}` resolves the entry-point namespace.
-5. **Interpolation** — If the stored value is a string or `TaggedString` containing `${...}` placeholders mixed with literal text, all placeholders are replaced with their resolved values using the same scope rules. Unresolvable placeholders are left as-is. Tags from the template and from every successfully resolved operand are unioned onto the result so values such as `"hello ${mySecret}"` cannot leak into an untagged string.
-6. **Parent fallback** — In an `InheritedRuntimeEnvironment`, if the variable is not found locally, the lookup is delegated to the parent chain.
-7. **Type casting** — The resolved value is matched against the requested type `T`. A type mismatch is treated as a resolution failure. `string` and `TaggedString` convert to each other: resolving a tagged value as `string` returns the raw value and discards tags (and logs a warning when tags were present), while resolving a stored string as `TaggedString` wraps it with no tags. Prefer `TryResolveVariable(..., out TaggedString)` so interpolation-introduced tags such as `cyborg.secret.v1` are preserved.
+4. **Eager capture** — If the stored value is a snapshot taken from `*{identifier}` at definition time, that snapshot is returned without further evaluation. The snapshot is the reference obtained when the variable was defined; it is not deep-cloned.
+5. **Lazy indirection** — If the stored value is exactly `&{...}`, the referenced target is resolved recursively on every read. `&{name}` resolves relative to the current resolution scope, `&{@name}` resolves relative to the entry-point scope, and `&{@}` / `&{@@}` resolve the current and entry-point namespaces. An undefined target fails resolution. Tags on a `TaggedString` wrapper are unioned onto a textual target.
+6. **Interpolation** — Otherwise, a stored string or `TaggedString` containing `${...}` placeholders is interpolated, including when the entire value is one `${...}` expression. The result is text. Unresolvable placeholders are left as-is. Tags from the template and from every successfully resolved operand are unioned onto the result so values such as `"hello ${mySecret}"` cannot leak into an untagged string. One escape layer is then removed from the string result.
+7. **Parent fallback** — In an `InheritedRuntimeEnvironment`, if the variable is not found locally, the lookup is delegated to the parent chain.
+8. **Type casting** — The resolved value is matched against the requested type `T`. A type mismatch throws `InvalidCastException`. `string` and `TaggedString` convert to each other: resolving a tagged value as `string` returns the raw value and discards tags (and logs a warning when tags were present), while resolving a stored string as `TaggedString` wraps it with no tags. Prefer `TryResolveVariable(..., out TaggedString)` so interpolation-introduced tags such as `cyborg.secret.v1` are preserved.
 
 #### Tagged Textual Values
 
-`TaggedString` is the native representation for textual values that must retain metadata while flowing through the runtime. It carries a raw string plus an opaque set of string tags. Environment storage and resolution do not interpret those tags; interpolation and indirection only preserve/union them. This keeps taint propagation independent from the policy attached to any particular tag.
+`TaggedString` is the native representation for textual values that must retain metadata while flowing through the runtime. It carries a raw string plus an opaque set of string tags. Environment storage and resolution do not interpret those tags; interpolation, indirection, and capture only preserve or union them. This keeps taint propagation independent from the policy attached to any particular tag.
 
 `cyborg.secret.v1` is the first globally interpreted tag. It can enter the system explicitly through the `cyborg.types.secret.v1` dynamic value or be imposed as a destination invariant by `[Secret]` on a module property. Safe presentation is centralized in `ITaggedStringRenderer`, whose tag handlers are supplied through dependency injection. Debugger serializers, generated validation diagnostics, CLI argument diagnostics, tagged metrics labels, subprocess argument diagnostics, and other tag-aware presentation paths use that renderer rather than formatting raw values directly. Unknown tags remain attached even when no handler is registered.
 
@@ -330,7 +335,7 @@ The resolution subsystem tracks the chain of variable names during recursive res
 
 #### Variable Name Syntax
 
-Cyborg distinguishes between identifiers, namespaces, variable expressions, interpolation, and indirection. Names and expressions are case-sensitive and use ASCII characters only.
+Cyborg distinguishes between identifiers, namespaces, interpolation, lazy indirection, eager capture, and override keys. Names and expressions are case-sensitive and use ASCII characters only. Key grammar supports interpolation only. Value grammar is described below.
 
 **Identifiers** are used for environment variable names and paths, module `name` and `group` values, template argument names, override-resolution tags, and the identifier portion of override keys.
 
@@ -351,31 +356,35 @@ Invalid identifiers include `.host`, `host.`, `host..port`, `host port`, and `${
 
 **Namespaces** are validated through a distinct grammar contract whose accepted syntax is identical to identifiers. Keeping the contracts separate allows namespace semantics to evolve independently from general identifier syntax.
 
-**Variable expressions** are enclosed in `${` and `}` and use one of the following forms:
+**Interpolation** uses `${` and `}` inside text, including when the expression is the entire value. The result is always text. An exact `${port}` whose target is an `int` stringifies; it does not yield the integer.
 
 - `${name}` resolves an identifier from the current resolution scope.
 - `${@name}` resolves an identifier from the entry-point scope.
 - `${@}` resolves to the namespace of the current resolution scope.
 - `${@@}` resolves to the namespace of the entry-point scope.
 
-The `name` portion must be a valid identifier. Forms such as `${}`, `${1name}`, `${name.}`, `${@1name}`, and `${@@name}` are not valid variable expressions.
+The `name` portion must be a valid identifier. Forms such as `${}`, `${1name}`, `${name.}`, `${@1name}`, and `${@@name}` are not interpolation expressions. Malformed `${...}` text is ignored. For example, `backup-${host.name}-${date}` contains two interpolation expressions. Unresolved placeholders are left unchanged.
 
-**Interpolation** occurs when one or more valid variable expressions appear within a larger string. Each recognized expression is resolved independently while surrounding text remains unchanged. For example, `backup-${host.name}-${date}` contains two interpolation expressions.
+**Lazy indirection** uses `&{` and `}` and must be the entire value. Each read returns the target's current type and value. `&{name}`, `&{@name}`, `&{@}`, and `&{@@}` follow the same scope rules as the corresponding `${...}` forms. An undefined target fails resolution. Leading or trailing text around an unescaped `&{...}` is a syntax error.
 
-Malformed `${...}` text is not recognized as an interpolation expression and is ignored. A hash immediately after `${` escapes one interpolation pass: `${#name}` becomes the literal `${name}`, `${##name}` becomes `${#name}`, and the expression revealed by removing the hash is not rescanned during the same pass. `$${name}` is not an escape because it still contains the valid expression `${name}`.
+**Eager capture** uses `*{` and `}` and must be the entire value. `*{name}` resolves `name` once when the variable is defined and stores that value. Later replacement of `name` does not change the snapshot, and the snapshot is not a deep clone. `*{@name}` is reserved and invalid. Leading or trailing text around an unescaped `*{...}` is a syntax error. An undefined target fails the definition.
 
-**Indirection** is the special case where the complete string consists of exactly one variable expression, with no surrounding text. Indirection allows the referenced value to retain its original type rather than being converted into part of an interpolated string. So the following substitution chain is valid for `port` of type `int`:
+A hash immediately after an operator escapes one evaluation pass: `${#name}` becomes `${name}`, `&{#name}` becomes `&{name}`, and `*{#name}` becomes `*{name}`. `${##name}` becomes `${#name}`. The expression revealed by removing the hash is not rescanned during the same pass. `$${name}` is not an escape because it still contains the valid expression `${name}`.
+
+The following substitution chain is valid for `port` of type `int`:
 
 ```text
 host_port = 8080
-@host.port = "${host_port}"
+@host.port = "&{host_port}"
 ```
 
-**Override keys** begin with an at-sign (`@`) followed by a valid identifier, for example `@backup.target`. The leading at-sign is override syntax and is not part of the identifier itself.
+`@host.port = "*{host_port}"` instead freezes `8080` at the time that override variable is defined.
+
+**Override keys** begin with an at-sign (`@`) followed by a valid identifier, for example `@backup.target`. The leading at-sign is override syntax and is not part of the identifier itself. Keys may contain interpolation, as in `@${my_module}.property`, and may not contain `&{...}` or `*{...}`.
 
 Structured values published through [decomposition](#decomposable-objects) are addressed using the same identifier and dotted-path syntax. Override lookup uses these rules when constructing the candidates described in [Module Property Overrides](#module-property-overrides).
 
-**Full grammar** for identifiers, namespaces, variable expressions, and override keys is as follows (ANTLR4 syntax):
+**Full grammar** for identifiers, namespaces, value expressions, and override keys is as follows (ANTLR4 syntax):
 
 ```antlr
 grammar VariableGrammar;
@@ -388,18 +397,22 @@ namespaceName
     : IDENTIFIER EOF
     ;
 
-indirection
-    : interpolation EOF
+expression
+    : '@@'
+    | '@' IDENTIFIER?
+    | IDENTIFIER
     ;
 
 interpolation
     : '${' expression '}'
     ;
 
-expression
-    : '@@'
-    | '@' IDENTIFIER?
-    | IDENTIFIER
+indirection
+    : '&{' expression '}' EOF
+    ;
+
+capture
+    : '*{' IDENTIFIER '}' EOF
     ;
 
 IDENTIFIER
@@ -440,20 +453,23 @@ Generated override preparation resolves module properties through `ModuleValidat
 1. The generator supplies the module and property expressions used to derive the snake_case property path.
 2. Override keys are constructed using every identifier that can address the module instance: first `@{name}.{property_name}`, then `@{group}.{property_name}` when a group is set, then `@{module_id}.{property_name}`, and finally `@{tag}.{property_name}` for each override resolution tag attached to the environment.
 3. The environment is checked for each override key in that order. The first matching override wins, so more specific identifiers take priority (`name` > `group` > `module_id` > tags).
-4. Textual properties (`string` and `TaggedString`) select the raw stored override without interpolation. This preserves late-bound expressions and, for `TaggedString`, any tags attached to the selected value. Non-text properties use typed resolution, including exact-reference indirection, and collections use a collection-specific resolver before generated code materializes the declared collection shape.
-5. The later generated `ApplyInterpolationAsync` phase recursively interpolates every eligible string, including strings for which no override was applied and strings inside nested records and collections. `[IgnoreInterpolation]` skips this phase, so a raw string selected from an override remains available for worker-controlled interpolation.
+4. Textual properties (`string` and `TaggedString`) select the raw stored override without evaluating its value expression. This preserves late-bound `${...}` templates and, for `TaggedString`, any tags attached to the selected value. Captured textual snapshots are shielded only against later phases that could otherwise reinterpret them. Non-text properties use typed resolution, including lazy `&{...}` indirection and eager `*{...}` snapshots, and collections use a collection-specific resolver before generated code materializes the declared collection shape. Collection capture is shallow; captured elements continue through normal destination preparation.
+5. The generated `ApplyDefaultsAsync` pass fills defaults for any remaining values introduced by overrides, including nested values whose own overrides are suppressed.
+6. The generated `ResolveValueExpressionsAsync` phase then visits textual values regardless of whether they came from configuration, defaults, or overrides. Whole-value `&{...}` / `*{...}` expressions resolve here; `${...}` remains textual input for the next phase.
+7. The generated `ApplyPreparationInvariantsAsync` pass establishes destination metadata such as `[Secret]`, but cannot introduce new defaults after expression resolution.
+8. The generated `ApplyInterpolationAsync` phase recursively interpolates every eligible string, including strings inside nested records and collections. `[IgnoreInterpolation]` skips only this phase, so a `${...}` template remains available for worker-controlled interpolation while typed value expressions have already resolved.
 
-`[IgnoreOverride]` disables resolution of the annotated node without disabling the later interpolation phase. With the default `recurse: false`, eligible descendants may still resolve overrides; `recurse: true` suppresses the complete subtree. `[IgnoreInterpolation]` is a separate string-only control for values that must remain raw until worker execution.
+`[IgnoreOverride]`, `[IgnoreValueExpression]`, and `[IgnoreInterpolation]` control separate concerns. The first disables environment override selection for the annotated node, the second suppresses generated whole-value `&{...}` / `*{...}` preparation, and the third suppresses `${...}` interpolation. With the default `recurse: false`, `[IgnoreOverride]` still allows eligible descendants to resolve overrides; `recurse: true` suppresses the complete subtree.
 
 #### Override Use Case
 
-Overrides solve the problem of injecting non-string typed values into module properties through exact-reference indirection. A composite interpolation result is a string, but an exact expression such as `${host.port}` can resolve directly to the stored `int`. By setting `@my_module.liveness_probe_port` to `"${host.port}"`, generated typed override resolution retrieves the referenced value as the property type rather than converting an interpolated string afterward.
+Overrides solve the problem of injecting non-string typed values into module properties through lazy indirection or eager capture. A composite interpolation result is a string, and an exact `${host.port}` is also text. By setting `@my_module.liveness_probe_port` to `"&{host.port}"`, generated typed override resolution retrieves the referenced `int` rather than converting an interpolated string afterward. Setting it to `"*{host.port}"` stores a snapshot of that integer when the override variable is defined.
 
 The override subsystem supports any addressable property on the module, including `ModuleReference` properties, allowing modules to be treated as data and enabling dynamic module composition patterns. Overrides always operate in a deterministic copy-on-write manner — the original deserialized module instance is never mutated. Instead, a new instance is returned with freshly resolved properties for each execution, ensuring that module definitions remain immutable while always observing the latest environment state at execution time.
 
 Override resolution is applied recursively within module properties, so a complex-typed property instance may have overrides applied to its own properties as well.
 
-The generated pipeline applies defaults and property-level preparation invariants before override resolution and again afterward. Overrides must therefore produce values that satisfy the module's constraints, but they can also inject a type-default value to trigger the second defaulting pass. Intrinsic metadata such as `[Secret]` is re-applied after override selection, so changing the value cannot declassify the destination property. Eligible textual values are then processed by the recursive interpolation phase before constraints are evaluated.
+The generated pipeline applies defaults before override resolution and again afterward, before the typed expression phase. Overrides must therefore produce values that satisfy the module's constraints, but they can also inject a type-default value to trigger the second defaulting pass. Intrinsic metadata such as `[Secret]` is applied after typed-reference resolution, without another default-assignment pass, so changing the value cannot declassify the destination property. Eligible textual values are then processed by the recursive interpolation phase before constraints are evaluated.
 
 #### Override Resolution Tags
 

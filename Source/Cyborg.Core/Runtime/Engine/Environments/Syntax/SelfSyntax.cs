@@ -15,6 +15,10 @@ public readonly record struct SelfSyntax
 
     public LateRefSyntax LateRef() => new(NamingPolicy, ToString());
 
+    public IndirectSyntax Indirect() => new(ToString());
+
+    public LateIndirectSyntax LateIndirect() => new(ToString());
+
     public override string ToString() => "@";
 
     public static implicit operator string(SelfSyntax self) => self.ToString();

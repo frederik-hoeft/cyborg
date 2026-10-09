@@ -10,7 +10,7 @@
         {
           "cyborg.modules.config.map.v1": {
             "entries": [
-              { "key": "@body_task.target", "string": "${body_task}" }
+              { "key": "@body_task.target", "string": "&{body_task}" }
             ]
           }
         }

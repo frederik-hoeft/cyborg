@@ -61,56 +61,58 @@ public sealed class VariableSyntaxTests
     }
 
     [TestMethod]
-    [DataRow("${a.}", false, "")]
-    [DataRow("${a..b}", false, "")]
-    [DataRow("${a-}", true, "a-")]
-    [DataRow("${a-.b}", true, "a-.b")]
-    [DataRow("${a.-b}", true, "a.-b")]
-    [DataRow("${a.-}", true, "a.-")]
-    [DataRow("${-}", true, "-")]
-    [DataRow("${--}", true, "--")]
-    [DataRow("${-.0}", true, "-.0")]
-    [DataRow("${name}", true, "name")]
-    [DataRow("hey ${name}", false, "")]
-    [DataRow("${name} wassup", false, "")]
-    [DataRow(" ${name}", false, "")]
-    [DataRow("${_}", true, "_")]
-    [DataRow("${a0}", true, "a0")]
-    [DataRow("${a-b.c_0}", true, "a-b.c_0")]
-    [DataRow("${name.}", false, "")]
-    [DataRow("${name-}", true, "name-")]
-    [DataRow("${@}", true, "@")]
-    [DataRow("${@@}", true, "@@")]
-    [DataRow("${@name}", true, "@name")]
-    [DataRow("${@_}", true, "@_")]
-    [DataRow("${@a-b.c_0}", true, "@a-b.c_0")]
-    [DataRow("${@-}", true, "@-")]
-    [DataRow("${@--}", true, "@--")]
-    [DataRow("${@-.0}", true, "@-.0")]
+    [DataRow("&{a.}", false, "")]
+    [DataRow("&{a..b}", false, "")]
+    [DataRow("&{a-}", true, "a-")]
+    [DataRow("&{a-.b}", true, "a-.b")]
+    [DataRow("&{a.-b}", true, "a.-b")]
+    [DataRow("&{a.-}", true, "a.-")]
+    [DataRow("&{-}", true, "-")]
+    [DataRow("&{--}", true, "--")]
+    [DataRow("&{-.0}", true, "-.0")]
+    [DataRow("&{name}", true, "name")]
+    [DataRow("hey &{name}", false, "")]
+    [DataRow("&{name} wassup", false, "")]
+    [DataRow(" &{name}", false, "")]
+    [DataRow("&{_}", true, "_")]
+    [DataRow("&{a0}", true, "a0")]
+    [DataRow("&{a-b.c_0}", true, "a-b.c_0")]
+    [DataRow("&{name.}", false, "")]
+    [DataRow("&{name-}", true, "name-")]
+    [DataRow("&{@}", true, "@")]
+    [DataRow("&{@@}", true, "@@")]
+    [DataRow("&{@name}", true, "@name")]
+    [DataRow("&{@_}", true, "@_")]
+    [DataRow("&{@a-b.c_0}", true, "@a-b.c_0")]
+    [DataRow("&{@-}", true, "@-")]
+    [DataRow("&{@--}", true, "@--")]
+    [DataRow("&{@-.0}", true, "@-.0")]
     [DataRow("", false, "")]
     [DataRow("name", false, "")]
     [DataRow("$name", false, "")]
-    [DataRow("${}", false, "")]
-    [DataRow("${1name}", false, "")]
-    [DataRow("${@1name}", false, "")]
-    [DataRow("${@@name}", false, "")]
-    [DataRow("${@@.name}", false, "")]
-    [DataRow("${-name}", true, "-name")]
-    [DataRow("${.name}", false, "")]
-    [DataRow("${name value}", false, "")]
-    [DataRow("${name/value}", false, "")]
-    [DataRow("${#name}", false, "")]
-    [DataRow("${##name}", false, "")]
-    [DataRow("$${name}", false, "")]
-    [DataRow("prefix ${name}", false, "")]
-    [DataRow("${name} suffix", false, "")]
-    [DataRow("${name}${other}", false, "")]
-    [DataRow("${name", false, "")]
-    [DataRow("$ {name}", false, "")]
-    [DataRow("${name}}", false, "")]
-    [DataRow("${\u00E4}", false, "")]
-    [DataRow("${name}\n", false, "")]
-    [DataRow("${name}\r\n", false, "")]
+    [DataRow("${name}", false, "")]
+    [DataRow("*{name}", false, "")]
+    [DataRow("&{}", false, "")]
+    [DataRow("&{1name}", false, "")]
+    [DataRow("&{@1name}", false, "")]
+    [DataRow("&{@@name}", false, "")]
+    [DataRow("&{@@.name}", false, "")]
+    [DataRow("&{-name}", true, "-name")]
+    [DataRow("&{.name}", false, "")]
+    [DataRow("&{name value}", false, "")]
+    [DataRow("&{name/value}", false, "")]
+    [DataRow("&{#name}", false, "")]
+    [DataRow("&{##name}", false, "")]
+    [DataRow("&&{name}", false, "")]
+    [DataRow("prefix &{name}", false, "")]
+    [DataRow("&{name} suffix", false, "")]
+    [DataRow("&{name}&{other}", false, "")]
+    [DataRow("&{name", false, "")]
+    [DataRow("& {name}", false, "")]
+    [DataRow("&{name}}", false, "")]
+    [DataRow("&{\u00E4}", false, "")]
+    [DataRow("&{name}\n", false, "")]
+    [DataRow("&{name}\r\n", false, "")]
     public void Test_IndirectionRegex_ReturnsExpectedMatch(string value, bool expected, string expectedExpression)
     {
         Assert.IsNotNull(value);
@@ -118,6 +120,38 @@ public sealed class VariableSyntaxTests
 
         System.Text.RegularExpressions.Match match =
             builder.IndirectionRegex.Match(value);
+
+        Assert.AreEqual(expected, match.Success);
+        if (!expected)
+        {
+            return;
+        }
+
+        Assert.AreEqual(0, match.Index);
+        Assert.AreEqual(value.Length, match.Length);
+        Assert.AreEqual(expectedExpression, match.Groups["expression"].Value);
+    }
+
+    [TestMethod]
+    [DataRow("*{name}", true, "name")]
+    [DataRow("*{host.port}", true, "host.port")]
+    [DataRow("*{a-b.c_0}", true, "a-b.c_0")]
+    [DataRow("*{-}", true, "-")]
+    [DataRow("*{@name}", false, "")]
+    [DataRow("*{@}", false, "")]
+    [DataRow("*{@@}", false, "")]
+    [DataRow("*{#name}", false, "")]
+    [DataRow("prefix *{name}", false, "")]
+    [DataRow("*{name} suffix", false, "")]
+    [DataRow("${name}", false, "")]
+    [DataRow("&{name}", false, "")]
+    [DataRow("*{}", false, "")]
+    [DataRow("*{1name}", false, "")]
+    public void Test_CaptureRegex_ReturnsExpectedMatch(string value, bool expected, string expectedExpression)
+    {
+        VariableSyntaxBuilder builder = CreateBuilder();
+
+        System.Text.RegularExpressions.Match match = builder.CaptureRegex.Match(value);
 
         Assert.AreEqual(expected, match.Success);
         if (!expected)
@@ -199,8 +233,15 @@ public sealed class VariableSyntaxTests
     [DataRow("${#HOME}", 1, "#|HOME")]
     [DataRow("${##HOME}", 1, "##|HOME")]
     [DataRow("${#}", 1, "#|")]
+    [DataRow("&{#name}", 1, "#|name")]
+    [DataRow("&{##name}", 1, "##|name")]
+    [DataRow("*{#name}", 1, "#|name")]
+    [DataRow("*{##@name}", 1, "##|@name")]
     [DataRow("before ${#HOME} after ${##USER}", 2, "#|HOME;##|USER")]
+    [DataRow("before &{#name} after *{#other}", 2, "#|name;#|other")]
     [DataRow("${HOME}", 0, "")]
+    [DataRow("&{name}", 0, "")]
+    [DataRow("*{name}", 0, "")]
     [DataRow("${#HOME", 0, "")]
     public void Test_HashLiteralRegex_Input_ReturnsExpectedMatches(string value, int expectedCount, string expectedMatches)
     {

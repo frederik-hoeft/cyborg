@@ -5,30 +5,11 @@ using Cyborg.Shared.Text;
 namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
 
 internal sealed class DefaultsSectionRenderer(ValidationContractInfo contractInfo, VisibilityContext visibilityContext, DiagnosticsReporter diagnosticsReporter)
-    : SectionRenderer(contractInfo, visibilityContext, diagnosticsReporter)
+    : PreparationSectionRenderer(contractInfo, visibilityContext, diagnosticsReporter)
 {
-    public override void RenderSection(IndentedStringBuilder builder, ModuleModel model)
-    {
-        string qualifiedType = model.FullyQualifiedTypeName;
-        builder.AppendBlock(
-            $$"""
-            private async {{KnownTypes.ValueTaskOfT(qualifiedType)}} ApplyDefaultsAsync(
-                {{ContractInfo.ModuleValidationContext.RenderGlobal()}} {{ContextVariable}},
-                {{KnownTypes.CancellationToken}} cancellationToken)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                {{qualifiedType}} {{RootModuleVariable}} = this;
+    protected override string MethodName => ModuleValidationRenderer.ApplyDefaultsAsync;
 
-            """);
+    protected override string DiagnosticsPhase => "defaults";
 
-        builder = builder.IncreaseIndent();
-        PropertyPreparationRenderer.AppendPreparationForObject(builder, model.Properties, RootModuleVariable, diagnosticsPhase: "defaults");
-        builder = builder.DecreaseIndent();
-        builder.AppendBlock(
-            $$"""
-                await {{KnownTypes.Task}}.CompletedTask;
-                return {{RootModuleVariable}};
-            }
-            """);
-    }
+    protected override PropertyPreparationRenderer PreparationRenderer => field ??= new DefaultPropertyPreparationRenderer(this);
 }

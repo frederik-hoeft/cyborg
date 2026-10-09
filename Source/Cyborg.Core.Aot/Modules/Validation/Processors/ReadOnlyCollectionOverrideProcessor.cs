@@ -19,6 +19,8 @@ internal sealed class ReadOnlyCollectionOverrideProcessor : IDynamicPropertyProc
     private sealed class ReadOnlyCollectionOverridesAspect : IPropertyOverrideAspect
     {
         public string RewriteOverrideResolutionExpression(PropertyRewriteContext context, string currentExpression, string rootPathExpression) =>
-            $"{context.ContextVariable}.ResolveCollectionOverride({context.ModuleVariable}, {context.PropertyAccessExpression}, moduleExpression: \"{context.ModuleVariable}\", valueExpression: \"{rootPathExpression}\")";
+            $"{context.ContextVariable}.ResolveCollectionOverride(" +
+            $"{context.ModuleVariable}, {context.PropertyAccessExpression}, " +
+            $"moduleExpression: \"{context.ModuleVariable}\", valueExpression: \"{rootPathExpression}\")";
     }
 }

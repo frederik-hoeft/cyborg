@@ -3,8 +3,9 @@
 internal interface IPropertyPreparationAspect : IPropertyAspect
 {
     /// <summary>
-    /// Re-applies property-level invariants after ordinary default resolution. This stage runs both
-    /// before and after override resolution, so destination invariants cannot be removed by an override.
+    /// Rewrites the effective property value to enforce preparation invariants, such as applying destination
+    /// tags after defaults, overrides, and typed value expressions have been resolved.
+    /// The resulting value proceeds to textual interpolation and constraint validation.
     /// </summary>
     string RewritePreparedValueExpression(PropertyRewriteContext context, string currentExpression);
 }

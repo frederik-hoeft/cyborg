@@ -116,7 +116,7 @@ The following scalar types are registered by the core runtime:
 }
 ```
 
-DI-aware Cyborg presentation surfaces render secret-tagged values through `ITaggedStringRenderer`; the built-in secret policy produces `[REDACTED]`. Interpolation and exact-reference resolution preserve or union tags, so a secret introduced through a dynamic value remains secret when composed into another tagged value. The raw string remains available through `TaggedString.Value` for subprocess execution and other explicit execution boundaries. Converting to raw `string` intentionally leaves the tagged-value model, so arbitrary code operating on that string is responsible for how it is subsequently exposed.
+DI-aware Cyborg presentation surfaces render secret-tagged values through `ITaggedStringRenderer`; the built-in secret policy produces `[REDACTED]`. Interpolation and typed indirection or capture preserve or union tags, so a secret introduced through a dynamic value remains secret when composed into another tagged value. The raw string remains available through `TaggedString.Value` for subprocess execution and other explicit execution boundaries. Converting to raw `string` intentionally leaves the tagged-value model, so arbitrary code operating on that string is responsible for how it is subsequently exposed.
 
 ### Configuration Enum Types
 

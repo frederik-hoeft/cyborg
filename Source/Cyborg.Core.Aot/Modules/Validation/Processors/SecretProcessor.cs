@@ -40,7 +40,7 @@ internal sealed class SecretProcessor : AttributeProcessorBase<SecretAttribute>
             string tagExpression = context.ContractInfo.SecretTagExpression;
             if (context.Property.IsNullable)
             {
-                return $"({currentExpression}) is {taggedStringType} secretValue ? secretValue.WithTag({tagExpression}) : null";
+                return $"({currentExpression}) is {taggedStringType} secretValue ? secretValue.WithTag({tagExpression}) : default({taggedStringType}?)";
             }
 
             return $"({currentExpression}).WithTag({tagExpression})";

@@ -20,7 +20,11 @@ internal static class ModuleValidationRenderer
 
     public static string ApplyInterpolationAsync => "ApplyInterpolationAsync";
 
+    public static string ApplyPreparationInvariantsAsync => "ApplyPreparationInvariantsAsync";
+
     public static string ResolveOverridesAsync => "ResolveOverridesAsync";
+
+    public static string ResolveValueExpressionsAsync => "ResolveValueExpressionsAsync";
 
     public static string ValidateAsync => "ValidateAsync";
 
@@ -30,7 +34,9 @@ internal static class ModuleValidationRenderer
         ReadOnlySpan<ISectionRenderer> renderPipeline =
         [
             new DefaultsSectionRenderer(contractInfo, visibilityContext, diagnosticsReporter),
+            new PreparationInvariantsSectionRenderer(contractInfo, visibilityContext, diagnosticsReporter),
             new OverrideSectionRenderer(contractInfo, visibilityContext, diagnosticsReporter),
+            new ValueExpressionSectionRenderer(contractInfo, visibilityContext, diagnosticsReporter),
             new InterpolationSectionRenderer(contractInfo, visibilityContext, diagnosticsReporter),
             new ValidationSectionRenderer(contractInfo, visibilityContext, diagnosticsReporter),
             new InspectionSectionRenderer(contractInfo, visibilityContext, diagnosticsReporter),

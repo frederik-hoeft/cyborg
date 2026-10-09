@@ -17,6 +17,7 @@ internal static class ValidationProcessorRegistry
         new RangeProcessor(),
         new IgnoreOverrideProcessor(),
         new IgnoreInterpolationProcessor(),
+        new IgnoreValueExpressionProcessor(),
         new LengthProcessor(),
         new MinLengthProcessor(),
         new MaxLengthProcessor(),

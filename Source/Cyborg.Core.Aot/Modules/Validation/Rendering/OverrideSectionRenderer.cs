@@ -13,6 +13,8 @@ namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
 internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInfo, VisibilityContext visibilityContext, DiagnosticsReporter diagnosticsReporter)
     : SectionRenderer(contractInfo, visibilityContext, diagnosticsReporter)
 {
+    private DefaultPropertyPreparationRenderer DefaultRenderer => field ??= new(this);
+
     public override void RenderSection(IndentedStringBuilder builder, ModuleModel model)
     {
         string qualifiedType = model.FullyQualifiedTypeName;
@@ -51,7 +53,7 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
                 && objectModel.Children.Any(child => HasOverrideWork(child, rewriteContext));
             bool hasCollectionElementAssignments = property.Collection is { Shape.SupportsElementRewrite: true } collection
                 && property.HasCollectionElementChildren
-                && PropertyPreparationRenderer.HasCollectionPreparationWork(collection, rewriteContext);
+                && DefaultRenderer.HasCollectionPreparationWork(collection, rewriteContext);
             bool ignoreOverride = property.TryGetAspect(out IgnoreOverrideAspect? ignoreOverrideAspect);
             if (ignoreOverride && (ignoreOverrideAspect is { Recurse: true } || !hasChildAssignments && !hasCollectionElementAssignments))
             {
@@ -75,7 +77,7 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
             {
                 PropertyAccessExpression = localName
             };
-            PropertyPreparationRenderer.AppendDirectPreparationForProperty(builder, nestedRewriteContext);
+            DefaultRenderer.AppendDirectPreparationForProperty(builder, nestedRewriteContext);
 
             if (hasChildAssignments)
             {
@@ -84,7 +86,7 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
 
             if (hasCollectionElementAssignments)
             {
-                PropertyPreparationRenderer.AppendCollectionPreparationForProperty(builder, property, localName, diagnosticsPhase: "overrides");
+                DefaultRenderer.AppendCollectionPreparationForProperty(builder, property, localName, diagnosticsPhase: "overrides");
             }
 
             assignments.Add((property.Name, localName));
@@ -149,10 +151,13 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
     private string CreateOverrideResolutionExpression(PropertyRewriteContext context, string rootPathExpression)
     {
         string arguments = $"{context.ModuleVariable}, {context.PropertyAccessExpression}, moduleExpression: \"{context.ModuleVariable}\", valueExpression: \"{rootPathExpression}\"";
+        bool isTextual = context.Property.Symbol.Type.EqualsIgnoreNullability(SpecialType.System_String)
+            || context.Property.Symbol.Type.EqualsIgnoreNullability(ContractInfo.TaggedString);
+        string shieldInterpolation = isTextual && !context.Property.HasAspect<IgnoreInterpolationAspect>() ? "true" : "false";
         string expression = context.Property.Symbol.Type.EqualsIgnoreNullability(SpecialType.System_String)
-            ? $"{ContextVariable}.SelectRawStringOverride({arguments})"
+            ? $"{ContextVariable}.SelectRawStringOverride({arguments}, shieldInterpolation: {shieldInterpolation})"
             : context.Property.Symbol.Type.EqualsIgnoreNullability(ContractInfo.TaggedString)
-                ? $"{ContextVariable}.SelectRawTaggedStringOverride({arguments})"
+                ? $"{ContextVariable}.SelectRawTaggedStringOverride({arguments}, shieldInterpolation: {shieldInterpolation})"
                 : $"{ContextVariable}.ResolveOverride({arguments})";
         foreach (IPropertyOverrideAspect aspect in context.Property.Aspects<IPropertyOverrideAspect>())
         {

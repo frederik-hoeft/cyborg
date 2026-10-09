@@ -62,35 +62,29 @@ The generated module pipeline has a fixed order:
 
 1. Apply defaults.
 2. Resolve or select overrides.
-3. Reapply defaults.
-4. Interpolate eligible textual values (`string` and `TaggedString`).
-5. Validate constraints.
+3. Reapply defaults for values introduced by overrides.
+4. Resolve typed value expressions in textual properties.
+5. Reapply destination preparation invariants without introducing new defaults.
+6. Interpolate eligible textual values (`string` and `TaggedString`).
+7. Validate constraints.
 
-Each phase returns transformed records through `with` expressions. Do not mutate the deserialized module instance.
+Each phase produces transformed records through `with` expressions. Do not mutate the deserialized module instance. These phases also traverse supported nested `[Validatable]` records and collections. See [Source Generators](/docs/architecture/source-generators.md) for the preparation architecture.
 
-`string` and `TaggedString` overrides are selected as stored values without evaluating their contents. Non-textual overrides use full typed resolution. This distinction is required so `[IgnoreInterpolation]` applies equally to JSON values, defaults, and overrides, and so generated preparation does not accidentally perform an extra interpolation pass.
+`string` and `TaggedString` overrides are selected without evaluating their contents; non-textual overrides use typed resolution. Selection is based on the presence of an override, never on whether its resolved value differs from the original property. `[IgnoreInterpolation]` suppresses only textual interpolation, not typed expression resolution. See [Interpolation and Overrides](/docs/architecture/interpolation.md) for their shared resolution contract.
 
 The worker receives the validated module. Do not repeat generated interpolation in worker code. Manually call `runtime.Environment.Interpolate(...)` only for values whose evaluation was intentionally deferred, normally through `[IgnoreInterpolation]`.
 
 ### Runtime environments, resolution, and interpolation
 
-Environment values are late-bound:
+Environment values support three distinct operations:
 
-- `SetVariable(...)` stores values unchanged.
-- `TryResolveVariable(...)` and `Interpolate(...)` are complete evaluation boundaries.
-- Unresolved ordinary expressions remain unchanged.
-- Cyclic resolution throws `InvalidOperationException`.
+- `${...}` is late-bound **text interpolation**, including when it occupies the entire value. Missing interpolated targets remain literal.
+- `&{...}` is late-bound **typed indirection**, preserving the target's CLR type. A missing target fails resolution.
+- `*{...}` is **typed capture** at `SetVariable(...)` time. The captured value is terminal on later reads and is not deep-cloned.
 
-Supported ordinary expressions are:
+`SetVariable(...)` validates value syntax and performs eager captures; other expressions remain stored for evaluation on read. `TryResolveVariable(...)` and `Interpolate(...)` finalize a read according to their respective typed or textual contracts. Escapes use layered `#` markers, with one layer removed per evaluation pass without rescanning the newly exposed expression. Cyclic references throw `InvalidOperationException`. Keys (including override paths) support only text interpolation, not typed expressions.
 
-| Syntax | Meaning |
-|--------|---------|
-| `${identifier}` | Resolve relative to the scope where the expression is encountered. |
-| `${@identifier}` | Resolve relative to the original resolution entry point. |
-| `${@}` | Resolve the current scope namespace. |
-| `${@@}` | Resolve the original entry-point namespace. |
-
-`${#...}` escapes one interpolation pass. Each pass removes exactly one leading `#` and does not rescan the newly exposed expression during that pass.
+For details on entry-point-relative references, tagging, deferred interpolation, phase boundaries, and escape behavior, refer to [Interpolation and Override Resolution](/docs/architecture/interpolation.md). The [Runtime Environment section](/docs/architecture/architecture-overview.md#runtime-environment) describes hierarchical scoping and its place in workflow execution.
 
 The effective module namespace uses `Name`, then `Group`, then `ModuleId`. Override lookup uses this precedence:
 

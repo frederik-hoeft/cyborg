@@ -44,10 +44,10 @@
                 "configuration": {
                   "cyborg.modules.config.map.v1": {
                     "entries": [
-                      // need to inject the port into the module via override since port is an integer
+                      // port is an int, so the override is a lazy typed indirection rather than text interpolation
                       {
                         "key": "@my_wol.liveness_probe_port",
-                        "string": "${host.port}"
+                        "string": "&{host.port}"
                       }
                     ]
                   }

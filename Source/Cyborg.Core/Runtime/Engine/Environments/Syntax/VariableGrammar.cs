@@ -1,7 +1,7 @@
 ﻿namespace Cyborg.Core.Runtime.Engine.Environments.Syntax;
 
 /// <summary>
-/// Defines the grammar for variable identifiers, namespaces, and interpolations used in the environment.
+/// Defines the grammar for variable identifiers, namespaces, and value expressions used in the environment.
 /// </summary>
 internal static class VariableGrammar
 {
@@ -25,12 +25,23 @@ internal static class VariableGrammar
     public const string NAMESPACE_PATTERN = $@"\A{IDENTIFIER}\z";
 
     [StringSyntax(StringSyntaxAttribute.Regex)]
-    // allow ${@@} for late self references, ${@} for self references, ${@identifier} for late refs, and ${identifier} for normal references
-    public const string INTERPOLATION_PATTERN = $@"\$\{{(?<expression>@@|@(?:{IDENTIFIER})?|{IDENTIFIER})\}}";
+    // @@ late self, @ self, @identifier entry-point reference, or identifier current-scope reference
+    public const string EXPRESSION_PATTERN = $@"@@|@(?:{IDENTIFIER})?|{IDENTIFIER}";
 
     [StringSyntax(StringSyntaxAttribute.Regex)]
-    public const string HASH_LITERAL_PATTERN = @"\$\{(?<hashes>#+)(?<content>[^}]*)\}";
+    public const string INTERPOLATION_PATTERN = $@"\$\{{(?<expression>{EXPRESSION_PATTERN})\}}";
 
     [StringSyntax(StringSyntaxAttribute.Regex)]
-    public const string INDIRECTION_PATTERN = $@"\A{INTERPOLATION_PATTERN}\z";
+    public const string INDIRECTION_PATTERN = $@"\A&\{{(?<expression>{EXPRESSION_PATTERN})\}}\z";
+
+    [StringSyntax(StringSyntaxAttribute.Regex)]
+    public const string CAPTURE_PATTERN = $@"\A\*\{{(?<expression>{IDENTIFIER})\}}\z";
+
+    [StringSyntax(StringSyntaxAttribute.Regex)]
+    // one or more hashes escape a single evaluation pass for interpolation, indirection, or capture
+    public const string HASH_LITERAL_PATTERN = @"[$&*]\{(?<hashes>#+)(?<content>[^}]*)\}";
+
+    [StringSyntax(StringSyntaxAttribute.Regex)]
+    // unescaped indirection or capture; a leading hash is an escape, not an active reference
+    public const string ACTIVE_REFERENCE_PATTERN = @"[&*]\{(?!#)[^}]*\}";
 }

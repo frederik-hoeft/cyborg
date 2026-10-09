@@ -1,6 +1,7 @@
 ﻿using Cyborg.Core.Runtime.Engine.Environments;
 using Cyborg.Core.Runtime.Engine.Environments.Syntax;
 using Cyborg.Core.Runtime.Model;
+using Cyborg.Core.Text;
 using Microsoft.Extensions.Logging;
 
 namespace Cyborg.Core.Runtime.Engine;
@@ -74,7 +75,8 @@ internal sealed class ModuleContextRunner(VariableSyntaxBuilder syntaxFactory, I
 
         foreach ((string argument, object value) in resolvedArguments)
         {
-            environment.SetVariable(argument, value);
+            object storedValue = value is string or TaggedString ? ExpressionShield.ShieldText(value) : value;
+            environment.SetVariable(argument, storedValue);
         }
     }
 }

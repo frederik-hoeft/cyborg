@@ -7,8 +7,8 @@ using System.Text.Json.Serialization;
 namespace Cyborg.Core.Text;
 
 /// <summary>
-/// A string value together with arbitrary metadata tags. Tags union across interpolation and
-/// indirection so taint such as <see cref="WellKnownTags.SECRET"/> cannot be stripped by composition.
+/// A string value together with arbitrary metadata tags. Tags union across interpolation,
+/// indirection, and capture so taint such as <see cref="WellKnownTags.SECRET"/> cannot be stripped by composition.
 /// </summary>
 /// <remarks>
 /// Use <see cref="Value"/> to read the raw string at an execution boundary. Cyborg-controlled

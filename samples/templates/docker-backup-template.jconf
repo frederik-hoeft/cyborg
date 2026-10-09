@@ -13,10 +13,10 @@
             "entries": [
               { "key": "container_root", "string": "${docker_root}/containers/${container_name}" },
               { "key": "volume_root", "string": "${docker_root}/volumes/${container_name}" },
-              { "key": "@borg_create.target", "string": "${borg_create}" },
-              { "key": "@borg_prune.target", "string": "${borg_prune}" },
-              { "key": "@borg_compact.target", "string": "${borg_compact}" },
-              { "key": "@borg_tasks.remote_shell", "string": "${@host.remote_shell}"},
+              { "key": "@borg_create.target", "string": "&{borg_create}" },
+              { "key": "@borg_prune.target", "string": "&{borg_prune}" },
+              { "key": "@borg_compact.target", "string": "&{borg_compact}" },
+              { "key": "@borg_tasks.remote_shell", "string": "&{@host.remote_shell}"},
               { "key": "@borg_tasks.passphrase", "string": "${@borg_passphrase}"},
               {
                 "key": "@borg_tasks.remote_repository",
@@ -27,7 +27,7 @@
                   "repository_name": "${container_name}"
                 }
               },
-              { "key": "@borg_tasks.remote_repository.port", "string": "${@host.port}" }
+              { "key": "@borg_tasks.remote_repository.port", "string": "&{@host.port}" }
             ]
           }
         },

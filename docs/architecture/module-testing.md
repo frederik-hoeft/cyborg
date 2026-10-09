@@ -243,7 +243,7 @@ protected Task TestValidationAsync<TModule>(
     Action<IConfigurationBuilder>? buildConfiguration = null)
 ```
 
-Runs the complete generated pipeline (defaults → overrides → defaults → interpolation → constraints) and passes the `IValidationResult<TModule>` to the assertion. Use this to verify transformed values, recursive collection behavior, interpolation ordering, and validation errors.
+Runs the complete generated pipeline (defaults → overrides → defaults → value expressions → preparation invariants → interpolation → constraints) and passes the `IValidationResult<TModule>` to the assertion. Use this to verify transformed values, recursive collection behavior, interpolation ordering, and validation errors.
 
 ```csharp
 protected Task TestValidatedModuleAsync<TModule>(

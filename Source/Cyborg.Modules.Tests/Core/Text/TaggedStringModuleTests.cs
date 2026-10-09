@@ -14,6 +14,25 @@ namespace Cyborg.Modules.Tests.Core.Text;
 public sealed class TaggedStringModuleTests : ModuleTestBase
 {
     [TestMethod]
+    public Task TestValidationAsync_SecretTaggingAfterDefaultsPreservesWhenPresentMatchingAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        TaggedStringTestModule module = new(
+            Plain: "visible",
+            Secret: "secret",
+            OptionalSecret: null,
+            IntentionallyUntagged: "id",
+            Values: []);
+
+        IValidationResult<TaggedStringTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
+
+        MSAssert.IsTrue(result.IsValid);
+        MSAssert.IsNull(result.Module.OptionalSecret);
+        MSAssert.AreEqual("default-secret", result.Module.DefaultedSecret.Value);
+        MSAssert.IsTrue(result.Module.DefaultedSecret.HasTag(WellKnownTags.SECRET));
+    });
+
+    [TestMethod]
     public Task TestValidationAsync_SecretAttribute_InjectsSecretTagAsync() => TestWithDIAsync(async services =>
     {
         IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
@@ -30,6 +49,50 @@ public sealed class TaggedStringModuleTests : ModuleTestBase
         MSAssert.AreEqual("visible", result.Module.Plain.Value);
         MSAssert.IsFalse(result.Module.Plain.HasTags);
         MSAssert.AreEqual("s3cret", result.Module.Secret.Value);
+        MSAssert.IsTrue(result.Module.Secret.HasTag(WellKnownTags.SECRET));
+    });
+
+    [TestMethod]
+    public Task TestValidationAsync_SecretLazyIndirectionPreservesSourceTagsAndDestinationSecretAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        runtime.Environment.SetVariable("source", new TaggedString("resolved", ["source.tag"]));
+        TaggedStringTestModule module = new(
+            Plain: "visible",
+            Secret: "&{source}",
+            OptionalSecret: null,
+            IntentionallyUntagged: "id",
+            Values: []);
+
+        IValidationResult<TaggedStringTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
+
+        MSAssert.IsTrue(result.IsValid);
+        MSAssert.AreEqual("resolved", result.Module.Secret.Value);
+        MSAssert.IsTrue(result.Module.Secret.HasTag("source.tag"));
+        MSAssert.IsTrue(result.Module.Secret.HasTag(WellKnownTags.SECRET));
+    });
+
+    [TestMethod]
+    public Task TestValidationAsync_SecretOverrideLazyIndirectionPreservesTagsAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        runtime.Environment.SetVariable("source", new TaggedString("resolved", ["source.tag"]));
+        runtime.Environment.SetVariable("@tagged.secret", "&{source}");
+        TaggedStringTestModule module = new(
+            Plain: "visible",
+            Secret: "fallback",
+            OptionalSecret: null,
+            IntentionallyUntagged: "id",
+            Values: [])
+        {
+            Name = "tagged",
+        };
+
+        IValidationResult<TaggedStringTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
+
+        MSAssert.IsTrue(result.IsValid);
+        MSAssert.AreEqual("resolved", result.Module.Secret.Value);
+        MSAssert.IsTrue(result.Module.Secret.HasTag("source.tag"));
         MSAssert.IsTrue(result.Module.Secret.HasTag(WellKnownTags.SECRET));
     });
 
@@ -130,6 +193,27 @@ public sealed class TaggedStringModuleTests : ModuleTestBase
         MSAssert.Contains(CustomTagRenderer.RenderedValue, error.Message);
         MSAssert.DoesNotContain("not valid", error.Message);
     }, static services => services.AddSingleton<ITaggedStringRenderer, CustomTagRenderer>());
+
+    [TestMethod]
+    public Task TestValidationAsync_SecretIgnoreInterpolationStillResolvesLazyIndirectionAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        runtime.Environment.SetVariable("source", new TaggedString("resolved", ["source.tag"]));
+        TaggedStringTestModule module = new(
+            Plain: "visible",
+            Secret: "secret",
+            OptionalSecret: "&{source}",
+            IntentionallyUntagged: "id",
+            Values: []);
+
+        IValidationResult<TaggedStringTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
+
+        MSAssert.IsTrue(result.IsValid);
+        MSAssert.IsTrue(result.Module.OptionalSecret.HasValue);
+        MSAssert.AreEqual("resolved", result.Module.OptionalSecret.Value.Value);
+        MSAssert.IsTrue(result.Module.OptionalSecret.Value.HasTag("source.tag"));
+        MSAssert.IsTrue(result.Module.OptionalSecret.Value.HasTag(WellKnownTags.SECRET));
+    });
 
     [TestMethod]
     public Task TestValidationAsync_SecretNullableIgnoreInterpolation_InjectsSecretTagAsync() => TestWithDIAsync(async services =>

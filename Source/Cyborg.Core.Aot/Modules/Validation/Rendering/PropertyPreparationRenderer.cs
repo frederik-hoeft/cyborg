@@ -1,5 +1,4 @@
-﻿using Cyborg.Core.Aot.Modules.Validation.Aspects;
-using Cyborg.Core.Aot.Modules.Validation.Models;
+﻿using Cyborg.Core.Aot.Modules.Validation.Models;
 using Cyborg.Core.Aot.Modules.Validation.Rendering.Collections;
 using Cyborg.Core.Aot.Modules.Validation.Rendering.Models;
 using Cyborg.Core.Aot.Modules.Validation.Rendering.Objects;
@@ -9,7 +8,7 @@ using System.Collections.Immutable;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
 
-internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
+internal abstract class PropertyPreparationRenderer(SectionRenderer parent)
 {
     public bool AppendPreparationForObject(IndentedStringBuilder builder, ImmutableArray<PropertyModel> properties, string targetVariable, string diagnosticsPhase)
     {
@@ -209,25 +208,7 @@ internal sealed class PropertyPreparationRenderer(SectionRenderer parent)
         return false;
     }
 
-    private static string? CreatePreparedValueExpression(PropertyRewriteContext context)
-    {
-        string? defaultExpression = null;
-        foreach (IPropertyDefaultAspect aspect in context.Property.Aspects<IPropertyDefaultAspect>())
-        {
-            defaultExpression = aspect.RewriteDefaultAssignmentExpression(context, defaultExpression);
-        }
-
-        string expression = defaultExpression ?? context.PropertyAccessExpression;
-        bool hasInvariantRewrite = false;
-        foreach (IPropertyPreparationAspect aspect in context.Property.Aspects<IPropertyPreparationAspect>())
-        {
-            string rewritten = aspect.RewritePreparedValueExpression(context, expression);
-            hasInvariantRewrite |= !string.Equals(rewritten, expression, StringComparison.Ordinal);
-            expression = rewritten;
-        }
-
-        return defaultExpression is null && !hasInvariantRewrite ? null : expression;
-    }
+    protected abstract string? CreatePreparedValueExpression(PropertyRewriteContext context);
 
     private static string CreateSafeIdentifier(string value) => string.Concat(value.Select(static character => char.IsLetterOrDigit(character) ? character : '_'));
 }

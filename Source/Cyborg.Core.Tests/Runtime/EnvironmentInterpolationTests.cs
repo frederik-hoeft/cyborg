@@ -189,7 +189,7 @@ public sealed class EnvironmentInterpolationTests : CyborgCoreTestBase
         IRuntimeEnvironment environment = runtime.Environment;
         ProbeModule module = new(Value: null, Port: 0) { Name = "probe" };
         environment.SetVariable("port", 22);
-        environment.SetVariable("@probe.port", "${port}");
+        environment.SetVariable("@probe.port", "&{port}");
 
         int actual = environment.Resolve(module, module.Port);
 
@@ -221,6 +221,101 @@ public sealed class EnvironmentInterpolationTests : CyborgCoreTestBase
         Assert.DoesNotContain("SelectStringOverride", methodNames);
         Assert.DoesNotContain("SelectRawStringOverride", methodNames);
         Assert.DoesNotContain("ResolveCollection", methodNames);
+    }
+
+    [TestMethod]
+    public void Test_Resolve_LocalOverrideEqualToOriginal_ShadowsParent()
+    {
+        GlobalRuntimeEnvironment parent = new(JsonNamingPolicy.SnakeCaseLower);
+        ProbeModule module = new(Value: null, Port: 22) { Name = "probe" };
+        parent.SetVariable("@probe.port", 80);
+
+        InheritedRuntimeEnvironment child = new(
+            Name: "child",
+            Parent: parent,
+            IsTransient: false,
+            SyntaxFactory: parent.SyntaxFactory,
+            Namespace: "child");
+        child.SetVariable("port", 22);
+        child.SetVariable("@probe.port", "&{port}");
+
+        Assert.AreEqual(22, child.Resolve(module, module.Port));
+    }
+
+    [TestMethod]
+    public void Test_ResolveCollection_LocalOverrideEqualByReference_ShadowsParent()
+    {
+        GlobalRuntimeEnvironment parent = new(JsonNamingPolicy.SnakeCaseLower);
+        IReadOnlyCollection<int> configured = [22];
+        ProbeCollectionModule module = new(configured) { Name = "probe" };
+        IReadOnlyCollection<int> parentOverride = [80];
+        parent.SetVariable("@probe.ports", parentOverride);
+
+        InheritedRuntimeEnvironment child = new(
+            Name: "child",
+            Parent: parent,
+            IsTransient: false,
+            SyntaxFactory: parent.SyntaxFactory,
+            Namespace: "child");
+        child.SetVariable("@probe.ports", configured);
+
+        IReadOnlyCollection<int>? result = ((IRuntimeEnvironment)child).ResolveCollection(module, module.Ports, nameof(module), "module.Ports");
+        Assert.AreSame(configured, result);
+    }
+
+    [TestMethod]
+    public void Test_Resolve_AbsentOverride_UsesConfiguredValue()
+    {
+        GlobalRuntimeEnvironment parent = new(JsonNamingPolicy.SnakeCaseLower);
+        ProbeModule module = new(Value: null, Port: 22) { Name = "probe" };
+        InheritedRuntimeEnvironment child = new(
+            Name: "child",
+            Parent: parent,
+            IsTransient: false,
+            SyntaxFactory: parent.SyntaxFactory,
+            Namespace: "child");
+
+        Assert.AreEqual(22, child.Resolve(module, module.Port));
+    }
+
+    [TestMethod]
+    public void Test_Resolve_AbsentLocalOverride_UsesParentOverride()
+    {
+        GlobalRuntimeEnvironment parent = new(JsonNamingPolicy.SnakeCaseLower);
+        ProbeModule module = new(Value: null, Port: 22) { Name = "probe" };
+        parent.SetVariable("@probe.port", 80);
+        InheritedRuntimeEnvironment child = new(
+            Name: "child",
+            Parent: parent,
+            IsTransient: false,
+            SyntaxFactory: parent.SyntaxFactory,
+            Namespace: "child");
+
+        Assert.AreEqual(80, child.Resolve(module, module.Port));
+    }
+
+    [TestMethod]
+    public void Test_ResolveCollection_AbsentLocalOverride_UsesParentOverride()
+    {
+        GlobalRuntimeEnvironment parent = new(JsonNamingPolicy.SnakeCaseLower);
+        IReadOnlyCollection<int> configured = [22];
+        IReadOnlyCollection<int> parentOverride = [80];
+        ProbeCollectionModule module = new(configured) { Name = "probe" };
+        parent.SetVariable("@probe.ports", parentOverride);
+        InheritedRuntimeEnvironment child = new(
+            Name: "child",
+            Parent: parent,
+            IsTransient: false,
+            SyntaxFactory: parent.SyntaxFactory,
+            Namespace: "child");
+
+        IReadOnlyCollection<int>? result = ((IRuntimeEnvironment)child).ResolveCollection(module, module.Ports, nameof(module), "module.Ports");
+        Assert.AreSame(parentOverride, result);
+    }
+
+    private sealed record ProbeCollectionModule(IReadOnlyCollection<int> Ports) : ModuleBase, IModuleDefinition
+    {
+        public static string ModuleId => "cyborg.tests.collection-probe.v1";
     }
 
     private sealed record ProbeModule(string? Value, int Port) : ModuleBase, IModuleDefinition
