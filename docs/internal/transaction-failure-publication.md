@@ -29,7 +29,7 @@ Rollback applies only to **workflow-data** participants:
 - the runtime named-module registry;
 - custom `TransactionalServiceParticipant<TState>` services, which are workflow-semantic unless they say otherwise.
 
-**Control** participants still reconcile. Debugger branch-control state is the built-in control participant: step and continue decisions survive a workflow rollback so a failed, rolled-back child cannot trap the branch in a stale step mode or drop a step that the child took. Custom participants opt into this class by overriding `TransactionalServiceParticipant.Role` to `TransactionParticipantRole.Control`. The default role is `WorkflowData`.
+**Control** participants still reconcile. Debugger branch-control state is the built-in control participant: step, next, and continue decisions survive a workflow rollback so a failed, rolled-back child cannot trap the branch in a stale step mode or drop a step or step-over that the child took. Custom participants opt into this class by overriding `TransactionalServiceParticipant.Role` to `TransactionParticipantRole.Control`. The default role is `WorkflowData`.
 
 External I/O, process-wide singletons, and mutation inside objects stored as environment values stay outside the transaction, for both policies.
 

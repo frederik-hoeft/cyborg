@@ -252,6 +252,229 @@ public sealed class DebuggerProductionFlowTests : ModuleTestBase
         MSAssert.HasCount(0, topology.CaptureTree().Roots);
     });
 
+    [TestMethod]
+    public Task Test_Sequence_NextStopsAtFollowingSiblingAsync() => TestWithDIAsync(async services =>
+    {
+        ScriptedFrontend frontend = UseFrontend(services, static (context, _) =>
+            ValueTask.FromResult(context.ValidationResult.Module.Name switch
+            {
+                "first" => DebugResumeAction.Next,
+                _ => DebugResumeAction.Continue,
+            }));
+        services.GetRequiredService<IBreakpointRegistry>().Add("^first$");
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        ModuleConfigurationLoadResult configuration = await LoadContextAsync(services, SequenceWorkflowJson);
+
+        IModuleExecutionResult result = await runtime.ExecuteAsync(configuration, TestContext.CancellationToken);
+
+        MSAssert.AreEqual(ModuleExitStatus.Success, result.Status);
+        MSAssert.AreSequenceEqual(["first", "second"], frontend.Names);
+    });
+
+    [TestMethod]
+    public Task Test_Dynamic_NextSkipsTargetAndPausesAtFollowingModuleAsync() => TestWithDIAsync(async services =>
+    {
+        ScriptedFrontend frontend = UseFrontend(services, static (context, _) =>
+            ValueTask.FromResult(context.ValidationResult.Module.Name switch
+            {
+                "dynamic" => DebugResumeAction.Next,
+                _ => DebugResumeAction.Continue,
+            }));
+        services.GetRequiredService<IBreakpointRegistry>().Add("^dynamic$");
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        ModuleConfigurationLoadResult configuration = await LoadContextAsync(services, DynamicWorkflowJson);
+
+        IModuleExecutionResult result = await runtime.ExecuteAsync(configuration, TestContext.CancellationToken);
+
+        MSAssert.AreEqual(ModuleExitStatus.Success, result.Status);
+        MSAssert.AreSequenceEqual(["dynamic", "after"], frontend.Names);
+    });
+
+    [TestMethod]
+    public Task Test_Sequence_StepThenNextSkipsCurrentSubtreeAsync() => TestWithDIAsync(async services =>
+    {
+        ScriptedFrontend frontend = UseFrontend(services, static (context, _) =>
+            ValueTask.FromResult(context.ValidationResult.Module.Name switch
+            {
+                "inner" => DebugResumeAction.Step,
+                "a" => DebugResumeAction.Next,
+                _ => DebugResumeAction.Continue,
+            }));
+        services.GetRequiredService<IBreakpointRegistry>().Add("^inner$");
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        ModuleConfigurationLoadResult configuration = await LoadContextAsync(services, NestedStepOverWorkflowJson);
+
+        IModuleExecutionResult result = await runtime.ExecuteAsync(configuration, TestContext.CancellationToken);
+
+        MSAssert.AreEqual(ModuleExitStatus.Success, result.Status);
+        MSAssert.AreSequenceEqual(["inner", "a", "b"], frontend.Names);
+    });
+
+    [TestMethod]
+    public Task Test_Sequence_NextOnLastChildPausesOnTheParentSuccessorAsync() => TestWithDIAsync(async services =>
+    {
+        ScriptedFrontend frontend = UseFrontend(services, static (context, _) =>
+            ValueTask.FromResult(context.ValidationResult.Module.Name switch
+            {
+                "only" => DebugResumeAction.Next,
+                _ => DebugResumeAction.Continue,
+            }));
+        services.GetRequiredService<IBreakpointRegistry>().Add("^only$");
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        ModuleConfigurationLoadResult configuration = await LoadContextAsync(services, LastChildWorkflowJson);
+
+        IModuleExecutionResult result = await runtime.ExecuteAsync(configuration, TestContext.CancellationToken);
+
+        MSAssert.AreEqual(ModuleExitStatus.Success, result.Status);
+        MSAssert.AreSequenceEqual(["only", "after"], frontend.Names);
+    });
+
+    [TestMethod]
+    public Task Test_Parallel_NextFollowsTheSameBranchAndNotTheSiblingBranchAsync() => TestWithDIAsync(async services =>
+    {
+        ScriptedFrontend frontend = UseFrontend(services, static (context, _) =>
+            ValueTask.FromResult(context.ValidationResult.Module.Name switch
+            {
+                "a1" => DebugResumeAction.Next,
+                _ => DebugResumeAction.Continue,
+            }));
+        services.GetRequiredService<IBreakpointRegistry>().Add("^a1$");
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        ModuleConfigurationLoadResult configuration = await LoadContextAsync(services, ParallelBranchWorkflowJson);
+
+        IModuleExecutionResult result = await runtime.ExecuteAsync(configuration, TestContext.CancellationToken);
+
+        MSAssert.AreEqual(ModuleExitStatus.Success, result.Status);
+        MSAssert.AreSequenceEqual(["a1", "a2"], frontend.Names);
+    });
+
+    [TestMethod]
+    public Task Test_Parallel_NextOnLeafResumesOnTheParentAfterJoinAsync() => TestWithDIAsync(async services =>
+    {
+        ScriptedFrontend frontend = UseFrontend(services, static (context, _) =>
+            ValueTask.FromResult(context.ValidationResult.Module.Name switch
+            {
+                "a" => DebugResumeAction.Next,
+                _ => DebugResumeAction.Continue,
+            }));
+        services.GetRequiredService<IBreakpointRegistry>().Add("^a$");
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        ModuleConfigurationLoadResult configuration = await LoadContextAsync(services, ShallowParallelWorkflowJson);
+
+        IModuleExecutionResult result = await runtime.ExecuteAsync(configuration, TestContext.CancellationToken);
+
+        MSAssert.AreEqual(ModuleExitStatus.Success, result.Status);
+        MSAssert.AreSequenceEqual(["a", "after"], frontend.Names);
+    });
+
+    [TestMethod]
+    public Task Test_Parallel_LaterNextInsideSteppedOverParentWinsAtJoinAsync() => TestWithDIAsync(async services =>
+    {
+        ScriptedFrontend frontend = UseFrontend(services, static (context, _) =>
+            ValueTask.FromResult(context.ValidationResult.Module.Name switch
+            {
+                "outer" => DebugResumeAction.Next,
+                "b" => DebugResumeAction.Next,
+                _ => DebugResumeAction.Continue,
+            }));
+        IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
+        breakpoints.Add("^outer$");
+        breakpoints.Add("^b$");
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        ModuleConfigurationLoadResult configuration = await LoadContextAsync(services, NestedParallelStepOverWorkflowJson);
+
+        IModuleExecutionResult result = await runtime.ExecuteAsync(configuration, TestContext.CancellationToken);
+
+        MSAssert.AreEqual(ModuleExitStatus.Success, result.Status);
+        MSAssert.AreSequenceEqual(["outer", "b", "c"], frontend.Names);
+    });
+
+    [TestMethod]
+    public Task Test_Sequence_BreakpointInsideStepOverStillPausesAsync() => TestWithDIAsync(async services =>
+    {
+        ScriptedFrontend frontend = UseFrontend(services, static (context, _) =>
+            ValueTask.FromResult(context.ValidationResult.Module.Name switch
+            {
+                "outer" => DebugResumeAction.Next,
+                "child" => DebugResumeAction.Continue,
+                _ => DebugResumeAction.Continue,
+            }));
+        IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
+        breakpoints.Add("^outer$");
+        breakpoints.Add("^child$");
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        ModuleConfigurationLoadResult configuration = await LoadContextAsync(services, BreakpointInsideStepOverWorkflowJson);
+
+        IModuleExecutionResult result = await runtime.ExecuteAsync(configuration, TestContext.CancellationToken);
+
+        MSAssert.AreEqual(ModuleExitStatus.Success, result.Status);
+        MSAssert.AreSequenceEqual(["outer", "child"], frontend.Names);
+    });
+
+    [TestMethod]
+    public Task Test_Sequence_DetachDuringStepOverSuppressesThePendingStopAsync() => TestWithDIAsync(async services =>
+    {
+        ScriptedFrontend frontend = UseFrontend(services, static (context, _) =>
+            ValueTask.FromResult(context.ValidationResult.Module.Name switch
+            {
+                "outer" => DebugResumeAction.Next,
+                "child" => DebugResumeAction.Detach,
+                _ => DebugResumeAction.Continue,
+            }));
+        IBreakpointRegistry breakpoints = services.GetRequiredService<IBreakpointRegistry>();
+        breakpoints.Add("^outer$");
+        breakpoints.Add("^child$");
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        ModuleConfigurationLoadResult configuration = await LoadContextAsync(services, BreakpointInsideStepOverWorkflowJson);
+
+        IModuleExecutionResult result = await runtime.ExecuteAsync(configuration, TestContext.CancellationToken);
+
+        MSAssert.AreEqual(ModuleExitStatus.Success, result.Status);
+        MSAssert.AreSequenceEqual(["outer", "child"], frontend.Names);
+        MSAssert.AreEqual(0, breakpoints.Count);
+    });
+
+    [TestMethod]
+    public Task Test_While_NextSkipsConditionAndBodyAsync() => TestWithDIAsync(async services =>
+    {
+        ScriptedFrontend frontend = UseFrontend(services, static (context, _) =>
+            ValueTask.FromResult(context.ValidationResult.Module.Name switch
+            {
+                "loop" => DebugResumeAction.Next,
+                _ => DebugResumeAction.Continue,
+            }));
+        services.GetRequiredService<IBreakpointRegistry>().Add("^loop$");
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        runtime.GlobalEnvironment.SetVariable("loop_enabled", true);
+        ModuleConfigurationLoadResult configuration = await LoadContextAsync(services, WhileWorkflowJson);
+
+        IModuleExecutionResult result = await runtime.ExecuteAsync(configuration, TestContext.CancellationToken);
+
+        MSAssert.AreEqual(ModuleExitStatus.Success, result.Status);
+        MSAssert.AreSequenceEqual(["loop", "after"], frontend.Names);
+        MSAssert.IsTrue(runtime.GlobalEnvironment.TryResolveVariable("loop_enabled", out bool loopEnabled));
+        MSAssert.IsFalse(loopEnabled);
+    });
+
+    [TestMethod]
+    public Task Test_Configuration_NextPausesAtTheOwningMainModuleAsync() => TestWithDIAsync(async services =>
+    {
+        ScriptedFrontend frontend = UseFrontend(services, static (context, _) =>
+            ValueTask.FromResult(context.ValidationResult.Module.Name switch
+            {
+                "configuration" => DebugResumeAction.Next,
+                _ => DebugResumeAction.Continue,
+            }));
+        services.GetRequiredService<IBreakpointRegistry>().Add("^configuration$");
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        ModuleConfigurationLoadResult configuration = await LoadContextAsync(services, ConfigurationThenMainWorkflowJson);
+
+        IModuleExecutionResult result = await runtime.ExecuteAsync(configuration, TestContext.CancellationToken);
+
+        MSAssert.AreEqual(ModuleExitStatus.Success, result.Status);
+        MSAssert.AreSequenceEqual(["configuration", "main"], frontend.Names);
+    });
+
     private static ScriptedFrontend UseFrontend(
         IServiceProvider services,
         Func<IDebugPauseContext, int, ValueTask<DebugResumeAction>> script)
@@ -441,6 +664,184 @@ public sealed class DebuggerProductionFlowTests : ModuleTestBase
                 { "module": { "cyborg.modules.empty.v1": { "name": "a" } } },
                 { "module": { "cyborg.modules.empty.v1": { "name": "b" } } }
               ]
+            }
+          }
+        }
+        """;
+
+    private const string NestedStepOverWorkflowJson =
+        """
+        {
+          "environment": { "scope": "global" },
+          "module": {
+            "cyborg.modules.sequence.v1": {
+              "name": "root",
+              "steps": [
+                {
+                  "module": {
+                    "cyborg.modules.sequence.v1": {
+                      "name": "inner",
+                      "steps": [
+                        {
+                          "module": {
+                            "cyborg.modules.sequence.v1": {
+                              "name": "a",
+                              "steps": [
+                                { "module": { "cyborg.modules.empty.v1": { "name": "a1" } } }
+                              ]
+                            }
+                          }
+                        },
+                        { "module": { "cyborg.modules.empty.v1": { "name": "b" } } }
+                      ]
+                    }
+                  }
+                },
+                { "module": { "cyborg.modules.empty.v1": { "name": "after" } } }
+              ]
+            }
+          }
+        }
+        """;
+
+    private const string LastChildWorkflowJson =
+        """
+        {
+          "environment": { "scope": "global" },
+          "module": {
+            "cyborg.modules.sequence.v1": {
+              "name": "root",
+              "steps": [
+                {
+                  "module": {
+                    "cyborg.modules.sequence.v1": {
+                      "name": "inner",
+                      "steps": [
+                        { "module": { "cyborg.modules.empty.v1": { "name": "only" } } }
+                      ]
+                    }
+                  }
+                },
+                { "module": { "cyborg.modules.empty.v1": { "name": "after" } } }
+              ]
+            }
+          }
+        }
+        """;
+
+    private const string NestedParallelStepOverWorkflowJson =
+        """
+        {
+          "environment": { "scope": "global" },
+          "module": {
+            "cyborg.modules.sequence.v1": {
+              "name": "root",
+              "steps": [
+                {
+                  "module": {
+                    "cyborg.modules.sequence.v1": {
+                      "name": "outer",
+                      "steps": [
+                        {
+                          "module": {
+                            "cyborg.modules.parallel.v1": {
+                              "name": "fanout",
+                              "branches": [
+                                { "module": { "cyborg.modules.empty.v1": { "name": "a" } } },
+                                { "module": { "cyborg.modules.empty.v1": { "name": "b" } } }
+                              ]
+                            }
+                          }
+                        },
+                        { "module": { "cyborg.modules.empty.v1": { "name": "c" } } }
+                      ]
+                    }
+                  }
+                },
+                { "module": { "cyborg.modules.empty.v1": { "name": "d" } } }
+              ]
+            }
+          }
+        }
+        """;
+
+    private const string BreakpointInsideStepOverWorkflowJson =
+        """
+        {
+          "environment": { "scope": "global" },
+          "module": {
+            "cyborg.modules.sequence.v1": {
+              "name": "root",
+              "steps": [
+                {
+                  "module": {
+                    "cyborg.modules.sequence.v1": {
+                      "name": "outer",
+                      "steps": [
+                        { "module": { "cyborg.modules.empty.v1": { "name": "child" } } },
+                        { "module": { "cyborg.modules.empty.v1": { "name": "skipped" } } }
+                      ]
+                    }
+                  }
+                },
+                { "module": { "cyborg.modules.empty.v1": { "name": "after" } } }
+              ]
+            }
+          }
+        }
+        """;
+
+    private const string WhileWorkflowJson =
+        """
+        {
+          "environment": { "scope": "global" },
+          "module": {
+            "cyborg.modules.sequence.v1": {
+              "name": "root",
+              "steps": [
+                {
+                  "module": {
+                    "cyborg.modules.while.v1": {
+                      "name": "loop",
+                      "condition": {
+                        "cyborg.modules.condition.is_true.v1": {
+                          "name": "condition",
+                          "variable": "loop_enabled"
+                        }
+                      },
+                      "body": {
+                        "environment": { "scope": "parent" },
+                        "module": {
+                          "cyborg.modules.config.map.v1": {
+                            "name": "disable",
+                            "entries": [
+                              { "key": "loop_enabled", "bool": false }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                { "module": { "cyborg.modules.empty.v1": { "name": "after" } } }
+              ]
+            }
+          }
+        }
+        """;
+
+    private const string ConfigurationThenMainWorkflowJson =
+        """
+        {
+          "environment": { "scope": "global" },
+          "configuration": {
+            "cyborg.modules.empty.v1": {
+              "name": "configuration"
+            }
+          },
+          "module": {
+            "cyborg.modules.empty.v1": {
+              "name": "main"
             }
           }
         }
