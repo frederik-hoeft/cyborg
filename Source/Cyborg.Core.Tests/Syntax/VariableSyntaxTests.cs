@@ -365,4 +365,87 @@ public sealed class VariableSyntaxTests
 
         Assert.AreEqual(expected, actual);
     }
+
+    [TestMethod]
+    [DataRow("${items[]}", true, "items[]")]
+    [DataRow("${items[+]}", true, "items[+]")]
+    [DataRow("${items[]+}", true, "items[]+")]
+    [DataRow("${@items[]}", true, "@items[]")]
+    [DataRow("${a.b[]+}", true, "a.b[]+")]
+    [DataRow("${items[]extra}", false, "")]
+    [DataRow("${[]}", false, "")]
+    public void Test_IndirectionRegex_AcceptsCollectionAccess(string value, bool expected, string expectedExpression)
+    {
+        VariableSyntaxBuilder builder = CreateBuilder();
+
+        System.Text.RegularExpressions.Match match = builder.IndirectionRegex.Match(value);
+
+        Assert.AreEqual(expected, match.Success);
+        if (expected)
+        {
+            Assert.AreEqual(expectedExpression, match.Groups["expression"].Value);
+        }
+    }
+
+    [TestMethod]
+    [DataRow("${items[]}", 1, "items[]")]
+    [DataRow("${items[]+}", 1, "items[]+")]
+    [DataRow("x ${items[+]} y", 1, "items[+]")]
+    [DataRow("${@items[]}", 1, "@items[]")]
+    [DataRow("${items[0]}", 0, "")]
+    public void Test_InterpolationRegex_AcceptsCollectionAccess(string value, int expectedCount, string expectedExpressions)
+    {
+        VariableSyntaxBuilder builder = CreateBuilder();
+
+        System.Text.RegularExpressions.MatchCollection matches = builder.InterpolationRegex.Matches(value);
+        List<string> actualExpressions = [];
+        foreach (System.Text.RegularExpressions.Match match in matches)
+        {
+            actualExpressions.Add(match.Groups["expression"].Value);
+        }
+
+        Assert.HasCount(expectedCount, matches);
+        Assert.AreEqual(expectedExpressions, string.Join("|", actualExpressions));
+    }
+
+    [TestMethod]
+    [DataRow("items", true)]
+    [DataRow("@module.items", true)]
+    [DataRow("$?", true)]
+    [DataRow("probe.$?", true)]
+    [DataRow("@probe.$?", true)]
+    [DataRow("items[]", false)]
+    [DataRow("@module.items[]", false)]
+    [DataRow("@", false)]
+    [DataRow("items[0]", false)]
+    public void Test_IsValidVariableName_AcceptsOrdinaryAndOverrideAddresses(string value, bool expected)
+    {
+        VariableSyntaxBuilder builder = CreateBuilder();
+
+        Assert.AreEqual(expected, builder.IsValidVariableName(value));
+    }
+
+    [TestMethod]
+    [DataRow("items", false, true)]
+    [DataRow("@module.items", false, true)]
+    [DataRow("$?", false, true)]
+    [DataRow("probe.$?", false, true)]
+    [DataRow("items[]", true, true)]
+    [DataRow("items[]+", true, true)]
+    [DataRow("items[+]", false, false)]
+    [DataRow("@module.items[]", true, true)]
+    [DataRow("@module.items[]+", true, true)]
+    [DataRow("@module.items[+]", false, false)]
+    [DataRow("a.b[]", true, true)]
+    [DataRow("items[", false, false)]
+    [DataRow("@items[", false, false)]
+    [DataRow("", false, false)]
+    public void Test_IsValidAssignmentTarget_AcceptsCollectionAssignmentsOnly(string value, bool isCollectionAssignment, bool isAssignmentTarget)
+    {
+        VariableSyntaxBuilder builder = CreateBuilder();
+
+        Assert.AreEqual(isCollectionAssignment, builder.IsCollectionAssignment(value));
+        Assert.AreEqual(isAssignmentTarget, builder.IsValidAssignmentTarget(value));
+        Assert.IsFalse(builder.IsValidIdentifier(value) && value.Contains('[', StringComparison.Ordinal));
+    }
 }

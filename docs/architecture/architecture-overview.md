@@ -51,6 +51,7 @@ For detailed reference material, see:
     - [Cycle Detection](#cycle-detection)
     - [Variable Name Syntax](#variable-name-syntax)
     - [Decomposable Objects](#decomposable-objects)
+    - [Virtual Collections](#virtual-collections)
   - [Module Property Overrides](#module-property-overrides)
     - [Override Resolution](#override-resolution)
     - [Override Use Case](#override-use-case)
@@ -308,7 +309,7 @@ When `TryResolveVariable<T>(name)` is called, the runtime captures the environme
 
 1. **Current-scope self-reference** — The special name `@` resolves to the environment namespace in the environment tree where resolution is currently occurring.
 2. **Entry-point self-reference** — The special name `@@` resolves to the namespace of the environment that initiated the current resolution or interpolation chain, effectively resetting the resolution scope back to the entry point for any lookups within that chain. This allows for late-bound references to the entry-point scope even when resolution has propagated into parent environments.
-3. **Direct lookup** — The variable name is looked up in the local dictionary.
+3. **Direct lookup** — The variable name is looked up in the local dictionary. Names that use [virtual-collection syntax](#virtual-collections) resolve to that collection instead of a single stored value.
 4. **Indirection** — If the stored value is a string matching the pattern `${...}`, the referenced expression is resolved recursively. `${name}` resolves relative to the current resolution scope, `${@name}` resolves relative to the entry-point scope, `${@}` resolves the current scope namespace, and `${@@}` resolves the entry-point namespace.
 5. **Interpolation** — If the stored value is a string or `TaggedString` containing `${...}` placeholders mixed with literal text, all placeholders are replaced with their resolved values using the same scope rules. Unresolvable placeholders are left as-is. Tags from the template and from every successfully resolved operand are unioned onto the result so values such as `"hello ${mySecret}"` cannot leak into an untagged string.
 6. **Parent fallback** — In an `InheritedRuntimeEnvironment`, if the variable is not found locally, the lookup is delegated to the parent chain.
@@ -358,7 +359,7 @@ Invalid identifiers include `.host`, `host.`, `host..port`, `host port`, and `${
 - `${@}` resolves to the namespace of the current resolution scope.
 - `${@@}` resolves to the namespace of the entry-point scope.
 
-The `name` portion must be a valid identifier. Forms such as `${}`, `${1name}`, `${name.}`, `${@1name}`, and `${@@name}` are not valid variable expressions.
+The `name` portion must be a valid identifier. It may also carry a virtual-collection suffix (`[]`, `[+]`, or `[]+`), for example `${items[]}` or `${@items[+]}`. Forms such as `${}`, `${1name}`, `${name.}`, `${@1name}`, and `${@@name}` are not valid variable expressions. The append suffix is write-only, so `${items[]+}` does not resolve and is left unchanged.
 
 **Interpolation** occurs when one or more valid variable expressions appear within a larger string. Each recognized expression is resolved independently while surrounding text remains unchanged. For example, `backup-${host.name}-${date}` contains two interpolation expressions.
 
@@ -371,11 +372,11 @@ host_port = 8080
 @host.port = "${host_port}"
 ```
 
-**Override keys** begin with an at-sign (`@`) followed by a valid identifier, for example `@backup.target`. The leading at-sign is override syntax and is not part of the identifier itself.
+**Stored variable addresses** are validated before environment reads and writes. Ordinary addresses use identifier paths. Override keys begin with an at-sign (`@`) followed by an identifier path, for example `@backup.target`. Artifact status may use the reserved `$?` leaf, such as `backup.$?`. Virtual-collection operators are valid only on identifier paths and may follow either an ordinary path or an override address. Internal collection-storage keys are outside this public grammar.
 
 Structured values published through [decomposition](#decomposable-objects) are addressed using the same identifier and dotted-path syntax. Override lookup uses these rules when constructing the candidates described in [Module Property Overrides](#module-property-overrides).
 
-**Full grammar** for identifiers, namespaces, variable expressions, and override keys is as follows (ANTLR4 syntax):
+**Full grammar** for identifiers, namespaces, stored variable addresses, and variable expressions is as follows (ANTLR4 syntax):
 
 ```antlr
 grammar VariableGrammar;
@@ -388,6 +389,12 @@ namespaceName
     : IDENTIFIER EOF
     ;
 
+variableAddress
+    : '@'? IDENTIFIER collectionSuffix? EOF
+    | '@'? IDENTIFIER '.' EXIT_STATUS EOF
+    | '@'? EXIT_STATUS EOF
+    ;
+
 indirection
     : interpolation EOF
     ;
@@ -398,8 +405,18 @@ interpolation
 
 expression
     : '@@'
-    | '@' IDENTIFIER?
-    | IDENTIFIER
+    | '@' (IDENTIFIER collectionSuffix?)?
+    | IDENTIFIER collectionSuffix?
+    ;
+
+collectionSuffix
+    : '[]+'
+    | '[+]'
+    | '[]'
+    ;
+
+EXIT_STATUS
+    : '$?'
     ;
 
 IDENTIFIER
@@ -429,6 +446,30 @@ The `DecompositionStrategy` controls how deeply nested objects are flattened:
 | `Shallow` | Top-level properties are published; nested decomposables become single entries |
 | `FullHierarchy` | The root and all nested decomposables are published at every level, allowing access to complex-typed intermediate nodes |
 
+#### Virtual Collections
+
+A virtual collection is assembled by assignment instead of being stored as one CLR collection. A collection operator follows an ordinary identifier path or a module-property override address; it is not part of the identifier grammar, so module names, namespaces, and override tags are unchanged. The plain name remains an ordinary variable: a CLR collection stored at `items` is not the virtual collection `items[]`.
+
+| Assignment or read | Meaning |
+|--------------------|---------|
+| `items[]+` | Append the assigned value as one element, creating the collection if needed. The name cannot be read. |
+| `items[]` | Define or replace the collection. A read returns a snapshot taken at resolution. |
+| `items[+]` | Read a live enumeration of the same collection. The name cannot be assigned. |
+
+Appending stores the assigned value itself. The value is not enumerated and it is not decomposed, so a virtual collection has no shared CLR element type. Assigning a sequence to `items[]` replaces the collection with a copy of that sequence. `string` stays one element. Assigning `null`, or any other empty non-string sequence, defines an empty collection. An empty collection resolves successfully and enumerates nothing. A name that was never defined and has no elements does not resolve, which is the same result as an undefined variable. Removing `items[]` or `items[+]` removes the collection from the current environment. Removing `items[]+` does nothing.
+
+The snapshot does not change while it is enumerated. The live enumeration consumes currently visible elements, refreshes after that batch, and then visits elements that became visible in the meantime without replaying elements already yielded. When a refresh exposes no new elements, enumeration stops and does not wait for a later append. A later resolution sees elements appended after the previous enumeration finished. Elements are returned as stored. The collection read does not interpolate them or rebuild objects from decomposed leaves.
+
+Exact indirection preserves the collection. A stored value whose entire text is `${items[]}` or `${items[+]}` resolves to the snapshot or the live view. The same expression inside a larger string is ordinary interpolation.
+
+Element types are checked when a consumer binds them, not when they are appended. Collection override resolution materializes a virtual collection into the property element type during module preparation, so a mismatch fails in the normal validation pipeline. `Foreach` resolves the collection as a sequence of elements and lets the iteration body validate what it reads. Callers use `TryResolveVariable` for both CLR collections and virtual collections.
+
+A read uses the nearest environment that already has the collection. An append or definition in a child environment creates that child's own collection and hides the parent collection of the same name. It does not extend the parent. Writers that should add to one collection select the same logical environment (`current`, `parent`, `global`, or one named environment).
+
+Publishing a decomposable value whose root is already a collection assignment stores that value as one element. `LeavesOnly`, `Shallow`, and `FullHierarchy` do not flatten that root. Publishing any other root is unchanged.
+
+Enumerating an environment does not surface element storage. A present virtual collection appears once, as `name[]`, with a snapshot of the elements stored in that environment. Copying those entries back through `SetVariable`, including artifact publication, defines the collection on the target. Each append is a distinct hidden binding with a process-local monotonic identity, so parallel branches can reconcile additions without sharing one mutable collection binding. Sequential appends retain their allocation order; relative order between truly concurrent branches is scheduling-dependent and is not a transaction semantic. Concurrent empty definitions are idempotent, while competing non-empty replacements remain conflicts. Rollback withholds a branch's new elements with the rest of its workflow data.
+
 ### Module Property Overrides
 
 The override subsystem allows runtime environment variables to replace module properties after deserialization. This is the mechanism used by the source-generated `ResolveOverridesAsync()` pipeline.
@@ -440,7 +481,7 @@ Generated override preparation resolves module properties through `ModuleValidat
 1. The generator supplies the module and property expressions used to derive the snake_case property path.
 2. Override keys are constructed using every identifier that can address the module instance: first `@{name}.{property_name}`, then `@{group}.{property_name}` when a group is set, then `@{module_id}.{property_name}`, and finally `@{tag}.{property_name}` for each override resolution tag attached to the environment.
 3. The environment is checked for each override key in that order. The first matching override wins, so more specific identifiers take priority (`name` > `group` > `module_id` > tags).
-4. Textual properties (`string` and `TaggedString`) select the raw stored override without interpolation. This preserves late-bound expressions and, for `TaggedString`, any tags attached to the selected value. Non-text properties use typed resolution, including exact-reference indirection, and collections use a collection-specific resolver before generated code materializes the declared collection shape.
+4. Textual properties (`string` and `TaggedString`) select the raw stored override without interpolation. This preserves late-bound expressions and, for `TaggedString`, any tags attached to the selected value. Non-text properties use typed resolution, including exact-reference indirection. Collection properties first resolve the ordinary override address and, when it is absent, a virtual collection assembled at the same address (for example `@my_module.items[]+`); generated preparation materializes that virtual collection as a snapshot of the declared element type.
 5. The later generated `ApplyInterpolationAsync` phase recursively interpolates every eligible string, including strings for which no override was applied and strings inside nested records and collections. `[IgnoreInterpolation]` skips this phase, so a raw string selected from an override remains available for worker-controlled interpolation.
 
 `[IgnoreOverride]` disables resolution of the annotated node without disabling the later interpolation phase. With the default `recurse: false`, eligible descendants may still resolve overrides; `recurse: true` suppresses the complete subtree. `[IgnoreInterpolation]` is a separate string-only control for values that must remain raw until worker execution.

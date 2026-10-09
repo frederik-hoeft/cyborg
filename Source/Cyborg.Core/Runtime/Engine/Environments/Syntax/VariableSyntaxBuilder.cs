@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using Cyborg.Core.Runtime.Engine.Environments.VirtualCollections;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -10,6 +11,9 @@ public sealed partial class VariableSyntaxBuilder(JsonNamingPolicy namingPolicy)
 
     [GeneratedRegex(VariableGrammar.IDENTIFIER_PATTERN)]
     internal partial Regex IdentifierRegex { get; }
+
+    [GeneratedRegex(VariableGrammar.VARIABLE_NAME_PATTERN)]
+    internal partial Regex VariableNameRegex { get; }
 
     [GeneratedRegex(VariableGrammar.INDIRECTION_PATTERN)]
     internal partial Regex IndirectionRegex { get; }
@@ -23,6 +27,9 @@ public sealed partial class VariableSyntaxBuilder(JsonNamingPolicy namingPolicy)
     [GeneratedRegex(VariableGrammar.NAMESPACE_PATTERN)]
     internal partial Regex NamespaceRegex { get; }
 
+    [GeneratedRegex(VariableGrammar.COLLECTION_ACCESS_PATTERN)]
+    internal partial Regex CollectionAccessRegex { get; }
+
     public bool IsValidIdentifier([NotNullWhen(true)] string? identifier) =>
         identifier is not null && IsValidIdentifier(identifier.AsSpan());
 
@@ -34,6 +41,27 @@ public sealed partial class VariableSyntaxBuilder(JsonNamingPolicy namingPolicy)
         }
         return IdentifierRegex.IsMatch(identifier);
     }
+
+    /// <summary>
+    /// Returns whether <paramref name="name"/> is a valid ordinary variable or module-override address.
+    /// </summary>
+    internal bool IsValidVariableName([NotNullWhen(true)] string? name) =>
+        name is not null && VariableNameRegex.IsMatch(name);
+
+    /// <summary>
+    /// Returns whether <paramref name="name"/> can be assigned with <c>SetVariable</c>.
+    /// Ordinary variables, override addresses, and virtual-collection assignments <c>name[]</c> and <c>name[]+</c> are included.
+    /// The live view <c>name[+]</c> is not an assignment target.
+    /// </summary>
+    public bool IsValidAssignmentTarget([NotNullWhen(true)] string? name) =>
+        IsValidVariableName(name) || IsCollectionAssignment(name);
+
+    /// <summary>
+    /// Returns whether <paramref name="name"/> assigns a virtual collection (<c>name[]</c> or <c>name[]+</c>).
+    /// </summary>
+    internal bool IsCollectionAssignment([NotNullWhen(true)] string? name) =>
+        VariableCollectionAccess.TryParse(this, name, out VariableCollectionAccess access)
+        && access.Kind is VariableCollectionAccessKind.Append or VariableCollectionAccessKind.Snapshot;
 
     public bool IsValidNamespace([NotNullWhen(true)] string? ns) =>
         ns is not null && IsValidNamespace(ns.AsSpan());

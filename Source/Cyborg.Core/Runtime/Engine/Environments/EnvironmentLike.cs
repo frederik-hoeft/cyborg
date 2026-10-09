@@ -1,6 +1,7 @@
 ﻿using Cyborg.Core.Configuration.Model;
 using Cyborg.Core.Runtime.Engine.Environments.Artifacts;
 using Cyborg.Core.Runtime.Engine.Environments.Syntax;
+using Cyborg.Core.Runtime.Engine.Environments.VirtualCollections;
 using Cyborg.Core.Text;
 using System.Collections;
 using System.Collections.Immutable;
@@ -112,6 +113,23 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
     protected virtual bool TryResolveVariableInCurrentScopeCore(ResolutionContext context, [NotNullWhen(true)] out object? value)
     {
         ArgumentNullException.ThrowIfNull(context);
+        if (VirtualCollectionKeys.IsInternal(context.Name))
+        {
+            value = default;
+            return false;
+        }
+
+        if (TryReadVirtualCollection(context.Name, out value))
+        {
+            return true;
+        }
+
+        if (VariableCollectionAccess.TryParse(SyntaxFactory, context.Name, out _))
+        {
+            value = default;
+            return false;
+        }
+
         // handle self-reference
         if (context.Name.Equals(SyntaxFactory.Self(), StringComparison.Ordinal))
         {
@@ -152,6 +170,23 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
     protected virtual bool TryGetStoredVariableInCurrentScopeCore(string name, [NotNullWhen(true)] out object? value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (VirtualCollectionKeys.IsInternal(name))
+        {
+            value = default;
+            return false;
+        }
+
+        if (TryReadVirtualCollection(name, out value))
+        {
+            return true;
+        }
+
+        if (VariableCollectionAccess.TryParse(SyntaxFactory, name, out _))
+        {
+            value = default;
+            return false;
+        }
+
         if (VariableStore.TryGetValue(name, out value) && value is not null)
         {
             return true;
@@ -196,6 +231,12 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
     public virtual bool TryResolveVariable<T>(string name, [NotNullWhen(true)] out T? value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (VirtualCollectionKeys.IsInternal(name))
+        {
+            value = default;
+            return false;
+        }
+        EnsureValidResolutionTarget(name);
         if (!TryResolveVariable(name, entryPoint: this, out value))
         {
             return false;
@@ -211,9 +252,66 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         return true;
     }
 
-    public virtual void SetVariable<T>(string name, T value) => VariableStore.SetValue(name, value);
+    public virtual void SetVariable<T>(string name, T value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (VirtualCollectionKeys.IsInternal(name))
+        {
+            throw new ArgumentException($"'{name}' is reserved for virtual-collection storage.", nameof(name));
+        }
 
-    public virtual bool TryRemoveVariable(string name) => VariableStore.TryRemove(name);
+        if (VariableCollectionAccess.TryParse(SyntaxFactory, name, out VariableCollectionAccess access))
+        {
+            switch (access.Kind)
+            {
+                case VariableCollectionAccessKind.Append:
+                    VirtualCollectionElements.Append(VariableStore, access.Name, value);
+                    return;
+                case VariableCollectionAccessKind.Snapshot:
+                    VirtualCollectionElements.Define(VariableStore, access.Name, value);
+                    return;
+                case VariableCollectionAccessKind.Lazy:
+                    throw new ArgumentException(
+                        $"'{name}' is a live virtual-collection view and cannot be assigned. Append with '{access.Name}[]+' or define the collection with '{access.Name}[]'.",
+                        nameof(name));
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(name), name, "Unsupported virtual collection assignment.");
+            }
+        }
+
+        if (!SyntaxFactory.IsValidVariableName(name))
+        {
+            throw new ArgumentException($"'{name}' is not a valid variable name.", nameof(name));
+        }
+
+        VariableStore.SetValue(name, value);
+    }
+
+    public virtual bool TryRemoveVariable(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (VirtualCollectionKeys.IsInternal(name))
+        {
+            return false;
+        }
+
+        if (VariableCollectionAccess.TryParse(SyntaxFactory, name, out VariableCollectionAccess access))
+        {
+            if (access.Kind is VariableCollectionAccessKind.Append)
+            {
+                return false;
+            }
+
+            return VirtualCollectionElements.TryRemove(VariableStore, access.Name);
+        }
+
+        if (!SyntaxFactory.IsValidVariableName(name))
+        {
+            throw new ArgumentException($"'{name}' is not a valid variable name.", nameof(name));
+        }
+
+        return VariableStore.TryRemove(name);
+    }
 
     public virtual TaggedString Interpolate(string template)
     {
@@ -230,6 +328,17 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(root);
         ArgumentNullException.ThrowIfNull(decomposable);
+        if (!SyntaxFactory.IsValidAssignmentTarget(root))
+        {
+            throw new ArgumentException($"'{root}' is not a valid variable assignment target.", nameof(root));
+        }
+
+        // A collection assignment root stores the value as one element. Leaves are not published, and are not recomposed on read.
+        if (VariableCollectionAccess.TryParse(SyntaxFactory, root, out _))
+        {
+            SetVariable(root, decomposable);
+            return;
+        }
 
         if (strategy is DecompositionStrategy.FullHierarchy)
         {
@@ -257,7 +366,7 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         }
     }
 
-    public IEnumerator<KeyValuePair<string, object?>> GetEnumerator() => VariableStore.GetEnumerator();
+    public IEnumerator<KeyValuePair<string, object?>> GetEnumerator() => EnumerateVisibleVariables().GetEnumerator();
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
@@ -291,6 +400,67 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         ArgumentNullException.ThrowIfNull(entryPoint);
         TaggedString interpolated = InterpolateString(ResolutionContext.CreateRoot(entryPoint), template);
         return interpolated.WithValue(FinalizeInterpolationLiterals(interpolated.Value));
+    }
+
+    private void EnsureValidResolutionTarget(string name)
+    {
+        if (name.Equals(SyntaxFactory.Self(), StringComparison.Ordinal)
+            || SyntaxFactory.IsValidVariableName(name)
+            || VariableCollectionAccess.TryParse(SyntaxFactory, name, out _))
+        {
+            return;
+        }
+        throw new ArgumentException($"'{name}' is not a valid variable reference.", nameof(name));
+    }
+
+    private bool TryReadVirtualCollection(string name, [NotNullWhen(true)] out object? value)
+    {
+        if (!VariableCollectionAccess.TryParse(SyntaxFactory, name, out VariableCollectionAccess access)
+            || access.Kind is VariableCollectionAccessKind.Append
+            || !VirtualCollectionElements.TryRead(VariableStore, access.Name, out object?[] elements))
+        {
+            value = default;
+            return false;
+        }
+
+        value = access.Kind is VariableCollectionAccessKind.Lazy
+            ? new VirtualCollectionLiveView(VariableStore, access.Name)
+            : elements;
+        return true;
+    }
+
+    private List<KeyValuePair<string, object?>> EnumerateVisibleVariables()
+    {
+        List<KeyValuePair<string, object?>> visible = [];
+        List<string> collections = [];
+        HashSet<string> seenCollections = new(StringComparer.Ordinal);
+        foreach ((string key, object? value) in VariableStore)
+        {
+            if (VirtualCollectionKeys.TryGetCollectionName(key, out string? collectionName))
+            {
+                if (seenCollections.Add(collectionName))
+                {
+                    collections.Add(collectionName);
+                }
+
+                continue;
+            }
+
+            visible.Add(new KeyValuePair<string, object?>(key, value));
+        }
+
+        collections.Sort(StringComparer.Ordinal);
+        foreach (string collectionName in collections)
+        {
+            if (!VirtualCollectionElements.TryRead(VariableStore, collectionName, out object?[] elements))
+            {
+                continue;
+            }
+
+            visible.Add(new KeyValuePair<string, object?>(collectionName + "[]", elements));
+        }
+
+        return visible;
     }
 
     private bool TryConvertResolvedValue<T>(object? objValue, string variableName, bool notifyImplicitConversion, [NotNullWhen(true)] out T? value)

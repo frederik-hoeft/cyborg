@@ -190,15 +190,15 @@ Iterates over a collection variable, executing a body module for each item.
 
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
-| `collection` | string | Yes | -- | Name of an environment variable containing an iterable collection. Collections are typically populated via the dynamic value system using the `collection<T>` type syntax in a ConfigMap (e.g., `"collection<cyborg.types.borg.remote.v1.4>"`). |
+| `collection` | string | Yes | -- | Name of an environment variable containing an iterable collection. The variable may be a CLR collection, usually created with `collection<T>` in a ConfigMap, or a [virtual collection](architecture-overview.md#virtual-collections) read with a `[]` or `[+]` suffix. |
 | `item_variable` | string | Yes | -- | Variable name to bind the current item to in each iteration. |
 | `continue_on_error` | bool | No | `false` | When `true`, continues iteration even if an item fails. |
 | `body` | module context | Yes | -- | Module to execute for each collection item. |
 
 **Behavior:**
 
-- Resolves the `collection` variable from the current environment.
-- For each item, creates a scoped environment and binds the item to `item_variable`. If the item supports decomposition (e.g., a structured record), its properties are published hierarchically (e.g., `current_host.hostname`, `current_host.port`).
+- Resolves the `collection` variable from the current environment. A CLR collection and a virtual collection are both sequences of elements. `name[]` is a snapshot of a virtual collection. `name[+]` is a live view: elements appended to that collection before the loop reaches the end are visited, and the loop stops at the last element instead of waiting. An empty but defined collection resolves and the body does not run. A missing collection fails the module.
+- For each item, creates a scoped environment and binds the item to `item_variable`. If the item supports decomposition (e.g., a structured record), its properties are published hierarchically (e.g., `current_host.hostname`, `current_host.port`). Element types are not checked while the collection is assembled. The iteration body validates values it binds through the normal preparation pipeline.
 - If `continue_on_error` is `false` (default), a failed iteration aborts the loop immediately.
 - Returns `Success` if at least one iteration succeeded; `Skipped` if all were skipped.
 
