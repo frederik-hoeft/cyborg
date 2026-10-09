@@ -23,27 +23,16 @@ Module descriptions remain independent of debugger control. `IModuleDescriptionS
 
 Every runtime-owned module invocation carries a stable `ModuleExecutionId` and an optional parent execution ID. All runtime views that belong to the same invocation reuse that identity. Nested execution creates a child identity from the structured caller rather than inferring ancestry from a CLR thread, `AsyncLocal<T>`, or runtime-object discovery.
 
-The runtime exposes a general-purpose execution-lifecycle observer independently of module validation/pre/post hooks:
+The runtime exposes general-purpose lifecycle events independently of the module validation and execution hooks. An invocation progresses through the following boundaries in order, although validation failures and other early exits may prevent later execution stages from being reached:
 
-```text
-invocation scope created
-  -> Started(execution id, parent id, initial module identity)
-  -> environment/configuration/main module work
-       -> generated preparation and validation
-       -> validation hooks
-       -> pre-execution hooks [debugger may pause]
-       -> EnsureValid
-       -> worker execution
-       -> post-execution hooks
-  -> Completed(result)              // only after a definite result exists
-  -> transaction reconciliation/discard
-  -> Closed(joined/discarded)
-  -> invocation scope disposal
-```
+1. **Establish the invocation.** Create its transaction and DI scope, assign its execution identity and optional parent ID, and emit `Started` before any module preparation. This allows observers to see invocations that fail before the debugger's pre-execution boundary.
+2. **Prepare and validate.** Resolve the invocation environment, requirements, and any configuration module before preparing the main module through defaults, overrides, interpolation, constraint evaluation, and validation hooks.
+3. **Enter pre-execution hooks.** Give the debugger access to the prepared module and validation result before validity is enforced or the worker runs. A debugger cancellation can end the invocation without executing the worker.
+4. **Execute the module.** Enforce validation and, if execution proceeds, invoke the worker and post-execution hooks.
+5. **Complete and reconcile.** Emit `Completed` if a definite result exists, then reconcile the transaction under its publication policy. An invocation that ends without a definite result is discarded instead; no `Completed` event is emitted.
+6. **Close the invocation.** Emit `Closed` after reconciliation or discard, when the invocation leaves the live topology, and dispose its scope after its structured child work has terminated.
 
-`Started` is early enough to observe invocations that fail before the module pre-execution boundary. `Completed` records a definite module result while the invocation may still be structurally open, and `Closed` marks the point after reconciliation or discard when that invocation no longer belongs in a current-state execution topology. Lifecycle observers are isolated from workflow execution: an observer failure is logged and does not change the module result, reconciliation, or delivery to later observers.
-
-The workflow debugger itself participates through the normal pre-execution hook. The validation result carried into the debugger always contains the prepared module. Returning `Continue` resumes the normal lifecycle; returning `Cancel` lets the debugging hook produce a canceled module result without invoking the worker. `Step`, `Next`, and `Detach` are debugger control actions interpreted centrally by the workflow debugger rather than mutations performed by the frontend.
+Lifecycle-observer failures are logged without changing module results, transaction reconciliation, or delivery to other observers. The debugger participates through the normal pre-execution hook, but frontend actions are applied centrally by `WorkflowDebugger`: `Continue` resumes execution, `Cancel` produces a canceled result, and `Step`, `Next`, and `Detach` update debugger control without requiring the frontend to manipulate transactional state.
 
 ## Breakpoints and Branch-Scoped Stepping
 
@@ -58,63 +47,54 @@ Persistent expressions are evaluated in breakpoint-ID order. One-shot expression
 | `cyborg\.modules\.empty\.v1` | Match the empty module ID |
 | `.*` | Match every module |
 
-At each prepared module boundary, the debugger evaluates two independent inputs:
+At each prepared module boundary, the debugger may pause for any of three reasons: a persistent or one-shot breakpoint matches (or produces a diagnostic that requires inspection), step-into is armed on the invocation's branch, or step-over is armed and its anchor is not an open strict ancestor of the current invocation. These conditions are independent, so a breakpoint inside a stepped-over subtree still takes effect.
 
-```text
-should pause = persistent/one-shot breakpoint decision
-               OR current branch is stepping
-               OR current branch has a step-over anchor that is not an open ancestor of this invocation
-```
+There is no process-wide `IsEnabled` mirror for branch control. The pre-execution hook reads the transaction-scoped `IDebugBranchControl` from the current invocation provider, and it consults the live execution topology for ancestry only when an active step-over anchor requires it. Sessions that never issue `next` avoid that lookup.
 
-There is no process-wide `IsEnabled` mirror for branch stepping or step-over. The pre-execution hook resolves the transaction-scoped `IDebugBranchControl` from the current invocation provider and performs the cheap branch-state/breakpoint check directly. The anchor check consults the live execution topology only when a step-over anchor is present, so sessions that never issue `next` do not take that path.
+### Branch-local stepping and reconciliation
 
-### Step propagation
+Step-into and step-over are execution-control state attached to the current transaction branch, not process-wide breakpoints. A child inherits the branch's control state when it forks, while parallel siblings receive isolated copies that remain independent until their common join. With step-into armed, the next prepared invocation on the branch pauses, including a nested, dynamic, or otherwise conditionally selected child.
 
-Step state is transaction-aware execution-control state. A child invocation inherits the control state of the transaction branch from which it forks. Sibling branches receive isolated copies and can independently choose `Step`, `Next`, or `Continue` while the fork remains open.
+Every explicit `step`, `next`, or `continue` command receives a monotonically increasing sequence from the shared debugger session. At a fork join, control-state reconciliation considers contributors from the newest session generation represented in that fork and selects the state with the highest command sequence. The owner continuation and child branches follow the same rule, regardless of creation or completion order. Untouched branches inherit equivalent control state and sequence values, so they cannot override a newer command; equal sequences with different control states violate an internal invariant. A later `continue` therefore overrides an earlier sibling `step`, just as a later `step` overrides an earlier `continue`.
 
-Each explicit stateful debugger command receives a monotonically increasing control-command sequence. When branches later converge, reconciliation first ignores state from older debugger-session generations, then restores the control state carrying the highest command sequence in the newest generation. The continuation and child branches are ordinary contributors to this rule; branch creation order has no semantic meaning. Untouched branches carry the same inherited sequence and state, so they cannot override a newer explicit command.
+This isolation also applies to workflow rollback: the debugger is a control participant, so a completed child's command is reconciled even when that child's workflow-data changes are rolled back. An invocation discarded without a definite result publishes neither workflow data nor debugger control state. Breakpoint evaluation remains global and may independently pause a sibling before convergence, without changing that sibling's inherited branch control.
 
-This gives the following behavior:
+### Step-over with `next`
 
-- stepping a sequential child causes the next child invocation on that branch to pause;
-- a workflow rollback still reconciles step and step-over state, because branch control is execution-control state rather than workflow data;
-- stepping into a nested or dynamic module follows that structured descendant;
-- stepping one parallel branch does not immediately change unrelated siblings while the fork is open;
-- when parallel branches converge, the most recently issued stateful debugger command determines the restored parent control state;
-- a later `Continue` therefore overrides an earlier sibling `Step`, and a later `Step` likewise overrides an earlier sibling `Continue`;
-- persistent breakpoint matches remain global and can pause an unrelated branch without consuming another branch's local control state before convergence.
+Issuing `next` clears step-into and records the paused invocation's `ModuleExecutionId` as an anchor. As long as that invocation remains open, its descendants are inside the anchored subtree and do not pause solely for step-over. The anchor follows subsequent child forks and joins until the first prepared module outside the subtree: normally the next sequential sibling, or a successor on an ancestor's branch after the anchored invocation closes. Because the successor is identified through open ancestry rather than predicted in advance, the same behavior applies to dynamic calls, conditions, and loops. Stepping over a loop invocation runs its child invocations without step-over pauses and stops at the loop's successor; stepping over a child inside the loop proceeds to the next eligible invocation in the loop.
 
-### Next
+A `next` issued in one parallel child cannot pause an unrelated sibling while the fork remains open. Once the branches join, the normal command-sequence reconciliation determines what control state the parent resumes with, including commands issued at breakpoints inside an otherwise stepped-over subtree. A breakpoint hit does not itself clear the anchor: the frontend's subsequent resume action controls whether the pending step-over continues. `step` replaces it with step-into, while `continue` and `cancel` clear both modes; issuing another `next` replaces the anchor. A non-runtime pause without an execution ID cannot identify a subtree, so choosing `next` there clears branch control instead of implicitly arming step-into.
 
-`next` is step-over for the same branch-local control state. It clears step-into and records the paused invocation's `ModuleExecutionId` as a step-over anchor. Forks inherit that anchor. A later boundary on the branch pauses for `next` only when the anchor is not an open strict ancestor of that boundary.
-
-While the anchored invocation is open, its descendants are inside the subtree and do not pause for `next`. The anchor stays armed across those joins. The first boundary that is not in the subtree is the next logical module: the following sibling when the caller runs one, or a module on an ancestor's branch after the anchored invocation has joined and closed. No successor module id is chosen in advance, so dynamic, looping, and conditional children use the same rule. `next` on a loop pauses at that loop's next child invocation; `next` on the loop module itself runs the loop's children without step-over pauses and stops after the loop.
-
-Parallel siblings are separate fork branches. `next` mutates only the branch that issued it, so it does not resume on a sibling branch while the fork remains open. At convergence, the same latest-command rule used for `step` and `continue` selects the restored parent state. This prevents an inherited outer anchor from overriding a newer command issued at a breakpoint in another child without introducing step-over-specific merge semantics.
-
-Breakpoints stay independent of the anchor. A breakpoint inside the stepped-over subtree still pauses, and the anchor remains until the resume command replaces it. `step`, `next`, and `continue` each replace the other two on the branch that issues them. `continue` and `cancel` clear the step flag and the anchor. A `next` resume that has no execution id clears the branch instead of arming step-into, because there is no subtree to name; production pauses have an execution id.
-
-The debugger session has a monotonically increasing generation used as a fencing token for branch-control state. `Detach` advances the generation so transactional state already copied into live branches becomes stale without requiring the debugger to discover and mutate every transaction instance. A separate monotonically increasing control-command sequence orders all same-session `step`, `next`, and `continue` decisions at branch convergence. `Detach` therefore wins across sessions, while the command sequence provides a total order for stateful debugger commands within a session.
+The session generation fences branch control across `detach`. Detaching clears global breakpoints, advances the shared generation, and clears the current branch; previously copied control state may still reconcile within other open forks but is hidden by generation-checked reads and cannot reactivate stepping. The command sequence orders decisions within a session, whereas the generation determines whether those decisions are still valid.
 
 ## Pause Coordination
 
-Parallel execution can decide to pause on several branches concurrently. Breakpoint matching and branch-step evaluation happen on the executing branch before frontend ownership is requested. Once a boundary has decided to pause, ordinary breakpoint mutation does not retroactively revoke that decision.
+Parallel branches independently evaluate breakpoints and branch-control state at their prepared-module boundaries. Once a branch decides to pause, it requests exclusive frontend ownership; the pause remains visible in the live topology even if another branch currently owns the interactive session.
 
-`DebugPauseCoordinator` serializes frontend ownership with FIFO semantics:
+```mermaid
+sequenceDiagram
+    participant B as Executing branch
+    participant C as Pause coordinator
+    participant T as Live topology
+    participant F as Debug frontend
 
-```text
-branch decides to pause
-  -> mark execution as paused
-  -> enqueue/acquire frontend ownership
-  -> mark owner as current
-  -> frontend session
-  -> release ownership
-  -> restore running state and promote next valid queued pause
+    B->>C: Acquire pause lease
+    C->>T: Mark paused
+    opt Frontend occupied
+        Note over B,C: Wait in FIFO queue
+    end
+    C->>T: Mark current on admission
+    C-->>B: Lease granted
+    B->>F: Present pause
+    F-->>B: Resume action
+    B->>C: Release lease
+    C->>T: Restore running
+    Note over C: Admit next valid request
 ```
 
-Only one frontend session is active. Other decided pauses remain logically paused and visible in the execution topology while they wait. Admission and release share one coordinator synchronization boundary, so a pause arriving while another session resumes is either queued before release or acquires the newly free slot; it is not lost between a separate queue check and resume decision.
+The coordinator admits requests and releases frontend ownership under the same synchronization boundary, ensuring that a pause arriving during a resume cannot be lost between queue inspection and admission. At most one branch owns the frontend, while other paused branches continue to wait in FIFO order.
 
-Deleting a breakpoint does not un-pause a branch that already matched it. `Detach` has stronger semantics because it invalidates the debugger session itself: it clears global breakpoints, advances the session generation, clears the current branch's effective step and step-over state, and suppresses queued pauses that belong to the invalidated generation. Cancellation of a queued execution removes its queue request and restores its topology state without preventing later valid requests from acquiring the frontend.
+Removing a breakpoint cannot undo a pause already decided by a branch. `Detach` instead invalidates the debugger session, clearing global breakpoints and effective branch-control state while suppressing queued pauses from the old session generation. Cancellation of a queued execution removes that request and restores its running topology state without blocking later requests.
 
 ## Live Execution Topology
 
@@ -148,7 +128,7 @@ public interface IDebugFrontend : IKeyedService
 
 Frontend selection uses the keyed-service setting `cyborg.core.debug.frontend`. Core has no implicit frontend (`DebugOptions.Default.Frontend` is `null`) because presentation policy belongs to the host. `Cyborg.Cli.Debugging` registers the built-in `console` frontend, while the CLI composition root supplies `console` as its host default; ordinary configuration sources can replace that selection.
 
-A frontend returns one of five dispositions:
+A frontend may return any of the following dispositions:
 
 | Action | Meaning |
 |---|---|
@@ -184,13 +164,7 @@ The console frontend uses ConsoleAppFramework (CAF) for command routing, aliases
 
 The process CLI and debugger command surfaces live in separate compilations:
 
-```text
-Cyborg.Cli
-  main CAF command surface (`run`, ...)
-
-Cyborg.Cli.Debugging
-  debugger CAF command surface (`continue`, `step`, `tree`, `stack`, `break`, ...)
-```
+`Cyborg.Cli` owns the process-level CAF commands, such as `run`, while `Cyborg.Cli.Debugging` defines the debugger-only commands, such as `continue`, `step`, `next`, `tree`, `stack`, and `break`. Each command surface is compiled separately, so they cannot accidentally share command routing or help output.
 
 This isolation prevents debugger help and routing from exposing or recursively invoking process-level commands. During one debugger command dispatch, pause-local objects are layered over the invocation service provider so command classes can receive both kinds of dependencies through constructor injection.
 
@@ -260,33 +234,7 @@ The shared collection rules matter for descriptor correctness as well as validat
 
 Core registration is separated by responsibility:
 
-```text
-ICyborgCoreServices
-  imports IModuleDescriptionServices
-  imports IDebugServices
-
-IModuleDescriptionServices
-  description tree construction
-  built-in serializers
-  serializer registry
-  serialization service
-
-IDebugServices
-  global breakpoint registry
-  debugger session generation
-  transactional branch-control participant + scoped facade
-  workflow debugger / FIFO pause coordinator
-  live execution topology
-  frontend selection service
-  pre-execution debugging hook
-  execution-lifecycle topology observer
-
-ICyborgCliDebugServices (Cyborg.Cli.Debugging)
-  console REPL I/O
-  keyed console debug frontend
-  CLI breakpoint argument integration
-  tree/stack rendering and command surface
-```
+`ICyborgCoreServices` imports `IModuleDescriptionServices` for descriptor construction, serializers, the format registry, and serialization, and `IDebugServices` for the breakpoint registry, shared session state, transaction-aware branch control, workflow debugger, pause coordination, topology, and runtime hooks. The separate `ICyborgCliDebugServices` module registers console REPL I/O, the keyed frontend, CLI breakpoint integration, and the `tree`/`stack` command and rendering surface.
 
 The execution lifecycle observer is a general runtime extension point; only the registered topology observer is debugger-specific. Transaction participation is likewise provided by the generic transaction-aware service infrastructure, while the debugger defines only its branch-state merge semantics.
 
