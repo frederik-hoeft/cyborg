@@ -1,4 +1,4 @@
-using Cyborg.Core.Parsing;
+﻿using Cyborg.Core.Parsing;
 using Cyborg.Core.Parsing.Parsers;
 using Cyborg.Core.Parsing.SyntaxNodes;
 using Cyborg.Core.Parsing.Visitors;
@@ -102,6 +102,77 @@ public sealed class ParserCombinatorTests
         Assert.IsNull(node);
         Assert.AreEqual(0, consumed);
         Assert.IsFalse(grammar.TryParseComplete(string.Empty, out _));
+    }
+
+    [TestMethod]
+    [DataRow("AB", true)]
+    [DataRow("BA", true)]
+    [DataRow("B", true)]
+    [DataRow("", false)]
+    public void Test_Set_IgnoresZeroWidthOptionalUntilItCanConsume(string input, bool expected)
+    {
+        IParser grammar = Grammar.Set(Grammar.Optional(new Literal("A")), new Literal("B"));
+
+        bool success = grammar.TryParseComplete(input, out ISyntaxNode? node);
+        Assert.AreEqual(expected, success);
+        if (expected)
+        {
+            Assert.IsInstanceOfType<SetSyntaxNode>(node);
+            LiteralVisitor visitor = new();
+            node.Accept(visitor);
+            Assert.AreEqual(input, string.Concat(visitor.Values));
+        }
+        else
+        {
+            Assert.IsNull(node);
+        }
+    }
+
+    [TestMethod]
+    [DataRow("AB", true)]
+    [DataRow("BA", true)]
+    [DataRow("B", true)]
+    [DataRow("AAAB", true)]
+    [DataRow("BAAA", true)]
+    [DataRow("", false)]
+    public void Test_Set_IgnoresZeroWidthRepeatUntilItCanConsume(string input, bool expected)
+    {
+        IParser grammar = Grammar.Set(Grammar.Repeat(new Literal("A")), new Literal("B"));
+
+        bool success = grammar.TryParseComplete(input, out ISyntaxNode? node);
+        Assert.AreEqual(expected, success);
+        if (expected)
+        {
+            Assert.IsInstanceOfType<SetSyntaxNode>(node);
+            LiteralVisitor visitor = new();
+            node.Accept(visitor);
+            Assert.AreEqual(input, string.Concat(visitor.Values));
+        }
+        else
+        {
+            Assert.IsNull(node);
+        }
+    }
+
+    [TestMethod]
+    public void Test_Set_ZeroWidthOnlyDoesNotCountAsSuccess()
+    {
+        IParser grammar = Grammar.Set(Grammar.Optional(new Literal("A")));
+
+        Assert.IsFalse(grammar.TryParse(string.Empty, 0, out ISyntaxNode? node, out int consumed));
+        Assert.IsNull(node);
+        Assert.AreEqual(0, consumed);
+        Assert.IsTrue(grammar.TryParseComplete("A", out _));
+    }
+
+    [TestMethod]
+    public void Test_Set_DoesNotBacktrackOverConsumingOptionalMatch()
+    {
+        IParser grammar = Grammar.Set(Grammar.Optional(new Literal("A")), new Literal("AB"));
+
+        Assert.IsTrue(grammar.TryParse("AB", 0, out _, out int consumed));
+        Assert.AreEqual(1, consumed);
+        Assert.IsFalse(grammar.TryParseComplete("AB", out _));
     }
 
     [TestMethod]

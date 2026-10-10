@@ -6,7 +6,8 @@ namespace Cyborg.Core.Parsing.Parsers;
 
 /// <summary>
 /// Matches a nonempty subset of child parsers in any order. Each child position can match at most once;
-/// successful matches are chosen greedily in declaration order, without backtracking.
+/// zero-width matches are ignored and do not consume a child position. At least one child must consume input.
+/// Consuming matches are chosen greedily in declaration order, without backtracking.
 /// </summary>
 public class Set(ImmutableArray<IParser> parsers, string? name = null) : ParserBase
 {
@@ -48,6 +49,12 @@ public class Set(ImmutableArray<IParser> parsers, string? name = null) : ParserB
             for (int i = 0; i < parsers.Length; i++)
             {
                 if (usedParsers[i] || !parsers[i].TryParse(input, currentOffset, out ISyntaxNode? node, out int consumed))
+                {
+                    continue;
+                }
+
+                // A zero-width success does not claim the member; it may match after another child advances the offset.
+                if (consumed == 0)
                 {
                     continue;
                 }
