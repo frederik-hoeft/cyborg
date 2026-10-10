@@ -1,5 +1,5 @@
-﻿using Cyborg.Core.Parsing.Visitors;
-using System.Text;
+﻿using System.Text;
+using Cyborg.Core.Parsing.Visitors;
 
 namespace Cyborg.Core.Parsing.SyntaxNodes;
 
@@ -20,6 +20,7 @@ public sealed class SequentialSyntaxNode : SyntaxNodeBase
 
     public override void Accept(INodeVisitor visitor)
     {
+        ArgumentNullException.ThrowIfNull(visitor);
         _node1.Accept(visitor);
         _node2.Accept(visitor);
     }

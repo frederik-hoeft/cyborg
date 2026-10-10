@@ -7,17 +7,17 @@ using System.Text.RegularExpressions;
 
 namespace Cyborg.Modules.Borg.Prune.Metrics;
 
-public sealed partial class ArchiveTimestamp(string? name = null) : RegexParserBase<BorgPruneVisitor, ArchiveTimestamp>(name), IParser<ArchiveTimestamp>, IRegexOwner
+public sealed partial class ArchiveTimestamp(string? name = null) : RegexParserBase<ArchiveTimestamp, BorgPruneVisitor>(name), IParser<ArchiveTimestamp>, IRegexOwner
 {
     // Sun, 2026-02-01 04:50:19
-    [GeneratedRegex(@"^(?<date_time>[A-Za-z]{3}, \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})")]
+    [GeneratedRegex(@"\G(?<date_time>[A-Za-z]{3}, \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})")]
     public static partial Regex ParserRegex { get; }
 
     public static ArchiveTimestamp Instance { get; } = new();
 
     public override IParser NamedCopy(string name) => new ArchiveTimestamp(name);
 
-    protected override bool TryCreateSyntaxNode([NotNull] Match match, [NotNullWhen(true)] out SyntaxNode<BorgPruneVisitor>? syntaxNode)
+    protected override bool TryCreateSyntaxNode([NotNull] Match match, [NotNullWhen(true)] out ISyntaxNode? syntaxNode)
     {
         string dateTimeString = match.Groups["date_time"].Value;
         if (!DateTime.TryParseExact(dateTimeString, "ddd, yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime dateTime))

@@ -1,25 +1,27 @@
-﻿using Cyborg.Core.Parsing.Visitors;
-using System.Text;
+﻿using System.Text;
+using Cyborg.Core.Parsing.Visitors;
 
 namespace Cyborg.Core.Parsing.SyntaxNodes;
 
-public class OptionalSyntaxNode : SyntaxNodeBase
+public sealed class OptionalSyntaxNode : SyntaxNodeBase
 {
+    private readonly ISyntaxNode? _inner;
+
     public OptionalSyntaxNode(string? name, ISyntaxNode? inner) : base(name)
     {
-        Inner = inner;
-        Inner?.Parent = this;
+        _inner = inner;
+        _inner?.Parent = this;
     }
 
-    public static OptionalSyntaxNode Instance { get; } = new(name: null, inner: null);
-
-    public ISyntaxNode? Inner { get; }
-
-    public override void Accept(INodeVisitor visitor) => Inner?.Accept(visitor);
+    public override void Accept(INodeVisitor visitor)
+    {
+        ArgumentNullException.ThrowIfNull(visitor);
+        _inner?.Accept(visitor);
+    }
 
     public override void ToString(StringBuilder builder, int indentLevel)
     {
         base.ToString(builder, indentLevel);
-        Inner?.ToString(builder, indentLevel + 1);
+        _inner?.ToString(builder, indentLevel + 1);
     }
 }

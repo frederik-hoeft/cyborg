@@ -1,12 +1,9 @@
-﻿using Cyborg.Core.Parsing.Visitors;
-using System.Text;
+﻿using System.Text;
 
 namespace Cyborg.Core.Parsing.SyntaxNodes;
 
-public class WhitespaceSyntaxNode(string? name, int length) : SyntaxNodeBase(name)
+public sealed class WhitespaceSyntaxNode(string? name, int length) : SyntaxNodeBase(name)
 {
-    public override void Accept(INodeVisitor visitor) { }
-
     public override void ToString(StringBuilder builder, int indentLevel)
     {
         ArgumentNullException.ThrowIfNull(builder);

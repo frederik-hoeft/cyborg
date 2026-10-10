@@ -44,10 +44,10 @@ internal sealed class MatchesGrammarProcessor : AttributeProcessorBase<MatchesGr
                     model.ContractInfo.IParser.Name);
                 return;
             }
-            // bool TryParse(string input, int offset, [NotNullWhen(true)] out ISyntaxNode? syntaxNode, out int charsConsumed);
+            // Require an exact grammar match rather than accepting a valid prefix.
             builder.AppendBlock(
             $$"""
-            if ({{model.NullAwareCondition($"!{valueExpression}.TryParse({model.StringContentExpression}, out _, out _)")}})
+            if ({{model.NullAwareCondition($"!global::Cyborg.Core.Parsing.Parsers.ParserExtensions.TryParseComplete({valueExpression}, {model.StringContentExpression}, out _)")}})
             {
                 {{model.Variables.Errors}}.Add({{CreateValidationError(model, "match_grammar", $"{model.TargetDescription} does not match the required grammar.")}});
             }
