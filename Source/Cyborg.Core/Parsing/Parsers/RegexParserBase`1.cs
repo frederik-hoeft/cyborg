@@ -1,17 +1,26 @@
-﻿using Cyborg.Core.Parsing.SyntaxNodes;
+﻿using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
+using Cyborg.Core.Parsing.SyntaxNodes;
 
 namespace Cyborg.Core.Parsing.Parsers;
 
-public abstract class RegexParserBase<TSelf>(string? name) : ParserBase(name) where TSelf : RegexParserBase<TSelf>, IRegexOwner
+public abstract class RegexParserBase<TSelf>(string? name) : ParserBase
+    where TSelf : RegexParserBase<TSelf>, IRegexOwner
 {
-    protected abstract bool TryCreateSyntaxNode([NotNull] Match match, [NotNullWhen(true)] out ISyntaxNode? syntaxNode);
+    public override string? Name { get; } = name;
 
-    public override bool TryParse(ReadOnlySpan<char> input, [NotNullWhen(true)] out ISyntaxNode? syntaxNode, out int charsConsumed)
+    protected abstract bool TryCreateSyntaxNode(Match match, [NotNullWhen(true)] out ISyntaxNode? syntaxNode);
+
+    public override bool TryParse(string input, int offset, [NotNullWhen(true)] out ISyntaxNode? syntaxNode, out int charsConsumed)
     {
-        if (TSelf.ParserRegex.IsMatch(input)                                         // zero-alloc pre-check
-            && TSelf.ParserRegex.Match(input.ToString()) is { Success: true } match  // should never fail
-            && TryCreateSyntaxNode(match, out syntaxNode))
+        ArgumentNullException.ThrowIfNull(input);
+        if ((uint)offset > (uint)input.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(offset));
+        }
+
+        Match match = TSelf.ParserRegex.Match(input, offset);
+        if (match.Success && match.Index == offset && TryCreateSyntaxNode(match, out syntaxNode))
         {
             charsConsumed = match.Length;
             return true;
@@ -21,4 +30,3 @@ public abstract class RegexParserBase<TSelf>(string? name) : ParserBase(name) wh
         return false;
     }
 }
-

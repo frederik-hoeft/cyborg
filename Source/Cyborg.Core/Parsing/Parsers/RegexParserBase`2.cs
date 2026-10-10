@@ -1,24 +1,14 @@
-﻿using Cyborg.Core.Parsing.SyntaxNodes;
-using Cyborg.Core.Parsing.Visitors;
-using System.Text.RegularExpressions;
+﻿using Cyborg.Core.Parsing.Visitors;
 
 namespace Cyborg.Core.Parsing.Parsers;
 
-public abstract class RegexParserBase<TVisitor, TSelf>(string? name) : RegexParserBase<TSelf>(name)
-    where TSelf : RegexParserBase<TVisitor, TSelf>, IRegexOwner
+public abstract class RegexParserBase<TSelf, TVisitor>(string? name) : RegexParserBase<TSelf>(name)
+    where TSelf : RegexParserBase<TSelf, TVisitor>, IRegexOwner
     where TVisitor : class, INodeVisitor
 {
-    protected abstract bool TryCreateSyntaxNode([NotNull] Match match, [NotNullWhen(true)] out SyntaxNode<TVisitor>? syntaxNode);
-
-    protected sealed override bool TryCreateSyntaxNode([NotNull] Match match, [NotNullWhen(true)] out ISyntaxNode? syntaxNode)
+    public override bool CanAccept(Type visitorType)
     {
-        if (TryCreateSyntaxNode(match, out SyntaxNode<TVisitor>? typedNode))
-        {
-            syntaxNode = typedNode;
-            return true;
-        }
-        syntaxNode = null;
-        return false;
+        ArgumentNullException.ThrowIfNull(visitorType);
+        return typeof(TVisitor).IsAssignableFrom(visitorType);
     }
 }
-

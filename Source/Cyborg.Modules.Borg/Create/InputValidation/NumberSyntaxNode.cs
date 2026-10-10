@@ -2,4 +2,4 @@
 
 namespace Cyborg.Modules.Borg.Create.InputValidation;
 
-internal sealed class NumberSyntaxNode(string? name, int value) : ValidationSyntaxNode(name, value.ToString());
+internal sealed class NumberSyntaxNode(string? name, int value) : ResultSyntaxNodeBase<string>(name, value.ToString());

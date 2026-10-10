@@ -19,12 +19,11 @@ internal static class BorgPruneLineGrammar
         Whitespace,
         ArchiveTimestamp,
         Whitespace,
-        ArchiveId,
-        End>.Instance;
+        ArchiveId>.Instance;
 
-    public static bool TryParse(ReadOnlySpan<char> input, [NotNullWhen(true)] out BorgPruneLineModel? model)
+    public static bool TryParse(string input, [NotNullWhen(true)] out BorgPruneLineModel? model)
     {
-        if (!s_grammar.TryParse(input, out ISyntaxNode? syntaxNode, out _))
+        if (!s_grammar.TryParseComplete(input, out ISyntaxNode? syntaxNode))
         {
             model = null;
             return false;

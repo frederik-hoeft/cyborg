@@ -1,4 +1,4 @@
-# Cyborg System Architecture
+﻿# Cyborg System Architecture
 
 This document provides a comprehensive overview of the Cyborg system architecture. It covers the module system, JSON deserialization, execution model, environment scoping, variable resolution, property overrides, artifact publishing, parsing infrastructure, process execution, metrics, and security. After reading this document, you should have a clear understanding of how the system is structured, how modules are loaded and executed, and how the major subsystems interact.
 
@@ -532,38 +532,29 @@ This configuration layer is also the selection mechanism for keyed host services
 
 ### Parsing Infrastructure
 
-Cyborg includes a grammar-based parser combinator framework for extracting structured data from subprocess output. This subsystem is primarily used to parse borg command output into typed results for metrics extraction and programmatic consumption, but may also be used for validating unstructured input via the `[MatchesGrammar]` validation attribute.
+Cyborg provides a domain-agnostic parser-combinator framework under `Cyborg.Core.Parsing`. The grammar layer is independent of Borg, environment value expressions, and other consumers. It currently parses Borg output into structured metrics and validates module input through `[MatchesGrammar]`.
 
-#### Parser Combinators
+#### Grammar Construction
 
-The `Grammar` static factory provides a fluent builder API for composing parsers from smaller building blocks:
+The `Grammar` factory and fluent builders compose `IParser` implementations into reusable grammars. Statically composed parsers also expose CRTP-based singleton instances for up to eight generic type arguments. The supported combinators are:
 
 | Combinator | Behavior |
 |------------|----------|
-| `Sequence` | All child parsers must match in order. Supports up to eight type parameters for zero-allocation singleton composition via CRTP, or a builder API for more flexible nesting. |
-| `Alternative` | Returns the result of the first child parser that matches. |
-| `Optional` | Always succeeds. If the inner parser matches, produces a node wrapping the result; otherwise produces an empty node. |
+| `Sequence` | Matches child parsers in declaration order. |
+| `Alternative` | Selects the first successful child parser. |
+| `Optional` | Succeeds whether or not its child matches. |
+| `Repeat` | Matches repeated instances of a child parser, with an optional minimum count. Repetition rejects child matches that consume no input. |
+| `Set` | Greedily matches a nonempty subset of child positions in any order, each at most once. Zero-width successes are treated as absent, so a child can be retried after another child advances the offset; at least one child must consume input. After each consuming match, retries unused children in declaration order without backtracking. |
 
-Combinators can be nested arbitrarily to express complex grammars. The builder API supports naming sub-parsers for disambiguation when the same parser type appears in multiple positions within a grammar.
+Parsers accept a string and a starting offset, return a syntax node and the number of characters consumed **from that offset**, and allow a grammar to match a prefix. Consumers that require an entire value, including generated `[MatchesGrammar]` validation and Borg prune-line parsing, use `TryParseComplete` to reject unmatched trailing input.
 
-#### Terminal Parsers
+#### Syntax Nodes and Visitors
 
-Terminal parsers match text patterns via compiled regular expressions. The `RegexParserBase<TSelf>` abstract base class uses the curiously recurring template pattern to provide a static `Instance` singleton for each parser type. Each terminal parser implements the `IRegexOwner` static abstract interface, which exposes a `[GeneratedRegex]` property for AOT-safe, build-time compiled regular expressions.
+Successful parsers return an `ISyntaxNode` tree. Combinators create parent-linked nodes, while terminal parsers produce result-bearing nodes implementing `ISyntaxNode<TResult>`. The untyped parser API is shared across grammars; concrete consumers can use `SyntaxNodeBase<TVisitor>` to enforce a strongly typed visitor when traversing their grammar-specific nodes. `ParserBase<TVisitor>` and `RequireVisitor<TVisitor>` provide corresponding visitor compatibility checks without propagating a visitor type through every combinator.
 
-All regex patterns must be anchored at the current parse offset (using the `\G` anchor) to ensure deterministic, position-based matching. On a successful match, the terminal parser produces a typed `ISyntaxNode` containing the parsed value.
+Regex-backed terminals use `RegexParserBase<TSelf>` and `IRegexOwner` to supply statically generated, AOT-compatible regexes. They must match at the requested offset; `\G` provides the appropriate anchor for regexes operating on a full string and a nonzero offset. The base parser also rejects matches that begin after that offset.
 
-#### Syntax Tree and Data Extraction
-
-Parsers produce an `ISyntaxNode` tree with parent-linked nodes. Each node carries a name and supports upward traversal via `HasParent(name)`, enabling contextual discrimination when the same parser type appears in different positions within a grammar.
-
-Data extraction from the syntax tree uses the visitor pattern. Consumers implement `INodeVisitor` with typed `Visit` methods for the syntax node types of interest. The `Accept` method on each node dispatches to the appropriate visitor method, allowing structured data to be collected in a single traversal.
-
-#### Integration Points
-
-The parsing infrastructure serves two roles:
-
-1. **Output parsing** — Grammars are applied to subprocess stdout or stderr to extract structured results (e.g., borg archive statistics, prune counts). The parsed data is published as module artifacts or metrics.
-2. **Input validation** — The `[MatchesGrammar]` validation attribute applies a grammar to a module property value at validation time, ensuring it conforms to an expected format (e.g., borg compression specifications).
+This infrastructure parses structured input but does not itself evaluate environment references or interpolation. The [Interpolation and Override Resolution](interpolation.md) document defines those existing runtime semantics.
 
 ### Process Execution
 

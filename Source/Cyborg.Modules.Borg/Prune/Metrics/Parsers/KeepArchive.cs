@@ -7,16 +7,16 @@ using System.Text.RegularExpressions;
 
 namespace Cyborg.Modules.Borg.Prune.Metrics;
 
-public sealed partial class KeepArchive(string? name = null) : RegexParserBase<BorgPruneVisitor, KeepArchive>(name), IParser<KeepArchive>, IRegexOwner
+public sealed partial class KeepArchive(string? name = null) : RegexParserBase<KeepArchive, BorgPruneVisitor>(name), IParser<KeepArchive>, IRegexOwner
 {
-    [GeneratedRegex(@"^[Kk]eeping archive \(rule: (?<rule>.+?) #(?<rule_index>\d+)\):")]
+    [GeneratedRegex(@"\G[Kk]eeping archive \(rule: (?<rule>.+?) #(?<rule_index>\d+)\):")]
     public static partial Regex ParserRegex { get; }
 
     public static KeepArchive Instance { get; } = new();
 
     public override IParser NamedCopy(string name) => new KeepArchive(name);
 
-    protected override bool TryCreateSyntaxNode([NotNull] Match match, [NotNullWhen(true)] out SyntaxNode<BorgPruneVisitor>? syntaxNode)
+    protected override bool TryCreateSyntaxNode([NotNull] Match match, [NotNullWhen(true)] out ISyntaxNode? syntaxNode)
     {
         string ruleName = match.Groups["rule"].Value;
         string ruleIndexString = match.Groups["rule_index"].Value;

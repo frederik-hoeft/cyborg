@@ -6,16 +6,16 @@ using System.Text.RegularExpressions;
 
 namespace Cyborg.Modules.Borg.Prune.Metrics;
 
-public sealed partial class ArchiveName(string? name = null) : RegexParserBase<BorgPruneVisitor, ArchiveName>(name), IParser<ArchiveName>, IRegexOwner
+public sealed partial class ArchiveName(string? name = null) : RegexParserBase<ArchiveName, BorgPruneVisitor>(name), IParser<ArchiveName>, IRegexOwner
 {
-    [GeneratedRegex(@"^(?<archive_name>\S+)")]
+    [GeneratedRegex(@"\G(?<archive_name>\S+)")]
     public static partial Regex ParserRegex { get; }
 
     public static ArchiveName Instance { get; } = new();
 
     public override IParser NamedCopy(string name) => new ArchiveName(name);
 
-    protected override bool TryCreateSyntaxNode([NotNull] Match match, [NotNullWhen(true)] out SyntaxNode<BorgPruneVisitor>? syntaxNode)
+    protected override bool TryCreateSyntaxNode([NotNull] Match match, [NotNullWhen(true)] out ISyntaxNode? syntaxNode)
     {
         string archiveName = match.Groups["archive_name"].Value;
         syntaxNode = new ArchiveNameSyntaxNode(Name, archiveName);

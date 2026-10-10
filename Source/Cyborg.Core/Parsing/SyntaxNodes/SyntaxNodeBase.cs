@@ -1,20 +1,18 @@
-﻿using Cyborg.Core.Parsing.Visitors;
-using System.Text;
+﻿using System.Text;
+using Cyborg.Core.Parsing.Visitors;
 
 namespace Cyborg.Core.Parsing.SyntaxNodes;
 
-public abstract class SyntaxNodeBase : ISyntaxNode
+public abstract class SyntaxNodeBase(string? name) : ISyntaxNode
 {
-    public string? Name { get; }
+    public string? Name => name;
 
     public ISyntaxNode? Parent { get; set; }
 
-    private protected SyntaxNodeBase(string? name)
+    public virtual void Accept(INodeVisitor visitor)
     {
-        Name = name;
+        ArgumentNullException.ThrowIfNull(visitor);
     }
-
-    public abstract void Accept(INodeVisitor visitor);
 
     public bool HasParent(string name)
     {
@@ -38,7 +36,10 @@ public abstract class SyntaxNodeBase : ISyntaxNode
         ArgumentNullException.ThrowIfNull(builder);
         builder.Append(' ', indentLevel * 2);
         builder.Append(GetType().Name);
-        builder.Append($" (Name: '{Name ?? "<unnamed>"}')");
+        if (Name is not null)
+        {
+            builder.Append($" (Name: '{Name}')");
+        }
         builder.AppendLine();
     }
 }

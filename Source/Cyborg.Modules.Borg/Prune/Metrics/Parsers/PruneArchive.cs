@@ -7,16 +7,16 @@ using System.Text.RegularExpressions;
 
 namespace Cyborg.Modules.Borg.Prune.Metrics;
 
-public sealed partial class PruneArchive(string? name = null) : RegexParserBase<BorgPruneVisitor, PruneArchive>(name), IParser<PruneArchive>, IRegexOwner
+public sealed partial class PruneArchive(string? name = null) : RegexParserBase<PruneArchive, BorgPruneVisitor>(name), IParser<PruneArchive>, IRegexOwner
 {
-    [GeneratedRegex(@"^[Pp]runing archive \((?<prune_index>\d+)/(?<prune_total>\d+)\):")]
+    [GeneratedRegex(@"\G[Pp]runing archive \((?<prune_index>\d+)/(?<prune_total>\d+)\):")]
     public static partial Regex ParserRegex { get; }
 
     public static PruneArchive Instance { get; } = new();
 
     public override IParser NamedCopy(string name) => new PruneArchive(name);
 
-    protected override bool TryCreateSyntaxNode([NotNull] Match match, [NotNullWhen(true)] out SyntaxNode<BorgPruneVisitor>? syntaxNode)
+    protected override bool TryCreateSyntaxNode([NotNull] Match match, [NotNullWhen(true)] out ISyntaxNode? syntaxNode)
     {
         string pruneIndexString = match.Groups["prune_index"].Value;
         string pruneTotalString = match.Groups["prune_total"].Value;

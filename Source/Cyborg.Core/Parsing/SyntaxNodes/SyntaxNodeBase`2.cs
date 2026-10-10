@@ -1,9 +1,9 @@
-﻿using Cyborg.Core.Parsing.Visitors;
-using System.Text;
+﻿using System.Text;
+using Cyborg.Core.Parsing.Visitors;
 
 namespace Cyborg.Core.Parsing.SyntaxNodes;
 
-public abstract class SyntaxNode<TVisitor, TResult>(string? name, TResult result) : SyntaxNode<TVisitor>(name), ISyntaxNode<TResult>
+public abstract class SyntaxNodeBase<TVisitor, TResult>(string? name, TResult result) : SyntaxNodeBase<TVisitor>(name), ISyntaxNode<TResult>
     where TVisitor : class, INodeVisitor
 {
     public TResult Evaluate() => result;

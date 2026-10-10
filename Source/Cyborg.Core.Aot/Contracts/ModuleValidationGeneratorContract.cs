@@ -10,6 +10,7 @@ internal enum ModuleValidationGeneratorContract
     ValidationError,
     IDefaultValueT,
     IParser,
+    ParserExtensions,
     IModuleDescriptor,
     IObjectDescriptionBuilder,
     ModuleIdentity,
