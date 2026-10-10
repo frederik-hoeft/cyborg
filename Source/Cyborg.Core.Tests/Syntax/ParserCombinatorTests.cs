@@ -1,6 +1,7 @@
 using Cyborg.Core.Parsing;
 using Cyborg.Core.Parsing.Parsers;
 using Cyborg.Core.Parsing.SyntaxNodes;
+using Cyborg.Core.Parsing.Visitors;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Core.Tests.Syntax;
@@ -59,6 +60,71 @@ public sealed class ParserCombinatorTests
     }
 
     [TestMethod]
+    [DataRow("ABC")]
+    [DataRow("ACB")]
+    [DataRow("BAC")]
+    [DataRow("BCA")]
+    [DataRow("CAB")]
+    [DataRow("CBA")]
+    public void Test_Set_AcceptsPermutationsAndPreservesInputOrder(string input)
+    {
+        IParser grammar = Grammar.Set(new Literal("A"), new Literal("B"), new Literal("C")).NamedCopy("letters");
+
+        Assert.IsTrue(grammar.TryParseComplete(input, out ISyntaxNode? node));
+        Assert.IsInstanceOfType<SetSyntaxNode>(node);
+        Assert.AreEqual("letters", node.Name);
+
+        LiteralVisitor visitor = new();
+        node.Accept(visitor);
+        Assert.AreSequenceEqual(input.Select(character => character.ToString()), visitor.Values);
+        Assert.IsTrue(visitor.Nodes.All(child => child.HasParent("letters")));
+    }
+
+    [TestMethod]
+    public void Test_Set_AcceptsNonemptySubsetsAndRejectsUnmatchedSuffixes()
+    {
+        IParser grammar = Grammar.Set(new Literal("A"), new Literal("B"));
+
+        Assert.IsTrue(grammar.TryParseComplete("B", out ISyntaxNode? node));
+        Assert.IsInstanceOfType<SetSyntaxNode>(node);
+        Assert.IsTrue(grammar.TryParse("prefixBAA", 6, out node, out int consumed));
+        Assert.AreEqual(2, consumed);
+        Assert.IsFalse(grammar.TryParseComplete("BAA", out _));
+        Assert.IsFalse(grammar.TryParseComplete("ABA", out _));
+    }
+
+    [TestMethod]
+    public void Test_Set_DoesNotMatchWhenNoMembersMatch()
+    {
+        IParser grammar = Grammar.Set(new Literal("A"), new Literal("B"));
+
+        Assert.IsFalse(grammar.TryParse("C", 0, out ISyntaxNode? node, out int consumed));
+        Assert.IsNull(node);
+        Assert.AreEqual(0, consumed);
+        Assert.IsFalse(grammar.TryParseComplete(string.Empty, out _));
+    }
+
+    [TestMethod]
+    public void Test_Set_TreatsDuplicateParserInstancesAsDistinctMembers()
+    {
+        Literal literal = new("A");
+        IParser grammar = Grammar.Set(literal, literal);
+
+        Assert.IsTrue(grammar.TryParseComplete("AA", out ISyntaxNode? node));
+        Assert.IsInstanceOfType<SetSyntaxNode>(node);
+        Assert.IsFalse(grammar.TryParseComplete("AAA", out _));
+    }
+
+    [TestMethod]
+    public void Test_Set_FluentFactorySupportsUnorderedMembers()
+    {
+        IParser grammar = Grammar.Set(set => set.Parser(new Literal("A")).Parser(new Literal("B")));
+
+        Assert.IsTrue(grammar.TryParseComplete("BA", out ISyntaxNode? node));
+        Assert.IsInstanceOfType<SetSyntaxNode>(node);
+    }
+
+    [TestMethod]
     public void Test_ResultNodes_RetainTypedValues()
     {
         IParser grammar = new Literal("abc");
@@ -90,5 +156,23 @@ public sealed class ParserCombinatorTests
         }
     }
 
-    private sealed class LiteralNode(string? name, string value) : ResultSyntaxNodeBase<string>(name, value);
+    private sealed class LiteralNode(string? name, string value) : ResultSyntaxNodeBase<string>(name, value)
+    {
+        public override void Accept(INodeVisitor visitor)
+        {
+            base.Accept(visitor);
+            if (visitor is LiteralVisitor literalVisitor)
+            {
+                literalVisitor.Values.Add(Evaluate());
+                literalVisitor.Nodes.Add(this);
+            }
+        }
+    }
+
+    private sealed class LiteralVisitor : INodeVisitor
+    {
+        public List<string> Values { get; } = [];
+
+        public List<ISyntaxNode> Nodes { get; } = [];
+    }
 }

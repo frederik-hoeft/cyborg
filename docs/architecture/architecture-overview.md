@@ -544,7 +544,7 @@ The `Grammar` factory and fluent builders compose `IParser` implementations into
 | `Alternative` | Selects the first successful child parser. |
 | `Optional` | Succeeds whether or not its child matches. |
 | `Repeat` | Matches repeated instances of a child parser, with an optional minimum count. Repetition rejects child matches that consume no input. |
-| `Set` | Composes distinct child parsers for set-style matching. |
+| `Set` | Greedily matches a nonempty subset of child positions in any order, each at most once. After every match, retries unused children from the beginning. Does not backtrack over ambiguous matches. |
 
 Parsers accept a string and a starting offset, return a syntax node and the number of characters consumed **from that offset**, and allow a grammar to match a prefix. Consumers that require an entire value, including generated `[MatchesGrammar]` validation and Borg prune-line parsing, use `TryParseComplete` to reject unmatched trailing input.
 
