@@ -1,9 +1,11 @@
-﻿using Cyborg.Core.Parsing.SyntaxNodes;
+﻿using Cyborg.Core.Aot.Contracts;
+using Cyborg.Core.Parsing.SyntaxNodes;
 using Cyborg.Core.Parsing.Visitors;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Core.Parsing.Parsers;
 
+[GeneratorContractRegistration<ModuleValidationGeneratorContract>(ModuleValidationGeneratorContract.ParserExtensions)]
 public static class ParserExtensions
 {
     /// <summary>

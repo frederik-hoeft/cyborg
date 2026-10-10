@@ -18,6 +18,7 @@ internal sealed class ValidationContractInfo(Dictionary<ModuleValidationGenerato
         ModuleValidationGeneratorContract.ValidationError,
         ModuleValidationGeneratorContract.IDefaultValueT,
         ModuleValidationGeneratorContract.IParser,
+        ModuleValidationGeneratorContract.ParserExtensions,
         ModuleValidationGeneratorContract.IModuleDescriptor,
         ModuleValidationGeneratorContract.IObjectDescriptionBuilder,
         ModuleValidationGeneratorContract.ModuleIdentity,
@@ -40,6 +41,8 @@ internal sealed class ValidationContractInfo(Dictionary<ModuleValidationGenerato
     public INamedTypeSymbol IDefaultValueT => ContractTypes[ModuleValidationGeneratorContract.IDefaultValueT];
 
     public INamedTypeSymbol IParser => ContractTypes[ModuleValidationGeneratorContract.IParser];
+
+    public INamedTypeSymbol ParserExtensions => ContractTypes[ModuleValidationGeneratorContract.ParserExtensions];
 
     public INamedTypeSymbol IModuleDescriptor => ContractTypes[ModuleValidationGeneratorContract.IModuleDescriptor];
 

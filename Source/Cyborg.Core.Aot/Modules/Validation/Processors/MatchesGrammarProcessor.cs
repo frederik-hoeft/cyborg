@@ -45,9 +45,10 @@ internal sealed class MatchesGrammarProcessor : AttributeProcessorBase<MatchesGr
                 return;
             }
             // Require an exact grammar match rather than accepting a valid prefix.
+            string validationExpression = $"!{model.ContractInfo.ParserExtensions.RenderGlobal()}.TryParseComplete({valueExpression}, {model.StringContentExpression}, out _)";
             builder.AppendBlock(
             $$"""
-            if ({{model.NullAwareCondition($"!global::Cyborg.Core.Parsing.Parsers.ParserExtensions.TryParseComplete({valueExpression}, {model.StringContentExpression}, out _)")}})
+            if ({{model.NullAwareCondition(validationExpression)}})
             {
                 {{model.Variables.Errors}}.Add({{CreateValidationError(model, "match_grammar", $"{model.TargetDescription} does not match the required grammar.")}});
             }
