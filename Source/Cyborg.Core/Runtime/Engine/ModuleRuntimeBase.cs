@@ -1,5 +1,6 @@
 ﻿using Cyborg.Core.Runtime.Configuration;
 using Cyborg.Core.Runtime.Engine.Environments;
+using Cyborg.Core.Runtime.Engine.Environments.Context;
 using Cyborg.Core.Runtime.Engine.Transactions;
 using Cyborg.Core.Runtime.Engine.Transactions.Internal;
 using Cyborg.Core.Runtime.Model;
@@ -124,6 +125,7 @@ internal abstract class ModuleRuntimeBase
         ArgumentNullException.ThrowIfNull(moduleReference);
         ArgumentNullException.ThrowIfNull(environment);
         IRuntimeEnvironment scopedEnvironment = environmentContext.BindEnvironment(environment);
+        scopedEnvironment = scopedEnvironment.WithEnvironmentContext(ModuleExecutionContext.Create(moduleReference));
         IModuleWorker worker = runtimeServices.Dispatcher.ActivateWorker(moduleReference, RequireExecutionServices());
         return ExecuteActivatedWorkerInCurrentScopeAsync(worker, scopedEnvironment, cancellationToken);
     }

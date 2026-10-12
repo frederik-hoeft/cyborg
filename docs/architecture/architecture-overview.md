@@ -310,13 +310,13 @@ Variables are the primary communication mechanism between modules. The resolutio
 
 When `TryResolveVariable<T>(name)` is called, the runtime captures the environment where the lookup started as the **entry point**. Resolution proceeds as follows:
 
-1. **Current-scope self-reference** — The special name `@` resolves to the environment namespace in the environment tree where resolution is currently occurring.
-2. **Entry-point self-reference** — The special name `@@` resolves to the namespace of the environment that initiated the current resolution or interpolation chain. This allows late-bound references to the entry-point scope even when resolution has propagated into parent environments.
-3. **Direct lookup** — The variable name is looked up in the local dictionary.
+1. **Current-scope self-reference** — The special name `@` resolves to the environment namespace in the environment tree where resolution is currently occurring. `@.<member>` resolves a runtime-owned contextual member of that same view. `@.origin.file` and `@.origin.directory` are the absolute file and directory of the module definition bound to the view.
+2. **Entry-point self-reference** — The special name `@@` resolves to the namespace of the environment that initiated the current resolution or interpolation chain. `@@.<member>` reads a contextual member of that entry point, including `@@.origin.file` and `@@.origin.directory`. This allows late-bound references to the entry-point scope even when resolution has propagated into parent environments.
+3. **Direct lookup** — The variable name is looked up in the local dictionary. Contextual names are not stored, so this step does not see them.
 4. **Eager capture** — If the stored value is a snapshot taken from `*{identifier}` at definition time, that snapshot is returned without further evaluation. The snapshot is the reference obtained when the variable was defined; it is not deep-cloned.
-5. **Lazy indirection** — If the stored value is exactly `&{...}`, the referenced target is resolved recursively on every read. `&{name}` resolves relative to the current resolution scope, `&{@name}` resolves relative to the entry-point scope, and `&{@}` / `&{@@}` resolve the current and entry-point namespaces. An undefined target fails resolution. Tags on a `TaggedString` wrapper are unioned onto a textual target.
+5. **Lazy indirection** — If the stored value is exactly `&{...}`, the referenced target is resolved recursively on every read. `&{name}` resolves relative to the current resolution scope, `&{@name}` resolves relative to the entry-point scope, and `&{@}` / `&{@@}` resolve the current and entry-point namespaces. `&{@.member}` and `&{@@.member}` read contextual members with those same scope rules. An undefined target fails resolution. Tags on a `TaggedString` wrapper are unioned onto a textual target.
 6. **Interpolation** — Otherwise, a stored string or `TaggedString` containing `${...}` placeholders is interpolated, including when the entire value is one `${...}` expression. The result is text. Unresolvable placeholders are left as-is. Tags from the template and from every successfully resolved operand are unioned onto the result so values such as `"hello ${mySecret}"` cannot leak into an untagged string. One escape layer is then removed from the string result.
-7. **Parent fallback** — In an `InheritedRuntimeEnvironment`, if the variable is not found locally, the lookup is delegated to the parent chain.
+7. **Parent fallback** — In an `InheritedRuntimeEnvironment`, if the variable is not found locally, the lookup is delegated to the parent chain. A contextual `@.<member>` name is answered only by the view selected in steps 1 or 2. An undefined contextual member does not fall through to a parent module's origin or to a stored variable.
 8. **Type casting** — The resolved value is matched against the requested type `T`. A type mismatch throws `InvalidCastException`. `string` and `TaggedString` convert to each other: resolving a tagged value as `string` returns the raw value and discards tags (and logs a warning when tags were present), while resolving a stored string as `TaggedString` wraps it with no tags. Prefer `TryResolveVariable(..., out TaggedString)` so interpolation-introduced tags such as `cyborg.secret.v1` are preserved.
 
 #### Tagged Textual Values
@@ -362,12 +362,26 @@ Invalid identifiers include `.host`, `host.`, `host..port`, `host port`, and `${
 - `${@name}` resolves an identifier from the entry-point scope.
 - `${@}` resolves to the namespace of the current resolution scope.
 - `${@@}` resolves to the namespace of the entry-point scope.
+- `${@.member}` resolves a contextual member of the current scope. `${@.origin.file}` and `${@.origin.directory}` are the absolute definition file and its directory.
+- `${@@.member}` resolves a contextual member of the entry-point scope.
 
-The `name` portion must be a valid identifier. Forms such as `${}`, `${1name}`, `${name.}`, `${@1name}`, and `${@@name}` are not interpolation expressions. Malformed `${...}` text is ignored. For example, `backup-${host.name}-${date}` contains two interpolation expressions. Unresolved placeholders are left unchanged.
+The `name` or `member` portion must be a valid identifier. Forms such as `${}`, `${1name}`, `${name.}`, `${@1name}`, `${@@name}`, `${@.}`, and `${@@.}` are not interpolation expressions. Malformed `${...}` text is ignored. For example, `backup-${host.name}-${date}` contains two interpolation expressions. Unresolved placeholders are left unchanged.
 
-**Lazy indirection** uses `&{` and `}` and must be the entire value. Each read returns the target's current type and value. `&{name}`, `&{@name}`, `&{@}`, and `&{@@}` follow the same scope rules as the corresponding `${...}` forms. An undefined target fails resolution. Leading or trailing text around an unescaped `&{...}` is a syntax error.
+**Lazy indirection** uses `&{` and `}` and must be the entire value. Each read returns the target's current type and value. `&{name}`, `&{@name}`, `&{@}`, `&{@@}`, `&{@.member}`, and `&{@@.member}` follow the same scope rules as the corresponding `${...}` forms. An undefined target fails resolution. Leading or trailing text around an unescaped `&{...}` is a syntax error.
 
-**Eager capture** uses `*{` and `}` and must be the entire value. `*{name}` resolves `name` once when the variable is defined and stores that value. Later replacement of `name` does not change the snapshot, and the snapshot is not a deep clone. `*{@name}` is reserved and invalid. Leading or trailing text around an unescaped `*{...}` is a syntax error. An undefined target fails the definition.
+**Eager capture** uses `*{` and `}` and must be the entire value. `*{name}` resolves `name` once when the variable is defined and stores that value. Later replacement of `name` does not change the snapshot, and the snapshot is not a deep clone. `*{@name}`, `*{@}`, and `*{@@}` are reserved and invalid. `*{@.member}` and `*{@@.member}` capture a contextual member; the view that defines the variable is the entry point, so both snapshot that view. Leading or trailing text around an unescaped `*{...}` is a syntax error. An undefined target fails the definition.
+
+#### Definition provenance
+
+`@.origin.file` and `@.origin.directory` expose where the executing module was defined. They are contextual members of the `@` self-reference, owned by the execution view, and they are not workflow variables.
+
+- A configuration file load stamps every module reference in that file with the canonical absolute path that was read. Nested and dynamic references in the same document share that path. A reference later loaded from another file keeps the other file.
+- `new ModuleReference(definition, moduleId)` has no origin. `new ModuleReference(definition, moduleId, ModuleOrigin.FromFile(path))` sets one. With no origin, both members are undefined.
+- The origin describes the definition, not the caller. A template or external file reports its own path when it runs. A dynamic invocation reports the referenced definition's origin.
+- The names are read-only. The `@.<member>` namespace is reserved for contextual members, so a workflow write cannot shadow `@.origin.file` or a member added later. `@identifier` override keys are unchanged.
+- Contextual state is not stored in the environment transaction. Join, rollback, and sibling reconciliation cannot publish it onto a parent or a peer. Capturing or interpolating the path into an ordinary variable is how workflow state records it. A reconstructed environment with no live execution view has no contextual values.
+
+`@@.origin.file` and `@@.origin.directory` apply the same facts to the resolution entry point. That is the same distinction `@` and `@@` already make for namespaces: a value stored in an ancestor environment resolves `@` against the ancestor view and `@@` against the view that started the read.
 
 A hash immediately after an operator escapes one evaluation pass: `${#name}` becomes `${name}`, `&{#name}` becomes `&{name}`, and `*{#name}` becomes `*{name}`. `${##name}` becomes `${#name}`. The expression revealed by removing the hash is not rescanned during the same pass. `$${name}` is not an escape because it still contains the valid expression `${name}`.
 
@@ -398,7 +412,8 @@ namespaceName
     ;
 
 expression
-    : '@@'
+    : '@@' ('.' IDENTIFIER)?
+    | '@.' IDENTIFIER
     | '@' IDENTIFIER?
     | IDENTIFIER
     ;
@@ -412,7 +427,7 @@ indirection
     ;
 
 capture
-    : '*{' IDENTIFIER '}' EOF
+    : '*{' ('@@.' IDENTIFIER | '@.' IDENTIFIER | IDENTIFIER) '}' EOF
     ;
 
 IDENTIFIER

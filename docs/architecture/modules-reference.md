@@ -14,6 +14,7 @@ For details on the execution model, environment scoping semantics, variable reso
   - [Module Base Properties](#module-base-properties)
   - [Module Context](#module-context)
   - [Environment Scoping](#environment-scoping)
+  - [Definition Provenance](#definition-provenance)
   - [Artifacts](#artifacts)
 - [Control Flow Modules](#control-flow-modules)
   - [Sequence (`cyborg.modules.sequence.v1`)](#sequence-cyborgmodulessequencev1)
@@ -100,6 +101,29 @@ The `environment` property on a module context controls variable scope inheritan
 | `transient` | bool | No | `false` | Whether the scope is transient (not persisted beyond execution). |
 
 Environments declared with an explicit `name` and not marked `transient` are registered in the current execution's transactional environment graph. A later module can access a visible registration via `reference` scope after the relevant state has reconciled. This is the primary mechanism for cross-step named state sharing. For a detailed overview of environment semantics, see [Runtime Infrastructure -- Environment Scoping](./architecture-overview.md#environment-scoping).
+
+### Definition Provenance
+
+A module loaded from a configuration file can refer to its own file and directory through the `@` self-reference. These are contextual, read-only values. They are not module properties and they are not written into the environment transaction.
+
+| Expression | Meaning |
+|------------|---------|
+| `@.origin.file` | Absolute path of the file that defined the module currently resolving `@` |
+| `@.origin.directory` | Absolute directory containing that file |
+| `@@.origin.file` | The same file path, read from the resolution entry point |
+| `@@.origin.directory` | The same directory, read from the resolution entry point |
+
+`@.origin.directory` is the way to load a neighbor file without depending on the process working directory:
+
+```json
+{
+  "cyborg.modules.external.v1": {
+    "path": "${@.origin.directory}/../templates/backup.jconf"
+  }
+}
+```
+
+The path is the definition site. An external or template file reports its own directory when it runs, not the directory of the module that called it. A dynamic module executes the referenced definition's origin. A reference constructed in code has no origin unless the caller passes one to `ModuleReference`; both variables are then undefined. `${...}`, `&{...}`, and `*{...}` all read these names. Assigning or removing `@.origin.file` fails. See [Definition provenance](./architecture-overview.md#definition-provenance) for resolution and isolation rules.
 
 ### Artifacts
 
@@ -577,7 +601,8 @@ Loads and executes a module definition from an external JSON file.
 
 **Behavior:**
 
-- Loads the module configuration from `path` and executes it.
+- Loads the module configuration from `path` and executes it. The loaded module's `@.origin.file` is `path` after canonicalization, not the file that contains this external module.
+- `path` may be built from `@.origin.directory` so the neighbor file is resolved next to the file that defined this module.
 - Returns the loaded module's execution status.
 
 ---
@@ -599,7 +624,8 @@ Loads and executes an external module, injecting namespaced arguments into the c
 
 - For each argument, sets a variable named `<namespace>.<key>` in the child environment (e.g., with namespace `backup.overleaf` and key `container_name`, the variable `backup.overleaf.container_name` is set).
 - For each override, sets the specified override key and value in the child environment's override resolution context.
-- Loads and executes the module at `path`. The loaded module's properties can reference template arguments via the standard variable interpolation and override mechanisms (e.g., `${backup.overleaf.container_name}`).
+- Loads and executes the module at `path`. The loaded module's properties can reference template arguments via the standard variable interpolation and override mechanisms (e.g., `${backup.overleaf.container_name}`). `@.origin.directory` inside the loaded module is the template file's directory.
+- `path` may itself be `${@.origin.directory}/...` when the template file sits next to the caller definition.
 - Returns the loaded module's execution status.
 
 ---

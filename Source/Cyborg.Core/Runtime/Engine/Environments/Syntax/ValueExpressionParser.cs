@@ -40,12 +40,12 @@ internal static class ValueExpressionParser
         if (text[0] == '*' && body.StartsWith('@'))
         {
             throw new FormatException(
-                $"Eager capture '{text}' is invalid. The entry-point modifier '@' is reserved and is not supported in '*{{...}}'.");
+                $"Eager capture '{text}' is invalid. The entry-point modifier '@' is reserved and is not supported in '*{{...}}'. Contextual self-members such as '*{{@.origin.file}}' and '*{{@@.origin.file}}' are allowed.");
         }
 
         throw new FormatException(
             text[0] == '&'
-                ? $"Lazy indirection '{text}' is invalid. The reference must be an identifier, '@identifier', '@', or '@@'."
-                : $"Eager capture '{text}' is invalid. The reference must be an identifier.");
+                ? $"Lazy indirection '{text}' is invalid. The reference must be an identifier, '@identifier', '@', '@@', '@.<member>', or '@@.<member>'."
+                : $"Eager capture '{text}' is invalid. The reference must be an identifier or a contextual self-member such as '@.origin.file'.");
     }
 }

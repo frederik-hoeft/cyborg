@@ -25,8 +25,16 @@ internal static class VariableGrammar
     public const string NAMESPACE_PATTERN = $@"\A{IDENTIFIER}\z";
 
     [StringSyntax(StringSyntaxAttribute.Regex)]
-    // @@ late self, @ self, @identifier entry-point reference, or identifier current-scope reference
-    public const string EXPRESSION_PATTERN = $@"@@|@(?:{IDENTIFIER})?|{IDENTIFIER}";
+    // dotted member of the @ or @@ self-reference, for example .origin.file
+    public const string SELF_MEMBER_PATTERN = $@"\.{IDENTIFIER}";
+
+    [StringSyntax(StringSyntaxAttribute.Regex)]
+    // @@ / @@.member late self, @ / @.member current self, @identifier entry-point reference, or identifier current-scope reference
+    public const string EXPRESSION_PATTERN = $@"@@(?:{SELF_MEMBER_PATTERN})?|@(?:{SELF_MEMBER_PATTERN}|(?:{IDENTIFIER})?)|{IDENTIFIER}";
+
+    [StringSyntax(StringSyntaxAttribute.Regex)]
+    // ordinary identifiers, plus contextual self-members. *@identifier remains reserved.
+    public const string CAPTURE_EXPRESSION_PATTERN = $@"@@{SELF_MEMBER_PATTERN}|@{SELF_MEMBER_PATTERN}|{IDENTIFIER}";
 
     [StringSyntax(StringSyntaxAttribute.Regex)]
     public const string INTERPOLATION_PATTERN = $@"\$\{{(?<expression>{EXPRESSION_PATTERN})\}}";
@@ -35,7 +43,7 @@ internal static class VariableGrammar
     public const string INDIRECTION_PATTERN = $@"\A&\{{(?<expression>{EXPRESSION_PATTERN})\}}\z";
 
     [StringSyntax(StringSyntaxAttribute.Regex)]
-    public const string CAPTURE_PATTERN = $@"\A\*\{{(?<expression>{IDENTIFIER})\}}\z";
+    public const string CAPTURE_PATTERN = $@"\A\*\{{(?<expression>{CAPTURE_EXPRESSION_PATTERN})\}}\z";
 
     [StringSyntax(StringSyntaxAttribute.Regex)]
     // one or more hashes escape a single evaluation pass for interpolation, indirection, or capture

@@ -31,6 +31,8 @@ public sealed class ValueExpressionParserTests
     [DataRow("&{@name}", "@name")]
     [DataRow("&{@}", "@")]
     [DataRow("&{@@}", "@@")]
+    [DataRow("&{@.origin.file}", "@.origin.file")]
+    [DataRow("&{@@.origin.directory}", "@@.origin.directory")]
     [DataRow("&{host.port}", "host.port")]
     public void Test_Parse_Indirection_ReturnsExpression(string value, string expectedExpression)
     {
@@ -43,6 +45,8 @@ public sealed class ValueExpressionParserTests
     [TestMethod]
     [DataRow("*{name}", "name")]
     [DataRow("*{host.port}", "host.port")]
+    [DataRow("*{@.origin.file}", "@.origin.file")]
+    [DataRow("*{@@.origin.file}", "@@.origin.file")]
     public void Test_Parse_Capture_ReturnsIdentifier(string value, string expectedExpression)
     {
         ValueExpression expression = ValueExpressionParser.Parse(CreateBuilder(), value);
@@ -60,6 +64,7 @@ public sealed class ValueExpressionParserTests
     [DataRow("*{@name}")]
     [DataRow("*{@}")]
     [DataRow("*{@@}")]
+    [DataRow("*{@@name}")]
     [DataRow("*{}")]
     public void Test_Parse_InvalidActiveReference_ThrowsFormatException(string value)
     {

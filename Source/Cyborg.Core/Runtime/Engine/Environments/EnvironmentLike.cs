@@ -1,5 +1,6 @@
 ﻿using Cyborg.Core.Configuration.Model;
 using Cyborg.Core.Runtime.Engine.Environments.Artifacts;
+using Cyborg.Core.Runtime.Engine.Environments.Context;
 using Cyborg.Core.Runtime.Engine.Environments.Syntax;
 using Cyborg.Core.Text;
 using System.Collections;
@@ -13,6 +14,11 @@ namespace Cyborg.Core.Runtime.Engine.Environments;
 public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, string Namespace) : IEnvironmentLike
 {
     private protected IEnvironmentVariableStore VariableStore { get; init; } = new MutableEnvironmentVariableStore();
+
+    /// <summary>
+    /// Definition-site facts for this view. Not part of the transactional variable store.
+    /// </summary>
+    internal IEnvironmentContext Context { get; init; } = EnvironmentContext.Empty;
 
     internal ITaggedStringConversionObserver? TaggedStringConversionObserver { get; init; }
 
@@ -140,7 +146,21 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
     internal protected virtual bool TryGetStoredVariableRecursiveCore(string name, [NotNullWhen(true)] out object? value) =>
         TryGetStoredVariableInCurrentScopeCore(name, out value);
 
-    internal protected virtual bool TryResolveVariableRecursiveCore(ResolutionContext context, out Evaluation evaluation) =>
+    internal protected bool TryResolveVariableRecursiveCore(ResolutionContext context, out Evaluation evaluation)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        if (TryResolveContextualVariable(context.Name, out evaluation, out bool consumed))
+        {
+            return true;
+        }
+        if (consumed)
+        {
+            return false;
+        }
+        return TryResolveStoredVariableRecursiveCore(context, out evaluation);
+    }
+
+    internal protected virtual bool TryResolveStoredVariableRecursiveCore(ResolutionContext context, out Evaluation evaluation) =>
         TryResolveVariableInCurrentScopeCore(context, out evaluation);
 
     private bool TryResolveVariableReference(ResolutionContext context, VariableReference reference, out Evaluation evaluation)
@@ -171,9 +191,17 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         throw new InvalidCastException($"Attempted to resolve variable '{name}' as type {typeof(T).FullName}, but it is of type {resolved.GetType().FullName}.");
     }
 
-    public virtual void SetVariable<T>(string name, T value) => VariableStore.SetValue(name, PrepareStoredValue(value));
+    public virtual void SetVariable<T>(string name, T value)
+    {
+        RejectContextualMutation(name);
+        VariableStore.SetValue(name, PrepareStoredValue(value));
+    }
 
-    public virtual bool TryRemoveVariable(string name) => VariableStore.TryRemove(name);
+    public virtual bool TryRemoveVariable(string name)
+    {
+        RejectContextualMutation(name);
+        return VariableStore.TryRemove(name);
+    }
 
     public virtual TaggedString Interpolate(string template)
     {
@@ -339,9 +367,21 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
             reference = new VariableReference(self, ResolutionOrigin.CurrentScope);
             return true;
         }
-        if (expression.Equals(LateRefSyntax.UncheckedMakeLate(SyntaxFactory.Self()), StringComparison.Ordinal))
+        string entrySelf = LateRefSyntax.UncheckedMakeLate(self);
+        if (expression.Equals(entrySelf, StringComparison.Ordinal))
         {
             reference = new VariableReference(self, ResolutionOrigin.EntryPoint);
+            return true;
+        }
+        if (expression.StartsWith(entrySelf + ".", StringComparison.Ordinal))
+        {
+            string contextualName = $"{self}.{expression[(entrySelf.Length + 1)..]}";
+            reference = new VariableReference(contextualName, ResolutionOrigin.EntryPoint);
+            return true;
+        }
+        if (expression.StartsWith(self + ".", StringComparison.Ordinal))
+        {
+            reference = new VariableReference(expression, ResolutionOrigin.CurrentScope);
             return true;
         }
         if (expression.StartsWith(LateRefSyntax.Symbol, StringComparison.Ordinal))
@@ -413,7 +453,7 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
             return text;
         }
 
-        if (!TryResolveVariable(expression.Expression, out object? snapshot))
+        if (!TryResolveCaptureTarget(expression.Expression, out object? snapshot))
         {
             throw new InvalidOperationException($"Failed to capture '*{{{expression.Expression}}}' because '{expression.Expression}' is not defined.");
         }
@@ -463,6 +503,46 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         Evaluation taggedTarget = WithWrapperTags(target, wrapperTags);
         object resolved = taggedTarget.Terminal ? taggedTarget.Value! : FinalizeIfText(taggedTarget.Value!);
         return Evaluation.TerminalValue(resolved);
+    }
+
+    private bool TryResolveCaptureTarget(string expression, [NotNullWhen(true)] out object? snapshot)
+    {
+        if (!TryParseVariableReference(expression, out VariableReference reference)
+            || !TryResolveVariableReference(ResolutionContext.CreateRoot(this), reference, out Evaluation evaluation)
+            || evaluation.Value is null)
+        {
+            snapshot = null;
+            return false;
+        }
+        snapshot = evaluation.Terminal ? evaluation.Value : FinalizeIfText(evaluation.Value);
+        return true;
+    }
+
+    private bool TryResolveContextualVariable(string name, out Evaluation evaluation, out bool consumed)
+    {
+        if (!ContextualVariableName.TryGetPath(name, SyntaxFactory, out string? path))
+        {
+            evaluation = default;
+            consumed = false;
+            return false;
+        }
+        consumed = true;
+        if (Context.TryGetValue(path, out object? value))
+        {
+            evaluation = Evaluation.Of(value);
+            return true;
+        }
+        evaluation = default;
+        return false;
+    }
+
+    private void RejectContextualMutation(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (ContextualVariableName.TryGetPath(name, SyntaxFactory, out _))
+        {
+            throw new InvalidOperationException($"Contextual variable '{name}' is runtime-owned and read-only.");
+        }
     }
 
     private void EnsureTextual(string text)

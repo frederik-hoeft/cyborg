@@ -26,6 +26,6 @@ public sealed class ModuleReferenceJsonConverter(IModuleLoaderRegistry registry,
         {
             throw new JsonException($"Expected end of module reference object after reading module configuration, but got {reader.TokenType}. Ensure that the JSON configuration for the module is properly formatted.");
         }
-        return new ModuleReference(module, configuration.ModuleId);
+        return new ModuleReference(module, configuration.ModuleId, ModuleOriginScope.Current);
     }
 }

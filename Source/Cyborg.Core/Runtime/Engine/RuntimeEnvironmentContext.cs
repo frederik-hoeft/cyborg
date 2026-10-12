@@ -1,4 +1,4 @@
-using Cyborg.Core.Runtime.Engine.Environments;
+﻿using Cyborg.Core.Runtime.Engine.Environments;
 using Cyborg.Core.Runtime.Engine.Environments.Syntax;
 using Cyborg.Core.Runtime.Engine.Transactions;
 using Cyborg.Core.Runtime.Engine.Transactions.Internal;
@@ -224,17 +224,21 @@ internal sealed class RuntimeEnvironmentContext
         }
 
         IRuntimeEnvironment? parent = null;
-        if (node.Parent is RuntimeEnvironmentParent parentReference)
+        if (node.Parent is { } parentReference)
         {
-            parent = CreateEnvironmentViewCore(
-                parentReference.EnvironmentId,
-                parentReference.Namespace,
-                active,
-                state,
-                visited);
-            if (parentReference.OverrideResolutionTags.Count > 0)
+            // Prefer the live view so definition-site context stays on the view and out of the transaction log.
+            if (!TryReuseLiveView(parentReference.EnvironmentId, out parent))
             {
-                parent = parent.WithOverrideResolutionTags(parentReference.OverrideResolutionTags);
+                parent = CreateEnvironmentViewCore(
+                    parentReference.EnvironmentId,
+                    parentReference.Namespace,
+                    active,
+                    state,
+                    visited);
+                if (parentReference.OverrideResolutionTags.Count > 0)
+                {
+                    parent = parent.WithOverrideResolutionTags(parentReference.OverrideResolutionTags);
+                }
             }
         }
         IRuntimeEnvironment environment = _environmentFactory.CreateTransactionView(
@@ -269,6 +273,30 @@ internal sealed class RuntimeEnvironmentContext
             parent);
         state.AddEnvironment(environmentId, node, environment);
     }
+
+    private bool TryReuseLiveView(RuntimeEnvironmentId environmentId, [NotNullWhen(true)] out IRuntimeEnvironment? environment)
+    {
+        if (HasEnvironmentId(Environment, environmentId))
+        {
+            environment = Environment;
+            return true;
+        }
+        if (HasEnvironmentId(GlobalEnvironment, environmentId))
+        {
+            environment = GlobalEnvironment;
+            return true;
+        }
+        if (_parent is not null && _parent.TryReuseLiveView(environmentId, out IRuntimeEnvironment? outer))
+        {
+            environment = BindEnvironment(outer);
+            return true;
+        }
+        environment = null;
+        return false;
+    }
+
+    private static bool HasEnvironmentId(IRuntimeEnvironment environment, RuntimeEnvironmentId environmentId) =>
+        environment is ITransactionalRuntimeEnvironment transactionalEnvironment && transactionalEnvironment.EnvironmentId.Equals(environmentId);
 
     private bool TryGetEnvironment(string name, [NotNullWhen(true)] out IRuntimeEnvironment? environment)
     {

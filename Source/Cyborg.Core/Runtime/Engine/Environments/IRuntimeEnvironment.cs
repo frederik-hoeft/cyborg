@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Configuration.Model;
+using Cyborg.Core.Runtime.Engine.Environments.Context;
 using Cyborg.Core.Text;
 using System.Runtime.CompilerServices;
 
@@ -55,6 +56,8 @@ public interface IRuntimeEnvironment : IEnvironmentLike
         where T : class, IDecomposable;
 
     internal IRuntimeEnvironment Bind(string ns);
+
+    internal IRuntimeEnvironment WithEnvironmentContext(IEnvironmentContext context);
 
     internal IRuntimeEnvironment WithOverrideResolutionTags(IReadOnlyCollection<string> tags);
 

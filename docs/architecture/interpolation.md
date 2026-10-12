@@ -14,12 +14,18 @@ Key grammar is not value grammar. Override addresses and other keys continue to 
 | `${@identifier}` | Interpolate `identifier` relative to the original resolution entry point. |
 | `${@}` | Interpolate the current scope's namespace. |
 | `${@@}` | Interpolate the original entry point's namespace. |
+| `${@.member}` | Interpolate a runtime-owned contextual member of the current scope, such as `@.origin.file`. |
+| `${@@.member}` | Interpolate a contextual member of the original entry point, such as `@@.origin.file`. |
 | `&{identifier}` | Lazy typed indirection. The entire value is a reference; each read yields the target's current type and value. |
 | `&{@identifier}` | Lazy typed indirection resolved from the original entry point. |
 | `&{@}` / `&{@@}` | Lazy typed references to the current scope namespace and the entry-point namespace. |
+| `&{@.member}` / `&{@@.member}` | Lazy typed references to a contextual member of the current scope or the entry point. |
 | `*{identifier}` | Eager typed capture. The target is resolved once when the variable is defined, and the variable stores that value. |
+| `*{@.member}` / `*{@@.member}` | Eager capture of a contextual member. At definition the defining view is the entry point, so both forms snapshot that view. |
 
-`&{...}` and `*{...}` are valid only when they are the entire value. `*{@...}` is reserved and invalid. `${@}` and `${@@}` remain string interpolation, including inside larger text.
+`&{...}` and `*{...}` are valid only when they are the entire value. `*{@identifier}`, `*{@}`, and `*{@@}` are reserved and invalid. `*{@.member}` and `*{@@.member}` are valid because they name contextual self-members rather than the entry-point modifier on an ordinary variable. `${@}` and `${@@}` remain string interpolation, including inside larger text.
+
+`@.origin.file` and `@.origin.directory` are the contextual members defined today. They are the absolute file and directory of the module definition bound to the resolving view. `@@.origin.file` and `@@.origin.directory` read the same facts from the entry point. A view with no definition origin leaves them undefined. They are not stored variables: assignment and removal fail, and they are not part of transactional reconciliation. See [Definition provenance](architecture-overview.md#definition-provenance).
 
 Unresolved `${...}` placeholders remain unchanged. Undefined targets of `&{...}` and `*{...}` fail with `InvalidOperationException`. Cyclic references fail with `InvalidOperationException`. A value whose CLR type is not the requested type fails with `InvalidCastException`.
 
@@ -43,7 +49,7 @@ A `#` immediately after `${`, `&{`, or `*{` marks a final-phase literal. Each ev
 
 `SetVariable(...)` is the definition boundary.
 
-- `*{identifier}` resolves the target immediately and stores a snapshot of its type and value. The expression text is not retained. The snapshot is the reference returned by that resolution; Cyborg does not deep-clone it. A missing target fails the write. `*{@...}` is rejected.
+- `*{identifier}` resolves the target immediately and stores a snapshot of its type and value. The expression text is not retained. The snapshot is the reference returned by that resolution; Cyborg does not deep-clone it. A missing target fails the write. `*{@identifier}`, `*{@}`, and `*{@@}` are rejected. `*{@.member}` and `*{@@.member}` snapshot the defining view's contextual member.
 - `&{...}` is stored unchanged. It is an opaque reference.
 - Other strings are stored unchanged after rejecting embedded unescaped `&{...}` and `*{...}`. `${...}` inside them is not evaluated yet.
 

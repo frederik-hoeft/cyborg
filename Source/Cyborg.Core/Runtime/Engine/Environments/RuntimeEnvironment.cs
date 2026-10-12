@@ -1,4 +1,5 @@
-﻿using Cyborg.Core.Runtime.Engine.Environments.Syntax;
+﻿using Cyborg.Core.Runtime.Engine.Environments.Context;
+using Cyborg.Core.Runtime.Engine.Environments.Syntax;
 using Cyborg.Core.Runtime.Engine.Transactions;
 using Cyborg.Core.Runtime.Engine.Transactions.Internal;
 using Cyborg.Core.Text;
@@ -251,6 +252,15 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         return this with
         {
             Namespace = ns
+        };
+    }
+
+    IRuntimeEnvironment IRuntimeEnvironment.WithEnvironmentContext(IEnvironmentContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        return this with
+        {
+            Context = context
         };
     }
 

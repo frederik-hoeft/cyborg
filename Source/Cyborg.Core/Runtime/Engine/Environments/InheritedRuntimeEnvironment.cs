@@ -56,7 +56,7 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
         return false;
     }
 
-    internal protected override bool TryResolveVariableRecursiveCore(ResolutionContext context, out Evaluation evaluation)
+    internal protected override bool TryResolveStoredVariableRecursiveCore(ResolutionContext context, out Evaluation evaluation)
     {
         if (TryResolveVariableInCurrentScopeCore(context, out evaluation))
         {
@@ -64,7 +64,7 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
         }
         if (Parent is EnvironmentLike parent)
         {
-            return parent.TryResolveVariableRecursiveCore(context, out evaluation);
+            return parent.TryResolveStoredVariableRecursiveCore(context, out evaluation);
         }
         if (Parent.TryResolveVariable(context.Name, out object? value))
         {
