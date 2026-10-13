@@ -226,6 +226,42 @@ public sealed class RuntimeEnvironmentContextContractTests
     }
 
     [TestMethod]
+    public void ImportedEnvironmentView_PreservesStructuralParentBindingsWithoutRewritingExistingTopology()
+    {
+        using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
+        (RuntimeEnvironmentContext source, _, _) = CreateRoot(loggerFactory);
+        source.Environment.SetVariable("inherited_value", 23);
+        IRuntimeEnvironment definitionView = source.Environment.Bind("definition").WithOverrideResolutionTags(["definition_tag"]);
+        RuntimeEnvironmentContext creator = source.CreateChild(definitionView);
+        IRuntimeEnvironment created = creator.PrepareEnvironment(new ModuleEnvironment
+        {
+            Scope = EnvironmentScope.InheritParent,
+            Name = "external"
+        });
+        created.SetVariable("local_value", 42);
+
+        (RuntimeEnvironmentContext target, ModuleTransaction targetTransaction, RuntimeEnvironmentTransactionParticipant targetParticipant) = CreateRoot(loggerFactory);
+        IRuntimeEnvironment imported = target.BindEnvironment(created);
+        InheritedRuntimeEnvironment importedChild = Assert.IsInstanceOfType<InheritedRuntimeEnvironment>(imported);
+        Assert.AreEqual("definition", importedChild.Parent.Namespace);
+        Assert.IsTrue(importedChild.Parent.OverrideResolutionTags.SequenceEqual(["definition_tag"]));
+        Assert.IsTrue(imported.TryResolveVariable("inherited_value", out int inherited));
+        Assert.AreEqual(23, inherited);
+        Assert.IsTrue(imported.TryResolveVariable("local_value", out int local));
+        Assert.AreEqual(42, local);
+
+        // A different view of the same logical node must not replace its already imported structural metadata.
+        InheritedRuntimeEnvironment differentlyBound = importedChild with { Parent = importedChild.Parent.Bind("other") };
+        target.BindEnvironment(differentlyBound);
+        RuntimeEnvironmentTransactionState state = targetTransaction.GetParticipantState(targetParticipant);
+        RuntimeEnvironmentId importedId = ((ITransactionalRuntimeEnvironment)imported).EnvironmentId;
+        Assert.IsTrue(state.TryGetEnvironment(importedId, out RuntimeEnvironmentNode? node));
+        Assert.IsNotNull(node.Parent);
+        Assert.AreEqual("definition", node.Parent.Namespace);
+        Assert.IsTrue(node.Parent.OverrideResolutionTags.SequenceEqual(["definition_tag"]));
+    }
+
+    [TestMethod]
     public void NamedEnvironment_ReferenceFailsWithoutAVisibleRegistration()
     {
         using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
