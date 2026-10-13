@@ -17,7 +17,7 @@ internal sealed class EnvironmentScopeSelector(
     private const string UNBOUND_ENVIRONMENT = "__UNBOUND";
 
     public IRuntimeEnvironment PrepareEnvironment(
-        RuntimeEnvironmentContext frame,
+        RuntimeInvocationFrame frame,
         ActiveTransaction active,
         ModuleEnvironment moduleEnvironment,
         IReadOnlyCollection<string>? overrideResolutionTags)
@@ -46,7 +46,7 @@ internal sealed class EnvironmentScopeSelector(
         {
             foreach (string tag in overrideResolutionTags)
             {
-                if (!frame.SyntaxFactory.IsValidIdentifier(tag))
+                if (!frame.Environment.SyntaxFactory.IsValidIdentifier(tag))
                 {
                     throw new InvalidOperationException($"Override resolution tags must be valid identifiers: \"{tag}\"");
                 }
@@ -57,7 +57,7 @@ internal sealed class EnvironmentScopeSelector(
         return environment;
     }
 
-    public IRuntimeEnvironment? ResolveEnvironmentReference(RuntimeEnvironmentContext frame, ActiveTransaction active, ModuleEnvironmentReference environmentReference)
+    public IRuntimeEnvironment? ResolveEnvironmentReference(RuntimeInvocationFrame frame, ActiveTransaction active, ModuleEnvironmentReference environmentReference)
     {
         ArgumentNullException.ThrowIfNull(environmentReference);
         return environmentReference switch
@@ -70,7 +70,7 @@ internal sealed class EnvironmentScopeSelector(
         };
     }
 
-    private IRuntimeEnvironment SelectOrCreate(RuntimeEnvironmentContext frame, ActiveTransaction active, EnvironmentScope scope, string? name, bool transient)
+    private IRuntimeEnvironment SelectOrCreate(RuntimeInvocationFrame frame, ActiveTransaction active, EnvironmentScope scope, string? name, bool transient)
     {
         if (string.IsNullOrEmpty(name))
         {
@@ -98,11 +98,11 @@ internal sealed class EnvironmentScopeSelector(
         return materializer.Materialize(environmentId, UNBOUND_ENVIRONMENT, overrideResolutionTags: [], active);
     }
 
-    private bool TryGetEnvironment(RuntimeEnvironmentContext frame, ActiveTransaction active, string name, [NotNullWhen(true)] out IRuntimeEnvironment? environment)
+    private bool TryGetEnvironment(RuntimeInvocationFrame frame, ActiveTransaction active, string name, [NotNullWhen(true)] out IRuntimeEnvironment? environment)
     {
         // Invocation-frame names take precedence over transaction-visible registrations.
         // Distinct views of the same logical ID must not be treated as interchangeable.
-        for (RuntimeEnvironmentContext? candidate = frame; candidate is not null; candidate = candidate.ParentFrame)
+        for (RuntimeInvocationFrame? candidate = frame; candidate is not null; candidate = candidate.Parent)
         {
             if (!candidate.Environment.Name.Equals(name, StringComparison.Ordinal))
             {

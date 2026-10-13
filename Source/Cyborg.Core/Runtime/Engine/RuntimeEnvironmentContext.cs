@@ -1,5 +1,4 @@
 using Cyborg.Core.Runtime.Engine.Environments;
-using Cyborg.Core.Runtime.Engine.Environments.Syntax;
 using Cyborg.Core.Runtime.Engine.Transactions;
 using Cyborg.Core.Runtime.Engine.Transactions.Internal;
 using Cyborg.Core.Runtime.Model;
@@ -8,39 +7,31 @@ using Microsoft.Extensions.Logging;
 namespace Cyborg.Core.Runtime.Engine;
 
 /// <summary>
-/// Represents the runtime invocation-frame hierarchy. Environment selection, logical graph access,
-/// and structural view materialization are delegated to their respective owners.
+/// Coordinates the transaction-bound invocation frame with environment scope selection.
+/// Structural topology and view materialization are managed independently of invocation ancestry.
 /// </summary>
 internal sealed class RuntimeEnvironmentContext
 {
     private readonly EnvironmentViewMaterializer _materializer;
     private readonly EnvironmentScopeSelector _selector;
-    private readonly RuntimeEnvironmentContext? _parent;
+    private readonly RuntimeInvocationFrame _frame;
     private readonly ActiveTransaction _active;
 
-    public IRuntimeEnvironment GlobalEnvironment { get; }
+    public IRuntimeEnvironment GlobalEnvironment => _frame.GlobalEnvironment;
 
-    public IRuntimeEnvironment ParentEnvironment => _parent?.Environment ?? GlobalEnvironment;
+    public IRuntimeEnvironment ParentEnvironment => _frame.ParentEnvironment;
 
-    public IRuntimeEnvironment Environment { get; }
-
-    public VariableSyntaxBuilder SyntaxFactory => Environment.SyntaxFactory;
-
-    internal RuntimeEnvironmentContext? ParentFrame => _parent;
+    public IRuntimeEnvironment Environment => _frame.Environment;
 
     private RuntimeEnvironmentContext(
         EnvironmentViewMaterializer materializer,
         EnvironmentScopeSelector selector,
         ActiveTransaction active,
-        RuntimeEnvironmentContext? parent,
-        IRuntimeEnvironment globalEnvironment,
-        IRuntimeEnvironment environment)
+        RuntimeInvocationFrame frame)
     {
         _materializer = materializer;
         _active = active;
-        _parent = parent;
-        GlobalEnvironment = globalEnvironment;
-        Environment = environment;
+        _frame = frame;
         _selector = selector;
     }
 
@@ -62,34 +53,32 @@ internal sealed class RuntimeEnvironmentContext
         EnvironmentViewMaterializer materializer = new(environmentFactory, graph);
         IRuntimeEnvironment transactionalGlobal = materializer.BindTransaction(globalEnvironment, active);
         EnvironmentScopeSelector selector = new(graph, materializer, logger);
-        return new RuntimeEnvironmentContext(materializer, selector, active, parent: null, transactionalGlobal, transactionalGlobal);
+        return new RuntimeEnvironmentContext(materializer, selector, active, RuntimeInvocationFrame.CreateRoot(transactionalGlobal));
     }
 
-    public RuntimeEnvironmentContext CreateTransactionView(ActiveTransaction active)
+    public RuntimeEnvironmentContext RebindTransaction(ActiveTransaction active)
     {
         ArgumentNullException.ThrowIfNull(active);
-        RuntimeEnvironmentContext? parent = _parent?.CreateTransactionView(active);
-        IRuntimeEnvironment globalEnvironment = _materializer.BindTransaction(GlobalEnvironment, active);
-        IRuntimeEnvironment environment = _materializer.BindTransaction(Environment, active);
-        return new RuntimeEnvironmentContext(_materializer, _selector, active, parent, globalEnvironment, environment);
+        RuntimeInvocationFrame reboundFrame = _frame.RebindTransaction(_materializer, active);
+        return new RuntimeEnvironmentContext(_materializer, _selector, active, reboundFrame);
     }
 
-    public RuntimeEnvironmentContext CreateChild(IRuntimeEnvironment environment)
+    public RuntimeEnvironmentContext CreateChildFrame(IRuntimeEnvironment environment)
     {
         ArgumentNullException.ThrowIfNull(environment);
-        IRuntimeEnvironment transactionalEnvironment = BindEnvironment(environment);
-        return new RuntimeEnvironmentContext(_materializer, _selector, _active, this, GlobalEnvironment, transactionalEnvironment);
+        IRuntimeEnvironment transactionalEnvironment = BindToCurrentTransaction(environment);
+        return new RuntimeEnvironmentContext(_materializer, _selector, _active, _frame.CreateChild(transactionalEnvironment));
     }
 
-    public IRuntimeEnvironment BindEnvironment(IRuntimeEnvironment environment)
+    public IRuntimeEnvironment BindToCurrentTransaction(IRuntimeEnvironment environment)
     {
         ArgumentNullException.ThrowIfNull(environment);
         return _materializer.BindTransaction(environment, _active);
     }
 
     public IRuntimeEnvironment PrepareEnvironment(ModuleEnvironment moduleEnvironment, IReadOnlyCollection<string>? overrideResolutionTags = null) =>
-        _selector.PrepareEnvironment(this, _active, moduleEnvironment, overrideResolutionTags);
+        _selector.PrepareEnvironment(_frame, _active, moduleEnvironment, overrideResolutionTags);
 
     public IRuntimeEnvironment? ResolveEnvironmentReference(ModuleEnvironmentReference environmentReference) =>
-        _selector.ResolveEnvironmentReference(this, _active, environmentReference);
+        _selector.ResolveEnvironmentReference(_frame, _active, environmentReference);
 }

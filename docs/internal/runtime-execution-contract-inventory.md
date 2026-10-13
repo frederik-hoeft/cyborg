@@ -35,7 +35,7 @@ The lower-level `TransactionalRuntimeEnvironmentTests` already cover duplicate r
 
 ## Transaction and invocation lifecycle
 
-`ActiveTransaction` points an invocation at its writable transaction. An open fork **freezes the owner**; the continuation is the read/write path for work the owner performs concurrently with child branches. `RuntimeEnvironmentContext.CreateTransactionView` recursively binds execution frames and structural parent views to the child or continuation transaction while preserving their namespace and override tags. It must not reconstruct parent topology from an unrelated runtime frame.
+`ActiveTransaction` points an invocation at its writable transaction. An open fork **freezes the owner**; the continuation is the read/write path for work the owner performs concurrently with child branches. `RuntimeEnvironmentContext.RebindTransaction` recursively binds execution frames and structural parent views to the child or continuation transaction while preserving their namespace and override tags. It must not reconstruct parent topology from an unrelated runtime frame.
 
 The normal definite-result order is `Started` -> `Completed` -> `Closed` after reconciliation. A failure before a definite module result still reports `Started` and `Closed`, without `Completed`; a conflicted join reports an unsuccessful close. Concurrent children may complete execution before the enclosing fork has joined, and therefore remain open until the scope is closed. Preserve observer delivery even when one observer fails, as characterized by `ModuleExecutionLifecycleTests`.
 
@@ -46,3 +46,11 @@ The normal definite-result order is `Started` -> `Completed` -> `Closed` after r
 The P0 tests intentionally do not require the proposed file-origin feature. Preserve the three existing independent identities: logical environment ID, contextual view binding, and selected transaction. A future definition-origin field belongs to the module reference, and an inherited parent may capture its durable contextual descriptor once those semantics are formally chosen. Do not simulate such capture by searching for a live invocation view that happens to have the same logical environment ID.
 
 Before P1, there is no reason to rename public `IModuleRuntime` APIs or change the transaction participant implementation. First make selection and view materialization explicit, use this inventory as the behavioral checklist, and keep the existing variable expression machinery unchanged.
+
+## Frame ownership after P2
+
+The invocation chain is represented by `RuntimeInvocationFrame`, independently of `RuntimeEnvironmentContext` and the transactional graph. A frame records the current view, global view, and enclosing invocation frame. Its `ParentEnvironment` is therefore the enclosing **invocation** view, never `InheritedRuntimeEnvironment.Parent` (the **structural** parent of a logical environment).
+
+`RuntimeEnvironmentContext` remains the compatibility entry point for `ModuleRuntimeBase` until the invocation coordinator is extracted. `CreateChildFrame` adds an execution frame using a view bound to the active transaction; `RebindTransaction` creates a corresponding invocation chain using a different `ActiveTransaction`, preserving namespaces, override tags, and the original ancestry. `BindToCurrentTransaction` binds an individual external view without adding a frame. `EnvironmentScopeSelector` works with frames directly, and `EnvironmentViewMaterializer` remains independent of invocation ancestry.
+
+An `ActiveTransaction` is an invocation-owned mutable pointer, so a frame's bound views also follow `Retarget()` to the fork continuation without reconstruction or rebinding. A new child invocation instead receives a **different** active pointer and a copied frame chain. `RuntimeEnvironmentContextContractTests` exercises both cases, including the distinction between invocation and structural parents and the preservation of contextual bindings across a nested fork/join.

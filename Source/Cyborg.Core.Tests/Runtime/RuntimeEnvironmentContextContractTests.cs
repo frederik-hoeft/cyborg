@@ -22,7 +22,7 @@ public sealed class RuntimeEnvironmentContextContractTests
         (RuntimeEnvironmentContext root, _, _) = CreateRoot(loggerFactory);
         root.Environment.SetVariable("template", "${@}/${@@}");
         IRuntimeEnvironment creatorView = root.Environment.Bind("creator").WithOverrideResolutionTags(["creator_tag"]);
-        RuntimeEnvironmentContext creator = root.CreateChild(creatorView);
+        RuntimeEnvironmentContext creator = root.CreateChildFrame(creatorView);
         IRuntimeEnvironment created = creator.PrepareEnvironment(new ModuleEnvironment
         {
             Scope = EnvironmentScope.InheritParent,
@@ -54,7 +54,7 @@ public sealed class RuntimeEnvironmentContextContractTests
             Scope = EnvironmentScope.Isolated,
             Name = "shared"
         });
-        RuntimeEnvironmentContext module = root.CreateChild(created.Bind("module").WithOverrideResolutionTags(["module_tag"]));
+        RuntimeEnvironmentContext module = root.CreateChildFrame(created.Bind("module").WithOverrideResolutionTags(["module_tag"]));
 
         IRuntimeEnvironment activeReference = module.PrepareEnvironment(Reference("shared"));
         IRuntimeEnvironment registryReference = root.PrepareEnvironment(Reference("shared"));
@@ -79,7 +79,7 @@ public sealed class RuntimeEnvironmentContextContractTests
             Scope = EnvironmentScope.Isolated,
             Name = "frame"
         });
-        RuntimeEnvironmentContext frame = root.CreateChild(frameEnvironment.Bind("worker"));
+        RuntimeEnvironmentContext frame = root.CreateChildFrame(frameEnvironment.Bind("worker"));
 
         IRuntimeEnvironment current = frame.PrepareEnvironment(new ModuleEnvironment { Scope = EnvironmentScope.Current });
         IRuntimeEnvironment invocationParent = frame.PrepareEnvironment(new ModuleEnvironment { Scope = EnvironmentScope.Parent });
@@ -102,6 +102,80 @@ public sealed class RuntimeEnvironmentContextContractTests
         Assert.AreEqual(root.GlobalEnvironment.Name, globalChild.Parent.Name);
         Assert.IsTrue(parentChild.IsTransient);
         Assert.IsTrue(globalChild.IsTransient);
+    }
+
+    [TestMethod]
+    public void InvocationParent_IsDistinctFromStructuralEnvironmentParent()
+    {
+        using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
+        (RuntimeEnvironmentContext root, _, _) = CreateRoot(loggerFactory);
+        IRuntimeEnvironment inheritedEnvironment = root.PrepareEnvironment(new ModuleEnvironment
+        {
+            Scope = EnvironmentScope.InheritGlobal,
+            Name = "inherited"
+        });
+        InheritedRuntimeEnvironment inherited = Assert.IsInstanceOfType<InheritedRuntimeEnvironment>(inheritedEnvironment);
+        RuntimeEnvironmentContext outer = root.CreateChildFrame(inherited.Bind("outer").WithOverrideResolutionTags(["outer_tag"]));
+        IRuntimeEnvironment independentEnvironment = root.PrepareEnvironment(new ModuleEnvironment
+        {
+            Scope = EnvironmentScope.Isolated,
+            Name = "independent"
+        });
+        RuntimeEnvironmentContext inner = outer.CreateChildFrame(independentEnvironment.Bind("inner"));
+
+        Assert.AreEqual("inherited", inner.ParentEnvironment.Name);
+        Assert.AreEqual("outer", inner.ParentEnvironment.Namespace);
+        Assert.IsTrue(inner.ParentEnvironment.OverrideResolutionTags.SequenceEqual(["outer_tag"]));
+        Assert.AreEqual(root.GlobalEnvironment.Name, inherited.Parent.Name);
+        Assert.AreNotEqual(inner.ParentEnvironment.Namespace, inherited.Parent.Namespace);
+        Assert.AreEqual("outer", inner.ResolveEnvironmentReference(new ModuleEnvironmentReference(EnvironmentScopeReference.Parent, Name: null))?.Namespace);
+
+        IRuntimeEnvironment structuralChild = inner.PrepareEnvironment(new ModuleEnvironment { Scope = EnvironmentScope.InheritParent });
+        InheritedRuntimeEnvironment structural = Assert.IsInstanceOfType<InheritedRuntimeEnvironment>(structuralChild);
+        Assert.AreEqual("independent", structural.Parent.Name);
+        Assert.AreEqual("inner", structural.Parent.Namespace);
+    }
+
+    [TestMethod]
+    public void InvocationViews_RetargetTransactionWithoutChangingAncestryOrContext()
+    {
+        using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
+        (RuntimeEnvironmentContext root, ModuleTransaction transaction, _) = CreateRoot(loggerFactory);
+        root.Environment.SetVariable("initial", 1);
+        ActiveTransaction active = new(transaction);
+        RuntimeEnvironmentContext owner = root.RebindTransaction(active);
+        RuntimeEnvironmentContext outer = owner.CreateChildFrame(owner.Environment.Bind("outer").WithOverrideResolutionTags(["outer_tag"]));
+        RuntimeEnvironmentContext inner = outer.CreateChildFrame(outer.Environment.Bind("inner").WithOverrideResolutionTags(["inner_tag"]));
+
+        ModuleTransactionForkGroup fork = transaction.Fork();
+        active.Retarget(fork.Continuation);
+        inner.Environment.SetVariable("continuation_only", 2);
+        Assert.IsTrue(inner.ParentEnvironment.TryResolveVariable("continuation_only", out int continuationValue));
+        Assert.AreEqual(2, continuationValue);
+
+        ModuleTransaction childTransaction = fork.CreateChild();
+        RuntimeEnvironmentContext child = inner.RebindTransaction(new ActiveTransaction(childTransaction));
+        Assert.AreEqual("inner", child.Environment.Namespace);
+        Assert.AreEqual("outer", child.ParentEnvironment.Namespace);
+        Assert.IsTrue(child.Environment.OverrideResolutionTags.SequenceEqual(["inner_tag"]));
+        Assert.IsTrue(child.ParentEnvironment.OverrideResolutionTags.SequenceEqual(["outer_tag"]));
+        Assert.IsTrue(child.Environment.TryResolveVariable("initial", out int initial));
+        Assert.AreEqual(1, initial);
+        Assert.IsFalse(child.Environment.TryResolveVariable("continuation_only", out int _));
+        child.Environment.SetVariable("child_only", 3);
+        Assert.IsFalse(inner.Environment.TryResolveVariable("child_only", out int _));
+
+        fork.Continuation.Complete();
+        childTransaction.Complete();
+        Assert.IsTrue(fork.TryJoin(out TransactionConflict? conflict));
+        Assert.IsNull(conflict);
+        active.Retarget(transaction);
+        Assert.AreEqual("inner", inner.Environment.Namespace);
+        Assert.AreEqual("outer", inner.ParentEnvironment.Namespace);
+        Assert.IsTrue(inner.Environment.OverrideResolutionTags.SequenceEqual(["inner_tag"]));
+        Assert.IsTrue(inner.ParentEnvironment.OverrideResolutionTags.SequenceEqual(["outer_tag"]));
+        Assert.IsTrue(inner.Environment.TryResolveVariable("child_only", out int committed));
+        Assert.AreEqual(3, committed);
     }
 
     [TestMethod]
@@ -128,11 +202,11 @@ public sealed class RuntimeEnvironmentContextContractTests
         using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
         (RuntimeEnvironmentContext root, ModuleTransaction rootTransaction, _) = CreateRoot(loggerFactory);
         root.Environment.SetVariable("value", "initial");
-        RuntimeEnvironmentContext frame = root.CreateChild(root.Environment.Bind("module").WithOverrideResolutionTags(["tag"]));
+        RuntimeEnvironmentContext frame = root.CreateChildFrame(root.Environment.Bind("module").WithOverrideResolutionTags(["tag"]));
         ModuleTransactionForkGroup fork = rootTransaction.Fork();
         ModuleTransaction childTransaction = fork.CreateChild();
-        RuntimeEnvironmentContext rebound = frame.CreateTransactionView(new ActiveTransaction(childTransaction));
-        RuntimeEnvironmentContext continuation = frame.CreateTransactionView(new ActiveTransaction(fork.Continuation));
+        RuntimeEnvironmentContext rebound = frame.RebindTransaction(new ActiveTransaction(childTransaction));
+        RuntimeEnvironmentContext continuation = frame.RebindTransaction(new ActiveTransaction(fork.Continuation));
 
         Assert.AreEqual("module", rebound.Environment.Namespace);
         Assert.IsTrue(rebound.Environment.OverrideResolutionTags.SequenceEqual(["tag"]));
@@ -159,8 +233,8 @@ public sealed class RuntimeEnvironmentContextContractTests
         ModuleTransactionForkGroup fork = rootTransaction.Fork();
         ModuleTransaction childTransaction = fork.CreateChild();
         ModuleTransaction siblingTransaction = fork.CreateChild();
-        RuntimeEnvironmentContext child = root.CreateTransactionView(new ActiveTransaction(childTransaction));
-        RuntimeEnvironmentContext sibling = root.CreateTransactionView(new ActiveTransaction(siblingTransaction));
+        RuntimeEnvironmentContext child = root.RebindTransaction(new ActiveTransaction(childTransaction));
+        RuntimeEnvironmentContext sibling = root.RebindTransaction(new ActiveTransaction(siblingTransaction));
         IRuntimeEnvironment created = child.PrepareEnvironment(new ModuleEnvironment
         {
             Scope = EnvironmentScope.Isolated,
@@ -189,7 +263,7 @@ public sealed class RuntimeEnvironmentContextContractTests
         (RuntimeEnvironmentContext root, ModuleTransaction rootTransaction, _) = CreateRoot(loggerFactory);
         ModuleTransactionForkGroup fork = rootTransaction.Fork();
         ModuleTransaction childTransaction = fork.CreateChild();
-        RuntimeEnvironmentContext child = root.CreateTransactionView(new ActiveTransaction(childTransaction));
+        RuntimeEnvironmentContext child = root.RebindTransaction(new ActiveTransaction(childTransaction));
         IRuntimeEnvironment created = child.PrepareEnvironment(new ModuleEnvironment
         {
             Scope = EnvironmentScope.Isolated,
@@ -207,7 +281,7 @@ public sealed class RuntimeEnvironmentContextContractTests
     {
         using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
         (RuntimeEnvironmentContext root, ModuleTransaction rootTransaction, _) = CreateRoot(loggerFactory);
-        RuntimeEnvironmentContext creator = root.CreateChild(root.Environment.Bind("creator").WithOverrideResolutionTags(["creator_tag"]));
+        RuntimeEnvironmentContext creator = root.CreateChildFrame(root.Environment.Bind("creator").WithOverrideResolutionTags(["creator_tag"]));
         creator.PrepareEnvironment(new ModuleEnvironment
         {
             Scope = EnvironmentScope.InheritParent,
@@ -215,7 +289,7 @@ public sealed class RuntimeEnvironmentContextContractTests
         });
         ModuleTransactionForkGroup fork = rootTransaction.Fork();
         ModuleTransaction childTransaction = fork.CreateChild();
-        RuntimeEnvironmentContext child = root.CreateTransactionView(new ActiveTransaction(childTransaction));
+        RuntimeEnvironmentContext child = root.RebindTransaction(new ActiveTransaction(childTransaction));
 
         IRuntimeEnvironment referenced = child.PrepareEnvironment(Reference("captured"));
         InheritedRuntimeEnvironment inherited = Assert.IsInstanceOfType<InheritedRuntimeEnvironment>(referenced);
@@ -232,7 +306,7 @@ public sealed class RuntimeEnvironmentContextContractTests
         (RuntimeEnvironmentContext source, _, _) = CreateRoot(loggerFactory);
         source.Environment.SetVariable("inherited_value", 23);
         IRuntimeEnvironment definitionView = source.Environment.Bind("definition").WithOverrideResolutionTags(["definition_tag"]);
-        RuntimeEnvironmentContext creator = source.CreateChild(definitionView);
+        RuntimeEnvironmentContext creator = source.CreateChildFrame(definitionView);
         IRuntimeEnvironment created = creator.PrepareEnvironment(new ModuleEnvironment
         {
             Scope = EnvironmentScope.InheritParent,
@@ -241,7 +315,7 @@ public sealed class RuntimeEnvironmentContextContractTests
         created.SetVariable("local_value", 42);
 
         (RuntimeEnvironmentContext target, ModuleTransaction targetTransaction, RuntimeEnvironmentTransactionParticipant targetParticipant) = CreateRoot(loggerFactory);
-        IRuntimeEnvironment imported = target.BindEnvironment(created);
+        IRuntimeEnvironment imported = target.BindToCurrentTransaction(created);
         InheritedRuntimeEnvironment importedChild = Assert.IsInstanceOfType<InheritedRuntimeEnvironment>(imported);
         Assert.AreEqual("definition", importedChild.Parent.Namespace);
         Assert.IsTrue(importedChild.Parent.OverrideResolutionTags.SequenceEqual(["definition_tag"]));
@@ -252,7 +326,7 @@ public sealed class RuntimeEnvironmentContextContractTests
 
         // A different view of the same logical node must not replace its already imported structural metadata.
         InheritedRuntimeEnvironment differentlyBound = importedChild with { Parent = importedChild.Parent.Bind("other") };
-        target.BindEnvironment(differentlyBound);
+        target.BindToCurrentTransaction(differentlyBound);
         RuntimeEnvironmentTransactionState state = targetTransaction.GetParticipantState(targetParticipant);
         RuntimeEnvironmentId importedId = ((ITransactionalRuntimeEnvironment)imported).EnvironmentId;
         Assert.IsTrue(state.TryGetEnvironment(importedId, out RuntimeEnvironmentNode? node));

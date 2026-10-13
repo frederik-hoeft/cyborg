@@ -98,7 +98,7 @@ internal abstract class ModuleRuntimeBase
     {
         ArgumentNullException.ThrowIfNull(moduleContext);
         ArgumentNullException.ThrowIfNull(environment);
-        IRuntimeEnvironment scopedEnvironment = environmentContext.BindEnvironment(environment);
+        IRuntimeEnvironment scopedEnvironment = environmentContext.BindToCurrentTransaction(environment);
         return runtimeServices.ContextRunner.ExecuteAsync(this, moduleContext, scopedEnvironment, cancellationToken);
     }
 
@@ -123,7 +123,7 @@ internal abstract class ModuleRuntimeBase
     {
         ArgumentNullException.ThrowIfNull(moduleReference);
         ArgumentNullException.ThrowIfNull(environment);
-        IRuntimeEnvironment scopedEnvironment = environmentContext.BindEnvironment(environment);
+        IRuntimeEnvironment scopedEnvironment = environmentContext.BindToCurrentTransaction(environment);
         IModuleWorker worker = runtimeServices.Dispatcher.ActivateWorker(moduleReference, RequireExecutionServices());
         return ExecuteActivatedWorkerInCurrentScopeAsync(worker, scopedEnvironment, cancellationToken);
     }
@@ -138,13 +138,13 @@ internal abstract class ModuleRuntimeBase
         runtimeServices.ArtifactPublisher.Publish(result, this, Environment);
 
     Task<IModuleExecutionResult> IModuleExecutionRuntime.ExecuteActivatedWorkerInCurrentScopeAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken) =>
-        ExecuteActivatedWorkerInCurrentScopeAsync(module, environmentContext.BindEnvironment(environment), cancellationToken);
+        ExecuteActivatedWorkerInCurrentScopeAsync(module, environmentContext.BindToCurrentTransaction(environment), cancellationToken);
 
     private Task<IModuleExecutionResult> ExecuteActivatedWorkerInCurrentScopeAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken)
     {
         IServiceProvider executionServices = RequireExecutionServices();
         IRuntimeEnvironment boundEnvironment = environment.Bind(module);
-        RuntimeEnvironmentContext childEnvironmentContext = environmentContext.CreateChild(boundEnvironment);
+        RuntimeEnvironmentContext childEnvironmentContext = environmentContext.CreateChildFrame(boundEnvironment);
         IModuleRuntime runtime = new ScopedRuntime(Root, childEnvironmentContext, runtimeServices, activeTransaction, executionServices,
             invocationContext ?? throw new InvalidOperationException("A worker runtime requires an active module invocation context."));
         return runtimeServices.Dispatcher.ExecuteAsync(module, runtime, boundEnvironment, executionServices, cancellationToken);
@@ -208,7 +208,7 @@ internal abstract class ModuleRuntimeBase
             ActiveTransaction childActiveTransaction = new(childTransaction);
             runtimeServices.ModuleRegistry.BindExecutionScope(executionScope.ServiceProvider, childActiveTransaction);
             runtimeServices.Transactional.BindExecutionScope(executionScope.ServiceProvider, childActiveTransaction);
-            RuntimeEnvironmentContext childEnvironmentContext = environmentContext.CreateTransactionView(childActiveTransaction);
+            RuntimeEnvironmentContext childEnvironmentContext = environmentContext.RebindTransaction(childActiveTransaction);
             ModuleInvocationContext childInvocation = CreateInvocationContext(moduleId, module);
             ScopedRuntime scopedRuntime = new(Root, childEnvironmentContext, runtimeServices, childActiveTransaction, executionScope.ServiceProvider, childInvocation);
             ModuleInvocationScope invocationScope = new(childTransaction, executionScope, scopedRuntime, childEnvironmentContext, childInvocation);

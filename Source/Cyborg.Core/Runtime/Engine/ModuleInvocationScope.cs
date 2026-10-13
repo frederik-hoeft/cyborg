@@ -17,7 +17,7 @@ internal sealed class ModuleInvocationScope(
 
     public IModuleExecutionRuntime Runtime { get; } = runtime;
 
-    public IRuntimeEnvironment BindEnvironment(IRuntimeEnvironment environment) => environmentContext.BindEnvironment(environment);
+    public IRuntimeEnvironment BindEnvironment(IRuntimeEnvironment environment) => environmentContext.BindToCurrentTransaction(environment);
 
     public ValueTask NotifyStartedAsync(CancellationToken cancellationToken) =>
         ModuleExecutionLifecycle.NotifyStartedAsync(serviceScope.ServiceProvider, invocation, Runtime, cancellationToken);
