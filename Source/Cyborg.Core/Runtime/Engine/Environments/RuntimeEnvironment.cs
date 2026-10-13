@@ -35,7 +35,8 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         value is { } tagged ? ResolveValueExpressionCore(tagged, willInterpolate) : null;
 
     /// <summary>
-    /// Reports a selected override (or completed parent resolution), independently of whether its value equals the configured collection.
+    /// Selects collection overrides in structural view order, retaining the original resolution entry point.
+    /// Each candidate is resolved recursively, so a candidate may also be found in an inherited store.
     /// </summary>
     internal protected virtual bool TryResolveCollectionCore<TModule, T>(
         EnvironmentLike entryPoint,
@@ -50,19 +51,32 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         ArgumentNullException.ThrowIfNull(module);
         string valuePath = ConstructValueResolutionPath(value, moduleExpression, valueExpression);
 
-        foreach (string identifier in EnumerateOverrideIdentifiers(module.Name, module.Group, TModule.ModuleId))
+        RuntimeEnvironment lastScope = this;
+        foreach (RuntimeEnvironment scope in EnumerateOverrideScopes())
         {
-            string overridePath = SyntaxFactory.Path(identifier, valuePath).Override();
-            if (!TryResolveEvaluation(overridePath, entryPoint, out Evaluation evaluation) || evaluation.Value is null)
+            lastScope = scope;
+            foreach (string identifier in scope.EnumerateOverrideIdentifiers(module.Name, module.Group, TModule.ModuleId))
             {
-                continue;
+                string overridePath = scope.SyntaxFactory.Path(identifier, valuePath).Override();
+                if (!scope.TryResolveEvaluation(overridePath, entryPoint, out Evaluation evaluation) || evaluation.Value is null)
+                {
+                    continue;
+                }
+                if (evaluation.Value is not IEnumerable enumerable)
+                {
+                    throw new InvalidCastException($"Attempted to resolve variable '{overridePath}' as type {typeof(IEnumerable).FullName}, but it is of type {evaluation.Value.GetType().FullName}.");
+                }
+                resolvedValue = enumerable is IReadOnlyCollection<T> typedCollection ? typedCollection : enumerable.Cast<T>().ToImmutableArray();
+                return true;
             }
-            if (evaluation.Value is not IEnumerable enumerable)
-            {
-                throw new InvalidCastException($"Attempted to resolve variable '{overridePath}' as type {typeof(IEnumerable).FullName}, but it is of type {evaluation.Value.GetType().FullName}.");
-            }
-            resolvedValue = enumerable is IReadOnlyCollection<T> typedCollection ? typedCollection : enumerable.Cast<T>().ToImmutableArray();
-            return true;
+        }
+
+        // A non-RuntimeEnvironment parent cannot participate in the internal override traversal.
+        // Preserve its public resolution boundary, just as the inherited implementation did.
+        if (lastScope is InheritedRuntimeEnvironment { Parent: not RuntimeEnvironment } inherited)
+        {
+            resolvedValue = inherited.Parent.Resolve(module, value, moduleExpression, valueExpression);
+            return resolvedValue is not null;
         }
 
         resolvedValue = default;
@@ -92,7 +106,8 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
     }
 
     /// <summary>
-    /// Reports a selected override (or completed parent resolution). The terminal flag controls text evaluation, not override precedence.
+    /// Selects typed overrides in structural view order. Terminal snapshots bypass the caller's final interpolation pass.
+    /// A candidate can resolve through inherited stores; view-local identifier order is preserved.
     /// </summary>
     internal protected virtual bool TryResolveCore<TModule, T>(
         EnvironmentLike entryPoint,
@@ -108,19 +123,31 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         terminal = false;
         string valuePath = ConstructValueResolutionPath(value, moduleExpression, valueExpression);
 
-        foreach (string identifier in EnumerateOverrideIdentifiers(module.Name, module.Group, TModule.ModuleId))
+        RuntimeEnvironment lastScope = this;
+        foreach (RuntimeEnvironment scope in EnumerateOverrideScopes())
         {
-            string overridePath = SyntaxFactory.Path(identifier, valuePath).Override();
-            if (!TryResolveEvaluation(overridePath, entryPoint, out Evaluation evaluation) || evaluation.Value is null)
+            lastScope = scope;
+            foreach (string identifier in scope.EnumerateOverrideIdentifiers(module.Name, module.Group, TModule.ModuleId))
             {
-                continue;
+                string overridePath = scope.SyntaxFactory.Path(identifier, valuePath).Override();
+                if (!scope.TryResolveEvaluation(overridePath, entryPoint, out Evaluation evaluation) || evaluation.Value is null)
+                {
+                    continue;
+                }
+                if (!scope.TryConvertResolvedValue(evaluation.Value, overridePath, notifyImplicitConversion: true, out resolvedValue))
+                {
+                    throw new InvalidCastException($"Attempted to resolve variable '{overridePath}' as type {typeof(T).FullName}, but it is of type {evaluation.Value.GetType().FullName}.");
+                }
+                terminal = evaluation.Terminal;
+                return true;
             }
-            if (!TryConvertResolvedValue(evaluation.Value, overridePath, notifyImplicitConversion: true, out resolvedValue))
-            {
-                throw new InvalidCastException($"Attempted to resolve variable '{overridePath}' as type {typeof(T).FullName}, but it is of type {evaluation.Value.GetType().FullName}.");
-            }
-            terminal = evaluation.Terminal;
-            return true;
+        }
+
+        if (lastScope is InheritedRuntimeEnvironment { Parent: not RuntimeEnvironment } inherited)
+        {
+            terminal = true;
+            resolvedValue = inherited.Parent.Resolve(module, value, moduleExpression, valueExpression);
+            return resolvedValue is not null;
         }
 
         resolvedValue = default;
@@ -138,33 +165,6 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
     TaggedString? IRuntimeEnvironment.SelectRawTaggedStringOverride<TModule>(TModule module, TaggedString? value, string moduleExpression, string valueExpression, bool shieldInterpolation) =>
         TrySelectRawTaggedStringOverrideCore(this, module, moduleExpression, valueExpression, shieldInterpolation, out TaggedString selectedValue) ? selectedValue : value;
 
-    internal protected virtual bool TrySelectRawTaggedStringOverrideCore<TModule>(
-        EnvironmentLike entryPoint,
-        TModule module,
-        string? moduleExpression,
-        string? valueExpression,
-        bool shieldInterpolation,
-        out TaggedString value)
-        where TModule : ModuleBase, IModuleDefinition
-    {
-        ArgumentNullException.ThrowIfNull(entryPoint);
-        ArgumentNullException.ThrowIfNull(module);
-        string valuePath = ConstructValueResolutionPath<TaggedString>(value: default, moduleExpression, valueExpression);
-
-        foreach (string identifier in EnumerateOverrideIdentifiers(module.Name, module.Group, TModule.ModuleId))
-        {
-            string overridePath = SyntaxFactory.Path(identifier, valuePath).Override();
-            if (TryGetStoredVariable(overridePath, shieldInterpolation, out TaggedString selectedValue))
-            {
-                value = selectedValue;
-                return true;
-            }
-        }
-
-        value = default;
-        return false;
-    }
-
     internal protected virtual bool TrySelectRawStringOverrideCore<TModule>(
         EnvironmentLike entryPoint,
         TModule module,
@@ -175,20 +175,69 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         where TModule : ModuleBase, IModuleDefinition
     {
         ArgumentNullException.ThrowIfNull(entryPoint);
-        ArgumentNullException.ThrowIfNull(module);
-        string valuePath = ConstructValueResolutionPath<string>(value: null, moduleExpression, valueExpression);
+        return TrySelectRawOverrideCore(module, moduleExpression, valueExpression, shieldInterpolation, out value);
+    }
 
-        foreach (string identifier in EnumerateOverrideIdentifiers(module.Name, module.Group, TModule.ModuleId))
+    internal protected virtual bool TrySelectRawTaggedStringOverrideCore<TModule>(
+        EnvironmentLike entryPoint,
+        TModule module,
+        string? moduleExpression,
+        string? valueExpression,
+        bool shieldInterpolation,
+        out TaggedString value)
+        where TModule : ModuleBase, IModuleDefinition
+    {
+        ArgumentNullException.ThrowIfNull(entryPoint);
+        return TrySelectRawOverrideCore(module, moduleExpression, valueExpression, shieldInterpolation, out value);
+    }
+
+    /// <summary>
+    /// Selects a stored textual override without evaluating it. This intentionally uses raw storage
+    /// lookup rather than the typed/evaluated override path, including for tagged strings.
+    /// </summary>
+    private bool TrySelectRawOverrideCore<TModule, T>(
+        TModule module,
+        string? moduleExpression,
+        string? valueExpression,
+        bool shieldInterpolation,
+        [NotNullWhen(true)] out T? value)
+        where TModule : ModuleBase, IModuleDefinition
+    {
+        ArgumentNullException.ThrowIfNull(module);
+        string valuePath = ConstructValueResolutionPath<T>(value: default, moduleExpression, valueExpression);
+
+        foreach (RuntimeEnvironment scope in EnumerateOverrideScopes())
         {
-            string overridePath = SyntaxFactory.Path(identifier, valuePath).Override();
-            if (TryGetStoredVariable(overridePath, shieldInterpolation, out value))
+            foreach (string identifier in scope.EnumerateOverrideIdentifiers(module.Name, module.Group, TModule.ModuleId))
             {
-                return true;
+                string overridePath = scope.SyntaxFactory.Path(identifier, valuePath).Override();
+                if (scope.TryGetStoredVariable(overridePath, shieldInterpolation, out value))
+                {
+                    return true;
+                }
             }
         }
 
         value = default;
         return false;
+    }
+
+    /// <summary>
+    /// Enumerates contextual views of one structural parent chain, starting with the child.
+    /// This is unrelated to runtime invocation ancestry or transactional graph traversal.
+    /// </summary>
+    private IEnumerable<RuntimeEnvironment> EnumerateOverrideScopes()
+    {
+        RuntimeEnvironment current = this;
+        while (true)
+        {
+            yield return current;
+            if (current is not InheritedRuntimeEnvironment { Parent: RuntimeEnvironment parent })
+            {
+                yield break;
+            }
+            current = parent;
+        }
     }
 
     private string ConstructValueResolutionPath<T>(T? value, string? moduleExpression, string? valueExpression)

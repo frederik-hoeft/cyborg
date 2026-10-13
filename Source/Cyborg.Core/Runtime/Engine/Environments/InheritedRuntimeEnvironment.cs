@@ -1,7 +1,6 @@
 ﻿using Cyborg.Core.Runtime.Engine.Environments.Syntax;
 using Cyborg.Core.Runtime.Engine.Transactions;
 using Cyborg.Core.Runtime.Engine.Transactions.Internal;
-using Cyborg.Core.Text;
 
 namespace Cyborg.Core.Runtime.Engine.Environments;
 
@@ -74,87 +73,5 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
         }
         evaluation = default;
         return false;
-    }
-
-    internal protected override bool TrySelectRawStringOverrideCore<TModule>(
-        EnvironmentLike entryPoint,
-        TModule module,
-        string? moduleExpression,
-        string? valueExpression,
-        bool shieldInterpolation,
-        [NotNullWhen(true)] out string? value)
-    {
-        if (base.TrySelectRawStringOverrideCore(entryPoint, module, moduleExpression, valueExpression, shieldInterpolation, out value))
-        {
-            return true;
-        }
-        if (Parent is RuntimeEnvironment runtimeParent)
-        {
-            return runtimeParent.TrySelectRawStringOverrideCore(entryPoint, module, moduleExpression, valueExpression, shieldInterpolation, out value);
-        }
-        value = default;
-        return false;
-    }
-
-    internal protected override bool TrySelectRawTaggedStringOverrideCore<TModule>(
-        EnvironmentLike entryPoint,
-        TModule module,
-        string? moduleExpression,
-        string? valueExpression,
-        bool shieldInterpolation,
-        out TaggedString value)
-    {
-        if (base.TrySelectRawTaggedStringOverrideCore(entryPoint, module, moduleExpression, valueExpression, shieldInterpolation, out value))
-        {
-            return true;
-        }
-        if (Parent is RuntimeEnvironment runtimeParent)
-        {
-            return runtimeParent.TrySelectRawTaggedStringOverrideCore(entryPoint, module, moduleExpression, valueExpression, shieldInterpolation, out value);
-        }
-        value = default;
-        return false;
-    }
-
-    internal protected override bool TryResolveCollectionCore<TModule, T>(
-        EnvironmentLike entryPoint,
-        TModule module,
-        IReadOnlyCollection<T>? value,
-        string? moduleExpression,
-        string? valueExpression,
-        [NotNullWhen(true)] out IReadOnlyCollection<T>? resolvedValue)
-    {
-        if (base.TryResolveCollectionCore(entryPoint, module, value, moduleExpression, valueExpression, out resolvedValue))
-        {
-            return true;
-        }
-        if (Parent is RuntimeEnvironment runtimeParent)
-        {
-            return runtimeParent.TryResolveCollectionCore(entryPoint, module, value, moduleExpression, valueExpression, out resolvedValue);
-        }
-        resolvedValue = Parent.Resolve(module, value, moduleExpression, valueExpression);
-        return resolvedValue is not null;
-    }
-
-    internal protected override bool TryResolveCore<TModule, T>(
-        EnvironmentLike entryPoint,
-        TModule module,
-        T? value,
-        string? moduleExpression,
-        string? valueExpression,
-        [NotNullWhen(true)] out T? resolvedValue,
-        out bool terminal) where T : default
-    {
-        if (base.TryResolveCore(entryPoint, module, value, moduleExpression, valueExpression, out resolvedValue, out terminal))
-        {
-            return true;
-        }
-        if (Parent is RuntimeEnvironment runtimeParent)
-        {
-            return runtimeParent.TryResolveCore(entryPoint, module, value, moduleExpression, valueExpression, out resolvedValue, out terminal);
-        }
-        terminal = true;
-        resolvedValue = Parent.Resolve(module, value, moduleExpression, valueExpression);
-        return resolvedValue is not null;
     }
 }
