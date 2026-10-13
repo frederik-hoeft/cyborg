@@ -11,7 +11,7 @@ internal sealed class ConcurrentExecutionScope : IConcurrentExecutionScope
     private readonly ModuleTransaction _restoreTransaction;
     private readonly ModuleTransactionForkGroup _fork;
     private readonly ITransactionCompletionPolicy _completionPolicy;
-    private readonly InvocationScopeFactory _createInvocationScopeAsync;
+    private readonly ModuleInvocationCoordinator _invocationCoordinator;
     private readonly CancellationTokenSource _scopeCancellation = new();
     private readonly List<ConcurrentModuleExecution> _executions = [];
     private readonly List<CancellationTokenSource> _childCancellations = [];
@@ -21,13 +21,13 @@ internal sealed class ConcurrentExecutionScope : IConcurrentExecutionScope
     private bool _scopeCancellationDisposed;
 
     public ConcurrentExecutionScope(ActiveTransaction activeTransaction, ModuleTransaction restoreTransaction, ModuleTransactionForkGroup fork,
-        ITransactionCompletionPolicy completionPolicy, InvocationScopeFactory createInvocationScopeAsync)
+        ITransactionCompletionPolicy completionPolicy, ModuleInvocationCoordinator invocationCoordinator)
     {
         _activeTransaction = activeTransaction;
         _restoreTransaction = restoreTransaction;
         _fork = fork;
         _completionPolicy = completionPolicy;
-        _createInvocationScopeAsync = createInvocationScopeAsync;
+        _invocationCoordinator = invocationCoordinator;
     }
 
     public async ValueTask<IConcurrentModuleExecution> StartAsync(ModuleContext moduleContext, CancellationToken cancellationToken = default)
@@ -40,7 +40,8 @@ internal sealed class ConcurrentExecutionScope : IConcurrentExecutionScope
         _childCancellations.Add(childCancellation);
         try
         {
-            ModuleInvocationScope invocationScope = await _createInvocationScopeAsync(childTransaction, moduleContext.Module.ModuleId, moduleContext.Module.Definition, childCancellation.Token);
+            ModuleInvocationScope invocationScope = await _invocationCoordinator.CreateInvocationScopeAsync(
+                childTransaction, moduleContext.Module.ModuleId, moduleContext.Module.Definition, childCancellation.Token);
             ConcurrentModuleExecution execution = new(invocationScope, moduleContext.Module.Definition, moduleContext, childCancellation);
             _executions.Add(execution);
             execution.Start();

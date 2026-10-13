@@ -4,7 +4,7 @@ This is a baseline characterization for the [runtime execution and environment r
 
 ## Execution entry points
 
-`ModuleRuntimeBase` accepts five execution targets. All five are wrapped in a fresh child transaction, DI scope, and invocation by `ExecuteInNewScopeAsync`; their differences occur during dispatch **inside** that scope.
+`ModuleRuntimeBase` accepts five execution targets. All five are wrapped in a fresh child transaction, DI scope, and invocation by `ModuleInvocationCoordinator.ExecuteAsync`; their differences occur during dispatch **inside** that scope.
 
 | Target | Current-scope path | Behavioral distinction |
 | --- | --- | --- |
@@ -14,7 +14,7 @@ This is a baseline characterization for the [runtime execution and environment r
 | `ModuleReference` | Worker activation followed by worker dispatch | Activates a fresh worker from the reference within the invocation's DI scope |
 | Already activated `IModuleWorker` | Direct worker dispatch | Skips reference activation but still creates the normal invocation boundary |
 
-The call path is `IModuleRuntime`/engine entry point -> `ModuleExecutionRequest` -> `ExecuteInNewScopeAsync` -> `ModuleInvocationScope` -> engine current-scope dispatch -> `ModuleDispatcher`. The execution-request objects call back into `IModuleExecutionRuntime` on the same runtime; this callback is an implementation detail, **not** an extra invocation boundary. Concurrent execution uses `ConcurrentExecutionScope` to create child invocation scopes under one open fork, with an owner continuation.
+The call path is `IModuleRuntime`/engine entry point -> `ModuleExecutionRequest` -> `ModuleInvocationCoordinator` -> `ModuleInvocationScope` -> engine current-scope dispatch -> `ModuleDispatcher`. The execution-request objects call back into `IModuleExecutionRuntime` on the same runtime; this callback is an implementation detail, **not** an extra invocation boundary. Concurrent execution uses `ConcurrentExecutionScope` to create child invocation scopes under one open fork, with an owner continuation.
 
 `ModuleExecutionLifecycleTests`, `ModuleRuntimeBaseTests`, `RootExecutionSessionTests` and `ConcurrentExecutionScopeTests` already characterize execution identity, scope boundaries, loaded-root execution, module-context configuration, lifecycle notification ordering, failures, rollback, cancellation, open/closed concurrent scopes, and detached/abandoned continuation cleanup. These tests should run unmodified throughout P1-P4.
 
@@ -54,3 +54,9 @@ The invocation chain is represented by `RuntimeInvocationFrame`, independently o
 `RuntimeEnvironmentContext` remains the compatibility entry point for `ModuleRuntimeBase` until the invocation coordinator is extracted. `CreateChildFrame` adds an execution frame using a view bound to the active transaction; `RebindTransaction` creates a corresponding invocation chain using a different `ActiveTransaction`, preserving namespaces, override tags, and the original ancestry. `BindToCurrentTransaction` binds an individual external view without adding a frame. `EnvironmentScopeSelector` works with frames directly, and `EnvironmentViewMaterializer` remains independent of invocation ancestry.
 
 An `ActiveTransaction` is an invocation-owned mutable pointer, so a frame's bound views also follow `Retarget()` to the fork continuation without reconstruction or rebinding. A new child invocation instead receives a **different** active pointer and a copied frame chain. `RuntimeEnvironmentContextContractTests` exercises both cases, including the distinction between invocation and structural parents and the preservation of contextual bindings across a nested fork/join.
+
+## Invocation lifecycle ownership after P3
+
+`ModuleInvocationCoordinator` owns the normal child fork, continuation completion, scope creation, result-dependent transaction completion, reconciliation, and exceptional discard/teardown. `ModuleRuntimeBase` selects an execution request and hands it to the coordinator; it continues to implement the current-invocation dispatch API until P4. The coordinator uses the runtime's execution services and parent invocation identity to create the child DI scope and `ScopedRuntime`, then notifies `Started` **before** dispatch or environment preparation. `ModuleInvocationScope` owns the DI lifetime and idempotent `Closed` observation.
+
+`ConcurrentExecutionScope` receives the same coordinator as a narrowly scoped collaborator, rather than a separate scope-creation delegate. It still owns its open fork, owner continuation and retarget/restore, child cancellation, atomic reconciliation, and final scope disposal. A concurrent child uses `ModuleInvocationCoordinator.CreateInvocationScopeAsync` to establish its invocation and emits `Completed` after a definite result; the enclosing concurrent scope delivers `Closed` only after reconciliation or abandonment. Sequential and concurrent execution therefore share scope construction and event setup, while retaining their distinct transaction-join policies.
