@@ -31,28 +31,28 @@ internal abstract class ModuleRuntimeBase
     {
         ArgumentNullException.ThrowIfNull(moduleContext);
         ArgumentNullException.ThrowIfNull(environment);
-        return CreateInvocationCoordinator().ExecuteAsync(new ModuleContextExecutionRequest(moduleContext, environment, cancellationToken));
+        return CreateInvocationCoordinator().ExecuteAsync(ModuleExecutionTarget.ForContext(moduleContext, environment, cancellationToken));
     }
 
     public Task<IModuleExecutionResult> ExecuteAsync(ModuleConfigurationLoadResult configuration, IRuntimeEnvironment environment, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(environment);
-        return CreateInvocationCoordinator().ExecuteAsync(new LoadedConfigurationExecutionRequest(configuration, environment, cancellationToken));
+        return CreateInvocationCoordinator().ExecuteAsync(ModuleExecutionTarget.ForConfiguration(configuration, environment, cancellationToken));
     }
 
     public Task<IModuleExecutionResult> ExecuteRootModuleAsync(ModuleConfigurationLoadResult configuration, IRuntimeEnvironment environment, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(environment);
-        return CreateInvocationCoordinator().ExecuteAsync(new LoadedRootModuleExecutionRequest(configuration, environment, cancellationToken));
+        return CreateInvocationCoordinator().ExecuteAsync(ModuleExecutionTarget.ForRootModule(configuration, environment, cancellationToken));
     }
 
     public Task<IModuleExecutionResult> ExecuteAsync(ModuleReference moduleReference, IRuntimeEnvironment environment, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(moduleReference);
         ArgumentNullException.ThrowIfNull(environment);
-        return CreateInvocationCoordinator().ExecuteAsync(new ModuleReferenceExecutionRequest(moduleReference, environment, cancellationToken));
+        return CreateInvocationCoordinator().ExecuteAsync(ModuleExecutionTarget.ForReference(moduleReference, environment, cancellationToken));
     }
 
     public async Task<IReadOnlyList<IModuleExecutionResult>> ExecuteConcurrentlyAsync(IReadOnlyList<ModuleContext> moduleContexts, CancellationToken cancellationToken = default)
@@ -82,41 +82,7 @@ internal abstract class ModuleRuntimeBase
     {
         ArgumentNullException.ThrowIfNull(module);
         ArgumentNullException.ThrowIfNull(environment);
-        return CreateInvocationCoordinator().ExecuteAsync(new ActivatedWorkerExecutionRequest(module, environment, cancellationToken));
-    }
-
-    Task<IModuleExecutionResult> IModuleExecutionRuntime.ExecuteModuleContextInCurrentScopeAsync(ModuleContext moduleContext, IRuntimeEnvironment environment, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(moduleContext);
-        ArgumentNullException.ThrowIfNull(environment);
-        IRuntimeEnvironment scopedEnvironment = environmentContext.BindToCurrentTransaction(environment);
-        return runtimeServices.ContextRunner.ExecuteAsync(this, moduleContext, scopedEnvironment, cancellationToken);
-    }
-
-    Task<IModuleExecutionResult> IModuleExecutionRuntime.ExecuteLoadedConfigurationInCurrentScopeAsync(
-        ModuleConfigurationLoadResult configuration, IRuntimeEnvironment environment, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(configuration);
-        runtimeServices.ModuleRegistry.ApplySeed(activeTransaction.Current, configuration.RegistrySeed);
-        return ((IModuleExecutionRuntime)this).ExecuteModuleContextInCurrentScopeAsync(configuration.ModuleContext, environment, cancellationToken);
-    }
-
-    Task<IModuleExecutionResult> IModuleExecutionRuntime.ExecuteLoadedRootModuleInCurrentScopeAsync(
-        ModuleConfigurationLoadResult configuration, IRuntimeEnvironment environment, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(configuration);
-        runtimeServices.ModuleRegistry.ApplySeed(activeTransaction.Current, configuration.RegistrySeed);
-        return ((IModuleExecutionRuntime)this).ExecuteModuleReferenceInCurrentScopeAsync(configuration.ModuleContext.Module, environment, cancellationToken);
-    }
-
-    Task<IModuleExecutionResult> IModuleExecutionRuntime.ExecuteModuleReferenceInCurrentScopeAsync(
-        ModuleReference moduleReference, IRuntimeEnvironment environment, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(moduleReference);
-        ArgumentNullException.ThrowIfNull(environment);
-        IRuntimeEnvironment scopedEnvironment = environmentContext.BindToCurrentTransaction(environment);
-        IModuleWorker worker = runtimeServices.Dispatcher.ActivateWorker(moduleReference, RequireExecutionServices());
-        return ExecuteActivatedWorkerInCurrentScopeAsync(worker, scopedEnvironment, cancellationToken);
+        return CreateInvocationCoordinator().ExecuteAsync(ModuleExecutionTarget.ForWorker(module, environment, cancellationToken));
     }
 
     public IRuntimeEnvironment PrepareEnvironment(ModuleEnvironment moduleEnvironment, IReadOnlyCollection<string>? overrideResolutionTags = null) =>
@@ -128,17 +94,11 @@ internal abstract class ModuleRuntimeBase
     public IModuleExecutionResult Exit<TModule>(IModuleExecutionResult<TModule> result) where TModule : ModuleBase, IModuleDefinition =>
         runtimeServices.ArtifactPublisher.Publish(result, this, Environment);
 
-    Task<IModuleExecutionResult> IModuleExecutionRuntime.ExecuteActivatedWorkerInCurrentScopeAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken) =>
-        ExecuteActivatedWorkerInCurrentScopeAsync(module, environmentContext.BindToCurrentTransaction(environment), cancellationToken);
-
-    private Task<IModuleExecutionResult> ExecuteActivatedWorkerInCurrentScopeAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken)
+    internal Task<IModuleExecutionResult> DispatchInCurrentScopeAsync(ModuleExecutionTarget target, IRuntimeEnvironment environment)
     {
-        IServiceProvider executionServices = RequireExecutionServices();
-        IRuntimeEnvironment boundEnvironment = environment.Bind(module);
-        RuntimeEnvironmentContext childEnvironmentContext = environmentContext.CreateChildFrame(boundEnvironment);
-        IModuleRuntime runtime = new ScopedRuntime(Root, childEnvironmentContext, runtimeServices, activeTransaction, executionServices,
-            invocationContext ?? throw new InvalidOperationException("A worker runtime requires an active module invocation context."));
-        return runtimeServices.Dispatcher.ExecuteAsync(module, runtime, boundEnvironment, executionServices, cancellationToken);
+        ModuleTargetExecutor executor = new(this, Root, environmentContext, runtimeServices, activeTransaction, RequireExecutionServices(),
+            invocationContext ?? throw new InvalidOperationException("Module dispatch requires an active invocation context."));
+        return executor.ExecuteAsync(target, environment);
     }
 
     private ModuleInvocationCoordinator CreateInvocationCoordinator() =>

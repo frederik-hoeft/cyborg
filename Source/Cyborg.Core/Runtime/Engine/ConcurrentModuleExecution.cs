@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Runtime.Engine.Environments;
+﻿﻿using Cyborg.Core.Runtime.Engine.Environments;
 using Cyborg.Core.Runtime.Engine.Transactions.Internal;
 using Cyborg.Core.Runtime.Model;
 
@@ -51,7 +51,7 @@ internal sealed class ConcurrentModuleExecution : IConcurrentModuleExecution
     private async Task<IModuleExecutionResult> ExecuteAsync()
     {
         IRuntimeEnvironment environment = _scope.Runtime.PrepareEnvironment(_moduleContext.Environment ?? ModuleEnvironment.Default);
-        IModuleExecutionResult result = await _scope.Runtime.ExecuteModuleContextInCurrentScopeAsync(_moduleContext, environment, _cancellation.Token);
+        IModuleExecutionResult result = await _scope.Runtime.DispatchInCurrentScopeAsync(ModuleExecutionTarget.ForContext(_moduleContext, environment, _cancellation.Token), environment);
         await _scope.NotifyCompletedAsync(result);
         return result;
     }

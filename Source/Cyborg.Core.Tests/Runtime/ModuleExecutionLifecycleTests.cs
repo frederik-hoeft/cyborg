@@ -1,4 +1,4 @@
-using Cyborg.Core.Runtime;
+﻿using Cyborg.Core.Runtime;
 using Cyborg.Core.Runtime.Configuration;
 using Cyborg.Core.Runtime.Engine;
 using Cyborg.Core.Runtime.Engine.Environments;
@@ -241,6 +241,66 @@ public sealed class ModuleExecutionLifecycleTests : CyborgCoreTestBase
         Assert.HasCount(1, hook.Observations.Where(static observation => observation.Event == LifecycleEvent.Started).ToArray());
     }, ConfigureProbeServices);
 
+    [TestMethod]
+    public Task Test_Dispatch_LoadedConfigurationAppliesRegistrySeedBeforeMainWorkerAsync() => TestWithDIAsync(async services =>
+    {
+        RecordingExecutionLifecycleHook hook = services.GetRequiredService<RecordingExecutionLifecycleHook>();
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        ModuleContext seeded = CreateContext("seeded", ProbeBehavior.Success);
+        ModuleRegistrySeedBuilder builder = new();
+        builder.Add("seeded", seeded);
+        ModuleContext main = CreateContext("loaded", ProbeBehavior.AssertLoadedRegistrySeed);
+        ModuleConfigurationLoadResult configuration = new(main, builder.Build());
+        IRuntimeEnvironment environment = runtime.PrepareEnvironment(main.Environment);
+
+        IModuleExecutionResult result = await runtime.ExecuteAsync(configuration, environment, TestContext.CancellationToken);
+
+        Assert.AreEqual(ModuleExitStatus.Success, result.Status);
+        Assert.HasCount(1, hook.Observations.Where(static observation => observation.Event == LifecycleEvent.Started).ToArray());
+        AssertLifecycle(hook, "loaded", ModuleExitStatus.Success, joined: true);
+    }, ConfigureProbeServices);
+
+    [TestMethod]
+    public Task Test_Dispatch_LoadedRootBypassesContextRequirementsAndConfigurationAsync() => TestWithDIAsync(async services =>
+    {
+        RecordingExecutionLifecycleHook hook = services.GetRequiredService<RecordingExecutionLifecycleHook>();
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        ModuleContext main = new(
+            CreateReference("loaded-root", ProbeBehavior.AssertLoadedRegistrySeed),
+            ModuleEnvironment.Default,
+            CreateReference("should-not-run", ProbeBehavior.FailedResult),
+            new ModuleRequirements(null, ["missing_argument"]));
+        ModuleRegistrySeedBuilder builder = new();
+        builder.Add("seeded", CreateContext("seeded", ProbeBehavior.Success));
+        ModuleConfigurationLoadResult configuration = new(main, builder.Build());
+        IRuntimeEnvironment environment = runtime.PrepareEnvironment(main.Environment);
+
+        IModuleExecutionResult result = await runtime.ExecuteRootModuleAsync(configuration, environment, TestContext.CancellationToken);
+
+        Assert.AreEqual(ModuleExitStatus.Success, result.Status);
+        Assert.HasCount(1, hook.Observations.Where(static observation => observation.Event == LifecycleEvent.Started).ToArray());
+        AssertLifecycle(hook, "loaded-root", ModuleExitStatus.Success, joined: true);
+    }, ConfigureProbeServices);
+
+    [TestMethod]
+    public Task Test_Dispatch_FailedConfigurationSkipsMainWorkerAsync() => TestWithDIAsync(async services =>
+    {
+        RecordingExecutionLifecycleHook hook = services.GetRequiredService<RecordingExecutionLifecycleHook>();
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        ModuleContext main = new(
+            CreateReference("main", ProbeBehavior.Success),
+            ModuleEnvironment.Default,
+            CreateReference("configuration", ProbeBehavior.FailedResult),
+            ModuleRequirements.Default);
+
+        IModuleExecutionResult result = await runtime.ExecuteAsync(main, TestContext.CancellationToken);
+
+        Assert.AreEqual(ModuleExitStatus.Failed, result.Status);
+        Assert.HasCount(2, hook.Observations.Where(static observation => observation.Event == LifecycleEvent.Started).ToArray());
+        AssertLifecycle(hook, "main", ModuleExitStatus.Failed, joined: true);
+        AssertLifecycle(hook, "configuration", ModuleExitStatus.Failed, joined: true);
+    }, ConfigureProbeServices);
+
     private static void ConfigureProbeServices(IServiceCollection services)
     {
         services.RemoveAll<IModuleWorkerFactory>();
@@ -293,7 +353,7 @@ public sealed class ModuleExecutionLifecycleTests : CyborgCoreTestBase
             {
                 ProbeBehavior.ActivationFailure => throw new InvalidOperationException("Synthetic activation failure."),
                 ProbeBehavior.ActivationCancellation => throw new OperationCanceledException("Synthetic activation cancellation."),
-                _ => new ProbeWorker(module, state),
+                _ => new ProbeWorker(module, state, serviceProvider.GetRequiredService<IModuleRegistry>()),
             };
         }
 
@@ -306,7 +366,7 @@ public sealed class ModuleExecutionLifecycleTests : CyborgCoreTestBase
             throw new NotSupportedException();
     }
 
-    private sealed class ProbeWorker(ProbeModule module, ProbeExecutionState state) : IModuleWorker
+    private sealed class ProbeWorker(ProbeModule module, ProbeExecutionState state, IModuleRegistry registry) : IModuleWorker
     {
         public string ModuleId => ProbeModule.MODULE_ID;
 
@@ -343,6 +403,10 @@ public sealed class ModuleExecutionLifecycleTests : CyborgCoreTestBase
                 case ProbeBehavior.WaitForRelease:
                     state.SlowStarted.TrySetResult();
                     await state.ReleaseSlow.Task.WaitAsync(cancellationToken);
+                    break;
+                case ProbeBehavior.AssertLoadedRegistrySeed:
+                    Assert.IsTrue(registry.TryGetModule("seeded", out ModuleContext? loaded));
+                    Assert.AreEqual("seeded", loaded.Module.Definition.Name);
                     break;
                 case ProbeBehavior.WriteGlobal:
                     runtime.GlobalEnvironment.SetVariable("shared", module.Value ?? string.Empty);
@@ -533,5 +597,6 @@ public sealed class ModuleExecutionLifecycleTests : CyborgCoreTestBase
         WaitForSlowStart,
         WaitForRelease,
         WriteGlobal,
+        AssertLoadedRegistrySeed,
     }
 }

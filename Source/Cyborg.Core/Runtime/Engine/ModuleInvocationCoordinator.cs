@@ -26,7 +26,7 @@ internal sealed class ModuleInvocationCoordinator(
         return new ConcurrentExecutionScope(activeTransaction, restoreTransaction, fork, runtimeServices.CompletionPolicy, this);
     }
 
-    public async Task<IModuleExecutionResult> ExecuteAsync(ModuleExecutionRequest request)
+    public async Task<IModuleExecutionResult> ExecuteAsync(ModuleExecutionTarget request)
     {
         ModuleTransactionForkGroup fork = activeTransaction.Current.Fork();
         ModuleTransaction childTransaction = fork.CreateChild();
@@ -36,7 +36,7 @@ internal sealed class ModuleInvocationCoordinator(
         {
             invocationScope = await CreateInvocationScopeAsync(childTransaction, request.ModuleId, request.Module, request.CancellationToken);
             IRuntimeEnvironment scopedEnvironment = invocationScope.BindEnvironment(request.Environment);
-            IModuleExecutionResult result = await request.ExecuteInCurrentScopeAsync(invocationScope.Runtime, scopedEnvironment);
+            IModuleExecutionResult result = await invocationScope.Runtime.DispatchInCurrentScopeAsync(request, scopedEnvironment);
             await invocationScope.NotifyCompletedAsync(result);
             childTransaction.Complete(runtimeServices.CompletionPolicy.Resolve(request.Module, result.Status));
             bool joined = fork.TryJoin(out TransactionConflict? conflict);

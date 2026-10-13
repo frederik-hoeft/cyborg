@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Runtime.Engine.Environments;
+﻿﻿using Cyborg.Core.Runtime.Engine.Environments;
 using Cyborg.Core.Runtime.Engine.Transactions.Internal;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -7,7 +7,7 @@ namespace Cyborg.Core.Runtime.Engine;
 internal sealed class ModuleInvocationScope(
     ModuleTransaction transaction,
     AsyncServiceScope serviceScope,
-    IModuleExecutionRuntime runtime,
+    ScopedRuntime runtime,
     RuntimeEnvironmentContext environmentContext,
     ModuleInvocationContext invocation) : IAsyncDisposable
 {
@@ -15,7 +15,7 @@ internal sealed class ModuleInvocationScope(
 
     public ModuleTransaction Transaction { get; } = transaction;
 
-    public IModuleExecutionRuntime Runtime { get; } = runtime;
+    public ScopedRuntime Runtime { get; } = runtime;
 
     public IRuntimeEnvironment BindEnvironment(IRuntimeEnvironment environment) => environmentContext.BindToCurrentTransaction(environment);
 
