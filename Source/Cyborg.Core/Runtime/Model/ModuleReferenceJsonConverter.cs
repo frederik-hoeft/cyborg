@@ -4,8 +4,25 @@ using System.Text.Json;
 
 namespace Cyborg.Core.Runtime.Model;
 
-public sealed class ModuleReferenceJsonConverter(IModuleLoaderRegistry registry, IJsonLoaderContextProvider provider) : ExtendedJsonConverter<ModuleReference>(provider)
+public sealed class ModuleReferenceJsonConverter : ExtendedJsonConverter<ModuleReference>
 {
+    private readonly IModuleLoaderRegistry _registry;
+    private readonly IJsonLoaderContextProvider _provider;
+    private readonly ModuleOrigin? _origin;
+
+    public ModuleReferenceJsonConverter(IModuleLoaderRegistry registry, IJsonLoaderContextProvider provider) : this(registry, provider, origin: null)
+    {
+    }
+
+    internal ModuleReferenceJsonConverter(IModuleLoaderRegistry registry, IJsonLoaderContextProvider provider, ModuleOrigin? origin) : base(provider)
+    {
+        _registry = registry;
+        _provider = provider;
+        _origin = origin;
+    }
+
+    internal ModuleReferenceJsonConverter WithOrigin(ModuleOrigin? origin) => new(_registry, _provider, origin);
+
     public override ModuleReference Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         // read the current key (module name), resolve through the registry, and let the configuration loader handle the rest of the deserialization
@@ -14,18 +31,21 @@ public sealed class ModuleReferenceJsonConverter(IModuleLoaderRegistry registry,
             throw new JsonException($"Expected string token for module reference, but got {reader.TokenType}.");
         }
         string? moduleName = reader.GetString() ?? throw new JsonException("Module reference cannot be null. Ensure that the JSON configuration specifies a valid module name.");
-        if (!registry.TryGetModuleLoader(moduleName, out IModuleLoader? configuration))
+        if (!_registry.TryGetModuleLoader(moduleName, out IModuleLoader? configuration))
         {
-            throw new JsonException($"Module configuration with name '{moduleName}' not found in the registry. Ensure that the module name specified in the JSON configuration matches a registered module configuration.");
+            throw new JsonException($"Module configuration with name '{moduleName}' not found in the registry. " +
+                "Ensure that the module name specified in the JSON configuration matches a registered module configuration.");
         }
         if (!configuration.TryLoadModule(ref reader, GetContext(options), out IModule? module))
         {
-            throw new JsonException($"Failed to load module definition for module '{moduleName}'. Ensure that the JSON configuration for the module is valid and that the module loader can handle it.");
+            throw new JsonException($"Failed to load module definition for module '{moduleName}'. " +
+                "Ensure that the JSON configuration for the module is valid and that the module loader can handle it.");
         }
         if (!reader.Read() || reader.TokenType != JsonTokenType.EndObject)
         {
-            throw new JsonException($"Expected end of module reference object after reading module configuration, but got {reader.TokenType}. Ensure that the JSON configuration for the module is properly formatted.");
+            throw new JsonException($"Expected end of module reference object after reading module configuration, but got {reader.TokenType}. " +
+                "Ensure that the JSON configuration for the module is properly formatted.");
         }
-        return new ModuleReference(module, configuration.ModuleId);
+        return new ModuleReference(module, configuration.ModuleId, _origin);
     }
 }

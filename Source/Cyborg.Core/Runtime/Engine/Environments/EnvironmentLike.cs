@@ -16,6 +16,8 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
 
     internal ITaggedStringConversionObserver? TaggedStringConversionObserver { get; init; }
 
+    internal EnvironmentContext Context { get; init; } = EnvironmentContext.Empty;
+
     protected JsonNamingPolicy NamingPolicy => SyntaxFactory.NamingPolicy;
 
     protected virtual TaggedString InterpolateString(ResolutionContext context, TaggedString tagged)
@@ -99,10 +101,11 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
     internal protected virtual bool TryResolveVariableInCurrentScopeCore(ResolutionContext context, out Evaluation evaluation)
     {
         ArgumentNullException.ThrowIfNull(context);
-        if (context.Name.Equals(SyntaxFactory.Self(), StringComparison.Ordinal))
+        if (EnvironmentContext.IsContextualName(context.Name))
         {
-            evaluation = Evaluation.Of(Namespace);
-            return true;
+            bool resolved = Context.TryResolve(context.Name, Namespace, out object? contextualValue);
+            evaluation = resolved ? Evaluation.Of(contextualValue) : default;
+            return resolved;
         }
         if (VariableStore.TryGetValue(context.Name, out object? objValue) && objValue is not null)
         {
@@ -171,9 +174,26 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         throw new InvalidCastException($"Attempted to resolve variable '{name}' as type {typeof(T).FullName}, but it is of type {resolved.GetType().FullName}.");
     }
 
-    public virtual void SetVariable<T>(string name, T value) => VariableStore.SetValue(name, PrepareStoredValue(value));
+    public virtual void SetVariable<T>(string name, T value)
+    {
+        EnsureWritableName(name);
+        VariableStore.SetValue(name, PrepareStoredValue(value));
+    }
 
-    public virtual bool TryRemoveVariable(string name) => VariableStore.TryRemove(name);
+    public virtual bool TryRemoveVariable(string name)
+    {
+        EnsureWritableName(name);
+        return VariableStore.TryRemove(name);
+    }
+
+    private static void EnsureWritableName(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (EnvironmentContext.IsContextualName(name))
+        {
+            throw new ArgumentException($"Contextual variable '{name}' is runtime-owned and cannot be modified.", nameof(name));
+        }
+    }
 
     public virtual TaggedString Interpolate(string template)
     {
@@ -344,6 +364,16 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
             reference = new VariableReference(self, ResolutionOrigin.EntryPoint);
             return true;
         }
+        if (expression.StartsWith("@.origin.", StringComparison.Ordinal))
+        {
+            reference = new VariableReference(expression, ResolutionOrigin.CurrentScope);
+            return true;
+        }
+        if (expression.StartsWith("@@.", StringComparison.Ordinal))
+        {
+            reference = new VariableReference(expression[1..], ResolutionOrigin.EntryPoint);
+            return true;
+        }
         if (expression.StartsWith(LateRefSyntax.Symbol, StringComparison.Ordinal))
         {
             reference = new VariableReference(expression[LateRefSyntax.Symbol.Length..], ResolutionOrigin.EntryPoint);
@@ -413,7 +443,21 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
             return text;
         }
 
-        if (!TryResolveVariable(expression.Expression, out object? snapshot))
+        object? snapshot;
+        if (expression.Expression.StartsWith('@'))
+        {
+            if (!TryParseVariableReference(expression.Expression, out VariableReference reference)
+                || !TryResolveVariableReference(ResolutionContext.CreateRoot(this), reference, out Evaluation captured))
+            {
+                throw new InvalidOperationException($"Failed to capture '*{{{expression.Expression}}}' because '{expression.Expression}' is not defined.");
+            }
+            snapshot = captured.Value;
+        }
+        else if (!TryResolveVariable(expression.Expression, out snapshot))
+        {
+            throw new InvalidOperationException($"Failed to capture '*{{{expression.Expression}}}' because '{expression.Expression}' is not defined.");
+        }
+        if (snapshot is null)
         {
             throw new InvalidOperationException($"Failed to capture '*{{{expression.Expression}}}' because '{expression.Expression}' is not defined.");
         }

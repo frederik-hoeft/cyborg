@@ -26,7 +26,7 @@ internal static class VariableGrammar
 
     [StringSyntax(StringSyntaxAttribute.Regex)]
     // @@ late self, @ self, @identifier entry-point reference, or identifier current-scope reference
-    public const string EXPRESSION_PATTERN = $@"@@|@(?:{IDENTIFIER})?|{IDENTIFIER}";
+    public const string EXPRESSION_PATTERN = $@"@@(?:\.origin\.(?:file|directory))?|@(?:\.origin\.(?:file|directory)|{IDENTIFIER})?|{IDENTIFIER}";
 
     [StringSyntax(StringSyntaxAttribute.Regex)]
     public const string INTERPOLATION_PATTERN = $@"\$\{{(?<expression>{EXPRESSION_PATTERN})\}}";
@@ -35,7 +35,7 @@ internal static class VariableGrammar
     public const string INDIRECTION_PATTERN = $@"\A&\{{(?<expression>{EXPRESSION_PATTERN})\}}\z";
 
     [StringSyntax(StringSyntaxAttribute.Regex)]
-    public const string CAPTURE_PATTERN = $@"\A\*\{{(?<expression>{IDENTIFIER})\}}\z";
+    public const string CAPTURE_PATTERN = $@"\A\*\{{(?<expression>{IDENTIFIER}|@{{1,2}}\.origin\.(?:file|directory))\}}\z";
 
     [StringSyntax(StringSyntaxAttribute.Regex)]
     // one or more hashes escape a single evaluation pass for interpolation, indirection, or capture

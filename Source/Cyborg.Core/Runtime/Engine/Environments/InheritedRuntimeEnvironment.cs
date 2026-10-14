@@ -61,6 +61,13 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
         {
             return true;
         }
+        // Contextual names are owned by the selected view, even when undefined.
+        // Never fall back to an ancestor's provenance.
+        if (EnvironmentContext.IsContextualName(context.Name))
+        {
+            evaluation = default;
+            return false;
+        }
         if (Parent is EnvironmentLike parent)
         {
             return parent.TryResolveVariableRecursiveCore(context, out evaluation);

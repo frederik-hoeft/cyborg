@@ -23,6 +23,14 @@ internal sealed class ModuleExecutionTarget
 
     public string ModuleId { get; }
 
+    public ModuleOrigin? Origin => Kind switch
+    {
+        ModuleExecutionKind.Context => Context!.Module.Origin,
+        ModuleExecutionKind.Configuration or ModuleExecutionKind.RootModule => Configuration!.ModuleContext.Module.Origin,
+        ModuleExecutionKind.Reference => Reference!.Origin,
+        _ => null
+    };
+
     public IModule Module { get; }
 
     public IRuntimeEnvironment Environment { get; }

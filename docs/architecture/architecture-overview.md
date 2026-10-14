@@ -157,6 +157,8 @@ When a `ModuleContext` is executed, the runtime first prepares the environment a
 
 The `ModuleReference` type enables modules to contain other modules as properties, creating arbitrarily nested execution trees. In JSON, a module reference is expressed as an object whose single property name is the module ID and whose value is the module's configuration. This structure eliminates the need for `$type` discriminators while enabling polymorphic, version-aware deserialization. Any module property typed as `ModuleReference` or `ModuleContext` can hold any module, enabling compositional patterns such as sequences of conditionals, loops over parameterized templates, or guards wrapping subprocess calls.
 
+Each `ModuleReference` may also carry immutable definition-site provenance (`ModuleOrigin`): the absolute source-file path and its containing directory. It belongs to the module definition, not the invocation or the selected environment. The file loader assigns the trust-approved file origin to all module references deserialized in that file, including nested definitions and module-valued configuration entries. Independent file loads establish independent origins; an externally loaded workflow therefore retains its own file identity. References constructed in code may provide an origin explicitly, or leave it undefined.
+
 ### Loading and Deserialization
 
 Cyborg uses a dynamic, registry-based JSON deserialization model where the module ID serves as both a discriminator and a version identifier. This approach is fully AOT-compatible, avoiding reflection-based polymorphic deserialization.
@@ -270,6 +272,8 @@ The runtime does not assign meaning to which child is primary. Cancellation of o
 
 Each module executes within a bound environment — one whose `Namespace` property is set to the module's effective namespace. The effective namespace uses the most specific available identifier in this order: `Name`, `Group`, then `ModuleId`. This namespace determines how override resolution, artifact paths, self-references, and default artifact namespaces operate for that module.
 
+Contextual environment views associate the executing module's immutable definition metadata with a logical environment and transaction binding. This does not write provenance into transaction-visible variables. Structured lifecycle hooks also receive the invoked module's `Origin` directly, since their start notification precedes worker dispatch.
+
 ## Runtime Environment
 
 The runtime environment subsystem manages the hierarchical variable stores that modules use to communicate. It encompasses environment scoping, variable resolution with string interpolation, lazy typed indirection, and eager typed capture, a property override mechanism for late-binding module configuration, and structured artifact publishing for module outputs. Together, these components form the data flow backbone of the execution model.
@@ -295,6 +299,8 @@ Environments form a hierarchical variable store. Each module executes in an envi
 The runtime exposes `RuntimeEnvironment` views, with `InheritedRuntimeEnvironment` representing a view that falls back through a logical parent and `GlobalRuntimeEnvironment` defining the global environment shape used to seed a root execution. The mutable workflow state is not owned by those CLR objects: transaction-bound views route variable reads, writes, removals, and topology lookup through the current environment transaction participant.
 
 When a scope is `InheritParent`, the transaction creates a logical environment node whose parent points at the caller's environment identity. Variables set in the child node shadow its parent, while unresolved lookups traverse the logical parent chain. The parent relationship also preserves the view metadata needed by inherited resolution, including namespace and override-resolution tags, so reconstructing a view does not depend on retaining the original CLR environment object.
+
+Structural inheritance captures the parent's contextual view descriptor at node creation: its logical environment identity, namespace, override-resolution tags, and immutable definition-site context. Named-environment reconstruction uses that recorded descriptor even after the defining invocation completes. A later module selecting the named node binds its own context to the current view while inherited parent lookups use the originally captured parent context. Transaction rebinding changes state visibility without replacing contextual view identity.
 
 #### Named Environments
 

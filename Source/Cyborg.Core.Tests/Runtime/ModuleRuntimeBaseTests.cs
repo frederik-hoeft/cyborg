@@ -40,6 +40,31 @@ public sealed class ModuleRuntimeBaseTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ReferenceProvenanceIsBoundOnlyToTheInvokedWorkerAsync()
+    {
+        GlobalRuntimeEnvironment globalEnvironment = new(JsonNamingPolicy.SnakeCaseLower)
+        {
+            Context = new EnvironmentContext(new ModuleOrigin(Path.Combine(Path.GetTempPath(), "unrelated.jconf")))
+        };
+        using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
+        ProbeModuleWorker worker = new();
+        using ServiceProvider serviceProvider = new ServiceCollection()
+            .AddSingleton<IModuleWorkerFactory>(new ProbeModuleWorkerFactory(worker))
+            .BuildServiceProvider();
+        RootModuleRuntime runtime = new(globalEnvironment, loggerFactory, serviceProvider);
+        ModuleOrigin definition = new(Path.Combine(Path.GetTempPath(), "definition.jconf"));
+
+        IModuleExecutionResult first = await runtime.ExecuteAsync(new ModuleReference(worker.Module, ProbeModule.ModuleId, definition), cancellationToken: TestContext.CancellationToken);
+        Assert.AreEqual(ModuleExitStatus.Success, first.Status);
+        Assert.AreEqual(definition.File, worker.ObservedOrigin);
+        Assert.AreEqual(globalEnvironment.Context.Origin!.File, ((RuntimeEnvironment)runtime.GlobalEnvironment).Context.Origin?.File);
+
+        IModuleExecutionResult second = await runtime.ExecuteAsync(new ModuleReference(worker.Module, ProbeModule.ModuleId), cancellationToken: TestContext.CancellationToken);
+        Assert.AreEqual(ModuleExitStatus.Success, second.Status);
+        Assert.IsNull(worker.ObservedOrigin);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_SameLoadedReference_ActivatesFreshWorkersForConcurrentExecutionsAsync()
     {
         GlobalRuntimeEnvironment globalEnvironment = new(JsonNamingPolicy.SnakeCaseLower);
@@ -226,10 +251,14 @@ public sealed class ModuleRuntimeBaseTests
 
         public string? ContainerName { get; private set; }
 
+        public string? ObservedOrigin { get; private set; }
+
         Task<IModuleExecutionResult> IModuleWorker.ExecuteAsync(IModuleRuntime runtime, CancellationToken cancellationToken)
         {
             SawContainerName = runtime.Environment.TryResolveVariable("container_name", out string? containerName);
             ContainerName = containerName;
+            runtime.Environment.TryResolveVariable("@.origin.file", out string? origin);
+            ObservedOrigin = origin;
             return Task.FromResult<IModuleExecutionResult>(new ProbeExecutionResult((ProbeModule)Module, ModuleExitStatus.Success, runtime.Environment.CreateTestArtifactCollection()));
         }
     }

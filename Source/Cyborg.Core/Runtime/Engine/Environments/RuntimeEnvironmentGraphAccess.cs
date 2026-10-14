@@ -72,7 +72,8 @@ internal sealed class RuntimeEnvironmentGraphAccess(RuntimeEnvironmentTransactio
     }
 
     public static RuntimeEnvironmentParent CaptureParentView(IRuntimeEnvironment environment) =>
-        new(GetEnvironmentId(environment), environment.Namespace, environment.OverrideResolutionTags);
+        new(GetEnvironmentId(environment), environment.Namespace, environment.OverrideResolutionTags,
+            environment is RuntimeEnvironment runtimeEnvironment ? runtimeEnvironment.Context : EnvironmentContext.Empty);
 
     public RuntimeEnvironmentTransactionState GetState(ActiveTransaction active) =>
         active.Current.GetParticipantState(participant);

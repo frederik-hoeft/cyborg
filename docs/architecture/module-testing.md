@@ -145,6 +145,8 @@ Key methods:
 - `ExecuteAsync(ModuleContext, CancellationToken)` — Executes a structural module context without additional configuration-load artifacts.
 - `ExecuteAsync(ModuleConfigurationLoadResult, CancellationToken)` — Executes a complete loaded configuration, including its load artifacts, through the production transaction lifecycle.
 
+Module tests can explicitly provide a definition origin without depending on an on-disk workflow file. `TestModuleRuntimeScope.DeserializeModule(...)`, `DeserializeModuleContext(...)`, and `DeserializeModuleConfiguration(...)` accept an optional `ModuleOrigin`; `CyborgTestBase` exposes the `ModuleOrigin` override used by its higher-order workflows. When not specified, in-memory module references have no file origin. Nested module references receive the same load-local origin through the production deserialization path.
+
 ### CyborgTestBase
 
 **File:** `Cyborg.Core.TestAdapter/CyborgTestBase.cs`
