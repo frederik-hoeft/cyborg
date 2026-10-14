@@ -314,10 +314,14 @@ public sealed class ModuleRuntimeBaseTests
 
         public string? ContainerName { get; private set; }
 
+        public string? ObservedOrigin { get; private set; }
+
         Task<IModuleExecutionResult> IModuleWorker.ExecuteAsync(IModuleRuntime runtime, CancellationToken cancellationToken)
         {
             SawContainerName = runtime.Environment.TryResolveVariable("container_name", out string? containerName);
             ContainerName = containerName;
+            runtime.Environment.TryResolveVariable("@.origin.file", out string? origin);
+            ObservedOrigin = origin;
             return Task.FromResult<IModuleExecutionResult>(new ProbeExecutionResult((ProbeModule)Module, ModuleExitStatus.Success, runtime.Environment.CreateTestArtifactCollection()));
         }
     }

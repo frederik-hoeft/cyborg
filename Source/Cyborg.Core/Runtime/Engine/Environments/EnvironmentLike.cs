@@ -20,6 +20,10 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
 
     internal ITaggedStringConversionObserver? TaggedStringConversionObserver { get; init; }
 
+    internal EnvironmentContext Context { get; init; } = EnvironmentContext.Empty;
+
+    internal ContextualVariableRegistry ContextualVariables { get; init; } = ContextualVariableRegistry.Default;
+
     protected JsonNamingPolicy NamingPolicy => SyntaxFactory.NamingPolicy;
 
     internal protected virtual bool TryResolveVariableInCurrentScopeCore(ResolutionContext context, out Evaluation evaluation)
@@ -36,9 +40,9 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
     internal virtual bool TryResolveStructuralInCurrentScopeCore(ResolutionContext context, [NotNullWhen(true)] out EvaluatedValue? value)
     {
         ArgumentNullException.ThrowIfNull(context);
-        if (EnvironmentContext.IsContextualName(context.Name))
+        if (ContextualVariableRegistry.IsContextualName(context.Name))
         {
-            bool resolved = Context.TryResolve(context.Name, Namespace, out object? contextualValue);
+            bool resolved = ContextualVariables.TryResolve(context.Name, Context, Namespace, out object? contextualValue);
             value = resolved ? new EvaluatedTerminal(contextualValue) : null;
             return resolved;
         }
@@ -130,12 +134,16 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         VariableStore.SetValue(name, new BoundCapture(terminal));
     }
 
-    public virtual bool TryRemoveVariable(string name) => VariableStore.TryRemove(name);
+    public virtual bool TryRemoveVariable(string name)
+    {
+        EnsureWritableName(name);
+        return VariableStore.TryRemove(name);
+    }
 
     private static void EnsureWritableName(string name)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        if (EnvironmentContext.IsContextualName(name))
+        if (ContextualVariableRegistry.IsContextualName(name))
         {
             throw new ArgumentException($"Contextual variable '{name}' is runtime-owned and cannot be modified.", nameof(name));
         }

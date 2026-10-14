@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Runtime.Engine.Environments.Syntax;
+using Cyborg.Core.Runtime.Engine.Environments.Syntax;
 using Cyborg.Core.Runtime.Engine.Transactions;
 using Cyborg.Core.Runtime.Engine.Transactions.Internal;
 using Cyborg.Core.Text;
@@ -7,7 +7,8 @@ namespace Cyborg.Core.Runtime.Engine.Environments;
 
 internal sealed class DefaultRuntimeEnvironmentFactory(
     VariableSyntaxBuilder syntaxFactory,
-    ITaggedStringConversionObserver? taggedStringConversionObserver) : IRuntimeEnvironmentFactory
+    ITaggedStringConversionObserver? taggedStringConversionObserver,
+    ContextualVariableRegistry? contextualVariables = null) : IRuntimeEnvironmentFactory
 {
     public GlobalRuntimeEnvironment CreateGlobalEnvironment() => AttachRuntimeServices(new GlobalRuntimeEnvironment(syntaxFactory));
 
@@ -58,16 +59,19 @@ internal sealed class DefaultRuntimeEnvironmentFactory(
 
     private EnvironmentLike AttachRuntimeServices(EnvironmentLike environment) => environment with
     {
-        TaggedStringConversionObserver = taggedStringConversionObserver
+        TaggedStringConversionObserver = taggedStringConversionObserver,
+        ContextualVariables = contextualVariables ?? ContextualVariableRegistry.Default
     };
 
     private RuntimeEnvironment AttachRuntimeServices(RuntimeEnvironment environment) => environment with
     {
-        TaggedStringConversionObserver = taggedStringConversionObserver
+        TaggedStringConversionObserver = taggedStringConversionObserver,
+        ContextualVariables = contextualVariables ?? ContextualVariableRegistry.Default
     };
 
     private GlobalRuntimeEnvironment AttachRuntimeServices(GlobalRuntimeEnvironment environment) => environment with
     {
-        TaggedStringConversionObserver = taggedStringConversionObserver
+        TaggedStringConversionObserver = taggedStringConversionObserver,
+        ContextualVariables = contextualVariables ?? ContextualVariableRegistry.Default
     };
 }

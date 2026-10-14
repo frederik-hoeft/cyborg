@@ -14,6 +14,47 @@ public sealed class ModuleOriginEnvironmentTests
     private static ModuleOrigin CreateOrigin(string fileName) => new(Path.Combine(Path.GetTempPath(), "cyborg-provenance-tests", fileName));
 
     [TestMethod]
+    public void ContextualRegistry_ResolvesGenericPathsWithoutChangingEnvironmentEvaluation()
+    {
+        ContextualVariableRegistry registry = ContextualVariableRegistry.Default.With(
+            new ContextualVariableRegistry.Registration("@.custom.namespace", static (_, ns) => ns));
+        DefaultRuntimeEnvironmentFactory factory = new(new(JsonNamingPolicy.SnakeCaseLower), taggedStringConversionObserver: null, contextualVariables: registry);
+        GlobalRuntimeEnvironment environment = factory.CreateGlobalEnvironment() with { Namespace = "custom" };
+        environment.SetVariable("target", "ordinary");
+        environment.SetVariable("text", "${@.custom.namespace}/${@@.custom.namespace}/${@target}");
+        environment.SetVariable("lazy", "&{@.custom.namespace}");
+        environment.SetVariable("captured", "*{@.custom.namespace}");
+
+        Assert.IsTrue(environment.TryResolveVariable("text", out string? text));
+        Assert.AreEqual("custom/custom/ordinary", text);
+        Assert.IsTrue(environment.TryResolveVariable("lazy", out string? lazy));
+        Assert.AreEqual("custom", lazy);
+        Assert.IsTrue(environment.TryResolveVariable("captured", out string? captured));
+        Assert.AreEqual("custom", captured);
+        Assert.ThrowsExactly<ArgumentException>(() => environment.SetVariable("@.custom.namespace", "spoofed"));
+    }
+
+    [TestMethod]
+    public void UnknownContextualPaths_AreUndefinedAndCannotBeWritten()
+    {
+        ModuleOrigin origin = CreateOrigin("parent.jconf");
+        GlobalRuntimeEnvironment parent = new(JsonNamingPolicy.SnakeCaseLower) { Context = new EnvironmentContext(origin) };
+        InheritedRuntimeEnvironment child = new("child", parent, IsTransient: true, parent.SyntaxFactory, "child");
+        parent.SetVariable("template", "${@.invalid}|${@@.invalid}|${@.origin.unknown}");
+        parent.SetVariable("lazy", "&{@.invalid}");
+
+        Assert.IsFalse(parent.TryResolveVariable("@.invalid", out string? _));
+        Assert.IsFalse(child.TryResolveVariable("@.invalid", out string? _));
+        Assert.IsFalse(child.TryResolveVariable("@.origin.unknown", out string? _));
+        Assert.IsTrue(child.TryResolveVariable("template", out string? text));
+        Assert.AreEqual("${@.invalid}|${@@.invalid}|${@.origin.unknown}", text);
+        Assert.ThrowsExactly<InvalidOperationException>(() => child.TryResolveVariable("lazy", out string? _));
+        Assert.ThrowsExactly<InvalidOperationException>(() => child.SetVariable("snapshot", "*{@@.invalid}"));
+        Assert.ThrowsExactly<ArgumentException>(() => child.SetVariable("@.invalid", "spoofed"));
+        Assert.ThrowsExactly<ArgumentException>(() => child.TryRemoveVariable("@.invalid"));
+    }
+
+    [TestMethod]
     public void ContextualExpressions_UseCurrentAndEntryPointBindings()
     {
         ModuleOrigin definingOrigin = CreateOrigin("definition.jconf");

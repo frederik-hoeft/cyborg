@@ -104,7 +104,7 @@ public sealed class VariableSyntaxTests
     [DataRow("&{1name}", false, "")]
     [DataRow("&{@1name}", false, "")]
     [DataRow("&{@@name}", false, "")]
-    [DataRow("&{@@.name}", false, "")]
+    [DataRow("&{@@.name}", true, "@@.name")]
     [DataRow("&{-name}", true, "-name")]
     [DataRow("&{.name}", false, "")]
     [DataRow("&{name value}", false, "")]

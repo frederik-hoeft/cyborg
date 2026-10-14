@@ -30,6 +30,8 @@ public sealed class ValueGrammarCompatibilityTests
     [DataRow("&{@}", "@")]
     [DataRow("&{@@}", "@@")]
     [DataRow("&{host.port}", "host.port")]
+    [DataRow("&{@.invalid}", "@.invalid")]
+    [DataRow("&{@@.future.property}", "@@.future.property")]
     public void Test_Parse_Indirection_ReturnsExpression(string value, string expectedExpression)
     {
         ValueSyntax expression = ValueGrammar.Instance.Parse(value);
@@ -41,6 +43,8 @@ public sealed class ValueGrammarCompatibilityTests
     [TestMethod]
     [DataRow("*{name}", "name")]
     [DataRow("*{host.port}", "host.port")]
+    [DataRow("*{@.invalid}", "@.invalid")]
+    [DataRow("*{@@.future.property}", "@@.future.property")]
     public void Test_Parse_Capture_ReturnsIdentifier(string value, string expectedExpression)
     {
         ValueSyntax expression = ValueGrammar.Instance.Parse(value);

@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Runtime.Engine.Environments.Syntax;
+using Cyborg.Core.Runtime.Engine.Environments.Syntax;
 using Cyborg.Core.Runtime.Engine.Transactions;
 using Cyborg.Core.Runtime.Engine.Transactions.Internal;
 
@@ -62,7 +62,7 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
             return true;
         }
         // Contextual paths are owned by the selected view, even when undefined.
-        if (EnvironmentContext.IsContextualName(context.Name))
+        if (ContextualVariableRegistry.IsContextualName(context.Name))
         {
             value = null;
             return false;
@@ -88,7 +88,7 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
         }
         // Contextual names are owned by the selected view, even when undefined.
         // Never fall back to an ancestor's provenance.
-        if (EnvironmentContext.IsContextualName(context.Name))
+        if (ContextualVariableRegistry.IsContextualName(context.Name))
         {
             evaluation = default;
             return false;

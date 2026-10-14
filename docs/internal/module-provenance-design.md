@@ -23,7 +23,7 @@ Independent file loads have independent converter state; no ambient `AsyncLocal`
 
 At invocation dispatch, the module's reference supplies a new `EnvironmentContext` binding to the selected runtime environment view *before* context requirements, optional configuration-child dispatch, worker preparation, and execution. A child invocation binds its own reference. Executing an already activated worker, which has no `ModuleReference`, explicitly binds an empty definition context instead of accidentally inheriting the caller's origin. Structured invocation lifecycle hooks have the module's immutable `Origin` on their lifecycle context, even for `Started` notifications that occur before worker environment binding.
 
-`EnvironmentContext` is an immutable descriptor, independent of transactional user-variable storage. It owns contextual variable resolution for bare `@` (the view namespace) and `@.origin.file` / `@.origin.directory`; future definition-stable contextual values can extend the descriptor and resolver. The names are runtime-owned, cannot be written or removed as user variables, and an undefined contextual name is **consumed** rather than allowed to fall back to a structural parent.
+`EnvironmentContext` is an immutable descriptor, independent of transactional user-variable storage. A separate immutable `ContextualVariableRegistry` maps recognized contextual names to accessors over that descriptor and the current view namespace. Bare `@` and any `@.` path belong to the contextual syntax; unregistered paths remain undefined rather than being rejected by the grammar. Additional contextual properties can be registered without modifying the environment evaluator or grammar. The names are runtime-owned, cannot be written or removed as user variables, and an undefined contextual name is **consumed** rather than allowed to fall back to a structural parent.
 
 ## Decision: capture the structural parent's view descriptor
 
@@ -60,7 +60,7 @@ For a view with no origin, `${@.origin.file}` remains an unresolved placeholder;
 ## Implementation boundaries and review checklist
 
 1. Loader and JSON converters: verify file normalization, per-load options isolation, nested/module-as-data references, and separate origins for external loads.
-2. Resolution grammar: retain existing `@` / `@@`, override addressing (`@module.property`), and normal identifier semantics; add contextual paths to interpolation and lazy indirection. Allow eager capture of the explicit origin paths without enabling arbitrary `*{@identifier}` capture.
+2. Resolution grammar: retain existing `@` / `@@`, override addressing (`@module.property`), and normal identifier semantics; add contextual paths to interpolation and lazy indirection. Allow eager capture of contextual paths without enabling ordinary `*{@identifier}` entry-point capture.
 3. Execution binding: install reference origin before module-context preparation, worker validation/preparation, execution and post-worker hooks. A direct activated-worker invocation has no implicit origin.
 4. Environment topology: snapshot contextual parent bindings upon inherited node creation/import; retain them on materialization and transaction rebinding without publishing ordinary variable bindings.
 5. Lifecycle: expose definition origin explicitly on structured lifecycle contexts because the start event intentionally precedes worker environment setup. Do not change lifecycle notification order.

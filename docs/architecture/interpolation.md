@@ -59,7 +59,7 @@ Environment inheritance, copying, and transactional forks preserve bound nodes i
 
 `SetVariable(...)` is the definition boundary.
 
-- `*{identifier}` resolves the target immediately and stores a snapshot of its type and value. The expression text is not retained. The snapshot is the reference returned by that resolution; Cyborg does not deep-clone it. A missing target fails the write. `*{@...}` is rejected.
+- `*{identifier}` resolves the target immediately and stores a snapshot of its type and value. The expression text is not retained. The snapshot is the reference returned by that resolution; Cyborg does not deep-clone it. A missing target fails the write. `*{@...}` is accepted for contextual paths, but rejects ordinary entry-point references.
 - `&{...}` is stored as an immutable lazy reference to the target and its resolution-origin semantics.
 - Other textual inputs are compiled into bound structural text after rejecting embedded unescaped `&{...}` and `*{...}`. `${...}` inside them is not evaluated yet.
 - Ordinary CLR values are stored inside terminal bound nodes, not mixed indiscriminately with internal expression objects.
