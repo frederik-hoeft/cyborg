@@ -9,9 +9,7 @@ using Cyborg.Core.Runtime.Engine.Expressions.Syntax;
 using Cyborg.Core.Text;
 using System.Collections;
 using System.Collections.Immutable;
-using System.Text;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace Cyborg.Core.Runtime.Engine.Environments;
 
@@ -189,8 +187,8 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
     internal IReadOnlyCollection<KeyValuePair<string, object?>> SnapshotStoredBindings() => [.. VariableStore];
 
     /// <summary>
-    /// Copies stored values without passing them through public value enumeration or parsing. Captured values retain their terminal marker,
-    /// and ordinary expression strings remain unevaluated in the destination environment.
+    /// Copies immutable bound values directly without using public CLR presentation or reparsing.
+    /// Captures remain terminal and lazy expressions retain their structural references.
     /// </summary>
     internal void CopyStoredVariablesTo(EnvironmentLike destination)
     {
@@ -205,6 +203,10 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         }
     }
 
+    /// <summary>
+    /// Legacy raw-CLR override selection. Without a structural result contract, captured text must be shielded for downstream string-only passes.
+    /// Generated preparation for <see cref="RuntimeEnvironment"/> instead selects bound values directly.
+    /// </summary>
     private protected bool TryGetStoredVariable<T>(string name, bool shieldInterpolation, [NotNullWhen(true)] out T? value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -304,7 +306,7 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         EnvironmentExpressionContext context = new(this, ResolutionContext.CreateRoot(this));
         BoundValue bound = syntax.Bind(context);
         object? result = s_materializer.Materialize(bound.Evaluate(context));
-        // Transitional public-CLR boundary until generated preparation can carry structural values.
+        // Legacy raw-CLR preparation cannot transport terminal metadata; the structural generated path does not use this bridge.
         return willInterpolate && result is not null ? ExpressionShield.ShieldText(result) : result;
     }
 

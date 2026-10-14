@@ -1,5 +1,13 @@
-﻿using Cyborg.Core.Runtime.Engine.Environments.Syntax;
+using Cyborg.Core.Parsing.Parsers;
+using Cyborg.Core.Parsing.SyntaxNodes;
+using Cyborg.Core.Runtime.Engine.Environments.Syntax;
+using Cyborg.Core.Runtime.Engine.Expressions.Grammars;
+using Cyborg.Core.Runtime.Engine.Expressions.Parsers;
+using Cyborg.Core.Runtime.Engine.Expressions.Syntax;
+using Cyborg.Core.Runtime.Engine.Expressions.SyntaxNodes;
+using Cyborg.Core.Runtime.Engine.Expressions.Visitors;
 using System.Text.Json;
+using ExpressionCaptureSyntax = Cyborg.Core.Runtime.Engine.Expressions.Syntax.CaptureSyntax;
 
 namespace Cyborg.Core.Tests.Syntax;
 
@@ -51,11 +59,11 @@ public sealed class VariableSyntaxTests
     [DataRow("name\0", false)]
     [DataRow("name\n", false)]
     [DataRow("name\r\n", false)]
-    public void Test_IdentifierRegex_ReturnsExpectedMatch(string value, bool expected)
+    public void Test_IdentifierGrammar_ReturnsExpectedMatch(string value, bool expected)
     {
         VariableSyntaxBuilder builder = CreateBuilder();
 
-        bool actual = builder.IdentifierRegex.IsMatch(value);
+        bool actual = builder.IsValidIdentifier(value);
 
         Assert.AreEqual(expected, actual);
     }
@@ -113,23 +121,18 @@ public sealed class VariableSyntaxTests
     [DataRow("&{\u00E4}", false, "")]
     [DataRow("&{name}\n", false, "")]
     [DataRow("&{name}\r\n", false, "")]
-    public void Test_IndirectionRegex_ReturnsExpectedMatch(string value, bool expected, string expectedExpression)
+    public void Test_IndirectionGrammar_ReturnsExpectedMatch(string value, bool expected, string expectedExpression)
     {
         Assert.IsNotNull(value);
         VariableSyntaxBuilder builder = CreateBuilder();
 
-        System.Text.RegularExpressions.Match match =
-            builder.IndirectionRegex.Match(value);
-
-        Assert.AreEqual(expected, match.Success);
-        if (!expected)
+        bool actual = TypedReferenceParser.Instance.TryParseComplete(value, out ISyntaxNode? node);
+        Assert.AreEqual(expected, actual);
+        if (expected)
         {
-            return;
+            TypedReferenceSyntax typed = Assert.IsInstanceOfType<TypedReferenceSyntax>(Assert.IsInstanceOfType<ValueNode>(node).Evaluate());
+            Assert.AreEqual(expectedExpression, typed.Reference.ToString());
         }
-
-        Assert.AreEqual(0, match.Index);
-        Assert.AreEqual(value.Length, match.Length);
-        Assert.AreEqual(expectedExpression, match.Groups["expression"].Value);
     }
 
     [TestMethod]
@@ -147,21 +150,17 @@ public sealed class VariableSyntaxTests
     [DataRow("&{name}", false, "")]
     [DataRow("*{}", false, "")]
     [DataRow("*{1name}", false, "")]
-    public void Test_CaptureRegex_ReturnsExpectedMatch(string value, bool expected, string expectedExpression)
+    public void Test_CaptureGrammar_ReturnsExpectedMatch(string value, bool expected, string expectedExpression)
     {
         VariableSyntaxBuilder builder = CreateBuilder();
 
-        System.Text.RegularExpressions.Match match = builder.CaptureRegex.Match(value);
-
-        Assert.AreEqual(expected, match.Success);
-        if (!expected)
+        bool actual = CaptureParser.Instance.TryParseComplete(value, out ISyntaxNode? node);
+        Assert.AreEqual(expected, actual);
+        if (expected)
         {
-            return;
+            ExpressionCaptureSyntax captured = Assert.IsInstanceOfType<ExpressionCaptureSyntax>(Assert.IsInstanceOfType<ValueNode>(node).Evaluate());
+            Assert.AreEqual(expectedExpression, captured.Reference.ToString());
         }
-
-        Assert.AreEqual(0, match.Index);
-        Assert.AreEqual(value.Length, match.Length);
-        Assert.AreEqual(expectedExpression, match.Groups["expression"].Value);
     }
 
     [TestMethod]
@@ -213,19 +212,12 @@ public sealed class VariableSyntaxTests
     [DataRow("${name}}", 1, "name")]
     [DataRow("{{${name}}}", 1, "name")]
     [DataRow("${\u00E4}", 0, "")]
-    public void Test_InterpolationRegex_Input_ReturnsExpectedMatches(string value, int expectedCount, string expectedExpressions)
+    public void Test_InterpolationGrammar_Input_ReturnsExpectedMatches(string value, int expectedCount, string expectedExpressions)
     {
-        VariableSyntaxBuilder builder = CreateBuilder();
+        TextValueSyntax expression = ValueGrammar.Instance.ParseText(value);
+        List<string> actualExpressions = expression.Parts.OfType<InterpolationPartSyntax>().Select(part => part.Reference.ToString()).ToList();
 
-        System.Text.RegularExpressions.MatchCollection matches = builder.InterpolationRegex.Matches(value);
-        List<string> actualExpressions = new(matches.Count);
-
-        foreach (System.Text.RegularExpressions.Match match in matches)
-        {
-            actualExpressions.Add(match.Groups["expression"].Value);
-        }
-
-        Assert.HasCount(expectedCount, matches);
+        Assert.HasCount(expectedCount, actualExpressions);
         Assert.AreEqual(expectedExpressions, string.Join("|", actualExpressions));
     }
 
@@ -243,18 +235,22 @@ public sealed class VariableSyntaxTests
     [DataRow("&{name}", 0, "")]
     [DataRow("*{name}", 0, "")]
     [DataRow("${#HOME", 0, "")]
-    public void Test_HashLiteralRegex_Input_ReturnsExpectedMatches(string value, int expectedCount, string expectedMatches)
+    public void Test_EscapedGrammar_Input_ReturnsExpectedMatches(string value, int expectedCount, string expectedMatches)
     {
-        VariableSyntaxBuilder builder = CreateBuilder();
-
-        System.Text.RegularExpressions.MatchCollection matches = builder.HashLiteralRegex.Matches(value);
-        List<string> actualMatches = new(matches.Count);
-        foreach (System.Text.RegularExpressions.Match match in matches)
+        List<string> actualMatches = [];
+        for (int offset = 0; offset < value.Length; offset++)
         {
-            actualMatches.Add($"{match.Groups["hashes"].Value}|{match.Groups["content"].Value}");
+            if (EscapedPartParser.Instance.TryParse(value, offset, out ISyntaxNode? node, out int consumed))
+            {
+                TextSyntaxCollector collector = new();
+                node.Accept(collector);
+                EscapedPartSyntax part = Assert.IsInstanceOfType<EscapedPartSyntax>(collector.Parts[0]);
+                actualMatches.Add($"{new string('#', part.EscapeDepth)}|{part.Body}");
+                offset += consumed - 1;
+            }
         }
 
-        Assert.HasCount(expectedCount, matches);
+        Assert.HasCount(expectedCount, actualMatches);
         Assert.AreEqual(expectedMatches, string.Join(";", actualMatches));
     }
 
@@ -307,11 +303,11 @@ public sealed class VariableSyntaxTests
     [DataRow("root\0", false)]
     [DataRow("root\n", false)]
     [DataRow("root\r\n", false)]
-    public void Test_NamespaceRegex_ReturnsExpectedMatch(string value, bool expected)
+    public void Test_NamespaceGrammar_ReturnsExpectedMatch(string value, bool expected)
     {
         VariableSyntaxBuilder builder = CreateBuilder();
 
-        bool actual = builder.NamespaceRegex.IsMatch(value);
+        bool actual = builder.IsValidNamespace(value);
 
         Assert.AreEqual(expected, actual);
     }

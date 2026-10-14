@@ -1,57 +1,37 @@
-﻿using System.Text;
+using Cyborg.Core.Parsing.Parsers;
+using Cyborg.Core.Parsing.SyntaxNodes;
+using Cyborg.Core.Runtime.Engine.Expressions.Parsers;
+using Cyborg.Core.Runtime.Engine.Expressions.Syntax;
+using Cyborg.Core.Runtime.Engine.Expressions.SyntaxNodes;
+using System.Text;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace Cyborg.Core.Runtime.Engine.Environments.Syntax;
 
-public sealed partial class VariableSyntaxBuilder(JsonNamingPolicy namingPolicy)
+public sealed class VariableSyntaxBuilder(JsonNamingPolicy namingPolicy)
 {
     internal JsonNamingPolicy NamingPolicy { get; } = namingPolicy ?? throw new ArgumentNullException(nameof(namingPolicy));
-
-    [GeneratedRegex(VariableGrammar.IDENTIFIER_PATTERN)]
-    internal partial Regex IdentifierRegex { get; }
-
-    [GeneratedRegex(VariableGrammar.INDIRECTION_PATTERN)]
-    internal partial Regex IndirectionRegex { get; }
-
-    [GeneratedRegex(VariableGrammar.CAPTURE_PATTERN)]
-    internal partial Regex CaptureRegex { get; }
-
-    [GeneratedRegex(VariableGrammar.INTERPOLATION_PATTERN)]
-    internal partial Regex InterpolationRegex { get; }
-
-    [GeneratedRegex(VariableGrammar.HASH_LITERAL_PATTERN)]
-    internal partial Regex HashLiteralRegex { get; }
-
-    [GeneratedRegex(VariableGrammar.ACTIVE_REFERENCE_PATTERN)]
-    internal partial Regex ActiveReferenceRegex { get; }
-
-    [GeneratedRegex(VariableGrammar.NAMESPACE_PATTERN)]
-    internal partial Regex NamespaceRegex { get; }
 
     public bool IsValidIdentifier([NotNullWhen(true)] string? identifier) =>
         identifier is not null && IsValidIdentifier(identifier.AsSpan());
 
     public bool IsValidIdentifier(ReadOnlySpan<char> identifier)
     {
-        if (identifier.IsWhiteSpace())
+        if (identifier.IsEmpty || identifier.IsWhiteSpace())
         {
             return false;
         }
-        return IdentifierRegex.IsMatch(identifier);
+        // Identifiers are the unmodified, named subset of the expression language's references.
+        // Reusing the same parser keeps validation consistent with indirection and interpolation.
+        return VariableReferenceParser.Instance.TryParseComplete(identifier.ToString(), out ISyntaxNode? node)
+            && node is VariableReferenceNode reference
+            && reference.Evaluate() is { Identifier: not null, Anchor: ReferenceAnchor.CurrentScope };
     }
 
     public bool IsValidNamespace([NotNullWhen(true)] string? ns) =>
         ns is not null && IsValidNamespace(ns.AsSpan());
 
-    public bool IsValidNamespace(ReadOnlySpan<char> ns)
-    {
-        if (ns.IsWhiteSpace())
-        {
-            return false;
-        }
-        return NamespaceRegex.IsMatch(ns);
-    }
+    public bool IsValidNamespace(ReadOnlySpan<char> ns) => IsValidIdentifier(ns);
 
     public PathSyntax Path(string? segment)
     {

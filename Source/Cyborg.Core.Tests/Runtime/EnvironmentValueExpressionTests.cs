@@ -1,4 +1,5 @@
-﻿using Cyborg.Core.Runtime;
+using Cyborg.Core.Runtime;
+using Cyborg.Core.Runtime.Engine.Expressions.Evaluated;
 using Cyborg.Core.Runtime.Engine;
 using Cyborg.Core.Runtime.Engine.Environments;
 using Cyborg.Core.Runtime.Engine.Environments.Syntax;
@@ -245,13 +246,13 @@ public sealed class EnvironmentValueExpressionTests : CyborgCoreTestBase
     });
 
     [TestMethod]
-    public Task Test_ShieldedResolvedValue_PreservesFinalizedIndirectionTextAsync() => TestWithDIAsync(services =>
+    public Task Test_StructuralTerminalCopy_PreservesFinalizedIndirectionTextAsync() => TestWithDIAsync(services =>
     {
         IRuntimeEnvironment environment = Environment(services);
+        EnvironmentLike structural = Assert.IsInstanceOfType<EnvironmentLike>(environment);
         environment.SetVariable("literal", "&{#port}");
-        Assert.IsTrue(environment.TryResolveVariable("literal", out string? finalized));
-        Assert.AreEqual("&{port}", finalized);
-        environment.SetVariable("copied", ExpressionShield.Shield(finalized));
+        Assert.IsTrue(structural.TryResolveStructuralValue("literal", out EvaluatedValue? finalized));
+        structural.SetTerminalVariable("copied", finalized);
         environment.SetVariable("port", 22);
 
         Assert.IsTrue(environment.TryResolveVariable("copied", out string? copied));
