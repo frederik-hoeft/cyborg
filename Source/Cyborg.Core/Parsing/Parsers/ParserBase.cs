@@ -1,6 +1,6 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using Cyborg.Core.Parsing.SyntaxNodes;
+﻿using Cyborg.Core.Parsing.SyntaxNodes;
 using Cyborg.Core.Parsing.Visitors;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Core.Parsing.Parsers;
 

@@ -6,7 +6,7 @@ namespace Cyborg.Core.Runtime.Engine;
 internal sealed record ModuleRuntimeServices
 (
     IModuleArtifactPublisher ArtifactPublisher,
-    IModuleContextRunner ContextRunner,
+    ModuleContextPreparer ContextPreparer,
     IModuleDispatcher Dispatcher,
     IRuntimeModuleRegistry ModuleRegistry,
     RuntimeTransactionalServices Transactional,

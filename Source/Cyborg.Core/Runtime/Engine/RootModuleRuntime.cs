@@ -43,7 +43,7 @@ internal sealed class RootModuleRuntime : ModuleRuntimeBase
         IRuntimeModuleRegistry moduleRegistry = new RuntimeModuleRegistry();
         ModuleRuntimeServices operations = new(
             new ModuleArtifactPublisher(loggerFactory),
-            new ModuleContextRunner(defaultEnvironment.SyntaxFactory, environmentFactory, loggerFactory),
+            new ModuleContextPreparer(defaultEnvironment.SyntaxFactory, environmentFactory, loggerFactory),
             new ModuleDispatcher(environmentFactory, loggerFactory),
             moduleRegistry,
             new RuntimeTransactionalServices([]),

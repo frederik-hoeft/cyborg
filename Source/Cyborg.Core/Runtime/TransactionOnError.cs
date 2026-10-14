@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Runtime;
+﻿namespace Cyborg.Core.Runtime;
 
 /// <summary>Selects how a failed or canceled invocation publishes transactional workflow data.</summary>
 public enum TransactionOnError

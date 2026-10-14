@@ -1,5 +1,5 @@
-﻿using System.Text;
-using Cyborg.Core.Parsing.Visitors;
+﻿using Cyborg.Core.Parsing.Visitors;
+using System.Text;
 
 namespace Cyborg.Core.Parsing.SyntaxNodes;
 

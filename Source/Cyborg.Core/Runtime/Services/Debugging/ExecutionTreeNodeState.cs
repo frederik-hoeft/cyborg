@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Runtime.Services.Debugging;
+﻿namespace Cyborg.Core.Runtime.Services.Debugging;
 
 /// <summary>Point-in-time state of one open logical module execution.</summary>
 public enum ExecutionTreeNodeState

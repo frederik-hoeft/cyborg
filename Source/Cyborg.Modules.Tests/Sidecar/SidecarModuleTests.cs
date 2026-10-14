@@ -430,7 +430,7 @@ public sealed class SidecarModuleTests : ModuleTestBase
 
     private sealed class SidecarProbeWorker(IWorkerContext<SidecarProbeModule> context, SidecarProbeRecorder recorder) : ModuleWorker<SidecarProbeModule>(context)
     {
-        protected override async Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
+        protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
         {
             switch (Module.Action)
             {

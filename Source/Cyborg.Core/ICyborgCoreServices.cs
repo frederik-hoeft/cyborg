@@ -99,7 +99,7 @@ public interface ICyborgCoreServices
         RuntimeTransactionalServices transactionalServices = new(transactionalServiceParticipants);
         ModuleRuntimeServices services = new(
             new ModuleArtifactPublisher(loggerFactory),
-            new ModuleContextRunner(syntaxFactory, environmentFactory, loggerFactory),
+            new ModuleContextPreparer(syntaxFactory, environmentFactory, loggerFactory),
             new ModuleDispatcher(environmentFactory, loggerFactory),
             moduleRegistry,
             transactionalServices,

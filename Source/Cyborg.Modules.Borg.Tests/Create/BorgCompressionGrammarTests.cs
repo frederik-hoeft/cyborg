@@ -1,4 +1,4 @@
-using Cyborg.Modules.Borg.Create;
+﻿using Cyborg.Modules.Borg.Create;
 using MSAssert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 
 namespace Cyborg.Modules.Borg.Tests.Create;

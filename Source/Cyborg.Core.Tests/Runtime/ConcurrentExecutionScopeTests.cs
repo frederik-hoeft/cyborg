@@ -16,6 +16,25 @@ namespace Cyborg.Core.Tests.Runtime;
 public sealed class ConcurrentExecutionScopeTests : CyborgCoreTestBase
 {
     [TestMethod]
+    public Task ExecuteAsync_SequentialInvocationsUseIndependentDisposedScopesAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        ScopeRecorder recorder = services.GetRequiredService<ScopeRecorder>();
+
+        IModuleExecutionResult first = await runtime.ExecuteAsync(CreateContext("first", ScopeProbeAction.WriteInner), TestContext.CancellationToken);
+        Assert.AreEqual(ModuleExitStatus.Success, first.Status);
+        Assert.HasCount(1, recorder.ScopedServices);
+        Assert.IsTrue(recorder.ScopedServices[0].IsDisposed);
+
+        IModuleExecutionResult second = await runtime.ExecuteAsync(CreateContext("second", ScopeProbeAction.WriteInner), TestContext.CancellationToken);
+        Assert.AreEqual(ModuleExitStatus.Success, second.Status);
+        Assert.HasCount(2, recorder.ScopedServices);
+        Assert.AreNotSame(recorder.ScopedServices[0], recorder.ScopedServices[1]);
+        Assert.IsTrue(recorder.ScopedServices[1].IsDisposed);
+        Assert.AreEqual("inner-child", RequireVariable(runtime, "inner_child"));
+    }, ConfigureProbeServices);
+
+    [TestMethod]
     public Task CloseAsync_OwnerAndChildWritesStayIsolatedUntilReconcileAsync() => TestWithDIAsync(async services =>
     {
         IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();

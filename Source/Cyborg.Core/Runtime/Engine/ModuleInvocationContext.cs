@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Runtime.Engine;
+﻿namespace Cyborg.Core.Runtime.Engine;
 
 /// <summary>
 /// Stable identity carried by every runtime view that belongs to the same logical module invocation.

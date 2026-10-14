@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Runtime.Hooks;
+﻿namespace Cyborg.Core.Runtime.Hooks;
 
 /// <summary>Observes the complete structured lifetime of runtime-owned module invocations.</summary>
 /// <remarks>

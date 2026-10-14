@@ -4,6 +4,10 @@ using Cyborg.Core.Runtime.Model;
 
 namespace Cyborg.Core.Runtime.Engine;
 
+/// <summary>
+/// Exposes invocation metadata and test-adapter worker execution without providing
+/// a callback surface for current-invocation module dispatch.
+/// </summary>
 internal interface IModuleExecutionRuntime : IModuleRuntime
 {
     ModuleInvocationContext? InvocationContext { get; }
@@ -11,14 +15,4 @@ internal interface IModuleExecutionRuntime : IModuleRuntime
     IServiceProvider? ExecutionServices { get; }
 
     Task<IModuleExecutionResult> ExecuteActivatedWorkerAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken);
-
-    Task<IModuleExecutionResult> ExecuteActivatedWorkerInCurrentScopeAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken);
-
-    Task<IModuleExecutionResult> ExecuteModuleContextInCurrentScopeAsync(ModuleContext moduleContext, IRuntimeEnvironment environment, CancellationToken cancellationToken);
-
-    Task<IModuleExecutionResult> ExecuteLoadedConfigurationInCurrentScopeAsync(ModuleConfigurationLoadResult configuration, IRuntimeEnvironment environment, CancellationToken cancellationToken);
-
-    Task<IModuleExecutionResult> ExecuteLoadedRootModuleInCurrentScopeAsync(ModuleConfigurationLoadResult configuration, IRuntimeEnvironment environment, CancellationToken cancellationToken);
-
-    Task<IModuleExecutionResult> ExecuteModuleReferenceInCurrentScopeAsync(ModuleReference moduleReference, IRuntimeEnvironment environment, CancellationToken cancellationToken);
 }

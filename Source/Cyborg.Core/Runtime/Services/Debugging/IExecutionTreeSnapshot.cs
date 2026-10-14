@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Runtime.Services.Debugging;
+﻿namespace Cyborg.Core.Runtime.Services.Debugging;
 
 /// <summary>
 /// Immutable point-in-time view of the currently open logical module executions.

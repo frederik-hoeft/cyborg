@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Runtime.Services.Transactions;
+﻿namespace Cyborg.Core.Runtime.Services.Transactions;
 
 /// <summary>Classifies a transaction participant for failure publication.</summary>
 public enum TransactionParticipantRole

@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Runtime.Services.Debugging;
+﻿namespace Cyborg.Core.Runtime.Services.Debugging;
 
 internal interface IDebugSessionStateController : IDebugSessionState
 {

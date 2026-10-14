@@ -6,11 +6,19 @@ using Microsoft.Extensions.Logging;
 
 namespace Cyborg.Core.Runtime.Engine;
 
-internal sealed class ModuleContextRunner(VariableSyntaxBuilder syntaxFactory, IRuntimeEnvironmentFactory environmentFactory, ILoggerFactory loggerFactory) : IModuleContextRunner
+/// <summary>
+/// Resolves context requirements and runs the optional configuration child invocation.
+/// The caller owns dispatch of the primary reference within the enclosing invocation.
+/// </summary>
+internal sealed class ModuleContextPreparer(VariableSyntaxBuilder syntaxFactory, IRuntimeEnvironmentFactory environmentFactory, ILoggerFactory loggerFactory)
 {
     private readonly ILogger _logger = loggerFactory.CreateLogger("cyborg.core.runtime");
 
-    public async Task<IModuleExecutionResult> ExecuteAsync(IModuleExecutionRuntime runtime, ModuleContext moduleContext, IRuntimeEnvironment environment, CancellationToken cancellationToken)
+    /// <summary>
+    /// Returns a failure result if the configuration child fails, or <see langword="null"/>
+    /// when the primary reference can be dispatched in the existing invocation.
+    /// </summary>
+    public async Task<IModuleExecutionResult?> PrepareAsync(IModuleRuntime runtime, ModuleContext moduleContext, IRuntimeEnvironment environment, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(runtime);
         ArgumentNullException.ThrowIfNull(moduleContext);
@@ -27,7 +35,7 @@ internal sealed class ModuleContextRunner(VariableSyntaxBuilder syntaxFactory, I
                 return new ModuleExecutionResult(moduleContext.Module.Definition, ModuleExitStatus.Failed, environmentFactory.CreateEnvironmentLike(environment.Namespace));
             }
         }
-        return await runtime.ExecuteModuleReferenceInCurrentScopeAsync(moduleContext.Module, environment, cancellationToken);
+        return null;
     }
 
     private void ResolveRequiredArguments(ModuleContext moduleContext, IRuntimeEnvironment environment)
