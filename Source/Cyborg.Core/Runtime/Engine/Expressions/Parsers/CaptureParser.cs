@@ -1,15 +1,15 @@
 ﻿using Cyborg.Core.Parsing.Parsers;
 using Cyborg.Core.Parsing.SyntaxNodes;
-using System.Diagnostics.CodeAnalysis;
 using Cyborg.Core.Runtime.Engine.Expressions.Syntax;
 using Cyborg.Core.Runtime.Engine.Expressions.SyntaxNodes;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Core.Runtime.Engine.Expressions.Parsers;
 
 /// <summary>Parses a complete eager capture; entry-point modifiers are reserved and rejected.</summary>
 internal sealed class CaptureParser(string? name = null) : ParserBase
 {
-    private readonly VariableReferenceParser _reference = new(allowEntryPoint: false);
+    private readonly VariableReferenceParser _reference = new();
 
     public override string? Name => name;
 
@@ -28,7 +28,7 @@ internal sealed class CaptureParser(string? name = null) : ParserBase
         int referenceOffset = offset + 2;
         if (!_reference.TryParse(input, referenceOffset, out ISyntaxNode? node, out int referenceLength)
             || node is not VariableReferenceNode reference
-            || reference.Evaluate().Identifier is null
+            || reference.Evaluate() is not { Identifier: not null, Anchor: ReferenceAnchor.CurrentScope }
             || referenceOffset + referenceLength >= input.Length
             || input[referenceOffset + referenceLength] != '}')
         {

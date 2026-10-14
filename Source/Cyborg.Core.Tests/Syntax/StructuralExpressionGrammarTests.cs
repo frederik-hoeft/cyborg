@@ -3,6 +3,7 @@ using Cyborg.Core.Parsing.SyntaxNodes;
 using Cyborg.Core.Runtime.Engine.Expressions.Grammars;
 using Cyborg.Core.Runtime.Engine.Expressions.Parsers;
 using Cyborg.Core.Runtime.Engine.Expressions.Syntax;
+using Cyborg.Core.Runtime.Engine.Expressions.SyntaxNodes;
 
 namespace Cyborg.Core.Tests.Syntax;
 
@@ -142,6 +143,51 @@ public sealed class StructuralExpressionGrammarTests
         Assert.IsNotNull(node);
         Assert.IsFalse(parser.TryParse("prefix ${host.port} suffix", 0, out _, out int rejected));
         Assert.AreEqual(0, rejected);
+    }
+
+    [TestMethod]
+    [DataRow("prefix host.9-port suffix", 7, "host.9-port", "CurrentScope", 11)]
+    [DataRow("prefix @name suffix", 7, "name", "EntryPoint", 5)]
+    [DataRow("prefix @ suffix", 7, null, "CurrentScope", 1)]
+    [DataRow("prefix @@ suffix", 7, null, "EntryPoint", 2)]
+    [DataRow("prefix @9invalid suffix", 7, null, "CurrentScope", 1)]
+    public void Test_RegexVariableReferences_HonorOffsetsAndScope(string input, int offset, string? identifier, string anchor, int expectedLength)
+    {
+        VariableReferenceParser parser = new();
+        Assert.IsTrue(parser.TryParse(input, offset, out ISyntaxNode? node, out int consumed));
+        Assert.AreEqual(expectedLength, consumed);
+        VariableReferenceSyntax reference = Assert.IsInstanceOfType<VariableReferenceNode>(node).Evaluate();
+        Assert.AreEqual(identifier, reference.Identifier);
+        Assert.AreEqual(anchor, reference.Anchor.ToString());
+    }
+
+    [TestMethod]
+    public void Test_RegexEscapes_PreserveBodiesAndHonorOffsets()
+    {
+        EscapedPartParser parser = new();
+        const string input = "prefix &{###some\nbody} suffix";
+        Assert.IsTrue(parser.TryParse(input, 7, out ISyntaxNode? node, out int consumed));
+        Assert.AreEqual("&{###some\nbody}".Length, consumed);
+        Assert.IsFalse(parser.TryParse(input, 0, out _, out int rejected));
+        Assert.AreEqual(0, rejected);
+
+        TextValueSyntax expression = ValueGrammar.Instance.ParseText(input);
+        EscapedPartSyntax escaped = Assert.IsInstanceOfType<EscapedPartSyntax>(expression.Parts[1]);
+        Assert.AreEqual('&', escaped.Operator);
+        Assert.AreEqual(3, escaped.EscapeDepth);
+        Assert.AreEqual("some\nbody", escaped.Body);
+    }
+
+    [TestMethod]
+    public void Test_RegexActiveTypedFragments_DistinguishEmptyMalformedAndEscaped()
+    {
+        ActiveTypedFragmentParser parser = new();
+        Assert.IsTrue(parser.TryParse("prefix &{} suffix", 7, out ISyntaxNode? rejectedNode, out int consumed));
+        Assert.IsInstanceOfType<RejectedTypedFragmentNode>(rejectedNode);
+        Assert.AreEqual(3, consumed);
+        Assert.IsFalse(parser.TryParse("prefix &{} suffix", 0, out _, out _));
+        Assert.IsFalse(parser.TryParse("&{#literal}", 0, out _, out _));
+        Assert.IsFalse(parser.TryParse("&{unfinished", 0, out _, out _));
     }
 
     [TestMethod]

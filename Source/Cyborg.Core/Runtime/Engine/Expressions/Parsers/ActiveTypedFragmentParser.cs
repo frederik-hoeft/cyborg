@@ -1,35 +1,23 @@
-﻿using Cyborg.Core.Parsing.Parsers;
+using Cyborg.Core.Parsing.Parsers;
 using Cyborg.Core.Parsing.SyntaxNodes;
-using System.Diagnostics.CodeAnalysis;
 using Cyborg.Core.Runtime.Engine.Expressions.SyntaxNodes;
 using Cyborg.Core.Runtime.Engine.Expressions.Visitors;
+using System.Diagnostics.CodeAnalysis;
+using System.Text.RegularExpressions;
 
 namespace Cyborg.Core.Runtime.Engine.Expressions.Parsers;
 
 /// <summary>Identifies active typed fragments so the enclosing text grammar rejects embedded or malformed typed expressions.</summary>
-internal sealed class ActiveTypedFragmentParser(string? name = null) : ParserBase<ITextSyntaxVisitor>
+internal sealed partial class ActiveTypedFragmentParser(string? name = null) : RegexParserBase<ActiveTypedFragmentParser, ITextSyntaxVisitor>(name), IRegexOwner
 {
-    public override string? Name => name;
+    [GeneratedRegex(@"\G[&*]\{(?!#)[^}]*\}")]
+    public static partial Regex ParserRegex { get; }
 
     public override IParser NamedCopy(string newName) => new ActiveTypedFragmentParser(newName);
 
-    public override bool TryParse(string input, int offset, [NotNullWhen(true)] out ISyntaxNode? syntaxNode, out int charsConsumed)
+    protected override bool TryCreateSyntaxNode(Match match, [NotNullWhen(true)] out ISyntaxNode? syntaxNode)
     {
-        ArgumentNullException.ThrowIfNull(input);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan((uint)offset, (uint)input.Length);
-        syntaxNode = null;
-        charsConsumed = 0;
-        if (offset + 2 >= input.Length || input[offset] is not ('&' or '*') || input[offset + 1] != '{' || input[offset + 2] == '#')
-        {
-            return false;
-        }
-        int closing = input.IndexOf('}', offset + 2);
-        if (closing < 0)
-        {
-            return false;
-        }
-        charsConsumed = closing + 1 - offset;
-        syntaxNode = new RejectedTypedFragmentNode(input.Substring(offset, charsConsumed));
+        syntaxNode = new RejectedTypedFragmentNode(match.Value);
         return true;
     }
 }
