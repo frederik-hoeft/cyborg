@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Configuration.Model;
+using Cyborg.Core.Configuration.Model;
 using Cyborg.Core.Runtime.Engine.Environments.Artifacts;
 using Cyborg.Core.Runtime.Engine.Environments.Syntax;
 using Cyborg.Core.Text;
@@ -17,6 +17,8 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
     internal ITaggedStringConversionObserver? TaggedStringConversionObserver { get; init; }
 
     internal EnvironmentContext Context { get; init; } = EnvironmentContext.Empty;
+
+    internal ContextualVariableRegistry ContextualVariables { get; init; } = ContextualVariableRegistry.Default;
 
     protected JsonNamingPolicy NamingPolicy => SyntaxFactory.NamingPolicy;
 
@@ -37,7 +39,7 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
             sb.Append(valueSpan[currentIndex..match.Index]);
             ReadOnlySpan<char> variableSlice = valueSpan.Slice(match.Index, match.Length);
             string expression = variableSlice[2..^1].ToString();
-            if (TryParseVariableReference(expression, out VariableReference reference) && TryResolveVariableReference(context, reference, out Evaluation resolved))
+            if (VariableReference.TryParse(expression, out VariableReference reference) && TryResolveVariableReference(context, reference, out Evaluation resolved))
             {
                 object? splice = resolved.Terminal && resolved.Value is not null
                     ? ExpressionShield.ShieldText(resolved.Value)
@@ -101,9 +103,9 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
     internal protected virtual bool TryResolveVariableInCurrentScopeCore(ResolutionContext context, out Evaluation evaluation)
     {
         ArgumentNullException.ThrowIfNull(context);
-        if (EnvironmentContext.IsContextualName(context.Name))
+        if (ContextualVariableRegistry.IsContextualName(context.Name))
         {
-            bool resolved = Context.TryResolve(context.Name, Namespace, out object? contextualValue);
+            bool resolved = ContextualVariables.TryResolve(context.Name, Context, Namespace, out object? contextualValue);
             evaluation = resolved ? Evaluation.Of(contextualValue) : default;
             return resolved;
         }
@@ -189,7 +191,7 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
     private static void EnsureWritableName(string name)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        if (EnvironmentContext.IsContextualName(name))
+        if (ContextualVariableRegistry.IsContextualName(name))
         {
             throw new ArgumentException($"Contextual variable '{name}' is runtime-owned and cannot be modified.", nameof(name));
         }
@@ -350,39 +352,6 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         return resolvedValue;
     }
 
-    private bool TryParseVariableReference(string expression, out VariableReference reference)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(expression);
-        string self = SyntaxFactory.Self();
-        if (expression.Equals(self, StringComparison.Ordinal))
-        {
-            reference = new VariableReference(self, ResolutionOrigin.CurrentScope);
-            return true;
-        }
-        if (expression.Equals(LateRefSyntax.UncheckedMakeLate(SyntaxFactory.Self()), StringComparison.Ordinal))
-        {
-            reference = new VariableReference(self, ResolutionOrigin.EntryPoint);
-            return true;
-        }
-        if (expression.StartsWith("@.origin.", StringComparison.Ordinal))
-        {
-            reference = new VariableReference(expression, ResolutionOrigin.CurrentScope);
-            return true;
-        }
-        if (expression.StartsWith("@@.", StringComparison.Ordinal))
-        {
-            reference = new VariableReference(expression[1..], ResolutionOrigin.EntryPoint);
-            return true;
-        }
-        if (expression.StartsWith(LateRefSyntax.Symbol, StringComparison.Ordinal))
-        {
-            reference = new VariableReference(expression[LateRefSyntax.Symbol.Length..], ResolutionOrigin.EntryPoint);
-            return true;
-        }
-        reference = new VariableReference(expression, ResolutionOrigin.CurrentScope);
-        return true;
-    }
-
     private bool TryEvaluateStoredText(ResolutionContext context, string text, ImmutableHashSet<string>? wrapperTags, out Evaluation evaluation)
     {
         ValueExpression expression = ValueExpressionParser.Parse(SyntaxFactory, text);
@@ -390,7 +359,7 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         {
             case ValueExpressionKind.LazyIndirection:
             {
-                if (!TryParseVariableReference(expression.Expression, out VariableReference reference)
+                if (!VariableReference.TryParse(expression.Expression, out VariableReference reference)
                     || !TryResolveVariableReference(context, reference, out Evaluation target)
                     || target.Value is null)
                 {
@@ -444,9 +413,9 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         }
 
         object? snapshot;
-        if (expression.Expression.StartsWith('@'))
+        if (ContextualVariableSyntax.IsContextualExpression(expression.Expression))
         {
-            if (!TryParseVariableReference(expression.Expression, out VariableReference reference)
+            if (!VariableReference.TryParse(expression.Expression, out VariableReference reference)
                 || !TryResolveVariableReference(ResolutionContext.CreateRoot(this), reference, out Evaluation captured))
             {
                 throw new InvalidOperationException($"Failed to capture '*{{{expression.Expression}}}' because '{expression.Expression}' is not defined.");
@@ -495,7 +464,7 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
             return Evaluation.Of(prepared);
         }
 
-        if (!TryParseVariableReference(expression.Expression, out VariableReference reference)
+        if (!VariableReference.TryParse(expression.Expression, out VariableReference reference)
             || !TryResolveVariableReference(ResolutionContext.CreateRoot(this), reference, out Evaluation target)
             || target.Value is null)
         {
@@ -554,7 +523,15 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         public Evaluation WithValue(object? value) => new(value, Terminal);
     }
 
-    protected readonly record struct VariableReference(string Name, ResolutionOrigin Origin);
+    protected readonly record struct VariableReference(string Name, ResolutionOrigin Origin)
+    {
+        public static bool TryParse(string expression, out VariableReference reference)
+        {
+            (string name, bool entryPoint) = ContextualVariableSyntax.ParseReference(expression);
+            reference = new VariableReference(name, entryPoint ? ResolutionOrigin.EntryPoint : ResolutionOrigin.CurrentScope);
+            return true;
+        }
+    }
 
     internal protected enum ResolutionOrigin
     {

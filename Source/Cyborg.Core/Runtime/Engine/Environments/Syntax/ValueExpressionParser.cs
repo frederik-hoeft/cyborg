@@ -1,4 +1,4 @@
-﻿using System.Text.RegularExpressions;
+using System.Text.RegularExpressions;
 
 namespace Cyborg.Core.Runtime.Engine.Environments.Syntax;
 
@@ -40,12 +40,12 @@ internal static class ValueExpressionParser
         if (text[0] == '*' && body.StartsWith('@'))
         {
             throw new FormatException(
-                $"Eager capture '{text}' is invalid. Only the explicit current/entry-point origin paths may use '@' in '*{{...}}'.");
+                $"Eager capture '{text}' is invalid. Only current/entry-point contextual paths may use '@' in '*{{...}}'.");
         }
 
         throw new FormatException(
             text[0] == '&'
                 ? $"Lazy indirection '{text}' is invalid. The reference must be an identifier, '@identifier', '@', or '@@'."
-                : $"Eager capture '{text}' is invalid. The reference must be an identifier or a contextual origin path.");
+                : $"Eager capture '{text}' is invalid. The reference must be an identifier or a contextual path.");
     }
 }

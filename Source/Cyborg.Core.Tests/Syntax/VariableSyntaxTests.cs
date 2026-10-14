@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Runtime.Engine.Environments.Syntax;
+using Cyborg.Core.Runtime.Engine.Environments.Syntax;
 using System.Text.Json;
 
 namespace Cyborg.Core.Tests.Syntax;
@@ -96,7 +96,8 @@ public sealed class VariableSyntaxTests
     [DataRow("&{1name}", false, "")]
     [DataRow("&{@1name}", false, "")]
     [DataRow("&{@@name}", false, "")]
-    [DataRow("&{@@.name}", false, "")]
+    [DataRow("&{@@.name}", true, "@@.name")]
+    [DataRow("&{@.unknown}", true, "@.unknown")]
     [DataRow("&{-name}", true, "-name")]
     [DataRow("&{.name}", false, "")]
     [DataRow("&{name value}", false, "")]
@@ -135,6 +136,8 @@ public sealed class VariableSyntaxTests
     [TestMethod]
     [DataRow("*{name}", true, "name")]
     [DataRow("*{host.port}", true, "host.port")]
+    [DataRow("*{@.unknown}", true, "@.unknown")]
+    [DataRow("*{@@.unknown}", true, "@@.unknown")]
     [DataRow("*{a-b.c_0}", true, "a-b.c_0")]
     [DataRow("*{-}", true, "-")]
     [DataRow("*{@name}", false, "")]

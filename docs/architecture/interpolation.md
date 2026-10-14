@@ -23,13 +23,15 @@ Key grammar is not value grammar. Override addresses and other keys continue to 
 | `&{@.origin.file}` / `&{@@.origin.file}` | Lazy typed references to the current or entry-point origin; the `directory` property works likewise. |
 | `*{@.origin.file}` / `*{@@.origin.file}` | Eagerly capture the current or entry-point defining file; the `directory` property works likewise. |
 
-`&{...}` and `*{...}` are valid only when they are the entire value. Eager capture permits the explicit origin paths, but other `*{@...}` expressions remain invalid. `${@}` and `${@@}` remain string interpolation, including inside larger text.
+`&{...}` and `*{...}` are valid only when they are the entire value. Eager capture permits contextual `@.path` / `@@.path` references, but ordinary entry-point references such as `*{@identifier}` remain invalid. `${@}` and `${@@}` remain string interpolation, including inside larger text.
 
 Unresolved `${...}` placeholders remain unchanged. Undefined targets of `&{...}` and `*{...}` fail with `InvalidOperationException`. Cyclic references fail with `InvalidOperationException`. A value whose CLR type is not the requested type fails with `InvalidCastException`.
 
 ### Definition-site contextual variables
 
 A file-backed `ModuleReference` carries an immutable, absolute definition-file origin. `@.origin.file` and `@.origin.directory` resolve through the **current structural environment view**; their `@@` variants use the original resolution entry-point view. A module executing in a named environment uses its own origin in its current view even if the named environment was created elsewhere. A lazy value inherited from a parent is evaluated in the parent's captured view, which can have a different origin. Existing bare `@` and `@@` namespace references follow the same current-versus-entry-point distinction.
+
+The contextual namespace consists of bare `@` and paths beginning with `@.`. A registry dispatches recognized names to runtime-owned accessors; the grammar does not enumerate registered properties. An unregistered path such as `@.invalid` is syntactically valid but undefined, including when an inherited parent has contextual metadata. `@identifier` remains a separate entry-point variable reference and is **not** routed through the contextual registry.
 
 These names are runtime-owned contextual properties, not environment variable bindings or module-property override keys. They cannot be set or removed through `SetVariable` / `TryRemoveVariable` and are not published through transaction joins. An originless reference, including one constructed in code without origin metadata, leaves both properties undefined; resolution never falls back to an ancestor's origin. As with ordinary undefined variables, interpolation retains the placeholder while typed indirection and eager capture fail. Capture freezes the path value at assignment time; ordinary `${...}` and `&{...}` values remain late-bound.
 
@@ -53,7 +55,7 @@ A `#` immediately after `${`, `&{`, or `*{` marks a final-phase literal. Each ev
 
 `SetVariable(...)` is the definition boundary.
 
-- `*{identifier}` resolves the target immediately and stores a snapshot of its type and value. The expression text is not retained. The snapshot is the reference returned by that resolution; Cyborg does not deep-clone it. A missing target fails the write. `*{@...}` is rejected.
+- `*{identifier}` resolves the target immediately and stores a snapshot of its type and value. The expression text is not retained. The snapshot is the reference returned by that resolution; Cyborg does not deep-clone it. A missing target fails the write. Contextual capture (`*{@.path}` and `*{@@.path}`) is permitted; ordinary entry-point capture (`*{@identifier}`) remains invalid.
 - `&{...}` is stored unchanged. It is an opaque reference.
 - Other strings are stored unchanged after rejecting embedded unescaped `&{...}` and `*{...}`. `${...}` inside them is not evaluated yet.
 

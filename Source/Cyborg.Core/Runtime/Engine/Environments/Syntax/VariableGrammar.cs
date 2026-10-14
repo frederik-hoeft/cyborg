@@ -1,4 +1,4 @@
-﻿namespace Cyborg.Core.Runtime.Engine.Environments.Syntax;
+namespace Cyborg.Core.Runtime.Engine.Environments.Syntax;
 
 /// <summary>
 /// Defines the grammar for variable identifiers, namespaces, and value expressions used in the environment.
@@ -25,8 +25,9 @@ internal static class VariableGrammar
     public const string NAMESPACE_PATTERN = $@"\A{IDENTIFIER}\z";
 
     [StringSyntax(StringSyntaxAttribute.Regex)]
-    // @@ late self, @ self, @identifier entry-point reference, or identifier current-scope reference
-    public const string EXPRESSION_PATTERN = $@"@@(?:\.origin\.(?:file|directory))?|@(?:\.origin\.(?:file|directory)|{IDENTIFIER})?|{IDENTIFIER}";
+    // @@ or @@.path resolves at the entry point; @ or @.path resolves in the current view.
+    // @identifier remains an entry-point variable reference, distinct from contextual paths.
+    public const string EXPRESSION_PATTERN = $@"@@(?:\.{IDENTIFIER})?|@(?:\.{IDENTIFIER}|{IDENTIFIER})?|{IDENTIFIER}";
 
     [StringSyntax(StringSyntaxAttribute.Regex)]
     public const string INTERPOLATION_PATTERN = $@"\$\{{(?<expression>{EXPRESSION_PATTERN})\}}";
@@ -35,7 +36,7 @@ internal static class VariableGrammar
     public const string INDIRECTION_PATTERN = $@"\A&\{{(?<expression>{EXPRESSION_PATTERN})\}}\z";
 
     [StringSyntax(StringSyntaxAttribute.Regex)]
-    public const string CAPTURE_PATTERN = $@"\A\*\{{(?<expression>{IDENTIFIER}|@{{1,2}}\.origin\.(?:file|directory))\}}\z";
+    public const string CAPTURE_PATTERN = $@"\A\*\{{(?<expression>{IDENTIFIER}|@{{1,2}}\.{IDENTIFIER})\}}\z";
 
     [StringSyntax(StringSyntaxAttribute.Regex)]
     // one or more hashes escape a single evaluation pass for interpolation, indirection, or capture

@@ -32,6 +32,8 @@ public sealed class ValueExpressionParserTests
     [DataRow("&{@}", "@")]
     [DataRow("&{@@}", "@@")]
     [DataRow("&{host.port}", "host.port")]
+    [DataRow("&{@.invalid}", "@.invalid")]
+    [DataRow("&{@@.future.property}", "@@.future.property")]
     public void Test_Parse_Indirection_ReturnsExpression(string value, string expectedExpression)
     {
         ValueExpression expression = ValueExpressionParser.Parse(CreateBuilder(), value);
@@ -43,6 +45,8 @@ public sealed class ValueExpressionParserTests
     [TestMethod]
     [DataRow("*{name}", "name")]
     [DataRow("*{host.port}", "host.port")]
+    [DataRow("*{@.invalid}", "@.invalid")]
+    [DataRow("*{@@.future.property}", "@@.future.property")]
     public void Test_Parse_Capture_ReturnsIdentifier(string value, string expectedExpression)
     {
         ValueExpression expression = ValueExpressionParser.Parse(CreateBuilder(), value);
