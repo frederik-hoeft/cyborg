@@ -8,7 +8,6 @@ using Cyborg.Core.Runtime.Engine.Expressions.Grammars;
 using Cyborg.Core.Runtime.Engine.Expressions.Syntax;
 using Cyborg.Core.Text;
 using System.Collections;
-using System.Collections.Immutable;
 using System.Text.Json;
 
 namespace Cyborg.Core.Runtime.Engine.Environments;
@@ -203,34 +202,6 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         }
     }
 
-    /// <summary>
-    /// Legacy raw-CLR override selection. Without a structural result contract, captured text must be shielded for downstream string-only passes.
-    /// Generated preparation for <see cref="RuntimeEnvironment"/> instead selects bound values directly.
-    /// </summary>
-    private protected bool TryGetStoredVariable<T>(string name, bool shieldInterpolation, [NotNullWhen(true)] out T? value)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        if (TryGetStoredVariableRecursiveCore(name, out object? stored) && stored is BoundValue bound)
-        {
-            object? presented = bound.PresentStoredValue();
-            bool terminal = bound is BoundCapture or BoundWithTags { Inner: BoundCapture };
-            if (terminal && presented is not null)
-            {
-                presented = shieldInterpolation ? ExpressionShield.ShieldText(presented) : ExpressionShield.ShieldValueExpressions(presented);
-            }
-            if (TryConvertResolvedValue(presented, name, notifyImplicitConversion: true, out value))
-            {
-                return true;
-            }
-            if (presented is not null)
-            {
-                throw new InvalidCastException($"Attempted to select stored variable '{name}' as type {typeof(T).FullName}, but it is of type {presented.GetType().FullName}.");
-            }
-        }
-        value = default;
-        return false;
-    }
-
     private protected bool TryResolveEvaluation(string name, EnvironmentLike entryPoint, out Evaluation evaluation)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -273,41 +244,6 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         }
         value = default;
         return false;
-    }
-
-    private protected string ResolveValueExpressionCore(string value, bool willInterpolate)
-    {
-        object? result = ResolveStandaloneTypedValue(value, tags: null, willInterpolate);
-        if (TryConvertResolvedValue(result, "value expression", notifyImplicitConversion: true, out string? resolved))
-        {
-            return resolved;
-        }
-        throw new InvalidCastException($"Value expression '{value}' did not resolve to {typeof(string).FullName}.");
-    }
-
-    private protected TaggedString ResolveValueExpressionCore(TaggedString value, bool willInterpolate)
-    {
-        object? result = ResolveStandaloneTypedValue(value.Value, value.Tags, willInterpolate);
-        if (!TryConvertResolvedValue(result, "value expression", notifyImplicitConversion: true, out TaggedString resolved))
-        {
-            throw new InvalidCastException($"Value expression '{value.Value}' did not resolve to {typeof(TaggedString).FullName}.");
-        }
-        return resolved;
-    }
-
-    private object? ResolveStandaloneTypedValue(string text, ImmutableHashSet<string>? tags, bool willInterpolate)
-    {
-        ValueSyntax syntax = tags is null ? ValueGrammar.Instance.Parse(text) : ValueGrammar.Instance.Parse(new TaggedString(text, tags));
-        if (syntax is TextValueSyntax || syntax is TaggedValueSyntax { Inner: TextValueSyntax })
-        {
-            // Text stays untouched for the subsequent generated interpolation phase.
-            return tags is null ? text : new TaggedString(text, tags);
-        }
-        EnvironmentExpressionContext context = new(this, ResolutionContext.CreateRoot(this));
-        BoundValue bound = syntax.Bind(context);
-        object? result = s_materializer.Materialize(bound.Evaluate(context));
-        // Legacy raw-CLR preparation cannot transport terminal metadata; the structural generated path does not use this bridge.
-        return willInterpolate && result is not null ? ExpressionShield.ShieldText(result) : result;
     }
 
     /// <summary>

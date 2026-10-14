@@ -21,8 +21,6 @@ Generated validation retains its established ordering: defaults, overrides, defa
 
 The environment exposes explicit `Interpolate(string)` as a fresh textual input boundary; worker-controlled interpolation intentionally starts another pass. Neither that API nor public enumeration is a reason to reparse a bound internal expression.
 
-## Legacy CLR compatibility boundary
+## Generated preparation boundary
 
-`IRuntimeEnvironment` retains internal raw-string selection and value-expression methods for compatible implementations that do not expose Cyborg's structural environment store. These signatures can carry only CLR strings, not terminality metadata. They therefore still use a limited `ExpressionShield` bridge for captured textual values passed to additional legacy preparation stages. Normal generated preparation against `RuntimeEnvironment` bypasses these APIs and retains structural state.
-
-Eliminating the last bridge requires a separate compatibility decision about the raw-string interface contract and custom `IRuntimeEnvironment` implementations. Silently deleting escape protection from those legacy methods would make captured syntax active again and change behavior. This limitation is deliberately explicit rather than hidden behind a new textual expression model.
+Generated validation uses `ModuleValidationContext` to translate ordinary CLR module properties into per-invocation structural preparation state. The supported runtime environment implementations share the `RuntimeEnvironment` storage model, so the context requires that representation rather than falling back to older raw-string APIs. Textual overrides remain selected independently of evaluation, and their bound values are retained across record rewrites without adding escape characters. Public `Interpolate(string)` remains a separate, explicit textual input boundary.

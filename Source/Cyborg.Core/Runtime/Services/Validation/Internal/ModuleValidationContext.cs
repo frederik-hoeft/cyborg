@@ -24,7 +24,8 @@ public sealed class ModuleValidationContext
 
     private StructuralModulePreparation? _expressions;
 
-    private StructuralModulePreparation? Expressions => _expressions ??= Runtime.Environment is RuntimeEnvironment environment ? new StructuralModulePreparation(environment) : null;
+    private StructuralModulePreparation Expressions => _expressions ??= new StructuralModulePreparation(
+        Runtime.Environment as RuntimeEnvironment ?? throw new InvalidOperationException("Generated module preparation requires a Cyborg runtime environment."));
 
     private ITaggedStringRenderer TaggedStringRenderer => field ??= ServiceProvider.GetRequiredService<ITaggedStringRenderer>();
 
@@ -38,34 +39,34 @@ public sealed class ModuleValidationContext
     public static ModuleValidationContext Create(IModuleRuntime runtime, IServiceProvider serviceProvider) => new(runtime, serviceProvider);
 
     public TaggedString Interpolate(string value, string preparationKey) =>
-        Expressions?.Interpolate(value, preparationKey) ?? Runtime.Environment.Interpolate(value);
+        Expressions.Interpolate(value, preparationKey);
 
     public TaggedString Interpolate(TaggedString value, string preparationKey) =>
-        Expressions?.Interpolate(value, preparationKey) ?? Runtime.Environment.Interpolate(value);
+        Expressions.Interpolate(value, preparationKey);
 
     public TaggedString Interpolate(TaggedString? value, string preparationKey) =>
         value is { } tagged ? Interpolate(tagged, preparationKey) : default;
 
     public string ResolveValueExpression(string value, bool willInterpolate, string preparationKey)
     {
-        object? prepared = Expressions?.ResolveValueExpression(value, willInterpolate, preparationKey)
-            ?? Runtime.Environment.ResolveValueExpression(value, willInterpolate);
+        object? prepared = Expressions.ResolveValueExpression(value, willInterpolate, preparationKey);
         return prepared switch
         {
             string text => text,
             TaggedString tagged => tagged.Value,
+            null => throw new InvalidCastException("Value expression resolved to null instead of string."),
             _ => throw new InvalidCastException($"Value expression resolved to '{prepared.GetType().FullName}' instead of string.")
         };
     }
 
     public TaggedString ResolveValueExpression(TaggedString value, bool willInterpolate, string preparationKey)
     {
-        object? prepared = Expressions?.ResolveValueExpression(value, willInterpolate, preparationKey)
-            ?? Runtime.Environment.ResolveValueExpression(value, willInterpolate);
+        object? prepared = Expressions.ResolveValueExpression(value, willInterpolate, preparationKey);
         return prepared switch
         {
             TaggedString tagged => tagged,
             string text => new TaggedString(text),
+            null => throw new InvalidCastException("Value expression resolved to null instead of TaggedString."),
             _ => throw new InvalidCastException($"Value expression resolved to '{prepared.GetType().FullName}' instead of TaggedString.")
         };
     }
@@ -80,67 +81,55 @@ public sealed class ModuleValidationContext
     public string? Render(TaggedString? value) => value is { } tagged ? Render(tagged) : null;
 
     [return: NotNullIfNotNull(nameof(value))]
-    public string? SelectRawStringOverride<TModule>(TModule module, string? value, string moduleExpression, string valueExpression, bool shieldInterpolation, string preparationKey)
+    public string? SelectRawStringOverride<TModule>(TModule module, string? value, string moduleExpression, string valueExpression, string preparationKey)
         where TModule : ModuleBase, IModuleDefinition
     {
-        if (Expressions is { } expressions)
+        if (!Expressions.TrySelectOverride(module, moduleExpression, valueExpression, preparationKey, out object? selected))
         {
-            if (!expressions.TrySelectOverride(module, moduleExpression, valueExpression, preparationKey, out object? selected))
-            {
-                return value;
-            }
-            return selected switch
-            {
-                string text => text,
-                TaggedString tagged => tagged.Value,
-                _ => throw new InvalidCastException($"Selected override is not a string for '{preparationKey}'.")
-            };
+            return value;
         }
-        return Runtime.Environment.SelectRawStringOverride(module, value, moduleExpression, valueExpression, shieldInterpolation);
+        return selected switch
+        {
+            string text => text,
+            TaggedString tagged => tagged.Value,
+            _ => throw new InvalidCastException($"Selected override is not a string for '{preparationKey}'.")
+        };
     }
 
-    public TaggedString SelectRawTaggedStringOverride<TModule>(TModule module, TaggedString value, string moduleExpression, string valueExpression, bool shieldInterpolation, string preparationKey)
+    public TaggedString SelectRawTaggedStringOverride<TModule>(TModule module, TaggedString value, string moduleExpression, string valueExpression, string preparationKey)
         where TModule : ModuleBase, IModuleDefinition
     {
-        if (Expressions is { } expressions)
+        if (!Expressions.TrySelectOverride(module, moduleExpression, valueExpression, preparationKey, out object? selected))
         {
-            if (!expressions.TrySelectOverride(module, moduleExpression, valueExpression, preparationKey, out object? selected))
-            {
-                return value;
-            }
-            return selected switch
-            {
-                TaggedString tagged => tagged,
-                string text => new TaggedString(text),
-                _ => throw new InvalidCastException($"Selected override is not textual for '{preparationKey}'.")
-            };
+            return value;
         }
-        return Runtime.Environment.SelectRawTaggedStringOverride(module, value, moduleExpression, valueExpression, shieldInterpolation);
+        return selected switch
+        {
+            TaggedString tagged => tagged,
+            string text => new TaggedString(text),
+            _ => throw new InvalidCastException($"Selected override is not textual for '{preparationKey}'.")
+        };
     }
 
     [return: NotNullIfNotNull(nameof(value))]
-    public TaggedString? SelectRawTaggedStringOverride<TModule>(TModule module, TaggedString? value, string moduleExpression, string valueExpression, bool shieldInterpolation, string preparationKey)
+    public TaggedString? SelectRawTaggedStringOverride<TModule>(TModule module, TaggedString? value, string moduleExpression, string valueExpression, string preparationKey)
         where TModule : ModuleBase, IModuleDefinition =>
-        value is { } tagged ? SelectRawTaggedStringOverride(module, tagged, moduleExpression, valueExpression, shieldInterpolation, preparationKey)
-        : SelectNullableTaggedOverride(module, moduleExpression, valueExpression, shieldInterpolation, preparationKey);
+        value is { } tagged ? SelectRawTaggedStringOverride(module, tagged, moduleExpression, valueExpression, preparationKey)
+        : SelectNullableTaggedOverride(module, moduleExpression, valueExpression, preparationKey);
 
-    private TaggedString? SelectNullableTaggedOverride<TModule>(TModule module, string moduleExpression, string valueExpression, bool shieldInterpolation, string preparationKey)
+    private TaggedString? SelectNullableTaggedOverride<TModule>(TModule module, string moduleExpression, string valueExpression, string preparationKey)
         where TModule : ModuleBase, IModuleDefinition
     {
-        if (Expressions is { } expressions)
+        if (!Expressions.TrySelectOverride(module, moduleExpression, valueExpression, preparationKey, out object? selected))
         {
-            if (!expressions.TrySelectOverride(module, moduleExpression, valueExpression, preparationKey, out object? selected))
-            {
-                return null;
-            }
-            return selected switch
-            {
-                TaggedString tagged => tagged,
-                string text => new TaggedString(text),
-                _ => throw new InvalidCastException($"Selected override is not textual for '{preparationKey}'.")
-            };
+            return null;
         }
-        return Runtime.Environment.SelectRawTaggedStringOverride(module, (TaggedString?)null, moduleExpression, valueExpression, shieldInterpolation);
+        return selected switch
+        {
+            TaggedString tagged => tagged,
+            string text => new TaggedString(text),
+            _ => throw new InvalidCastException($"Selected override is not textual for '{preparationKey}'.")
+        };
     }
 
     [return: NotNullIfNotNull(nameof(value))]

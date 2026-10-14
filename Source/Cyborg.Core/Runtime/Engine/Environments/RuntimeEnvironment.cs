@@ -26,15 +26,6 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         string valueExpression) =>
         TryResolveCollectionCore(this, module, value, moduleExpression, valueExpression, out IReadOnlyCollection<T>? selected) ? selected : value;
 
-    string IRuntimeEnvironment.ResolveValueExpression(string value, bool willInterpolate) =>
-        ResolveValueExpressionCore(value, willInterpolate);
-
-    TaggedString IRuntimeEnvironment.ResolveValueExpression(TaggedString value, bool willInterpolate) =>
-        ResolveValueExpressionCore(value, willInterpolate);
-
-    TaggedString? IRuntimeEnvironment.ResolveValueExpression(TaggedString? value, bool willInterpolate) =>
-        value is { } tagged ? ResolveValueExpressionCore(tagged, willInterpolate) : null;
-
     /// <summary>
     /// Selects collection overrides in structural view order, retaining the original resolution entry point.
     /// Each candidate is resolved recursively, so a candidate may also be found in an inherited store.
@@ -152,74 +143,6 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         }
 
         resolvedValue = default;
-        return false;
-    }
-
-    [return: NotNullIfNotNull(nameof(value))]
-    string? IRuntimeEnvironment.SelectRawStringOverride<TModule>(TModule module, string? value, string moduleExpression, string valueExpression, bool shieldInterpolation) =>
-        TrySelectRawStringOverrideCore(this, module, moduleExpression, valueExpression, shieldInterpolation, out string? selectedValue) ? selectedValue : value;
-
-    TaggedString IRuntimeEnvironment.SelectRawTaggedStringOverride<TModule>(TModule module, TaggedString value, string moduleExpression, string valueExpression, bool shieldInterpolation) =>
-        TrySelectRawTaggedStringOverrideCore(this, module, moduleExpression, valueExpression, shieldInterpolation, out TaggedString selectedValue) ? selectedValue : value;
-
-    [return: NotNullIfNotNull(nameof(value))]
-    TaggedString? IRuntimeEnvironment.SelectRawTaggedStringOverride<TModule>(TModule module, TaggedString? value, string moduleExpression, string valueExpression, bool shieldInterpolation) =>
-        TrySelectRawTaggedStringOverrideCore(this, module, moduleExpression, valueExpression, shieldInterpolation, out TaggedString selectedValue) ? selectedValue : value;
-
-    internal protected virtual bool TrySelectRawStringOverrideCore<TModule>(
-        EnvironmentLike entryPoint,
-        TModule module,
-        string? moduleExpression,
-        string? valueExpression,
-        bool shieldInterpolation,
-        [NotNullWhen(true)] out string? value)
-        where TModule : ModuleBase, IModuleDefinition
-    {
-        ArgumentNullException.ThrowIfNull(entryPoint);
-        return TrySelectRawOverrideCore(module, moduleExpression, valueExpression, shieldInterpolation, out value);
-    }
-
-    internal protected virtual bool TrySelectRawTaggedStringOverrideCore<TModule>(
-        EnvironmentLike entryPoint,
-        TModule module,
-        string? moduleExpression,
-        string? valueExpression,
-        bool shieldInterpolation,
-        out TaggedString value)
-        where TModule : ModuleBase, IModuleDefinition
-    {
-        ArgumentNullException.ThrowIfNull(entryPoint);
-        return TrySelectRawOverrideCore(module, moduleExpression, valueExpression, shieldInterpolation, out value);
-    }
-
-    /// <summary>
-    /// Selects a stored textual override without evaluating it. This intentionally uses raw storage
-    /// lookup rather than the typed/evaluated override path, including for tagged strings.
-    /// </summary>
-    private bool TrySelectRawOverrideCore<TModule, T>(
-        TModule module,
-        string? moduleExpression,
-        string? valueExpression,
-        bool shieldInterpolation,
-        [NotNullWhen(true)] out T? value)
-        where TModule : ModuleBase, IModuleDefinition
-    {
-        ArgumentNullException.ThrowIfNull(module);
-        string valuePath = ConstructValueResolutionPath<T>(value: default, moduleExpression, valueExpression);
-
-        foreach (RuntimeEnvironment scope in EnumerateOverrideScopes())
-        {
-            foreach (string identifier in scope.EnumerateOverrideIdentifiers(module.Name, module.Group, TModule.ModuleId))
-            {
-                string overridePath = scope.SyntaxFactory.Path(identifier, valuePath).Override();
-                if (scope.TryGetStoredVariable(overridePath, shieldInterpolation, out value))
-                {
-                    return true;
-                }
-            }
-        }
-
-        value = default;
         return false;
     }
 

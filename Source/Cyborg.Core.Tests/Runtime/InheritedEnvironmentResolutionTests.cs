@@ -1,5 +1,8 @@
-﻿using Cyborg.Core.Runtime;
+using Cyborg.Core.Runtime;
 using Cyborg.Core.Runtime.Engine.Environments;
+using Cyborg.Core.Runtime.Engine.Expressions;
+using Cyborg.Core.Runtime.Engine.Expressions.Bound;
+using Cyborg.Core.Runtime.Engine.Expressions.Evaluated;
 using Cyborg.Core.Text;
 using System.Text.Json;
 
@@ -59,7 +62,7 @@ public sealed class InheritedEnvironmentResolutionTests
     }
 
     [TestMethod]
-    public void RawTaggedOverride_FromAncestorRetainsTemplateAndTags()
+    public void StructuralOverride_FromAncestorRetainsTemplateAndTags()
     {
         GlobalRuntimeEnvironment root = CreateRoot();
         InheritedRuntimeEnvironment middle = Inherit(root, "middle");
@@ -68,10 +71,16 @@ public sealed class InheritedEnvironmentResolutionTests
         root.SetVariable("value", "resolved");
         root.SetVariable("@probe.value", new TaggedString("before ${value}", ["secret"]));
 
-        TaggedString actual = ((IRuntimeEnvironment)child).SelectRawTaggedStringOverride(module, new TaggedString("configured"), nameof(module), "module.Value", shieldInterpolation: false);
+        Assert.IsTrue(child.TrySelectBoundOverride(module, nameof(module), "module.Value", out BoundValue? selected));
+        TaggedString stored = (TaggedString)selected.PresentStoredValue()!;
+        Assert.AreEqual("before ${value}", stored.Value);
+        Assert.IsTrue(stored.Tags.Contains("secret"));
 
-        Assert.AreEqual("before ${value}", actual.Value);
-        Assert.IsTrue(actual.Tags.Contains("secret"));
+        object? materialized = new ExpressionMaterializer().Materialize(child.EvaluateStructuralValue(selected));
+        Assert.IsInstanceOfType<TaggedString>(materialized);
+        TaggedString resolved = (TaggedString)materialized;
+        Assert.AreEqual("before resolved", resolved.Value);
+        Assert.IsTrue(resolved.Tags.Contains("secret"));
     }
 
     [TestMethod]
@@ -107,7 +116,7 @@ public sealed class InheritedEnvironmentResolutionTests
     }
 
     [TestMethod]
-    public void RawStringOverride_CapturedValueShieldsInterpolationOnlyWhenRequested()
+    public void StructuralOverride_CapturedValueRemainsTerminalWithoutShielding()
     {
         GlobalRuntimeEnvironment root = CreateRoot();
         InheritedRuntimeEnvironment child = Inherit(root, "child");
@@ -116,11 +125,11 @@ public sealed class InheritedEnvironmentResolutionTests
         root.SetVariable("source", "${#HOME}");
         root.SetVariable("@probe.value", "*{source}");
 
-        string? raw = ((IRuntimeEnvironment)child).SelectRawStringOverride(module, "fallback", nameof(module), "module.Value", shieldInterpolation: false);
-        string? shielded = ((IRuntimeEnvironment)child).SelectRawStringOverride(module, "fallback", nameof(module), "module.Value", shieldInterpolation: true);
-
-        Assert.AreEqual("${HOME}", raw);
-        Assert.AreEqual("${#HOME}", shielded);
+        Assert.IsTrue(child.TrySelectBoundOverride(module, nameof(module), "module.Value", out BoundValue? selected));
+        Assert.AreEqual("${HOME}", selected.PresentStoredValue());
+        object? materialized = new ExpressionMaterializer().Materialize(child.EvaluateStructuralValue(selected));
+        Assert.AreEqual("${HOME}", materialized);
+        Assert.AreEqual("${HOME}", child.Resolve(module, module.Value));
     }
 
     [TestMethod]

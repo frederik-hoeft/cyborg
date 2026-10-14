@@ -151,13 +151,10 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
     private string CreateOverrideResolutionExpression(PropertyRewriteContext context, string rootPathExpression)
     {
         string arguments = $"{context.ModuleVariable}, {context.PropertyAccessExpression}, moduleExpression: \"{context.ModuleVariable}\", valueExpression: \"{rootPathExpression}\"";
-        bool isTextual = context.Property.Symbol.Type.EqualsIgnoreNullability(SpecialType.System_String)
-            || context.Property.Symbol.Type.EqualsIgnoreNullability(ContractInfo.TaggedString);
-        string shieldInterpolation = isTextual && !context.Property.HasAspect<IgnoreInterpolationAspect>() ? "true" : "false";
         string expression = context.Property.Symbol.Type.EqualsIgnoreNullability(SpecialType.System_String)
-            ? $"{ContextVariable}.SelectRawStringOverride({arguments}, shieldInterpolation: {shieldInterpolation}, preparationKey: \"{rootPathExpression}\")"
+            ? $"{ContextVariable}.SelectRawStringOverride({arguments}, preparationKey: \"{rootPathExpression}\")"
             : context.Property.Symbol.Type.EqualsIgnoreNullability(ContractInfo.TaggedString)
-                ? $"{ContextVariable}.SelectRawTaggedStringOverride({arguments}, shieldInterpolation: {shieldInterpolation}, preparationKey: \"{rootPathExpression}\")"
+                ? $"{ContextVariable}.SelectRawTaggedStringOverride({arguments}, preparationKey: \"{rootPathExpression}\")"
                 : $"{ContextVariable}.ResolveOverride({arguments})";
         foreach (IPropertyOverrideAspect aspect in context.Property.Aspects<IPropertyOverrideAspect>())
         {
