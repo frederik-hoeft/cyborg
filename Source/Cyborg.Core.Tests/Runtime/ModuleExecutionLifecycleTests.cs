@@ -15,6 +15,27 @@ namespace Cyborg.Core.Tests.Runtime;
 public sealed class ModuleExecutionLifecycleTests : CyborgCoreTestBase
 {
     [TestMethod]
+    public Task Test_ExecutionOrigin_LifecycleEventsRetainEachDefinitionsOriginAsync() => TestWithDIAsync(async services =>
+    {
+        RecordingExecutionLifecycleHook hook = services.GetRequiredService<RecordingExecutionLifecycleHook>();
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        ModuleOrigin mainOrigin = new(Path.Combine(Path.GetTempPath(), "main-definition.jconf"));
+        ModuleOrigin configurationOrigin = new(Path.Combine(Path.GetTempPath(), "configuration-definition.jconf"));
+        ModuleReference main = CreateReference("main", ProbeBehavior.Success) with { Origin = mainOrigin };
+        ModuleReference configuration = CreateReference("configuration", ProbeBehavior.Success) with { Origin = configurationOrigin };
+        ModuleContext moduleContext = new(main, ModuleEnvironment.Default, configuration, ModuleRequirements.Default);
+
+        IModuleExecutionResult result = await runtime.ExecuteAsync(moduleContext, TestContext.CancellationToken);
+
+        Assert.AreEqual(ModuleExitStatus.Success, result.Status);
+        foreach (LifecycleEvent lifecycleEvent in Enum.GetValues<LifecycleEvent>())
+        {
+            Assert.AreEqual(mainOrigin, hook.GetSingle("main", lifecycleEvent).Origin);
+            Assert.AreEqual(configurationOrigin, hook.GetSingle("configuration", lifecycleEvent).Origin);
+        }
+    }, ConfigureProbeServices);
+
+    [TestMethod]
     public Task Test_ExecutionIdentity_NestedInvocationUsesStableParentAndWorkerIdentityAsync() => TestWithDIAsync(async services =>
     {
         RecordingExecutionLifecycleHook hook = services.GetRequiredService<RecordingExecutionLifecycleHook>();
@@ -483,7 +504,8 @@ public sealed class ModuleExecutionLifecycleTests : CyborgCoreTestBase
                 context.Name,
                 Status: null,
                 Joined: null,
-                cancellationToken.IsCancellationRequested));
+                cancellationToken.IsCancellationRequested,
+                context.Origin));
             return ValueTask.CompletedTask;
         }
 
@@ -496,7 +518,8 @@ public sealed class ModuleExecutionLifecycleTests : CyborgCoreTestBase
                 context.Name,
                 context.Result.Status,
                 Joined: null,
-                cancellationToken.IsCancellationRequested));
+                cancellationToken.IsCancellationRequested,
+                context.Origin));
             if (string.Equals(context.Name, "fast", StringComparison.Ordinal))
             {
                 FastCompleted.TrySetResult();
@@ -513,7 +536,8 @@ public sealed class ModuleExecutionLifecycleTests : CyborgCoreTestBase
                 context.Name,
                 Status: null,
                 context.Joined,
-                cancellationToken.IsCancellationRequested));
+                cancellationToken.IsCancellationRequested,
+                context.Origin));
             return ValueTask.CompletedTask;
         }
 
@@ -575,7 +599,8 @@ public sealed class ModuleExecutionLifecycleTests : CyborgCoreTestBase
         string? ModuleName,
         ModuleExitStatus? Status,
         bool? Joined,
-        bool CancellationRequested);
+        bool CancellationRequested,
+        ModuleOrigin? Origin);
 
     private enum LifecycleEvent
     {

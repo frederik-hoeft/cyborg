@@ -7,7 +7,8 @@
 internal sealed record RuntimeEnvironmentParent(
     RuntimeEnvironmentId EnvironmentId,
     string Namespace,
-    IReadOnlyCollection<string> OverrideResolutionTags);
+    IReadOnlyCollection<string> OverrideResolutionTags,
+    EnvironmentContext Context);
 
 internal sealed record RuntimeEnvironmentNode(
     string Name,

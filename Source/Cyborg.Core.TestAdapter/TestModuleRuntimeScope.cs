@@ -64,12 +64,12 @@ public sealed class TestModuleRuntimeScope : IAsyncDisposable
     /// </summary>
     /// <param name="moduleJson">The JSON string representing a module reference (e.g., <c>{ "cyborg.modules.subprocess.v1": { ... } }</c>).</param>
     /// <returns>The deserialized immutable module reference.</returns>
-    public ModuleReference DeserializeModule(string moduleJson)
+    public ModuleReference DeserializeModule(string moduleJson, ModuleOrigin? origin = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(moduleJson);
         IJsonLoaderContext loaderContext = _serviceProvider.GetRequiredService<IJsonLoaderContext>();
-        ModuleReference moduleReference = JsonSerializer.Deserialize<ModuleReference>(moduleJson, loaderContext.JsonSerializerOptions)
-            ?? throw new InvalidOperationException("Deserialization of the module JSON returned null. Verify the JSON is a valid module reference.");
+        ModuleConfigurationDeserializer deserializer = new(loaderContext);
+        ModuleReference moduleReference = deserializer.DeserializeReference(moduleJson, origin);
         return moduleReference;
     }
 
@@ -79,18 +79,18 @@ public sealed class TestModuleRuntimeScope : IAsyncDisposable
     /// </summary>
     /// <param name="moduleContextJson">The JSON string representing a full module context.</param>
     /// <returns>The deserialized module context.</returns>
-    public ModuleContext DeserializeModuleContext(string moduleContextJson) =>
-        DeserializeModuleConfiguration(moduleContextJson).ModuleContext;
+    public ModuleContext DeserializeModuleContext(string moduleContextJson, ModuleOrigin? origin = null) =>
+        DeserializeModuleConfiguration(moduleContextJson, origin).ModuleContext;
 
     /// <summary>
     /// Deserializes a full module configuration while preserving load artifacts required when the context is executed.
     /// </summary>
-    public ModuleConfigurationLoadResult DeserializeModuleConfiguration(string moduleContextJson)
+    public ModuleConfigurationLoadResult DeserializeModuleConfiguration(string moduleContextJson, ModuleOrigin? origin = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(moduleContextJson);
         IJsonLoaderContext loaderContext = _serviceProvider.GetRequiredService<IJsonLoaderContext>();
         ModuleConfigurationDeserializer deserializer = new(loaderContext);
-        ModuleConfigurationLoadResult configuration = deserializer.Deserialize(moduleContextJson)
+        ModuleConfigurationLoadResult configuration = deserializer.Deserialize(moduleContextJson, origin)
             ?? throw new InvalidOperationException("Deserialization of the module context JSON returned null. Verify the JSON is a valid module context.");
         return configuration;
     }

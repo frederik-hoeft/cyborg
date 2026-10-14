@@ -36,10 +36,11 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
     internal virtual bool TryResolveStructuralInCurrentScopeCore(ResolutionContext context, [NotNullWhen(true)] out EvaluatedValue? value)
     {
         ArgumentNullException.ThrowIfNull(context);
-        if (context.Name.Equals(SyntaxFactory.Self(), StringComparison.Ordinal))
+        if (EnvironmentContext.IsContextualName(context.Name))
         {
-            value = new EvaluatedTerminal(Namespace);
-            return true;
+            bool resolved = Context.TryResolve(context.Name, Namespace, out object? contextualValue);
+            value = resolved ? new EvaluatedTerminal(contextualValue) : null;
+            return resolved;
         }
         if (VariableStore.TryGetValue(context.Name, out object? stored) && stored is BoundValue bound)
         {
@@ -100,6 +101,7 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
 
     public virtual void SetVariable<T>(string name, T value)
     {
+        EnsureWritableName(name);
         BoundValue bound = ValueGrammar.Instance.Compile(value).Bind(new EnvironmentExpressionContext(this, ResolutionContext.CreateRoot(this)));
         VariableStore.SetValue(name, bound);
     }
@@ -123,12 +125,21 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
     /// <summary>Publishes an already evaluated value as a terminal binding, retaining captured expression text as literal data.</summary>
     internal void SetTerminalVariable(string name, EvaluatedValue terminal)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        EnsureWritableName(name);
         ArgumentNullException.ThrowIfNull(terminal);
         VariableStore.SetValue(name, new BoundCapture(terminal));
     }
 
     public virtual bool TryRemoveVariable(string name) => VariableStore.TryRemove(name);
+
+    private static void EnsureWritableName(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (EnvironmentContext.IsContextualName(name))
+        {
+            throw new ArgumentException($"Contextual variable '{name}' is runtime-owned and cannot be modified.", nameof(name));
+        }
+    }
 
     public virtual TaggedString Interpolate(string template)
     {

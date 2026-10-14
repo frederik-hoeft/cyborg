@@ -238,7 +238,7 @@ Graph and binding state are reconciled together because topology determines whic
 
 `IRuntimeEnvironment` instances are views over this transaction-owned graph. A view identifies one logical environment together with view-level resolution context such as namespace and override-resolution tags. Rebinding the same logical environment into another transaction creates a view over that transaction's participant state rather than aliasing a mutable dictionary from the caller.
 
-Inherited-parent relationships preserve the parent logical identity and the view metadata required by resolution semantics. Reconstructing an inherited or named environment therefore preserves namespace and override-tag behavior without relying on the original CLR environment object remaining alive. Runtime services needed to implement environment behavior are supplied when views are materialized; service references are not stored in environment topology or transaction snapshots.
+Inherited-parent relationships preserve the parent logical identity and the view metadata required by resolution semantics, including namespace, override-resolution tags, and immutable definition-site context captured when the relationship is created. Reconstructing an inherited or named environment therefore preserves namespace and override-tag behavior without relying on the original CLR environment object remaining alive. Runtime services needed to implement environment behavior are supplied when views are materialized; service references are not stored in environment topology or transaction snapshots.
 
 Environment scopes retain their user-facing semantics inside this model:
 
@@ -253,6 +253,8 @@ Variable writes use `(environment identity, variable path)` as their logical con
 Named environment registration is transaction-local. A child can immediately resolve a name it creates, while siblings continue to see the fork-time catalog until join. Competing contributors registering the same name conflict under the default strategy.
 
 Transient child environments are not retained in ancestors merely because they existed during execution. Reconciliation keeps environments that already belonged to the owner, newly surviving named environments, and any ancestors needed to preserve the inheritance chains of those survivors. Binding changes for pruned child-local identities are discarded with those identities.
+
+Contextual definition metadata is not a variable binding. A parent-view descriptor can be retained as structural topology when its named descendant survives reconciliation, but no `@.origin.*` value is published into user-variable state. Rebinding a view into another transaction preserves that metadata and changes only which graph/binding state it accesses.
 
 Environment values themselves remain opaque. Transactions isolate the binding from a logical path to an object; they do not clone or reconcile mutation performed inside that object after it has been stored.
 

@@ -5,5 +5,6 @@ namespace Cyborg.Core.Runtime.Model;
 public sealed record ModuleReference
 (
     [property: JsonIgnore] IModule Definition,
-    [property: JsonIgnore] string ModuleId
+    [property: JsonIgnore] string ModuleId,
+    [property: JsonIgnore] ModuleOrigin? Origin = null
 );

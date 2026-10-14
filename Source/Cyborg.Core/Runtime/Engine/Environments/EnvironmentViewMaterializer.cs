@@ -45,6 +45,7 @@ internal sealed class EnvironmentViewMaterializer(IRuntimeEnvironmentFactory fac
             {
                 parent = parent.WithOverrideResolutionTags(parentView.OverrideResolutionTags);
             }
+            parent = parent.WithContext(parentView.Context);
         }
         IRuntimeEnvironment environment = factory.CreateTransactionView(environmentId, node, parent, ns, graph.Participant, active);
         visited.Remove(environmentId);

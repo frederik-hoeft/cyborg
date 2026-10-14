@@ -13,14 +13,15 @@ internal sealed partial class VariableReferenceParser(string? name = null) : Reg
     public static VariableReferenceParser Instance { get; } = new();
 
     // The optional entry-point prefix backtracks for solitary '@', which denotes current-scope self.
-    [GeneratedRegex(@"\G(?<entry>@)?(?:(?<self>@)|(?<identifier>[A-Za-z_-][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]+)*))")]
+    [GeneratedRegex(@"\G(?<entry>@)?(?:(?<context>@\.[A-Za-z_-][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]+)*)|(?<self>@)|(?<identifier>[A-Za-z_-][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]+)*))")]
     public static partial Regex ParserRegex { get; }
 
     public override IParser NamedCopy(string newName) => new VariableReferenceParser(newName);
 
     protected override bool TryCreateSyntaxNode(Match match, [NotNullWhen(true)] out ISyntaxNode? syntaxNode)
     {
-        string? identifier = match.Groups["identifier"].Success ? match.Groups["identifier"].Value : null;
+        string? identifier = match.Groups["context"].Success ? match.Groups["context"].Value
+            : match.Groups["identifier"].Success ? match.Groups["identifier"].Value : null;
         ReferenceAnchor anchor = match.Groups["entry"].Success ? ReferenceAnchor.EntryPoint : ReferenceAnchor.CurrentScope;
         syntaxNode = new VariableReferenceNode(new VariableReferenceSyntax(identifier, anchor));
         return true;

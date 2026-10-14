@@ -30,7 +30,8 @@ internal sealed class CaptureParser(string? name = null) : ParserBase, IParser<C
         int referenceOffset = offset + 2;
         if (!_reference.TryParse(input, referenceOffset, out ISyntaxNode? node, out int referenceLength)
             || node is not VariableReferenceNode reference
-            || reference.Evaluate() is not { Identifier: not null, Anchor: ReferenceAnchor.CurrentScope }
+            || reference.Evaluate() is not { Identifier: not null } parsed
+            || (parsed.Anchor != ReferenceAnchor.CurrentScope && !parsed.Identifier.StartsWith("@.", StringComparison.Ordinal))
             || referenceOffset + referenceLength >= input.Length
             || input[referenceOffset + referenceLength] != '}')
         {

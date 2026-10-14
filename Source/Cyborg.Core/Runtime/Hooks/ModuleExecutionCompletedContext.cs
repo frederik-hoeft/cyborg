@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Runtime.Engine;
+using Cyborg.Core.Runtime.Model;
 
 namespace Cyborg.Core.Runtime.Hooks;
 
@@ -18,4 +19,6 @@ internal sealed record ModuleExecutionCompletedContext(
     public string? Group => Invocation.Group;
 
     public IModule Module => Invocation.Module;
+
+    public ModuleOrigin? Origin => Invocation.Origin;
 }
