@@ -9,8 +9,10 @@ using System.Text.RegularExpressions;
 namespace Cyborg.Core.Runtime.Engine.Expressions.Parsers;
 
 /// <summary>Recognizes escaped interpolation, indirection, and capture tokens without consuming escape layers.</summary>
-internal sealed partial class EscapedPartParser(string? name = null) : RegexParserBase<EscapedPartParser, ITextSyntaxVisitor>(name), IRegexOwner
+internal sealed partial class EscapedPartParser(string? name = null) : RegexParserBase<EscapedPartParser, ITextSyntaxVisitor>(name), IRegexOwner, IParser<EscapedPartParser>
 {
+    public static EscapedPartParser Instance { get; } = new();
+
     [GeneratedRegex(@"\G(?<operator>[$&*])\{(?<hashes>#+)(?<body>[^}]*)\}")]
     public static partial Regex ParserRegex { get; }
 

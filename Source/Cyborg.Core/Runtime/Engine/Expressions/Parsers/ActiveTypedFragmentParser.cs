@@ -8,8 +8,10 @@ using System.Text.RegularExpressions;
 namespace Cyborg.Core.Runtime.Engine.Expressions.Parsers;
 
 /// <summary>Identifies active typed fragments so the enclosing text grammar rejects embedded or malformed typed expressions.</summary>
-internal sealed partial class ActiveTypedFragmentParser(string? name = null) : RegexParserBase<ActiveTypedFragmentParser, ITextSyntaxVisitor>(name), IRegexOwner
+internal sealed partial class ActiveTypedFragmentParser(string? name = null) : RegexParserBase<ActiveTypedFragmentParser, ITextSyntaxVisitor>(name), IRegexOwner, IParser<ActiveTypedFragmentParser>
 {
+    public static ActiveTypedFragmentParser Instance { get; } = new();
+
     [GeneratedRegex(@"\G[&*]\{(?!#)[^}]*\}")]
     public static partial Regex ParserRegex { get; }
 

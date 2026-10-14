@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Parsing.Parsers;
+using Cyborg.Core.Parsing.Parsers;
 using Cyborg.Core.Parsing.SyntaxNodes;
 using Cyborg.Core.Runtime.Engine.Expressions.Syntax;
 using Cyborg.Core.Runtime.Engine.Expressions.SyntaxNodes;
@@ -7,9 +7,11 @@ using System.Diagnostics.CodeAnalysis;
 namespace Cyborg.Core.Runtime.Engine.Expressions.Parsers;
 
 /// <summary>Parses a complete eager capture; entry-point modifiers are reserved and rejected.</summary>
-internal sealed class CaptureParser(string? name = null) : ParserBase
+internal sealed class CaptureParser(string? name = null) : ParserBase, IParser<CaptureParser>
 {
-    private readonly VariableReferenceParser _reference = new();
+    public static CaptureParser Instance { get; } = new();
+
+    private readonly VariableReferenceParser _reference = VariableReferenceParser.Instance;
 
     public override string? Name => name;
 

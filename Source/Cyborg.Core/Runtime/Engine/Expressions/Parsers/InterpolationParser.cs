@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Parsing.Parsers;
+using Cyborg.Core.Parsing.Parsers;
 using Cyborg.Core.Parsing.SyntaxNodes;
 using System.Diagnostics.CodeAnalysis;
 using Cyborg.Core.Runtime.Engine.Expressions.Syntax;
@@ -8,9 +8,11 @@ using Cyborg.Core.Runtime.Engine.Expressions.Visitors;
 namespace Cyborg.Core.Runtime.Engine.Expressions.Parsers;
 
 /// <summary>Parses a lazy textual interpolation token, including entry-point and self references.</summary>
-internal sealed class InterpolationParser(string? name = null) : ParserBase<ITextSyntaxVisitor>
+internal sealed class InterpolationParser(string? name = null) : ParserBase<ITextSyntaxVisitor>, IParser<InterpolationParser>
 {
-    private readonly VariableReferenceParser _reference = new();
+    public static InterpolationParser Instance { get; } = new();
+
+    private readonly VariableReferenceParser _reference = VariableReferenceParser.Instance;
 
     public override string? Name => name;
 
