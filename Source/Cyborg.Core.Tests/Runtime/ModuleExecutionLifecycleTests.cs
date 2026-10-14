@@ -430,7 +430,7 @@ public sealed class ModuleExecutionLifecycleTests : CyborgCoreTestBase
 
     private sealed class ProbeExecutionState
     {
-        private readonly object _lock = new();
+        private readonly Lock _lock = new();
         private readonly Dictionary<string, ModuleExecutionId> _workerExecutionIds = [];
 
         public TaskCompletionSource SlowStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -456,7 +456,7 @@ public sealed class ModuleExecutionLifecycleTests : CyborgCoreTestBase
 
     private sealed class RecordingExecutionLifecycleHook : IModuleExecutionLifecycleHook
     {
-        private readonly object _lock = new();
+        private readonly Lock _lock = new();
         private readonly List<LifecycleObservation> _observations = [];
 
         public int Priority => 0;

@@ -1,6 +1,6 @@
-﻿using System.Collections.Immutable;
+﻿using Cyborg.Core.Parsing.SyntaxNodes;
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
-using Cyborg.Core.Parsing.SyntaxNodes;
 
 namespace Cyborg.Core.Parsing.Parsers;
 

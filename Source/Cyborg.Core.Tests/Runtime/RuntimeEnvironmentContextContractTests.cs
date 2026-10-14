@@ -1,4 +1,4 @@
-using Cyborg.Core.Runtime.Engine;
+﻿using Cyborg.Core.Runtime.Engine;
 using Cyborg.Core.Runtime.Engine.Environments;
 using Cyborg.Core.Runtime.Engine.Transactions;
 using Cyborg.Core.Runtime.Engine.Transactions.Internal;
@@ -254,7 +254,6 @@ public sealed class RuntimeEnvironmentContextContractTests
         Assert.IsTrue(committed.TryResolveVariable("value", out int value));
         Assert.AreEqual(12, value);
     }
-
 
     [TestMethod]
     public void NamedEnvironmentRegistration_DiscardedBranchDoesNotPublishTopologyOrBindings()

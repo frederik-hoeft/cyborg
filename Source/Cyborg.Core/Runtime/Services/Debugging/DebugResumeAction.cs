@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Runtime.Services.Debugging;
+﻿namespace Cyborg.Core.Runtime.Services.Debugging;
 
 /// <summary>
 /// Disposition returned by a debug frontend when the current pause ends.

@@ -1,5 +1,4 @@
-using System.Diagnostics.CodeAnalysis;
-using Cyborg.Core.Configuration.Builders;
+﻿using Cyborg.Core.Configuration.Builders;
 using Cyborg.Core.Runtime;
 using Cyborg.Core.Runtime.Configuration;
 using Cyborg.Core.Runtime.Engine;
@@ -11,6 +10,7 @@ using Cyborg.Core.Runtime.Services.Validation;
 using Cyborg.Core.Services.Default;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Core.Tests.Debugging;
 
@@ -306,7 +306,7 @@ public sealed class WorkflowDebuggerRuntimeIntegrationTests : CyborgCoreTestBase
 
     private sealed class DebugProbeWorker(IWorkerContext<DebugProbeModule> context) : ModuleWorker<DebugProbeModule>(context)
     {
-        protected override async Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
+        protected async override Task<IModuleExecutionResult> ExecuteAsync([NotNull] IModuleRuntime runtime, CancellationToken cancellationToken)
         {
             switch (Module.Name)
             {

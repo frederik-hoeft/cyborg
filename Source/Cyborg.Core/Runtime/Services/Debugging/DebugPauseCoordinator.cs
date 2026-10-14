@@ -1,4 +1,4 @@
-using Cyborg.Core.Runtime.Engine;
+﻿using Cyborg.Core.Runtime.Engine;
 
 namespace Cyborg.Core.Runtime.Services.Debugging;
 
@@ -10,7 +10,7 @@ internal sealed class DebugPauseCoordinator(
     IDebugExecutionTopology topology,
     IDebugSessionState sessionState)
 {
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
     private readonly IDebugExecutionTopologyController _topology =
         topology as IDebugExecutionTopologyController
         ?? throw new ArgumentException("The debugger topology service must expose controller operations.", nameof(topology));

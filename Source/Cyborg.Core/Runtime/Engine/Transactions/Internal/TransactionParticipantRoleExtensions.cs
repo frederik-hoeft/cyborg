@@ -1,4 +1,4 @@
-using Cyborg.Core.Runtime.Services.Transactions;
+﻿using Cyborg.Core.Runtime.Services.Transactions;
 
 namespace Cyborg.Core.Runtime.Engine.Transactions.Internal;
 
@@ -21,12 +21,12 @@ internal static class TransactionParticipantRoleExtensions
             TransactionPublicationDisposition disposition,
             ITransactionParticipantFork fork,
             ITransactionParticipantState completedState) => disposition switch
-        {
-            TransactionPublicationDisposition.Commit => completedState,
-            TransactionPublicationDisposition.Rollback => fork.CreateBranch()
-                ?? throw new InvalidOperationException("A transaction participant returned a null branch state."),
-            _ => throw new ArgumentOutOfRangeException(nameof(disposition), disposition, "Unsupported transaction publication disposition."),
-        };
+            {
+                TransactionPublicationDisposition.Commit => completedState,
+                TransactionPublicationDisposition.Rollback => fork.CreateBranch()
+                    ?? throw new InvalidOperationException("A transaction participant returned a null branch state."),
+                _ => throw new ArgumentOutOfRangeException(nameof(disposition), disposition, "Unsupported transaction publication disposition."),
+            };
     }
 
     private sealed class ControlContributionPolicy : ITransactionParticipantContributionPolicy
@@ -35,9 +35,9 @@ internal static class TransactionParticipantRoleExtensions
             TransactionPublicationDisposition disposition,
             ITransactionParticipantFork fork,
             ITransactionParticipantState completedState) => disposition switch
-        {
-            TransactionPublicationDisposition.Commit or TransactionPublicationDisposition.Rollback => completedState,
-            _ => throw new ArgumentOutOfRangeException(nameof(disposition), disposition, "Unsupported transaction publication disposition."),
-        };
+            {
+                TransactionPublicationDisposition.Commit or TransactionPublicationDisposition.Rollback => completedState,
+                _ => throw new ArgumentOutOfRangeException(nameof(disposition), disposition, "Unsupported transaction publication disposition."),
+            };
     }
 }

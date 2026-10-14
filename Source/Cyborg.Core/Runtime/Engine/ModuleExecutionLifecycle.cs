@@ -1,4 +1,4 @@
-using Cyborg.Core.Runtime.Hooks;
+﻿using Cyborg.Core.Runtime.Hooks;
 using Cyborg.Core.Services.Pipelines;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;

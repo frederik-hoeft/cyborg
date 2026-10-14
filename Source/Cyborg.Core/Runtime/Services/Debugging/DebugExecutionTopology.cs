@@ -1,12 +1,12 @@
-using System.Collections.Immutable;
-using Cyborg.Core.Runtime.Engine;
+﻿using Cyborg.Core.Runtime.Engine;
 using Cyborg.Core.Runtime.Hooks;
+using System.Collections.Immutable;
 
 namespace Cyborg.Core.Runtime.Services.Debugging;
 
 internal sealed class DebugExecutionTopology : IDebugExecutionTopologyController
 {
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
     private readonly Dictionary<ModuleExecutionId, LiveExecutionNode> _nodes = [];
     private readonly List<LiveExecutionNode> _roots = [];
 

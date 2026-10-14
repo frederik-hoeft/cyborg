@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Runtime.Hooks;
+﻿namespace Cyborg.Core.Runtime.Hooks;
 
 /// <summary>Describes an invocation after its owning fork has joined or discarded it.</summary>
 public interface IModuleExecutionClosedContext : IModuleExecutionLifecycleContext

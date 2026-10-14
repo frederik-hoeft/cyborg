@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Runtime.Engine.Transactions.Internal;
+﻿namespace Cyborg.Core.Runtime.Engine.Transactions.Internal;
 
 /// <summary>Selects a participant's contribution to reconciliation for one completed invocation.</summary>
 internal interface ITransactionParticipantContributionPolicy

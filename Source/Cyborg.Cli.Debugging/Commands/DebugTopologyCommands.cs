@@ -1,4 +1,4 @@
-using ConsoleAppFramework;
+﻿using ConsoleAppFramework;
 using Cyborg.Core.Runtime.Services.Debugging;
 
 namespace Cyborg.Cli.Debugging.Commands;

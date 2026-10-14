@@ -1,4 +1,4 @@
-using Cyborg.Core.Configuration.Builders;
+﻿using Cyborg.Core.Configuration.Builders;
 using Cyborg.Core.Runtime;
 using Cyborg.Core.Runtime.Engine;
 using Cyborg.Core.Runtime.Services.Debugging;
@@ -434,7 +434,7 @@ public sealed class WorkflowDebuggerTests : CyborgCoreTestBase
 
     private sealed class ControlledFrontend : IDebugFrontend
     {
-        private readonly object _lock = new();
+        private readonly Lock _lock = new();
         private readonly List<ControlledPause> _pauses = [];
         private readonly SemaphoreSlim _entered = new(initialCount: 0);
 

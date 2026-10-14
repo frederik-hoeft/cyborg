@@ -1,5 +1,4 @@
-using System.Diagnostics.CodeAnalysis;
-using Cyborg.Core.Runtime;
+﻿using Cyborg.Core.Runtime;
 using Cyborg.Core.Runtime.Configuration;
 using Cyborg.Core.Runtime.Engine;
 using Cyborg.Core.Runtime.Engine.Environments;
@@ -10,6 +9,7 @@ using Cyborg.Core.Runtime.Services.Validation;
 using Cyborg.Core.Tests.TestInfrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Cyborg.Core.Tests.Debugging;
 
@@ -143,7 +143,6 @@ public sealed class DebugExecutionTopologyTests : CyborgCoreTestBase
         Assert.IsTrue(topology.IsOpenAncestor(siblingId, parentId));
     }
 
-
     [TestMethod]
     public Task Test_Topology_DebuggingHookEnrichesPreparedMetadataBeforeLaterPreExecutionHooksAsync() => TestWithDIAsync(async services =>
     {
@@ -227,7 +226,6 @@ public sealed class DebugExecutionTopologyTests : CyborgCoreTestBase
         Assert.HasCount(0, topology.CaptureTree().Roots);
     }, ConfigureTopologyProbeServices);
 
-
     private static void ConfigurePreparedMetadataServices(IServiceCollection services)
     {
         services.RemoveAll<IModuleWorkerFactory>();
@@ -264,7 +262,6 @@ public sealed class DebugExecutionTopologyTests : CyborgCoreTestBase
         new(executionId, parentExecutionId, TestModule.MODULE_ID, module.Name, module.Group, module);
 
     private static ModuleExecutionId CreateExecutionId() => new(Guid.NewGuid());
-
 
     private static IExecutionTreeNode FindByExecutionId(IExecutionTreeSnapshot snapshot, ModuleExecutionId executionId)
     {
@@ -368,7 +365,6 @@ public sealed class DebugExecutionTopologyTests : CyborgCoreTestBase
 
         public bool Joined { get; set; }
     }
-
 
     private static ModuleArtifacts PreparedArtifacts { get; } = ModuleArtifacts.Default with { Environment = ArtifactModuleEnvironment.Default };
 

@@ -1,4 +1,4 @@
-using Cyborg.Core.Runtime;
+﻿using Cyborg.Core.Runtime;
 using Cyborg.Core.Runtime.Engine;
 using Cyborg.Core.Runtime.Services.Debugging;
 using Cyborg.Core.Runtime.Services.Debugging.Breakpoints;
@@ -59,7 +59,6 @@ public sealed class DebugPauseContextTests
         Assert.AreEqual(0, topology.AncestryCaptureCount);
     }
 
-
     [TestMethod]
     public void Test_UnscopedCustomContext_UsesEmptyTopologyDefaults()
     {
@@ -114,7 +113,6 @@ public sealed class DebugPauseContextTests
                 ExitStatus: null,
                 Children: []);
     }
-
 
     private sealed record MinimalPauseContext(
         string ModuleId,

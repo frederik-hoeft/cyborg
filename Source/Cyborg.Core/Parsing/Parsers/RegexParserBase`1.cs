@@ -1,6 +1,6 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using Cyborg.Core.Parsing.SyntaxNodes;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
-using Cyborg.Core.Parsing.SyntaxNodes;
 
 namespace Cyborg.Core.Parsing.Parsers;
 

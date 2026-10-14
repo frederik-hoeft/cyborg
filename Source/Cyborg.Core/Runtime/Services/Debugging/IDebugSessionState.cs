@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Runtime.Services.Debugging;
+﻿namespace Cyborg.Core.Runtime.Services.Debugging;
 
 /// <summary>
 /// Exposes the generation of the current debugger session.

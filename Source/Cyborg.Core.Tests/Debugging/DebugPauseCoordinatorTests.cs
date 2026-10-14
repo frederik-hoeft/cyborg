@@ -1,4 +1,4 @@
-using Cyborg.Core.Runtime;
+﻿using Cyborg.Core.Runtime;
 using Cyborg.Core.Runtime.Engine;
 using Cyborg.Core.Runtime.Hooks;
 using Cyborg.Core.Runtime.Services.Debugging;
@@ -86,7 +86,7 @@ public sealed class DebugPauseCoordinatorTests
 
     private sealed class RecordingTopology : IDebugExecutionTopologyController
     {
-        private readonly object _lock = new();
+        private readonly Lock _lock = new();
         private readonly Dictionary<ModuleExecutionId, ExecutionTreeNodeState> _states = [];
 
         public int Priority => 0;
