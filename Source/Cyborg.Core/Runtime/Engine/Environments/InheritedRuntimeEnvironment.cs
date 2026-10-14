@@ -55,6 +55,25 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
         return false;
     }
 
+    internal override bool TryResolveStructuralRecursiveCore(ResolutionContext context, [NotNullWhen(true)] out Cyborg.Core.Runtime.Engine.Expressions.Evaluated.EvaluatedValue? value)
+    {
+        if (TryResolveStructuralInCurrentScopeCore(context, out value))
+        {
+            return true;
+        }
+        if (Parent is EnvironmentLike parent)
+        {
+            return parent.TryResolveStructuralRecursiveCore(context, out value);
+        }
+        if (Parent.TryResolveVariable(context.Name, out object? resolved) && resolved is not null)
+        {
+            value = new Cyborg.Core.Runtime.Engine.Expressions.Evaluated.EvaluatedTerminal(resolved);
+            return true;
+        }
+        value = null;
+        return false;
+    }
+
     internal protected override bool TryResolveVariableRecursiveCore(ResolutionContext context, out Evaluation evaluation)
     {
         if (TryResolveVariableInCurrentScopeCore(context, out evaluation))

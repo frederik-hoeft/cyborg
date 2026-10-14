@@ -61,7 +61,7 @@ internal sealed class RootModuleRuntime : ModuleRuntimeBase
         RuntimeEnvironmentTransactionParticipant environments = new();
         TransactionCoordinator coordinator = new([environments, operations.ModuleRegistry.Participant, .. operations.Transactional.Participants]);
         RuntimeEnvironmentNode globalNode = new(defaultEnvironment.Name, defaultEnvironment.IsTransient, Parent: null);
-        RuntimeEnvironmentSeed globalSeed = new(defaultEnvironment.EnvironmentId, globalNode, [.. defaultEnvironment], RegisterName: false);
+        RuntimeEnvironmentSeed globalSeed = new(defaultEnvironment.EnvironmentId, globalNode, defaultEnvironment.SnapshotStoredBindings(), RegisterName: false);
         RuntimeEnvironmentTransactionSeed environmentSeed = new(defaultEnvironment.EnvironmentId, [globalSeed]);
         TransactionRootSeed seed = new TransactionRootSeed().With(environments, environmentSeed);
         ModuleTransaction transaction = coordinator.CreateRoot(seed);

@@ -1,4 +1,5 @@
-﻿using Cyborg.Core.Runtime.Engine.Environments.Syntax;
+using Cyborg.Core.Runtime.Engine.Environments.Syntax;
+using Cyborg.Core.Runtime.Engine.Expressions.Bound;
 using Cyborg.Core.Runtime.Engine.Transactions;
 using Cyborg.Core.Runtime.Engine.Transactions.Internal;
 using Cyborg.Core.Text;
@@ -219,6 +220,32 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         }
 
         value = default;
+        return false;
+    }
+
+    /// <summary>Retrieves a selected textual override as structural state without materializing or reinterpreting its expression.</summary>
+    internal bool TrySelectBoundOverride<TModule>(
+        TModule module,
+        string moduleExpression,
+        string valueExpression,
+        [NotNullWhen(true)] out BoundValue? bound)
+        where TModule : ModuleBase, IModuleDefinition
+    {
+        ArgumentNullException.ThrowIfNull(module);
+        string valuePath = ConstructValueResolutionPath<object?>(value: null, moduleExpression, valueExpression);
+        foreach (RuntimeEnvironment scope in EnumerateOverrideScopes())
+        {
+            foreach (string identifier in scope.EnumerateOverrideIdentifiers(module.Name, module.Group, TModule.ModuleId))
+            {
+                string overridePath = scope.SyntaxFactory.Path(identifier, valuePath).Override();
+                if (scope.TryGetStoredVariableRecursiveCore(overridePath, out object? stored) && stored is BoundValue expression)
+                {
+                    bound = expression;
+                    return true;
+                }
+            }
+        }
+        bound = null;
         return false;
     }
 

@@ -8,4 +8,16 @@ internal sealed record BoundWithTags(BoundValue Inner, ImmutableHashSet<string> 
 {
     public override EvaluatedValue Evaluate(IExpressionResolutionContext context) =>
         new EvaluatedWithTags(Inner.Evaluate(context), Tags, PreserveTaggedTextKind);
+    public override bool IsTextual => Inner.IsTextual;
+
+    public override object? PresentStoredValue()
+    {
+        object? raw = Inner.PresentStoredValue();
+        return raw switch
+        {
+            Cyborg.Core.Text.TaggedString tagged => tagged.WithTags(Tags),
+            string text => new Cyborg.Core.Text.TaggedString(text, Tags),
+            _ => raw
+        };
+    }
 }

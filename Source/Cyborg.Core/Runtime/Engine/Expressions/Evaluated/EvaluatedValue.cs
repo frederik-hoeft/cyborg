@@ -4,4 +4,6 @@ namespace Cyborg.Core.Runtime.Engine.Expressions.Evaluated;
 internal abstract record EvaluatedValue
 {
     internal abstract object? Materialize(ExpressionMaterializer materializer);
+
+    internal virtual bool IsNull => false;
 }

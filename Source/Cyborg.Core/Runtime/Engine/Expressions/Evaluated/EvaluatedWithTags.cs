@@ -6,6 +6,8 @@ namespace Cyborg.Core.Runtime.Engine.Expressions.Evaluated;
 /// <summary>Immutable source-tag wrapper, independent of the evaluated payload's CLR text kind.</summary>
 internal sealed record EvaluatedWithTags(EvaluatedValue Inner, ImmutableHashSet<string> Tags, bool PreserveTaggedTextKind) : EvaluatedValue
 {
+    internal override bool IsNull => Inner.IsNull;
+
     internal override object? Materialize(ExpressionMaterializer materializer)
     {
         object? value = materializer.Materialize(Inner);

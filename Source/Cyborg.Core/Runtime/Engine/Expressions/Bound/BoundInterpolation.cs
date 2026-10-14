@@ -15,4 +15,5 @@ internal sealed record BoundInterpolation(VariableReferenceSyntax Reference) : B
         // Missing textual references remain literal for this evaluation, without freezing the stored lazy reference.
         return new EvaluatedLiteral($"${{{Reference}}}");
     }
+    public override void AppendWithoutInterpolation(System.Text.StringBuilder builder) => builder.Append("${").Append(Reference).Append('}');
 }

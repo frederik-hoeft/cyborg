@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using Cyborg.Core.Aot.Modules.Validation.Processors;
 using Microsoft.CodeAnalysis;
@@ -12,12 +12,12 @@ internal sealed class ValueExpressionSectionRenderer(ValidationContractInfo cont
 
     protected override bool ShouldSkip(PropertyModel property) => property.HasAspect<IgnoreValueExpressionAspect>();
 
-    protected override string CreateStringExpression(PropertyModel property, string accessExpression)
+    protected override string CreateStringExpression(PropertyModel property, string accessExpression, string preparationKey)
     {
         bool willInterpolate = !property.HasAspect<IgnoreInterpolationAspect>();
-        return $"{ContextVariable}.ResolveValueExpression({accessExpression}, willInterpolate: {willInterpolate.ToString().ToLowerInvariant()})";
+        return $"{ContextVariable}.ResolveValueExpression({accessExpression}, willInterpolate: {willInterpolate.ToString().ToLowerInvariant()}, preparationKey: {preparationKey})";
     }
 
-    protected override string CreateElementExpression(ITypeSymbol elementType, string accessExpression) =>
-        $"{ContextVariable}.ResolveValueExpression({accessExpression}, willInterpolate: true)";
+    protected override string CreateElementExpression(ITypeSymbol elementType, string accessExpression, string preparationKey) =>
+        $"{ContextVariable}.ResolveValueExpression({accessExpression}, willInterpolate: true, preparationKey: {preparationKey})";
 }

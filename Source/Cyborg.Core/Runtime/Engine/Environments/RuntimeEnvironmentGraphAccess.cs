@@ -68,7 +68,7 @@ internal sealed class RuntimeEnvironmentGraphAccess(RuntimeEnvironmentTransactio
             parent = CaptureParentView(inheritedEnvironment.Parent);
         }
         RuntimeEnvironmentNode node = new(environment.Name, environment.IsTransient, parent);
-        state.AddEnvironment(environmentId, node, environment);
+        state.AddEnvironment(environmentId, node, environment is EnvironmentLike source ? source.SnapshotStoredBindings() : environment);
     }
 
     public static RuntimeEnvironmentParent CaptureParentView(IRuntimeEnvironment environment) =>

@@ -6,6 +6,8 @@ namespace Cyborg.Core.Runtime.Engine.Expressions.Syntax;
 /// <summary>Textual value composed of literal, interpolated, and escaped segments in source order.</summary>
 internal sealed record TextValueSyntax(ImmutableArray<TextPartSyntax> Parts) : ValueSyntax
 {
+    public string Source { get; init; } = string.Empty;
+
     public override BoundValue Bind(IExpressionResolutionContext context)
     {
         ImmutableArray<BoundTextPart>.Builder parts = ImmutableArray.CreateBuilder<BoundTextPart>(Parts.Length);
@@ -13,6 +15,6 @@ internal sealed record TextValueSyntax(ImmutableArray<TextPartSyntax> Parts) : V
         {
             parts.Add(part.Bind());
         }
-        return new BoundText(parts.MoveToImmutable());
+        return new BoundText(parts.MoveToImmutable()) { Source = Source };
     }
 }

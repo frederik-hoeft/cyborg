@@ -6,4 +6,5 @@ namespace Cyborg.Core.Runtime.Engine.Expressions.Bound;
 internal sealed record BoundTerminal(object? Value) : BoundValue
 {
     public override EvaluatedValue Evaluate(IExpressionResolutionContext context) => new EvaluatedTerminal(Value);
+    public override object? PresentStoredValue() => Value;
 }

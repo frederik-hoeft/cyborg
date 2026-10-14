@@ -15,4 +15,5 @@ internal sealed record BoundIndirection(VariableReferenceSyntax Reference) : Bou
         }
         return value;
     }
+    public override object PresentStoredValue() => $"&{{{Reference}}}";
 }

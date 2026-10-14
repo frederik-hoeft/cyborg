@@ -15,12 +15,12 @@ namespace Cyborg.Core.Runtime.Engine.Expressions.Grammars;
 /// </summary>
 internal sealed class ValueGrammar
 {
-    private readonly IParser _typed = Grammar.Alternative(new TypedReferenceParser(), new CaptureParser());
+    private readonly IParser _typed = Alternative<TypedReferenceParser, CaptureParser>.Instance;
     private readonly IParser _text;
 
     private ValueGrammar()
     {
-        IParser tokens = Grammar.Alternative(new InterpolationParser(), new EscapedPartParser(), new ActiveTypedFragmentParser());
+        IParser tokens = Alternative<InterpolationParser, EscapedPartParser, ActiveTypedFragmentParser>.Instance;
         _text = Grammar.Repeat(Grammar.Alternative(tokens, new LiteralRunParser(tokens)));
     }
 
@@ -57,6 +57,6 @@ internal sealed class ValueGrammar
         }
         TextSyntaxCollector collector = new();
         root.Accept(collector);
-        return new TextValueSyntax(ImmutableArray.CreateRange(collector.Parts));
+        return new TextValueSyntax(ImmutableArray.CreateRange(collector.Parts)) { Source = input };
     }
 }

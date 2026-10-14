@@ -6,4 +6,5 @@ namespace Cyborg.Core.Runtime.Engine.Expressions.Bound;
 internal sealed record BoundCapture(EvaluatedValue Snapshot) : BoundValue
 {
     public override EvaluatedValue Evaluate(IExpressionResolutionContext context) => Snapshot;
+    public override object? PresentStoredValue() => new ExpressionMaterializer().Materialize(Snapshot);
 }

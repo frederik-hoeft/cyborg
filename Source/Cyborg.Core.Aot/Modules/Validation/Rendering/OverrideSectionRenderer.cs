@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Aot.Extensions;
+using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Aspects;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using Cyborg.Core.Aot.Modules.Validation.Processors;
@@ -155,9 +155,9 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
             || context.Property.Symbol.Type.EqualsIgnoreNullability(ContractInfo.TaggedString);
         string shieldInterpolation = isTextual && !context.Property.HasAspect<IgnoreInterpolationAspect>() ? "true" : "false";
         string expression = context.Property.Symbol.Type.EqualsIgnoreNullability(SpecialType.System_String)
-            ? $"{ContextVariable}.SelectRawStringOverride({arguments}, shieldInterpolation: {shieldInterpolation})"
+            ? $"{ContextVariable}.SelectRawStringOverride({arguments}, shieldInterpolation: {shieldInterpolation}, preparationKey: \"{rootPathExpression}\")"
             : context.Property.Symbol.Type.EqualsIgnoreNullability(ContractInfo.TaggedString)
-                ? $"{ContextVariable}.SelectRawTaggedStringOverride({arguments}, shieldInterpolation: {shieldInterpolation})"
+                ? $"{ContextVariable}.SelectRawTaggedStringOverride({arguments}, shieldInterpolation: {shieldInterpolation}, preparationKey: \"{rootPathExpression}\")"
                 : $"{ContextVariable}.ResolveOverride({arguments})";
         foreach (IPropertyOverrideAspect aspect in context.Property.Aspects<IPropertyOverrideAspect>())
         {
