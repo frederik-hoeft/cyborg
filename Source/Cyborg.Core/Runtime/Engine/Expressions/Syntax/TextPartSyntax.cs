@@ -1,4 +1,9 @@
-﻿namespace Cyborg.Core.Runtime.Engine.Expressions.Syntax;
+using Cyborg.Core.Runtime.Engine.Expressions.Bound;
 
-/// <summary>A source-order segment of a textual expression.</summary>
-internal abstract record TextPartSyntax;
+namespace Cyborg.Core.Runtime.Engine.Expressions.Syntax;
+
+/// <summary>Source-order text segment with polymorphic binding into a distinct bound node.</summary>
+internal abstract record TextPartSyntax
+{
+    public abstract BoundTextPart Bind();
+}

@@ -1,6 +1,9 @@
-﻿namespace Cyborg.Core.Runtime.Engine.Expressions.Syntax;
+using Cyborg.Core.Runtime.Engine.Expressions.Bound;
 
-/// <summary>
-/// Describes a non-text CLR value. The syntax wrapper is immutable; the contained object is not deep-cloned.
-/// </summary>
-internal sealed record TerminalValueSyntax(object? Value) : ValueSyntax;
+namespace Cyborg.Core.Runtime.Engine.Expressions.Syntax;
+
+/// <summary>Arbitrary CLR object represented structurally without interpretation or deep cloning.</summary>
+internal sealed record TerminalValueSyntax(object? Value) : ValueSyntax
+{
+    public override BoundValue Bind(IExpressionResolutionContext context) => new BoundTerminal(Value);
+}

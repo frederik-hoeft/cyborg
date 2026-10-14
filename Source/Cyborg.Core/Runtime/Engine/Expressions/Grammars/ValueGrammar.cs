@@ -1,11 +1,12 @@
 ﻿using Cyborg.Core.Parsing;
 using Cyborg.Core.Parsing.Parsers;
 using Cyborg.Core.Parsing.SyntaxNodes;
-using System.Collections.Immutable;
 using Cyborg.Core.Runtime.Engine.Expressions.Parsers;
 using Cyborg.Core.Runtime.Engine.Expressions.Syntax;
 using Cyborg.Core.Runtime.Engine.Expressions.SyntaxNodes;
 using Cyborg.Core.Runtime.Engine.Expressions.Visitors;
+using Cyborg.Core.Text;
+using System.Collections.Immutable;
 
 namespace Cyborg.Core.Runtime.Engine.Expressions.Grammars;
 
@@ -24,6 +25,17 @@ internal sealed class ValueGrammar
     }
 
     public static ValueGrammar Instance { get; } = new();
+
+    /// <summary>Converts arbitrary environment values to immutable syntax, without interpreting non-text CLR objects.</summary>
+    public ValueSyntax Compile(object? value) => value switch
+    {
+        string text => Parse(text),
+        TaggedString tagged => Parse(tagged),
+        _ => new TerminalValueSyntax(value)
+    };
+
+    /// <summary>Compiles tagged textual input without discarding tags or its CLR text kind.</summary>
+    public ValueSyntax Parse(TaggedString input) => new TaggedValueSyntax(Parse(input.Value), input.Tags);
 
     public ValueSyntax Parse(string input)
     {

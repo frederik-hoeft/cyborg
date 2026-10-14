@@ -1,6 +1,9 @@
-﻿namespace Cyborg.Core.Runtime.Engine.Expressions.Syntax;
+namespace Cyborg.Core.Runtime.Engine.Expressions.Syntax;
 
-/// <summary>
-/// Variable reference. A null identifier denotes the current namespace, whose scope is selected by <see cref="Anchor"/>.
-/// </summary>
-internal sealed record VariableReferenceSyntax(string? Identifier, ReferenceAnchor Anchor);
+/// <summary>Variable reference. A null identifier denotes the namespace of the selected scope.</summary>
+internal sealed record VariableReferenceSyntax(string? Identifier, ReferenceAnchor Anchor)
+{
+    public override string ToString() => Identifier is null
+        ? Anchor == ReferenceAnchor.EntryPoint ? "@@" : "@"
+        : Anchor == ReferenceAnchor.EntryPoint ? $"@{Identifier}" : Identifier;
+}

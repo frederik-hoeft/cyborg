@@ -1,6 +1,9 @@
-﻿namespace Cyborg.Core.Runtime.Engine.Expressions.Syntax;
+using Cyborg.Core.Runtime.Engine.Expressions.Bound;
 
-/// <summary>
-/// An escaped operator expression. Escape depth and original body remain structural; no escape layer is consumed during parsing.
-/// </summary>
-internal sealed record EscapedPartSyntax(char Operator, int EscapeDepth, string Body) : TextPartSyntax;
+namespace Cyborg.Core.Runtime.Engine.Expressions.Syntax;
+
+/// <summary>Escaped operator expression, preserving structural escape depth until evaluation.</summary>
+internal sealed record EscapedPartSyntax(char Operator, int EscapeDepth, string Body) : TextPartSyntax
+{
+    public override BoundTextPart Bind() => new BoundEscape(Operator, EscapeDepth, Body);
+}
