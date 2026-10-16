@@ -102,6 +102,11 @@ internal abstract class TextualValueSectionRenderer(ValidationContractInfo contr
     private void EmitStringRewrite(IndentedStringBuilder builder, PropertyModel property, string localName, string propertyAccess, PreparationPath preparationPath)
     {
         string rewrittenExpression = CreateStringExpression(property, propertyAccess, preparationPath.RenderExpression());
+        if (property.Symbol.Type.IsReferenceType && !property.IsNullable)
+        {
+            // Keep generated nullable flow warnings independent of the runtime's explicit-null override semantics.
+            rewrittenExpression = $"{rewrittenExpression}!";
+        }
         if (!property.Symbol.Type.CanEverBeNull)
         {
             builder.AppendLine($"{property.NullableTypeName} {localName} = {rewrittenExpression};");
@@ -189,7 +194,7 @@ internal abstract class TextualValueSectionRenderer(ValidationContractInfo contr
                     $$"""
                     if ({{elementAccess.GuardExpression}})
                     {
-                        {{collection.ElementNonNullableTypeName}} {{elementValueVariable}} = {{CreateElementExpression(collection.ElementType, elementAccess.ValueExpression, elementPath.RenderExpression())}};
+                        {{collection.ElementNonNullableTypeName}} {{elementValueVariable}} = {{RenderElementExpression(collection.ElementType, elementAccess.ValueExpression, elementPath.RenderExpression(), assumeNotNull: true)}};
                         {{elementCurrentVariable}} = {{elementValueVariable}};
                     }
                     """);
@@ -198,7 +203,7 @@ internal abstract class TextualValueSectionRenderer(ValidationContractInfo contr
             }
             else
             {
-                loopBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elementCurrentVariable} = {CreateElementExpression(collection.ElementType, elementAccess.ValueExpression, elementPath.RenderExpression())};");
+                loopBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elementCurrentVariable} = {RenderElementExpression(collection.ElementType, elementAccess.ValueExpression, elementPath.RenderExpression())};");
                 loopBuilder.AppendLine($"{rewrittenItemsVariable}.Add({elementCurrentVariable});");
             }
         }
@@ -218,6 +223,13 @@ internal abstract class TextualValueSectionRenderer(ValidationContractInfo contr
         loopBuilder.AppendLine($"++{elementIndexVariable};");
         builder.AppendLine("}");
         collection.Renderer.AppendMaterialization(builder, collectionVariable, rewrittenItemsVariable);
+    }
+
+    private string RenderElementExpression(ITypeSymbol elementType, string accessExpression, string preparationKey, bool assumeNotNull = false)
+    {
+        string expression = CreateElementExpression(elementType, accessExpression, preparationKey);
+        return elementType.IsReferenceType && (assumeNotNull || elementType.NullableAnnotation != NullableAnnotation.Annotated)
+            ? $"{expression}!" : expression;
     }
 
     private bool HasWork(ImmutableArray<PropertyModel> properties)

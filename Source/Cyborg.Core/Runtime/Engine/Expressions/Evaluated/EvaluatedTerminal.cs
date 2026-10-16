@@ -5,5 +5,4 @@ internal sealed record EvaluatedTerminal(object? Value) : EvaluatedValue
 {
     internal override object? Materialize(ExpressionMaterializer materializer) => Value;
 
-    internal override bool IsNull => Value is null;
 }

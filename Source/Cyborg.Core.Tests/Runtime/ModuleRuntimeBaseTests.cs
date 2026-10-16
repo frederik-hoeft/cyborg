@@ -16,6 +16,31 @@ public sealed class ModuleRuntimeBaseTests
     public TestContext TestContext { get; set; }
 
     [TestMethod]
+    public async Task ExecuteAsync_RequiredNullArgumentRemainsPresentAndShadowsFallbackAsync()
+    {
+        GlobalRuntimeEnvironment globalEnvironment = new(JsonNamingPolicy.SnakeCaseLower);
+        globalEnvironment.SetVariable<object?>("settings.container_name", null);
+        globalEnvironment.SetVariable("container_name", "fallback");
+        using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
+        ProbeModuleWorker worker = new();
+        using ServiceProvider serviceProvider = new ServiceCollection()
+            .AddSingleton<IModuleWorkerFactory>(new ProbeModuleWorkerFactory(worker))
+            .BuildServiceProvider();
+        RootModuleRuntime runtime = new(globalEnvironment, loggerFactory, serviceProvider);
+        ModuleContext moduleContext = new(
+            Module: new ModuleReference(worker.Module, ProbeModule.ModuleId),
+            Environment: ModuleEnvironment.Default,
+            Configuration: null,
+            Requires: new ModuleRequirements("settings", ["container_name"]));
+
+        IModuleExecutionResult result = await runtime.ExecuteAsync(moduleContext, TestContext.CancellationToken);
+
+        Assert.AreEqual(ModuleExitStatus.Success, result.Status);
+        Assert.IsTrue(worker.SawContainerName);
+        Assert.IsNull(worker.ContainerName);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_WithNamespacedRequiredArguments_ImportsArgumentsIntoChildEnvironmentUnqualifiedAsync()
     {
         GlobalRuntimeEnvironment globalEnvironment = new(JsonNamingPolicy.SnakeCaseLower);

@@ -163,6 +163,7 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
         {
             expression = aspect.RewriteOverrideResolutionExpression(context, expression, rootPathExpression);
         }
-        return expression;
+        // Nullable resolution preserves explicit null overrides. The generated CLR property annotation does not restrict runtime values.
+        return context.Property.Symbol.Type.IsReferenceType && !context.Property.IsNullable ? $"{expression}!" : expression;
     }
 }

@@ -152,6 +152,12 @@ Raw string selection and typed resolution use the same override lookup order:
 
 The first matching override wins, including when its resolved value equals the module property's current value or is the same collection instance. Override presence is tracked independently from the resolved value and its terminal-evaluation state; a selected value does not fall through to an inherited environment's override merely because it compares equal. A present override whose `&{...}` or `*{...}` target is undefined fails resolution instead of falling through to a less specific override. Separating raw selection from evaluation does not change precedence or path construction.
 
+## Defined Null and Missing Values
+
+A variable binding is **present** even when its stored or evaluated CLR value is `null`. `TryResolveVariable(...)` returns `true` with a null output for such a binding, whereas an absent variable returns `false`. This distinction is preserved by eager capture (`*{...}`), lazy typed indirection (`&{...}`), required-argument transfer, inherited scopes, public environment publication, and transactional storage. A null target is defined and therefore does not produce an undefined-reference error. Interpolating a present null into text contributes an empty textual segment; only missing `${...}` references remain unresolved.
+
+Override selection also uses presence, not non-nullness: the first matching override wins even when its resolved value is null. It cannot fall through to a lower-priority identifier or an inherited override. Nullable CLR destinations receive null; non-nullable CLR value types reject it as an incompatible type. Generated defaults and property validation may still transform or reject the selected value according to the destination's own rules. For example, a default configured to replace null may do so after override selection; null is not, however, treated as an absent override during selection.
+
 ## Examples
 
 ### Shell expression passed literally

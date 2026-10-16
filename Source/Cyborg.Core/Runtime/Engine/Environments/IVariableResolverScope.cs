@@ -30,6 +30,8 @@ public interface IVariableResolverScope : IEnumerable<KeyValuePair<string, objec
     /// Fully resolves a stored variable at this scope's entry point.
     /// Text results finalize one escape layer unless the value is an eager-capture snapshot, which is returned unchanged.
     /// Prefer <see cref="TaggedString"/> retrieval so tags are preserved. Retrieving a tagged value as <see cref="string"/> discards tags.
+    /// A defined null value returns true with a null result; false means the variable is absent.
+    /// Null cannot be converted to a non-nullable value type.
     /// </summary>
-    bool TryResolveVariable<T>(string name, [NotNullWhen(true)] out T? value);
+    bool TryResolveVariable<T>(string name, out T? value);
 }

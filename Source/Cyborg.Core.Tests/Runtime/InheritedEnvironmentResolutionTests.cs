@@ -16,6 +16,57 @@ namespace Cyborg.Core.Tests.Runtime;
 public sealed class InheritedEnvironmentResolutionTests
 {
     [TestMethod]
+    public void DefinedNull_ShadowsInheritedVariableUntilRemoved()
+    {
+        GlobalRuntimeEnvironment root = CreateRoot();
+        InheritedRuntimeEnvironment child = Inherit(root, "child");
+        root.SetVariable("present", "parent");
+        child.SetVariable<object?>("present", null);
+        child.SetVariable("alias", "&{present}");
+
+        Assert.IsTrue(child.TryResolveVariable("present", out string? current));
+        Assert.IsNull(current);
+        Assert.IsTrue(child.TryResolveVariable("alias", out object? alias));
+        Assert.IsNull(alias);
+        Assert.IsTrue(child.TryRemoveVariable("present"));
+        Assert.IsTrue(child.TryResolveVariable("present", out string? inherited));
+        Assert.AreEqual("parent", inherited);
+    }
+
+    [TestMethod]
+    public void PresentNullOverride_ShadowsLowerPriorityIdentifiersAndInheritedValues()
+    {
+        GlobalRuntimeEnvironment root = CreateRoot();
+        InheritedRuntimeEnvironment child = Inherit(root, "child");
+        ProbeModule module = new(Port: 22, Value: "configured", Ports: [22]) { Name = "probe", Group = "group" };
+        root.SetVariable<object?>("@probe.value", null);
+        child.SetVariable("@group.value", "lower-priority");
+        root.SetVariable("@group.value", "root-group");
+        child.SetVariable("@probe.port", 40);
+        child.SetVariable<IReadOnlyCollection<int>?>("@probe.ports", null);
+        child.SetVariable("@group.ports", (IReadOnlyCollection<int>)[80]);
+
+        Assert.IsNull(child.Resolve(module, module.Value));
+        Assert.IsNull(((IRuntimeEnvironment)child).ResolveCollection(module, module.Ports, nameof(module), "module.Ports"));
+        Assert.AreEqual(40, child.Resolve(module, module.Port));
+        Assert.IsTrue(child.TryRemoveVariable("@probe.ports"));
+        Assert.AreEqual(80, ((IRuntimeEnvironment)child).ResolveCollection(module, module.Ports, nameof(module), "module.Ports")!.Single());
+        Assert.IsTrue(root.TryRemoveVariable("@probe.value"));
+        Assert.AreEqual("lower-priority", child.Resolve(module, module.Value));
+    }
+
+    [TestMethod]
+    public void NullableTypedOverride_AcceptsNullButNonNullableValueTypeRejectsIt()
+    {
+        GlobalRuntimeEnvironment root = CreateRoot();
+        ProbeModule module = new(Port: 22, Value: "configured", Ports: null) { Name = "probe" };
+        root.SetVariable<object?>("@probe.port", null);
+
+        Assert.IsNull(root.Resolve(module, (int?)module.Port, nameof(module), "module.Port"));
+        Assert.ThrowsExactly<InvalidCastException>(() => root.Resolve(module, module.Port));
+    }
+
+    [TestMethod]
     public void TypedOverride_NearestMatchingViewWinsAcrossMultipleParents()
     {
         GlobalRuntimeEnvironment root = CreateRoot();

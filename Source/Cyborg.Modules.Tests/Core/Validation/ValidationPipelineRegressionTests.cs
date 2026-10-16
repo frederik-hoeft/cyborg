@@ -10,6 +10,24 @@ namespace Cyborg.Modules.Tests.Core.Validation;
 public sealed class ValidationPipelineRegressionTests : ModuleTestBase
 {
     [TestMethod]
+    public Task TestValidationAsync_NullTextOverrideAndIndirectionStayNullAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        runtime.Environment.SetVariable<object?>("@probe.optional_text", null);
+        ValidationPipelineTestModule module = CreateValidModule() with { Name = "probe", OptionalText = "configured" };
+
+        IValidationResult<ValidationPipelineTestModule> first = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
+        MSAssert.IsTrue(first.IsValid);
+        MSAssert.IsNull(first.Module.OptionalText);
+
+        runtime.Environment.SetVariable<object?>("source", null);
+        runtime.Environment.SetVariable("@probe.optional_text", "&{source}");
+        IValidationResult<ValidationPipelineTestModule> second = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
+        MSAssert.IsTrue(second.IsValid);
+        MSAssert.IsNull(second.Module.OptionalText);
+    });
+
+    [TestMethod]
     public Task TestValidationAsync_DefaultRequiredImmutableArray_ProducesRequiredErrorWithoutEnumeratingAsync() => TestWithDIAsync(async services =>
     {
         IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();

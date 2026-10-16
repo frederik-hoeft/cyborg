@@ -44,7 +44,7 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         if (VariableStore.TryGetValue(context.Name, out object? stored) && stored is BoundValue bound)
         {
             value = bound.Evaluate(new EnvironmentExpressionContext(this, context));
-            return !value.IsNull;
+            return true;
         }
         value = null;
         return false;
@@ -65,10 +65,10 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         }
     }
 
-    protected virtual bool TryGetStoredVariableInCurrentScopeCore(string name, [NotNullWhen(true)] out object? value)
+    protected virtual bool TryGetStoredVariableInCurrentScopeCore(string name, out object? value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        if (VariableStore.TryGetValue(name, out value) && value is not null)
+        if (VariableStore.TryGetValue(name, out value))
         {
             return true;
         }
@@ -76,26 +76,26 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         return false;
     }
 
-    internal protected virtual bool TryGetStoredVariableRecursiveCore(string name, [NotNullWhen(true)] out object? value) =>
+    internal protected virtual bool TryGetStoredVariableRecursiveCore(string name, out object? value) =>
         TryGetStoredVariableInCurrentScopeCore(name, out value);
 
     internal protected virtual bool TryResolveVariableRecursiveCore(ResolutionContext context, out Evaluation evaluation) =>
         TryResolveVariableInCurrentScopeCore(context, out evaluation);
 
-    public virtual bool TryResolveVariable<T>(string name, [NotNullWhen(true)] out T? value)
+    public virtual bool TryResolveVariable<T>(string name, out T? value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        if (!TryResolveEvaluation(name, entryPoint: this, out Evaluation evaluation) || evaluation.Value is null)
+        if (!TryResolveEvaluation(name, entryPoint: this, out Evaluation evaluation))
         {
             value = default;
             return false;
         }
-        object resolved = evaluation.Value;
+        object? resolved = evaluation.Value;
         if (TryConvertResolvedValue(resolved, name, notifyImplicitConversion: true, out value))
         {
             return true;
         }
-        throw new InvalidCastException($"Attempted to resolve variable '{name}' as type {typeof(T).FullName}, but it is of type {resolved.GetType().FullName}.");
+        throw new InvalidCastException($"Attempted to resolve variable '{name}' as type {typeof(T).FullName}, but it is of type {resolved?.GetType().FullName ?? "null"}.");
     }
 
     public virtual void SetVariable<T>(string name, T value)
@@ -221,8 +221,13 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
         return result is TaggedString tagged ? tagged : new TaggedString((string)result!);
     }
 
-    private protected bool TryConvertResolvedValue<T>(object? objValue, string variableName, bool notifyImplicitConversion, [NotNullWhen(true)] out T? value)
+    private protected bool TryConvertResolvedValue<T>(object? objValue, string variableName, bool notifyImplicitConversion, out T? value)
     {
+        if (objValue is null && default(T) is null)
+        {
+            value = default;
+            return true;
+        }
         if (objValue is T typedValue)
         {
             value = typedValue;

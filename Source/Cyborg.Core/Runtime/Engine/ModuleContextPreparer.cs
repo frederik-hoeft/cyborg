@@ -73,7 +73,7 @@ internal sealed class ModuleContextPreparer(VariableSyntaxBuilder syntaxFactory,
                 if (structural.TryResolveStructuralValue(argumentPath, out EvaluatedValue? namespaced)
                     || structural.TryResolveStructuralValue(path, out namespaced))
                 {
-                    resolvedArguments.Add((argument, namespaced.SnapshotText()));
+                    resolvedArguments.Add((argument, namespaced.SnapshotForCapture()));
                     continue;
                 }
             }

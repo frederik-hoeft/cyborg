@@ -21,6 +21,33 @@ public sealed class TransactionalRuntimeEnvironmentTests
     public TestContext TestContext { get; set; }
 
     [TestMethod]
+    public void RuntimeEnvironmentParticipant_NullBindingRemainsPresentAcrossForkAndJoin()
+    {
+        RuntimeEnvironmentTransactionParticipant participant = new();
+        ModuleTransaction root = CreateEnvironmentRoot(participant, out RuntimeEnvironmentId environmentId);
+        RuntimeEnvironmentTransactionState initial = root.GetParticipantState(participant);
+        initial.SetValue(environmentId, "present", null);
+
+        ModuleTransactionForkGroup fork = root.Fork();
+        ModuleTransaction child = fork.CreateChild();
+        RuntimeEnvironmentTransactionState childState = child.GetParticipantState(participant);
+        Assert.IsTrue(childState.TryGetValue(environmentId, "present", out object? inherited));
+        Assert.IsNull(inherited);
+        Assert.IsFalse(childState.TryGetValue(environmentId, "absent", out object? _));
+        childState.SetValue(environmentId, "new-null", null);
+        fork.Continuation.Complete();
+        child.Complete();
+
+        Assert.IsTrue(fork.TryJoin(out TransactionConflict? conflict));
+        Assert.IsNull(conflict);
+        RuntimeEnvironmentTransactionState merged = root.GetParticipantState(participant);
+        Assert.IsTrue(merged.TryGetValue(environmentId, "present", out object? existing));
+        Assert.IsNull(existing);
+        Assert.IsTrue(merged.TryGetValue(environmentId, "new-null", out object? added));
+        Assert.IsNull(added);
+    }
+
+    [TestMethod]
     public void RuntimeEnvironmentParticipant_SiblingsUseStableBindingBaselineAndConflictingWritesFail()
     {
         RuntimeEnvironmentTransactionParticipant participant = new();

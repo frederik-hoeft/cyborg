@@ -47,14 +47,14 @@ public sealed class ModuleValidationContext
     public TaggedString Interpolate(TaggedString? value, string preparationKey) =>
         value is { } tagged ? Interpolate(tagged, preparationKey) : default;
 
-    public string ResolveValueExpression(string value, bool willInterpolate, string preparationKey)
+    public string? ResolveValueExpression(string value, bool willInterpolate, string preparationKey)
     {
         object? prepared = Expressions.ResolveValueExpression(value, willInterpolate, preparationKey);
         return prepared switch
         {
             string text => text,
             TaggedString tagged => tagged.Value,
-            null => throw new InvalidCastException("Value expression resolved to null instead of string."),
+            null => null,
             _ => throw new InvalidCastException($"Value expression resolved to '{prepared.GetType().FullName}' instead of string.")
         };
     }
@@ -71,8 +71,21 @@ public sealed class ModuleValidationContext
         };
     }
 
-    public TaggedString? ResolveValueExpression(TaggedString? value, bool willInterpolate, string preparationKey) =>
-        value is { } tagged ? ResolveValueExpression(tagged, willInterpolate, preparationKey) : null;
+    public TaggedString? ResolveValueExpression(TaggedString? value, bool willInterpolate, string preparationKey)
+    {
+        if (value is not { } tagged)
+        {
+            return default(TaggedString?);
+        }
+        object? prepared = Expressions.ResolveValueExpression(tagged, willInterpolate, preparationKey);
+        return prepared switch
+        {
+            TaggedString result => result,
+            string text => new TaggedString(text),
+            null => default(TaggedString?),
+            _ => throw new InvalidCastException($"Value expression resolved to '{prepared.GetType().FullName}' instead of TaggedString.")
+        };
+    }
 
     /// <summary>Replaces a selected override with a generated default, discarding its stale structural expression.</summary>
     public T ApplyDefaultReplacement<T>(T replacement, string preparationKey)
@@ -87,7 +100,6 @@ public sealed class ModuleValidationContext
     /// <summary>Renders a nullable tagged value through the application-configured rendering pipeline.</summary>
     public string? Render(TaggedString? value) => value is { } tagged ? Render(tagged) : null;
 
-    [return: NotNullIfNotNull(nameof(value))]
     public string? SelectRawStringOverride<TModule>(TModule module, string? value, string moduleExpression, string valueExpression, string preparationKey)
         where TModule : ModuleBase, IModuleDefinition
     {
@@ -99,6 +111,7 @@ public sealed class ModuleValidationContext
         {
             string text => text,
             TaggedString tagged => tagged.Value,
+            null => null,
             _ => throw new InvalidCastException($"Selected override is not a string for '{preparationKey}'.")
         };
     }
@@ -118,32 +131,25 @@ public sealed class ModuleValidationContext
         };
     }
 
-    [return: NotNullIfNotNull(nameof(value))]
     public TaggedString? SelectRawTaggedStringOverride<TModule>(TModule module, TaggedString? value, string moduleExpression, string valueExpression, string preparationKey)
-        where TModule : ModuleBase, IModuleDefinition =>
-        value is { } tagged ? SelectRawTaggedStringOverride(module, tagged, moduleExpression, valueExpression, preparationKey)
-        : SelectNullableTaggedOverride(module, moduleExpression, valueExpression, preparationKey);
-
-    private TaggedString? SelectNullableTaggedOverride<TModule>(TModule module, string moduleExpression, string valueExpression, string preparationKey)
         where TModule : ModuleBase, IModuleDefinition
     {
         if (!Expressions.TrySelectOverride(module, moduleExpression, valueExpression, preparationKey, out object? selected))
         {
-            return null;
+            return value;
         }
         return selected switch
         {
             TaggedString tagged => tagged,
             string text => new TaggedString(text),
+            null => default(TaggedString?),
             _ => throw new InvalidCastException($"Selected override is not textual for '{preparationKey}'.")
         };
     }
 
-    [return: NotNullIfNotNull(nameof(value))]
     public T? ResolveOverride<TModule, T>(TModule module, T? value, string moduleExpression, string valueExpression) where TModule : ModuleBase, IModuleDefinition =>
         Runtime.Environment.Resolve(module, value, moduleExpression, valueExpression);
 
-    [return: NotNullIfNotNull(nameof(value))]
     public IReadOnlyCollection<T>? ResolveCollectionOverride<TModule, T>(
         TModule module,
         IReadOnlyCollection<T>? value,

@@ -18,7 +18,6 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
 
     RuntimeEnvironmentId ITransactionalRuntimeEnvironment.EnvironmentId => EnvironmentId;
 
-    [return: NotNullIfNotNull(nameof(value))]
     IReadOnlyCollection<T>? IRuntimeEnvironment.ResolveCollection<TModule, T>(
         TModule module,
         IReadOnlyCollection<T>? value,
@@ -36,7 +35,7 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         IReadOnlyCollection<T>? value,
         string? moduleExpression,
         string? valueExpression,
-        [NotNullWhen(true)] out IReadOnlyCollection<T>? resolvedValue)
+        out IReadOnlyCollection<T>? resolvedValue)
         where TModule : ModuleBase, IModuleDefinition
     {
         ArgumentNullException.ThrowIfNull(entryPoint);
@@ -50,13 +49,19 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
             foreach (string identifier in scope.EnumerateOverrideIdentifiers(module.Name, module.Group, TModule.ModuleId))
             {
                 string overridePath = scope.SyntaxFactory.Path(identifier, valuePath).Override();
-                if (!scope.TryResolveEvaluation(overridePath, entryPoint, out Evaluation evaluation) || evaluation.Value is null)
+                if (!scope.TryResolveEvaluation(overridePath, entryPoint, out Evaluation evaluation))
                 {
                     continue;
                 }
+                if (evaluation.Value is null)
+                {
+                    resolvedValue = null;
+                    return true;
+                }
                 if (evaluation.Value is not IEnumerable enumerable)
                 {
-                    throw new InvalidCastException($"Attempted to resolve variable '{overridePath}' as type {typeof(IEnumerable).FullName}, but it is of type {evaluation.Value.GetType().FullName}.");
+                    throw new InvalidCastException(
+                        $"Attempted to resolve variable '{overridePath}' as type {typeof(IEnumerable).FullName}, but it is of type {evaluation.Value.GetType().FullName}.");
                 }
                 resolvedValue = enumerable is IReadOnlyCollection<T> typedCollection ? typedCollection : enumerable.Cast<T>().ToImmutableArray();
                 return true;
@@ -68,14 +73,13 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         if (lastScope is InheritedRuntimeEnvironment { Parent: not RuntimeEnvironment } inherited)
         {
             resolvedValue = inherited.Parent.Resolve(module, value, moduleExpression, valueExpression);
-            return resolvedValue is not null;
+            return true;
         }
 
         resolvedValue = default;
         return false;
     }
 
-    [return: NotNullIfNotNull(nameof(value))]
     public virtual T? Resolve<TModule, T>(TModule module, T? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
         where TModule : ModuleBase, IModuleDefinition
     {
@@ -107,7 +111,7 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         T? value,
         string? moduleExpression,
         string? valueExpression,
-        [NotNullWhen(true)] out T? resolvedValue,
+        out T? resolvedValue,
         out bool terminal) where TModule : ModuleBase, IModuleDefinition
     {
         ArgumentNullException.ThrowIfNull(entryPoint);
@@ -122,13 +126,13 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
             foreach (string identifier in scope.EnumerateOverrideIdentifiers(module.Name, module.Group, TModule.ModuleId))
             {
                 string overridePath = scope.SyntaxFactory.Path(identifier, valuePath).Override();
-                if (!scope.TryResolveEvaluation(overridePath, entryPoint, out Evaluation evaluation) || evaluation.Value is null)
+                if (!scope.TryResolveEvaluation(overridePath, entryPoint, out Evaluation evaluation))
                 {
                     continue;
                 }
                 if (!scope.TryConvertResolvedValue(evaluation.Value, overridePath, notifyImplicitConversion: true, out resolvedValue))
                 {
-                    throw new InvalidCastException($"Attempted to resolve variable '{overridePath}' as type {typeof(T).FullName}, but it is of type {evaluation.Value.GetType().FullName}.");
+                    throw new InvalidCastException($"Attempted to resolve variable '{overridePath}' as type {typeof(T).FullName}, but it is of type {evaluation.Value?.GetType().FullName ?? "null"}.");
                 }
                 terminal = evaluation.Terminal;
                 return true;
@@ -139,7 +143,7 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         {
             terminal = true;
             resolvedValue = inherited.Parent.Resolve(module, value, moduleExpression, valueExpression);
-            return resolvedValue is not null;
+            return true;
         }
 
         resolvedValue = default;

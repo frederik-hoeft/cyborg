@@ -3,6 +3,7 @@ using Cyborg.Core.Runtime.Engine.Expressions.Evaluated;
 using Cyborg.Core.Runtime.Engine;
 using Cyborg.Core.Runtime.Engine.Environments;
 using Cyborg.Core.Runtime.Engine.Environments.Syntax;
+using Cyborg.Core.Runtime.Extensions;
 using Cyborg.Core.Text;
 using Microsoft.Extensions.DependencyInjection;
 using System.Text;
@@ -13,6 +14,55 @@ namespace Cyborg.Core.Tests.Runtime;
 [TestClass]
 public sealed class EnvironmentValueExpressionTests : CyborgCoreTestBase
 {
+    [TestMethod]
+    public void DefinedNull_IsPresentForTypedResolutionCaptureAndInterpolation()
+    {
+        GlobalRuntimeEnvironment environment = new(JsonNamingPolicy.SnakeCaseLower);
+        environment.SetVariable<object?>("present", null);
+        environment.SetVariable("alias", "&{present}");
+        environment.SetVariable("snapshot", "*{present}");
+        environment.SetVariable("message", "before ${present} after");
+
+        Assert.IsTrue(environment.TryResolveVariable("present", out object? present));
+        Assert.IsNull(present);
+        Assert.IsTrue(environment.TryResolveVariable("present", out string? text));
+        Assert.IsNull(text);
+        Assert.IsTrue(environment.TryResolveVariable("present", out int? nullableNumber));
+        Assert.IsNull(nullableNumber);
+        Assert.IsFalse(environment.TryResolveVariable("absent", out object? absent));
+        Assert.IsNull(absent);
+        Assert.IsNull(environment.ResolveVariableOrDefault("present", "fallback"));
+        Assert.AreEqual("fallback", environment.ResolveVariableOrDefault("absent", "fallback"));
+        Assert.ThrowsExactly<InvalidCastException>(() => environment.TryResolveVariable("present", out int _));
+
+        Assert.IsTrue(environment.TryResolveVariable("alias", out object? alias));
+        Assert.IsNull(alias);
+        Assert.IsTrue(environment.TryResolveVariable("snapshot", out object? snapshot));
+        Assert.IsNull(snapshot);
+        Assert.IsTrue(environment.TryResolveVariable("message", out string? message));
+        Assert.AreEqual("before  after", message);
+        Assert.AreEqual("before  after", environment.Interpolate("before ${present} after").Value);
+
+        environment.SetVariable("present", "updated");
+        Assert.IsTrue(environment.TryResolveVariable("alias", out string? updated));
+        Assert.AreEqual("updated", updated);
+        Assert.IsTrue(environment.TryResolveVariable("snapshot", out object? captured));
+        Assert.IsNull(captured);
+    }
+
+    [TestMethod]
+    public void PublishedNull_StaysPresentAcrossEnvironmentCopies()
+    {
+        GlobalRuntimeEnvironment source = new(JsonNamingPolicy.SnakeCaseLower);
+        GlobalRuntimeEnvironment destination = new(JsonNamingPolicy.SnakeCaseLower);
+        source.SetVariable<object?>("present", null);
+        ((IRuntimeEnvironment)destination).Publish(source);
+
+        Assert.IsTrue(destination.TryResolveVariable("present", out object? value));
+        Assert.IsNull(value);
+        Assert.IsFalse(destination.TryResolveVariable("missing", out object? _));
+    }
+
     [TestMethod]
     public Task Test_ExactInterpolation_StringifiesNonStringTargetAsync() => TestWithDIAsync(services =>
     {
@@ -191,6 +241,24 @@ public sealed class EnvironmentValueExpressionTests : CyborgCoreTestBase
         Assert.AreEqual("prefix: before-after", current);
         Assert.IsTrue(environment.TryResolveVariable("object", out StringBuilder? capturedObject));
         Assert.AreSame(mutable, capturedObject);
+    }
+
+    [TestMethod]
+    public void Test_EagerCapture_TaggedTextFreezesMutableInterpolationAndPreservesTags()
+    {
+        GlobalRuntimeEnvironment environment = new(JsonNamingPolicy.SnakeCaseLower);
+        StringBuilder mutable = new("before");
+        environment.SetVariable("object", mutable);
+        environment.SetVariable("source", new TaggedString("prefix: ${object}", ["source-tag"]));
+        environment.SetVariable("snapshot", new TaggedString("*{source}", ["capture-tag"]));
+        mutable.Append("-after");
+
+        Assert.IsTrue(environment.TryResolveVariable("snapshot", out TaggedString captured));
+        Assert.AreEqual("prefix: before", captured.Value);
+        Assert.IsTrue(captured.HasTag("source-tag"));
+        Assert.IsTrue(captured.HasTag("capture-tag"));
+        Assert.IsTrue(environment.TryResolveVariable("source", out TaggedString current));
+        Assert.AreEqual("prefix: before-after", current.Value);
     }
 
     [TestMethod]

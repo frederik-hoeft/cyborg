@@ -16,6 +16,10 @@ public sealed class ForeachModuleWorker(IWorkerContext<ForeachModule> context) :
             Logger.LogCollectionNotFound(Module.Collection);
             throw new InvalidOperationException($"Collection variable '{Module.Collection}' not found in the current environment.");
         }
+        if (collection is null)
+        {
+            throw new InvalidOperationException($"Collection variable '{Module.Collection}' is defined but null.");
+        }
         ModuleExitStatus exitCode = ModuleExitStatus.Skipped;
         int iteration = 0;
         foreach (object item in collection)
