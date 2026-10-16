@@ -13,6 +13,8 @@ internal abstract class PreparationSectionRenderer(ValidationContractInfo contra
 
     protected abstract PropertyPreparationRenderer PreparationRenderer { get; }
 
+    protected virtual bool TracksSelectedOverrides => false;
+
     public override void RenderSection(IndentedStringBuilder builder, ModuleModel model)
     {
         string qualifiedType = model.FullyQualifiedTypeName;
@@ -28,7 +30,8 @@ internal abstract class PreparationSectionRenderer(ValidationContractInfo contra
             """);
 
         builder = builder.IncreaseIndent();
-        PreparationRenderer.AppendPreparationForObject(builder, model.Properties, RootModuleVariable, DiagnosticsPhase);
+        PreparationRenderer.AppendPreparationForObject(builder, model.Properties, RootModuleVariable, DiagnosticsPhase,
+            TracksSelectedOverrides ? $"\"{RootModuleVariable}\"" : null);
         builder = builder.DecreaseIndent();
         builder.AppendBlock(
             $$"""

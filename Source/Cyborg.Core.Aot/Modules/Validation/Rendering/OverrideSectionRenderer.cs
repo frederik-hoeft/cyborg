@@ -75,7 +75,8 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
             builder.AppendLine($"{property.NullableTypeName} {localName} = {localInitializer};");
             PropertyRewriteContext nestedRewriteContext = rewriteContext with
             {
-                PropertyAccessExpression = localName
+                PropertyAccessExpression = localName,
+                PreparationKeyExpression = $"\"{rootPathExpression}\""
             };
             DefaultRenderer.AppendDirectPreparationForProperty(builder, nestedRewriteContext);
 
@@ -86,7 +87,8 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
 
             if (hasCollectionElementAssignments)
             {
-                DefaultRenderer.AppendCollectionPreparationForProperty(builder, property, localName, diagnosticsPhase: "overrides");
+                DefaultRenderer.AppendCollectionPreparationForProperty(builder, property, localName, diagnosticsPhase: "overrides",
+                    preparationKeyExpression: $"\"{rootPathExpression}\"");
             }
 
             assignments.Add((property.Name, localName));

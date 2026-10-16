@@ -68,14 +68,18 @@ internal sealed class ModuleContextPreparer(VariableSyntaxBuilder syntaxFactory,
             }
             PathSyntax path = syntaxFactory.Path(argument);
             PathSyntax argumentPath = syntaxFactory.Path(argumentNamespaceValue).Child(path);
-            if (environment.TryResolveVariable(argumentPath, out object? value) || environment.TryResolveVariable(path, out value))
+            if (environment is EnvironmentLike structural)
             {
-                EvaluatedValue terminal = environment is EnvironmentLike source && source.TryResolveStructuralValue(argumentPath, out EvaluatedValue? namespaced)
-                    ? namespaced
-                    : environment is EnvironmentLike fallback && fallback.TryResolveStructuralValue(path, out EvaluatedValue? unqualified)
-                        ? unqualified
-                        : new EvaluatedTerminal(value);
-                resolvedArguments.Add((argument, terminal));
+                if (structural.TryResolveStructuralValue(argumentPath, out EvaluatedValue? namespaced)
+                    || structural.TryResolveStructuralValue(path, out namespaced))
+                {
+                    resolvedArguments.Add((argument, namespaced.SnapshotText()));
+                    continue;
+                }
+            }
+            else if (environment.TryResolveVariable(argumentPath, out object? value) || environment.TryResolveVariable(path, out value))
+            {
+                resolvedArguments.Add((argument, new EvaluatedTerminal(value)));
                 continue;
             }
             errors.Add($"Unable to resolve template argument: '{argument}'");

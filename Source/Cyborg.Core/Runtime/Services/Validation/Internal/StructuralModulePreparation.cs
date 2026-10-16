@@ -31,6 +31,8 @@ internal sealed class StructuralModulePreparation(RuntimeEnvironment environment
         return true;
     }
 
+    public void DiscardSelectedOverride(string preparationKey) => _selectedOverrides.Remove(preparationKey);
+
     public object? ResolveValueExpression(object value, bool willInterpolate, string preparationKey)
     {
         BoundValue bound = _selectedOverrides.Remove(preparationKey, out BoundValue? selected)

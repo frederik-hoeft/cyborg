@@ -8,6 +8,8 @@ internal sealed record EvaluatedWithTags(EvaluatedValue Inner, ImmutableHashSet<
 {
     internal override bool IsNull => Inner.IsNull;
 
+    internal override bool RequiresTextSnapshot => Inner.RequiresTextSnapshot;
+
     internal override object? Materialize(ExpressionMaterializer materializer)
     {
         object? value = materializer.Materialize(Inner);

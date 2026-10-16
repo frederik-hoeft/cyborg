@@ -74,6 +74,13 @@ public sealed class ModuleValidationContext
     public TaggedString? ResolveValueExpression(TaggedString? value, bool willInterpolate, string preparationKey) =>
         value is { } tagged ? ResolveValueExpression(tagged, willInterpolate, preparationKey) : null;
 
+    /// <summary>Replaces a selected override with a generated default, discarding its stale structural expression.</summary>
+    public T ApplyDefaultReplacement<T>(T replacement, string preparationKey)
+    {
+        _expressions?.DiscardSelectedOverride(preparationKey);
+        return replacement;
+    }
+
     /// <summary>Renders a tagged value through the application-configured rendering pipeline.</summary>
     public string Render(TaggedString value) => TaggedStringRenderer.Render(value);
 

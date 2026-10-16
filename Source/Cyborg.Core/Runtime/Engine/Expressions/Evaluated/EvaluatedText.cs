@@ -6,6 +6,8 @@ namespace Cyborg.Core.Runtime.Engine.Expressions.Evaluated;
 /// <summary>Terminal textual result whose literal and already-evaluated splice segments cannot be interpreted again.</summary>
 internal sealed record EvaluatedText(ImmutableArray<EvaluatedTextPart> Parts) : EvaluatedValue
 {
+    internal override bool RequiresTextSnapshot => true;
+
     internal override object Materialize(ExpressionMaterializer materializer)
     {
         StringBuilder builder = new();

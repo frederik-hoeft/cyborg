@@ -12,4 +12,6 @@ internal sealed class DefaultsSectionRenderer(ValidationContractInfo contractInf
     protected override string DiagnosticsPhase => "defaults";
 
     protected override PropertyPreparationRenderer PreparationRenderer => field ??= new DefaultPropertyPreparationRenderer(this);
+
+    protected override bool TracksSelectedOverrides => true;
 }

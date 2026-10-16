@@ -33,6 +33,29 @@ public sealed class TaggedStringModuleTests : ModuleTestBase
     });
 
     [TestMethod]
+    public Task TestValidationAsync_DefaultReplacesSelectedCapturedSentinelAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        runtime.Environment.SetVariable("sentinel", "unset");
+        runtime.Environment.SetVariable("@tagged.defaulted_secret", "*{sentinel}");
+        TaggedStringTestModule module = new(
+            Plain: "visible",
+            Secret: "secret",
+            OptionalSecret: null,
+            IntentionallyUntagged: "id",
+            Values: [])
+        {
+            Name = "tagged",
+        };
+
+        IValidationResult<TaggedStringTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
+
+        MSAssert.IsTrue(result.IsValid);
+        MSAssert.AreEqual("default-secret", result.Module.DefaultedSecret.Value);
+        MSAssert.IsTrue(result.Module.DefaultedSecret.HasTag(WellKnownTags.SECRET));
+    });
+
+    [TestMethod]
     public Task TestValidationAsync_SecretAttribute_InjectsSecretTagAsync() => TestWithDIAsync(async services =>
     {
         IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();

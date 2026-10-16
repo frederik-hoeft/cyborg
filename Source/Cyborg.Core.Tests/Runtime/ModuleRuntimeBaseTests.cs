@@ -40,6 +40,44 @@ public sealed class ModuleRuntimeBaseTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_RequiredArgumentResolvesNamespacedTextOnlyOnceAsync()
+    {
+        GlobalRuntimeEnvironment globalEnvironment = new(JsonNamingPolicy.SnakeCaseLower);
+        CountingTextValue operand = new();
+        globalEnvironment.SetVariable("operand", operand);
+        globalEnvironment.SetVariable("settings.container_name", "${operand}");
+        globalEnvironment.SetVariable("container_name", "fallback");
+        using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
+        ProbeModuleWorker worker = new();
+        using ServiceProvider serviceProvider = new ServiceCollection()
+            .AddSingleton<IModuleWorkerFactory>(new ProbeModuleWorkerFactory(worker))
+            .BuildServiceProvider();
+        RootModuleRuntime runtime = new(globalEnvironment, loggerFactory, serviceProvider);
+        ModuleContext moduleContext = new(
+            Module: new ModuleReference(worker.Module, ProbeModule.ModuleId),
+            Environment: ModuleEnvironment.Default,
+            Configuration: null,
+            Requires: new ModuleRequirements("settings", ["container_name"]));
+
+        IModuleExecutionResult result = await runtime.ExecuteAsync(moduleContext, TestContext.CancellationToken);
+
+        Assert.AreEqual(ModuleExitStatus.Success, result.Status);
+        Assert.AreEqual("one", worker.ContainerName);
+        Assert.AreEqual(1, operand.Conversions);
+    }
+
+    private sealed class CountingTextValue
+    {
+        public int Conversions { get; private set; }
+
+        public override string ToString()
+        {
+            ++Conversions;
+            return "one";
+        }
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_SameLoadedReference_ActivatesFreshWorkersForConcurrentExecutionsAsync()
     {
         GlobalRuntimeEnvironment globalEnvironment = new(JsonNamingPolicy.SnakeCaseLower);

@@ -13,6 +13,8 @@ internal sealed record CaptureSyntax(VariableReferenceSyntax Reference) : ValueS
         {
             throw new InvalidOperationException($"Failed to capture '*{{{Reference}}}' because the target is not defined.");
         }
-        return new BoundCapture(value);
+        // Textual splices may reference mutable CLR objects. Freeze their stringification at capture time,
+        // while preserving shallow object identity for direct typed captures.
+        return new BoundCapture(value.SnapshotText());
     }
 }

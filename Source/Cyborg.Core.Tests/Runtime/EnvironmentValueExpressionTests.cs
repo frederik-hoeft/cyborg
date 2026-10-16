@@ -5,6 +5,7 @@ using Cyborg.Core.Runtime.Engine.Environments;
 using Cyborg.Core.Runtime.Engine.Environments.Syntax;
 using Cyborg.Core.Text;
 using Microsoft.Extensions.DependencyInjection;
+using System.Text;
 using System.Text.Json;
 
 namespace Cyborg.Core.Tests.Runtime;
@@ -173,6 +174,24 @@ public sealed class EnvironmentValueExpressionTests : CyborgCoreTestBase
         Assert.AreEqual(22, value);
         Assert.IsTrue(environment.Where(static pair => pair.Key == "snapshot").Select(static pair => pair.Value).Single() is int stored && stored == 22);
     });
+
+    [TestMethod]
+    public void Test_EagerCapture_TextualSpliceFreezesMutableObjectStringification()
+    {
+        GlobalRuntimeEnvironment environment = new(JsonNamingPolicy.SnakeCaseLower);
+        StringBuilder mutable = new("before");
+        environment.SetVariable("object", mutable);
+        environment.SetVariable("source", "prefix: ${object}");
+        environment.SetVariable("snapshot", "*{source}");
+        mutable.Append("-after");
+
+        Assert.IsTrue(environment.TryResolveVariable("snapshot", out string? snapshot));
+        Assert.AreEqual("prefix: before", snapshot);
+        Assert.IsTrue(environment.TryResolveVariable("source", out string? current));
+        Assert.AreEqual("prefix: before-after", current);
+        Assert.IsTrue(environment.TryResolveVariable("object", out StringBuilder? capturedObject));
+        Assert.AreSame(mutable, capturedObject);
+    }
 
     [TestMethod]
     public Task Test_EagerCapture_CopiesReferenceWithoutCloningAsync() => TestWithDIAsync(services =>
