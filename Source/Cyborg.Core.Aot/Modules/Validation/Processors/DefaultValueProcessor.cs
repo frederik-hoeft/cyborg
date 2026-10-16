@@ -64,10 +64,10 @@ internal sealed class DefaultValueProcessor : AttributeProcessorBase
             }
 
             string replacement = valueExpression;
-            if (rewriteContext.PreparationKeyExpression is { } preparationKey
+            if (rewriteContext.PreparationPath is { } preparationPath
                 && rewriteContext.Property.Symbol.Type.IsStringLike(rewriteContext.ContractInfo.TaggedString))
             {
-                replacement = $"{rewriteContext.ContextVariable}.ApplyDefaultReplacement({replacement}, {preparationKey})";
+                replacement = $"{rewriteContext.ContextVariable}.ApplyDefaultReplacement({replacement}, {preparationPath.RenderExpression()})";
             }
             return $"{triggerExpression} ? {replacement} : {propertyAccessExpression}";
         }

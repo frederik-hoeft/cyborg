@@ -4,6 +4,7 @@ using Cyborg.Core.Aot.Modules.Validation.Models;
 using Cyborg.Core.Aot.Modules.Validation.Processors;
 using Cyborg.Core.Aot.Modules.Validation.Rendering.Models;
 using Cyborg.Core.Aot.Modules.Validation.Rendering.Objects;
+using Cyborg.Core.Aot.Modules.Validation.Rendering.Models;
 using Cyborg.Shared.Text;
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
@@ -76,7 +77,7 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
             PropertyRewriteContext nestedRewriteContext = rewriteContext with
             {
                 PropertyAccessExpression = localName,
-                PreparationKeyExpression = $"\"{rootPathExpression}\""
+                PreparationPath = PreparationPath.Root(rootPathExpression)
             };
             DefaultRenderer.AppendDirectPreparationForProperty(builder, nestedRewriteContext);
 
@@ -88,7 +89,7 @@ internal sealed class OverrideSectionRenderer(ValidationContractInfo contractInf
             if (hasCollectionElementAssignments)
             {
                 DefaultRenderer.AppendCollectionPreparationForProperty(builder, property, localName, diagnosticsPhase: "overrides",
-                    preparationKeyExpression: $"\"{rootPathExpression}\"");
+                    preparationPath: PreparationPath.Root(rootPathExpression));
             }
 
             assignments.Add((property.Name, localName));

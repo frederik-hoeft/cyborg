@@ -54,10 +54,10 @@ internal sealed class DefaultInstanceFactoryProcessor : AttributeProcessorBase<D
         {
             _ = currentExpression;
             string replacement = $"{factoryMember}()";
-            if (context.PreparationKeyExpression is { } preparationKey
+            if (context.PreparationPath is { } preparationPath
                 && context.Property.Symbol.Type.IsStringLike(context.ContractInfo.TaggedString))
             {
-                replacement = $"{context.ContextVariable}.ApplyDefaultReplacement({replacement}, {preparationKey})";
+                replacement = $"{context.ContextVariable}.ApplyDefaultReplacement({replacement}, {preparationPath.RenderExpression()})";
             }
             return $"{context.PropertyAccessExpression} is null ? {replacement} : {context.PropertyAccessExpression}";
         }

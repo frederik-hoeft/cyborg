@@ -1,6 +1,7 @@
 using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
 using Cyborg.Core.Aot.Modules.Validation.Rendering.Collections;
+using Cyborg.Core.Aot.Modules.Validation.Rendering.Models;
 using Cyborg.Core.Aot.Modules.Validation.Rendering.Objects;
 using Cyborg.Shared.Text;
 using Microsoft.CodeAnalysis;
@@ -33,7 +34,7 @@ internal abstract class TextualValueSectionRenderer(ValidationContractInfo contr
             """);
 
         builder = builder.IncreaseIndent();
-        AppendForObject(builder, model.Properties, RootModuleVariable, $"\"{RootModuleVariable}\"");
+        AppendForObject(builder, model.Properties, RootModuleVariable, PreparationPath.Root(RootModuleVariable));
         builder = builder.DecreaseIndent();
         builder.AppendBlock(
             $$"""
@@ -43,7 +44,7 @@ internal abstract class TextualValueSectionRenderer(ValidationContractInfo contr
             """);
     }
 
-    private bool AppendForObject(IndentedStringBuilder builder, ImmutableArray<PropertyModel> properties, string targetVariable, string pathExpression)
+    private bool AppendForObject(IndentedStringBuilder builder, ImmutableArray<PropertyModel> properties, string targetVariable, PreparationPath path)
     {
         List<(string PropertyName, string LocalName)> assignments = [];
 
@@ -51,7 +52,7 @@ internal abstract class TextualValueSectionRenderer(ValidationContractInfo contr
         {
             string propertyAccess = $"{targetVariable}.{property.Name}";
             string localName = $"{targetVariable}_{property.Name}";
-            string propertyKey = $"{pathExpression} + \".{property.Name}\"";
+            PreparationPath propertyPath = path.AppendProperty(property.Name);
             bool isStringLike = property.Symbol.Type.IsStringLike(ContractInfo.TaggedString);
             bool skipProperty = isStringLike && ShouldSkip(property);
             bool hasNestedWork = property.Object is { HasChildren: true } objectModel && HasWork(objectModel.Children);
@@ -71,18 +72,18 @@ internal abstract class TextualValueSectionRenderer(ValidationContractInfo contr
 
             if (isStringLike)
             {
-                EmitStringRewrite(builder, property, localName, propertyAccess, propertyKey);
+                EmitStringRewrite(builder, property, localName, propertyAccess, propertyPath);
             }
             else
             {
                 builder.AppendLine($"{property.NullableTypeName} {localName} = {propertyAccess};");
                 if (hasNestedWork)
                 {
-                    AppendNestedRewrite(builder, property, localName, propertyKey);
+                    AppendNestedRewrite(builder, property, localName, propertyPath);
                 }
                 if (hasCollectionWork)
                 {
-                    AppendCollectionRewrite(builder, property, collection!, localName, propertyKey);
+                    AppendCollectionRewrite(builder, property, collection!, localName, propertyPath);
                 }
             }
 
@@ -98,9 +99,9 @@ internal abstract class TextualValueSectionRenderer(ValidationContractInfo contr
         return true;
     }
 
-    private void EmitStringRewrite(IndentedStringBuilder builder, PropertyModel property, string localName, string propertyAccess, string preparationKey)
+    private void EmitStringRewrite(IndentedStringBuilder builder, PropertyModel property, string localName, string propertyAccess, PreparationPath preparationPath)
     {
-        string rewrittenExpression = CreateStringExpression(property, propertyAccess, preparationKey);
+        string rewrittenExpression = CreateStringExpression(property, propertyAccess, preparationPath.RenderExpression());
         if (!property.Symbol.Type.CanEverBeNull)
         {
             builder.AppendLine($"{property.NullableTypeName} {localName} = {rewrittenExpression};");
@@ -117,7 +118,7 @@ internal abstract class TextualValueSectionRenderer(ValidationContractInfo contr
         }
     }
 
-    private void AppendNestedRewrite(IndentedStringBuilder builder, PropertyModel property, string localName, string preparationKey)
+    private void AppendNestedRewrite(IndentedStringBuilder builder, PropertyModel property, string localName, PreparationPath preparationPath)
     {
         ObjectModel objectModel = property.Object
             ?? throw new InvalidOperationException($"Nested textual value preparation requires object metadata for property '{property.Name}'.");
@@ -127,10 +128,10 @@ internal abstract class TextualValueSectionRenderer(ValidationContractInfo contr
             builder,
             localName,
             nestedVariable,
-            (nestedBuilder, currentVariable) => AppendForObject(nestedBuilder, objectModel.Children, currentVariable, preparationKey));
+            (nestedBuilder, currentVariable) => AppendForObject(nestedBuilder, objectModel.Children, currentVariable, preparationPath));
     }
 
-    private void AppendCollectionRewrite(IndentedStringBuilder builder, PropertyModel property, CollectionModel collection, string localName, string preparationKey)
+    private void AppendCollectionRewrite(IndentedStringBuilder builder, PropertyModel property, CollectionModel collection, string localName, PreparationPath preparationPath)
     {
         ValueAccess access = collection.Shape.Renderer.Access(localName);
         if (access.RequiresGuard)
@@ -142,7 +143,7 @@ internal abstract class TextualValueSectionRenderer(ValidationContractInfo contr
                 {
                     {{property.NonNullableTypeName}} {{collectionCurrentVariable}} = {{access.ValueExpression}};
                 """);
-            AppendCollectionRewriteBody(builder.IncreaseIndent(), collection, collectionCurrentVariable, preparationKey);
+            AppendCollectionRewriteBody(builder.IncreaseIndent(), collection, collectionCurrentVariable, preparationPath);
             builder.AppendBlock(
                 $$"""
                     {{localName}} = {{collectionCurrentVariable}};
@@ -155,10 +156,10 @@ internal abstract class TextualValueSectionRenderer(ValidationContractInfo contr
             return;
         }
 
-        AppendCollectionRewriteBody(builder, collection, localName, preparationKey);
+        AppendCollectionRewriteBody(builder, collection, localName, preparationPath);
     }
 
-    private void AppendCollectionRewriteBody(IndentedStringBuilder builder, CollectionModel collection, string collectionVariable, string preparationKey)
+    private void AppendCollectionRewriteBody(IndentedStringBuilder builder, CollectionModel collection, string collectionVariable, PreparationPath preparationPath)
     {
         string safeIdentifier = CreateSafeIdentifier(collectionVariable);
         string rewrittenItemsVariable = $"{safeIdentifier}Items";
@@ -166,7 +167,7 @@ internal abstract class TextualValueSectionRenderer(ValidationContractInfo contr
         string elementCurrentVariable = $"{safeIdentifier}ElementCurrent";
         string elementValueVariable = $"{safeIdentifier}ElementValue";
         string elementIndexVariable = $"{safeIdentifier}Index";
-        string elementKeyExpression = $"{preparationKey} + \"[\" + {elementIndexVariable} + \"]\"";
+        PreparationPath elementPath = preparationPath.AppendIndex(elementIndexVariable);
 
         builder.AppendBlock(
             $$"""
@@ -188,7 +189,7 @@ internal abstract class TextualValueSectionRenderer(ValidationContractInfo contr
                     $$"""
                     if ({{elementAccess.GuardExpression}})
                     {
-                        {{collection.ElementNonNullableTypeName}} {{elementValueVariable}} = {{CreateElementExpression(collection.ElementType, elementAccess.ValueExpression, elementKeyExpression)}};
+                        {{collection.ElementNonNullableTypeName}} {{elementValueVariable}} = {{CreateElementExpression(collection.ElementType, elementAccess.ValueExpression, elementPath.RenderExpression())}};
                         {{elementCurrentVariable}} = {{elementValueVariable}};
                     }
                     """);
@@ -197,7 +198,7 @@ internal abstract class TextualValueSectionRenderer(ValidationContractInfo contr
             }
             else
             {
-                loopBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elementCurrentVariable} = {CreateElementExpression(collection.ElementType, elementAccess.ValueExpression, elementKeyExpression)};");
+                loopBuilder.AppendLine($"{collection.ElementNonNullableTypeName} {elementCurrentVariable} = {CreateElementExpression(collection.ElementType, elementAccess.ValueExpression, elementPath.RenderExpression())};");
                 loopBuilder.AppendLine($"{rewrittenItemsVariable}.Add({elementCurrentVariable});");
             }
         }
@@ -210,7 +211,7 @@ internal abstract class TextualValueSectionRenderer(ValidationContractInfo contr
                 loopBuilder,
                 elementCurrentVariable,
                 elementValueVariable,
-                (elementBuilder, currentVariable) => AppendForObject(elementBuilder, elementObject.Children, currentVariable, elementKeyExpression));
+                (elementBuilder, currentVariable) => AppendForObject(elementBuilder, elementObject.Children, currentVariable, elementPath));
             loopBuilder.AppendLine($"{rewrittenItemsVariable}.Add({elementCurrentVariable});");
         }
 
