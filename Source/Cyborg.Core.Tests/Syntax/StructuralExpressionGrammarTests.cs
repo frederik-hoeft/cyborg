@@ -1,4 +1,4 @@
-using Cyborg.Core.Parsing.Parsers;
+﻿using Cyborg.Core.Parsing.Parsers;
 using Cyborg.Core.Parsing.SyntaxNodes;
 using Cyborg.Core.Runtime.Engine.Expressions.Grammars;
 using Cyborg.Core.Runtime.Engine.Expressions.Parsers;
@@ -137,11 +137,10 @@ public sealed class StructuralExpressionGrammarTests
     [TestMethod]
     public void Test_SpecializedParsers_HonorOffsetsAndConsumedLengths()
     {
-        IParser parser = new InterpolationParser();
-        Assert.IsTrue(parser.TryParse("prefix ${host.port} suffix", 7, out ISyntaxNode? node, out int consumed));
+        Assert.IsTrue(InterpolationParser.Instance.TryParse("prefix ${host.port} suffix", 7, out ISyntaxNode? node, out int consumed));
         Assert.AreEqual(12, consumed);
         Assert.IsNotNull(node);
-        Assert.IsFalse(parser.TryParse("prefix ${host.port} suffix", 0, out _, out int rejected));
+        Assert.IsFalse(InterpolationParser.Instance.TryParse("prefix ${host.port} suffix", 0, out _, out int rejected));
         Assert.AreEqual(0, rejected);
     }
 
@@ -165,13 +164,13 @@ public sealed class StructuralExpressionGrammarTests
     public void Test_RegexEscapes_PreserveBodiesAndHonorOffsets()
     {
         EscapedPartParser parser = new();
-        const string input = "prefix &{###some\nbody} suffix";
-        Assert.IsTrue(parser.TryParse(input, 7, out ISyntaxNode? node, out int consumed));
+        const string INPUT = "prefix &{###some\nbody} suffix";
+        Assert.IsTrue(parser.TryParse(INPUT, 7, out _, out int consumed));
         Assert.AreEqual("&{###some\nbody}".Length, consumed);
-        Assert.IsFalse(parser.TryParse(input, 0, out _, out int rejected));
+        Assert.IsFalse(parser.TryParse(INPUT, 0, out _, out int rejected));
         Assert.AreEqual(0, rejected);
 
-        TextValueSyntax expression = ValueGrammar.Instance.ParseText(input);
+        TextValueSyntax expression = ValueGrammar.Instance.ParseText(INPUT);
         EscapedPartSyntax escaped = Assert.IsInstanceOfType<EscapedPartSyntax>(expression.Parts[1]);
         Assert.AreEqual('&', escaped.Operator);
         Assert.AreEqual(3, escaped.EscapeDepth);

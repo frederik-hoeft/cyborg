@@ -291,7 +291,7 @@ public sealed class ConcurrentExecutionScopeTests : CyborgCoreTestBase
         Assert.AreEqual("child", RequireVariable(runtime, "child_value"));
     }, ConfigureTransactionalServices);
 
-    private static string RequireVariable(IModuleRuntime runtime, string name)
+    private static string? RequireVariable(IModuleRuntime runtime, string name)
     {
         Assert.IsTrue(runtime.GlobalEnvironment.TryResolveVariable(name, out string? value));
         return value;

@@ -1,4 +1,4 @@
-using Cyborg.Core.Text;
+﻿using Cyborg.Core.Text;
 using System.Collections.Immutable;
 
 namespace Cyborg.Core.Runtime.Engine.Expressions.Evaluated;

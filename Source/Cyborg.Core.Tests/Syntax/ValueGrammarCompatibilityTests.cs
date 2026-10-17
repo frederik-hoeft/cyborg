@@ -1,4 +1,4 @@
-using Cyborg.Core.Runtime.Engine.Expressions.Grammars;
+﻿using Cyborg.Core.Runtime.Engine.Expressions.Grammars;
 using Cyborg.Core.Runtime.Engine.Expressions.Syntax;
 
 namespace Cyborg.Core.Tests.Syntax;

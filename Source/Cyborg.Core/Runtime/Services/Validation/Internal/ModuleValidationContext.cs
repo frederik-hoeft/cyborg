@@ -1,4 +1,4 @@
-using Cyborg.Core.Aot.Contracts;
+﻿using Cyborg.Core.Aot.Contracts;
 using Cyborg.Core.Runtime.Engine;
 using Cyborg.Core.Runtime.Engine.Environments;
 using Cyborg.Core.Text;

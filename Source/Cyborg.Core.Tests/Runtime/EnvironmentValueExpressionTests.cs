@@ -1,8 +1,8 @@
-using Cyborg.Core.Runtime;
-using Cyborg.Core.Runtime.Engine.Expressions.Evaluated;
+﻿using Cyborg.Core.Runtime;
 using Cyborg.Core.Runtime.Engine;
 using Cyborg.Core.Runtime.Engine.Environments;
 using Cyborg.Core.Runtime.Engine.Environments.Syntax;
+using Cyborg.Core.Runtime.Engine.Expressions.Evaluated;
 using Cyborg.Core.Runtime.Extensions;
 using Cyborg.Core.Text;
 using Microsoft.Extensions.DependencyInjection;
@@ -188,7 +188,7 @@ public sealed class EnvironmentValueExpressionTests : CyborgCoreTestBase
 
         InvalidOperationException exception = Assert.ThrowsExactly<InvalidOperationException>(() => environment.TryResolveVariable("alias", out object? _));
 
-        StringAssert.Contains(exception.Message, "missing");
+        Assert.Contains("missing", exception.Message);
     });
 
     [TestMethod]
@@ -262,7 +262,7 @@ public sealed class EnvironmentValueExpressionTests : CyborgCoreTestBase
     }
 
     [TestMethod]
-    public Task Test_EagerCapture_CopiesReferenceWithoutCloningAsync() => TestWithDIAsync(services =>
+    public Task Test_EagerCapture_CopiesReferenceWithoutCloningAsync() => TestWithDIAsync(static services =>
     {
         IRuntimeEnvironment environment = Environment(services);
         List<int> items = [1];
@@ -272,6 +272,7 @@ public sealed class EnvironmentValueExpressionTests : CyborgCoreTestBase
 
         Assert.IsTrue(environment.TryResolveVariable("snapshot", out List<int>? snapshot));
         Assert.AreSame(items, snapshot);
+        Assert.IsNotNull(snapshot);
         Assert.HasCount(2, snapshot);
     });
 
