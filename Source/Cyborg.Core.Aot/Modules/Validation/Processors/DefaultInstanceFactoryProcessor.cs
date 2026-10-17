@@ -53,7 +53,13 @@ internal sealed class DefaultInstanceFactoryProcessor : AttributeProcessorBase<D
         public string? RewriteDefaultAssignmentExpression(PropertyRewriteContext context, string? currentExpression)
         {
             _ = currentExpression;
-            return $"{context.PropertyAccessExpression} is null ? {factoryMember}() : {context.PropertyAccessExpression}";
+            string replacement = $"{factoryMember}()";
+            if (context.PreparationPath is { } preparationPath
+                && context.Property.Symbol.Type.IsStringLike(context.ContractInfo.TaggedString))
+            {
+                replacement = $"{context.ContextVariable}.ApplyDefaultReplacement({replacement}, {preparationPath.RenderExpression()})";
+            }
+            return $"{context.PropertyAccessExpression} is null ? {replacement} : {context.PropertyAccessExpression}";
         }
     }
 }

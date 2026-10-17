@@ -1,5 +1,6 @@
 ﻿using Cyborg.Core.Aot.Extensions;
 using Cyborg.Core.Aot.Modules.Validation.Models;
+using Cyborg.Core.Aot.Modules.Validation.Rendering.Models;
 using Cyborg.Shared.Text;
 
 namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
@@ -12,6 +13,8 @@ internal abstract class PreparationSectionRenderer(ValidationContractInfo contra
     protected abstract string DiagnosticsPhase { get; }
 
     protected abstract PropertyPreparationRenderer PreparationRenderer { get; }
+
+    protected virtual bool TracksSelectedOverrides => false;
 
     public override void RenderSection(IndentedStringBuilder builder, ModuleModel model)
     {
@@ -28,7 +31,8 @@ internal abstract class PreparationSectionRenderer(ValidationContractInfo contra
             """);
 
         builder = builder.IncreaseIndent();
-        PreparationRenderer.AppendPreparationForObject(builder, model.Properties, RootModuleVariable, DiagnosticsPhase);
+        PreparationRenderer.AppendPreparationForObject(builder, model.Properties, RootModuleVariable, DiagnosticsPhase,
+            TracksSelectedOverrides ? PreparationPath.Root(RootModuleVariable) : null);
         builder = builder.DecreaseIndent();
         builder.AppendBlock(
             $$"""

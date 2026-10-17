@@ -9,7 +9,7 @@ namespace Cyborg.Core.Tests.Debugging;
 public sealed class DebugPauseCoordinatorTests
 {
     [TestMethod]
-    public async Task AcquireAsync_QueuesFifoAndProjectsPausedVersusCurrentState()
+    public async Task TestAcquireAsync_QueuesFifoAndProjectsPausedVersusCurrentStateAsync()
     {
         RecordingTopology topology = new();
         DebugSessionState session = new();
@@ -46,7 +46,7 @@ public sealed class DebugPauseCoordinatorTests
     }
 
     [TestMethod]
-    public async Task AcquireAsync_QueuedCancellationRemovesRequestAndRestoresRunningState()
+    public async Task TestAcquireAsync_QueuedCancellationRemovesRequestAndRestoresRunningStateAsync()
     {
         RecordingTopology topology = new();
         DebugSessionState session = new();
@@ -65,7 +65,7 @@ public sealed class DebugPauseCoordinatorTests
     }
 
     [TestMethod]
-    public async Task AcquireAsync_SessionInvalidationSuppressesQueuedPause()
+    public async Task TestAcquireAsync_SessionInvalidationSuppressesQueuedPauseAsync()
     {
         RecordingTopology topology = new();
         DebugSessionState session = new();

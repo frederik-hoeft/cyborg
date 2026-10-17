@@ -2,6 +2,7 @@
 using Cyborg.Core.Runtime.Engine.Environments;
 using Cyborg.Core.Runtime.Services.ModuleDescriptors;
 using Cyborg.Core.Runtime.Services.Validation;
+using Cyborg.Core.Runtime.Services.Validation.Internal;
 using Cyborg.Core.Text;
 using Cyborg.Core.Text.Rendering;
 using Cyborg.Modules.Subprocess;
@@ -13,6 +14,63 @@ namespace Cyborg.Modules.Tests.Core.Text;
 [TestClass]
 public sealed class TaggedStringModuleTests : ModuleTestBase
 {
+    [TestMethod]
+    public Task TestValidationAsync_PresentNullOverrideRemainsNullForNullableTaggedPropertyAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        runtime.Environment.SetVariable<object?>("@tagged.optional_secret", null);
+        TaggedStringTestModule module = new(
+            Plain: "visible",
+            Secret: "secret",
+            OptionalSecret: "configured",
+            IntentionallyUntagged: "id",
+            Values: [])
+        {
+            Name = "tagged"
+        };
+
+        MSAssert.IsTrue(runtime.Environment.TryResolveVariable("@tagged.optional_secret", out object? selected));
+        MSAssert.IsNull(selected);
+        ModuleValidationContext diagnostic = ModuleValidationContext.Create(runtime, services);
+        TaggedString? direct = diagnostic.SelectRawTaggedStringOverride(module, module.OptionalSecret, "module", "module.OptionalSecret", "module.OptionalSecret");
+        MSAssert.IsNull(direct);
+        MSAssert.IsNull(diagnostic.ResolveValueExpression((TaggedString?)null, willInterpolate: false, preparationKey: "unselected"));
+        IValidationResult<TaggedStringTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
+
+        MSAssert.IsTrue(result.IsValid);
+        MSAssert.IsNull(result.Module.OptionalSecret);
+    });
+
+    [TestMethod]
+    public Task TestValidationAsync_NullTypedReferenceRemainsNullForNullableTaggedPropertyAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        runtime.Environment.SetVariable<object?>("source", null);
+        runtime.Environment.SetVariable("@tagged.optional_secret", "&{source}");
+        TaggedStringTestModule module = new(
+            Plain: "visible",
+            Secret: "secret",
+            OptionalSecret: "configured",
+            IntentionallyUntagged: "id",
+            Values: [])
+        {
+            Name = "tagged"
+        };
+
+        MSAssert.IsTrue(runtime.Environment.TryResolveVariable("@tagged.optional_secret", out object? selected));
+        MSAssert.IsNull(selected);
+        ModuleValidationContext diagnostic = ModuleValidationContext.Create(runtime, services);
+        TaggedString? direct = diagnostic.SelectRawTaggedStringOverride(module, module.OptionalSecret, "module", "module.OptionalSecret", "module.OptionalSecret");
+        MSAssert.IsNotNull(direct);
+        MSAssert.AreEqual("&{source}", direct.Value.Value);
+        TaggedString? evaluated = diagnostic.ResolveValueExpression(direct, willInterpolate: false, preparationKey: "module.OptionalSecret");
+        MSAssert.IsNull(evaluated);
+        IValidationResult<TaggedStringTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
+
+        MSAssert.IsTrue(result.IsValid);
+        MSAssert.IsNull(result.Module.OptionalSecret);
+    });
+
     [TestMethod]
     public Task TestValidationAsync_SecretTaggingAfterDefaultsPreservesWhenPresentMatchingAsync() => TestWithDIAsync(async services =>
     {
@@ -28,6 +86,29 @@ public sealed class TaggedStringModuleTests : ModuleTestBase
 
         MSAssert.IsTrue(result.IsValid);
         MSAssert.IsNull(result.Module.OptionalSecret);
+        MSAssert.AreEqual("default-secret", result.Module.DefaultedSecret.Value);
+        MSAssert.IsTrue(result.Module.DefaultedSecret.HasTag(WellKnownTags.SECRET));
+    });
+
+    [TestMethod]
+    public Task TestValidationAsync_DefaultReplacesSelectedCapturedSentinelAsync() => TestWithDIAsync(async services =>
+    {
+        IModuleRuntime runtime = services.GetRequiredService<IModuleRuntime>();
+        runtime.Environment.SetVariable("sentinel", "unset");
+        runtime.Environment.SetVariable("@tagged.defaulted_secret", "*{sentinel}");
+        TaggedStringTestModule module = new(
+            Plain: "visible",
+            Secret: "secret",
+            OptionalSecret: null,
+            IntentionallyUntagged: "id",
+            Values: [])
+        {
+            Name = "tagged",
+        };
+
+        IValidationResult<TaggedStringTestModule> result = await module.ValidateAsync(runtime, services, TestContext.CancellationToken);
+
+        MSAssert.IsTrue(result.IsValid);
         MSAssert.AreEqual("default-secret", result.Module.DefaultedSecret.Value);
         MSAssert.IsTrue(result.Module.DefaultedSecret.HasTag(WellKnownTags.SECRET));
     });

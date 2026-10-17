@@ -18,6 +18,9 @@ public sealed partial record ValidationPipelineTestModule
     IReadOnlyCollection<string?>? Tags
 ) : ModuleBase, IModule
 {
+    [Untagged]
+    public string? OptionalText { get; init; }
+
     [DefaultValue<string>("${deferred_default}")]
     [IgnoreInterpolation]
     [Untagged]

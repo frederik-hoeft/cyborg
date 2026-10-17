@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Runtime.Engine.Environments.Syntax;
+using Cyborg.Core.Runtime.Engine.Expressions.Bound;
 using Cyborg.Core.Runtime.Engine.Transactions;
 using Cyborg.Core.Runtime.Engine.Transactions.Internal;
 using Cyborg.Core.Text;
@@ -17,22 +18,12 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
 
     RuntimeEnvironmentId ITransactionalRuntimeEnvironment.EnvironmentId => EnvironmentId;
 
-    [return: NotNullIfNotNull(nameof(value))]
     IReadOnlyCollection<T>? IRuntimeEnvironment.ResolveCollection<TModule, T>(
         TModule module,
         IReadOnlyCollection<T>? value,
         string moduleExpression,
         string valueExpression) =>
         TryResolveCollectionCore(this, module, value, moduleExpression, valueExpression, out IReadOnlyCollection<T>? selected) ? selected : value;
-
-    string IRuntimeEnvironment.ResolveValueExpression(string value, bool willInterpolate) =>
-        ResolveValueExpressionCore(value, willInterpolate);
-
-    TaggedString IRuntimeEnvironment.ResolveValueExpression(TaggedString value, bool willInterpolate) =>
-        ResolveValueExpressionCore(value, willInterpolate);
-
-    TaggedString? IRuntimeEnvironment.ResolveValueExpression(TaggedString? value, bool willInterpolate) =>
-        value is { } tagged ? ResolveValueExpressionCore(tagged, willInterpolate) : null;
 
     /// <summary>
     /// Selects collection overrides in structural view order, retaining the original resolution entry point.
@@ -44,7 +35,7 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         IReadOnlyCollection<T>? value,
         string? moduleExpression,
         string? valueExpression,
-        [NotNullWhen(true)] out IReadOnlyCollection<T>? resolvedValue)
+        out IReadOnlyCollection<T>? resolvedValue)
         where TModule : ModuleBase, IModuleDefinition
     {
         ArgumentNullException.ThrowIfNull(entryPoint);
@@ -58,13 +49,19 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
             foreach (string identifier in scope.EnumerateOverrideIdentifiers(module.Name, module.Group, TModule.ModuleId))
             {
                 string overridePath = scope.SyntaxFactory.Path(identifier, valuePath).Override();
-                if (!scope.TryResolveEvaluation(overridePath, entryPoint, out Evaluation evaluation) || evaluation.Value is null)
+                if (!scope.TryResolveEvaluation(overridePath, entryPoint, out Evaluation evaluation))
                 {
                     continue;
                 }
+                if (evaluation.Value is null)
+                {
+                    resolvedValue = null;
+                    return true;
+                }
                 if (evaluation.Value is not IEnumerable enumerable)
                 {
-                    throw new InvalidCastException($"Attempted to resolve variable '{overridePath}' as type {typeof(IEnumerable).FullName}, but it is of type {evaluation.Value.GetType().FullName}.");
+                    throw new InvalidCastException(
+                        $"Attempted to resolve variable '{overridePath}' as type {typeof(IEnumerable).FullName}, but it is of type {evaluation.Value.GetType().FullName}.");
                 }
                 resolvedValue = enumerable is IReadOnlyCollection<T> typedCollection ? typedCollection : enumerable.Cast<T>().ToImmutableArray();
                 return true;
@@ -76,14 +73,13 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         if (lastScope is InheritedRuntimeEnvironment { Parent: not RuntimeEnvironment } inherited)
         {
             resolvedValue = inherited.Parent.Resolve(module, value, moduleExpression, valueExpression);
-            return resolvedValue is not null;
+            return true;
         }
 
         resolvedValue = default;
         return false;
     }
 
-    [return: NotNullIfNotNull(nameof(value))]
     public virtual T? Resolve<TModule, T>(TModule module, T? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
         where TModule : ModuleBase, IModuleDefinition
     {
@@ -115,7 +111,7 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         T? value,
         string? moduleExpression,
         string? valueExpression,
-        [NotNullWhen(true)] out T? resolvedValue,
+        out T? resolvedValue,
         out bool terminal) where TModule : ModuleBase, IModuleDefinition
     {
         ArgumentNullException.ThrowIfNull(entryPoint);
@@ -130,13 +126,13 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
             foreach (string identifier in scope.EnumerateOverrideIdentifiers(module.Name, module.Group, TModule.ModuleId))
             {
                 string overridePath = scope.SyntaxFactory.Path(identifier, valuePath).Override();
-                if (!scope.TryResolveEvaluation(overridePath, entryPoint, out Evaluation evaluation) || evaluation.Value is null)
+                if (!scope.TryResolveEvaluation(overridePath, entryPoint, out Evaluation evaluation))
                 {
                     continue;
                 }
                 if (!scope.TryConvertResolvedValue(evaluation.Value, overridePath, notifyImplicitConversion: true, out resolvedValue))
                 {
-                    throw new InvalidCastException($"Attempted to resolve variable '{overridePath}' as type {typeof(T).FullName}, but it is of type {evaluation.Value.GetType().FullName}.");
+                    throw new InvalidCastException($"Attempted to resolve variable '{overridePath}' as type {typeof(T).FullName}, but it is of type {evaluation.Value?.GetType().FullName ?? "null"}.");
                 }
                 terminal = evaluation.Terminal;
                 return true;
@@ -147,78 +143,36 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         {
             terminal = true;
             resolvedValue = inherited.Parent.Resolve(module, value, moduleExpression, valueExpression);
-            return resolvedValue is not null;
+            return true;
         }
 
         resolvedValue = default;
         return false;
     }
 
-    [return: NotNullIfNotNull(nameof(value))]
-    string? IRuntimeEnvironment.SelectRawStringOverride<TModule>(TModule module, string? value, string moduleExpression, string valueExpression, bool shieldInterpolation) =>
-        TrySelectRawStringOverrideCore(this, module, moduleExpression, valueExpression, shieldInterpolation, out string? selectedValue) ? selectedValue : value;
-
-    TaggedString IRuntimeEnvironment.SelectRawTaggedStringOverride<TModule>(TModule module, TaggedString value, string moduleExpression, string valueExpression, bool shieldInterpolation) =>
-        TrySelectRawTaggedStringOverrideCore(this, module, moduleExpression, valueExpression, shieldInterpolation, out TaggedString selectedValue) ? selectedValue : value;
-
-    [return: NotNullIfNotNull(nameof(value))]
-    TaggedString? IRuntimeEnvironment.SelectRawTaggedStringOverride<TModule>(TModule module, TaggedString? value, string moduleExpression, string valueExpression, bool shieldInterpolation) =>
-        TrySelectRawTaggedStringOverrideCore(this, module, moduleExpression, valueExpression, shieldInterpolation, out TaggedString selectedValue) ? selectedValue : value;
-
-    internal protected virtual bool TrySelectRawStringOverrideCore<TModule>(
-        EnvironmentLike entryPoint,
+    /// <summary>Retrieves a selected textual override as structural state without materializing or reinterpreting its expression.</summary>
+    internal bool TrySelectBoundOverride<TModule>(
         TModule module,
-        string? moduleExpression,
-        string? valueExpression,
-        bool shieldInterpolation,
-        [NotNullWhen(true)] out string? value)
-        where TModule : ModuleBase, IModuleDefinition
-    {
-        ArgumentNullException.ThrowIfNull(entryPoint);
-        return TrySelectRawOverrideCore(module, moduleExpression, valueExpression, shieldInterpolation, out value);
-    }
-
-    internal protected virtual bool TrySelectRawTaggedStringOverrideCore<TModule>(
-        EnvironmentLike entryPoint,
-        TModule module,
-        string? moduleExpression,
-        string? valueExpression,
-        bool shieldInterpolation,
-        out TaggedString value)
-        where TModule : ModuleBase, IModuleDefinition
-    {
-        ArgumentNullException.ThrowIfNull(entryPoint);
-        return TrySelectRawOverrideCore(module, moduleExpression, valueExpression, shieldInterpolation, out value);
-    }
-
-    /// <summary>
-    /// Selects a stored textual override without evaluating it. This intentionally uses raw storage
-    /// lookup rather than the typed/evaluated override path, including for tagged strings.
-    /// </summary>
-    private bool TrySelectRawOverrideCore<TModule, T>(
-        TModule module,
-        string? moduleExpression,
-        string? valueExpression,
-        bool shieldInterpolation,
-        [NotNullWhen(true)] out T? value)
+        string moduleExpression,
+        string valueExpression,
+        [NotNullWhen(true)] out BoundValue? bound)
         where TModule : ModuleBase, IModuleDefinition
     {
         ArgumentNullException.ThrowIfNull(module);
-        string valuePath = ConstructValueResolutionPath<T>(value: default, moduleExpression, valueExpression);
-
+        string valuePath = ConstructValueResolutionPath<object?>(value: null, moduleExpression, valueExpression);
         foreach (RuntimeEnvironment scope in EnumerateOverrideScopes())
         {
             foreach (string identifier in scope.EnumerateOverrideIdentifiers(module.Name, module.Group, TModule.ModuleId))
             {
                 string overridePath = scope.SyntaxFactory.Path(identifier, valuePath).Override();
-                if (scope.TryGetStoredVariable(overridePath, shieldInterpolation, out value))
+                if (scope.TryGetStoredVariableRecursiveCore(overridePath, out object? stored) && stored is BoundValue expression)
                 {
+                    bound = expression;
                     return true;
                 }
             }
         }
-
-        value = default;
+        bound = null;
         return false;
     }
 

@@ -41,7 +41,7 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
         VariableStore = new TransactionalEnvironmentVariableStore(environmentId, participant, activeTransaction);
     }
 
-    internal protected override bool TryGetStoredVariableRecursiveCore(string name, [NotNullWhen(true)] out object? value)
+    internal protected override bool TryGetStoredVariableRecursiveCore(string name, out object? value)
     {
         if (TryGetStoredVariableInCurrentScopeCore(name, out value))
         {
@@ -52,6 +52,25 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
             return parent.TryGetStoredVariableRecursiveCore(name, out value);
         }
         value = default;
+        return false;
+    }
+
+    internal override bool TryResolveStructuralRecursiveCore(ResolutionContext context, [NotNullWhen(true)] out Cyborg.Core.Runtime.Engine.Expressions.Evaluated.EvaluatedValue? value)
+    {
+        if (TryResolveStructuralInCurrentScopeCore(context, out value))
+        {
+            return true;
+        }
+        if (Parent is EnvironmentLike parent)
+        {
+            return parent.TryResolveStructuralRecursiveCore(context, out value);
+        }
+        if (Parent.TryResolveVariable(context.Name, out object? resolved))
+        {
+            value = new Cyborg.Core.Runtime.Engine.Expressions.Evaluated.EvaluatedTerminal(resolved);
+            return true;
+        }
+        value = null;
         return false;
     }
 

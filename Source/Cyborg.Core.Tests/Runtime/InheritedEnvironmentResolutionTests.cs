@@ -1,5 +1,8 @@
 ﻿using Cyborg.Core.Runtime;
 using Cyborg.Core.Runtime.Engine.Environments;
+using Cyborg.Core.Runtime.Engine.Expressions;
+using Cyborg.Core.Runtime.Engine.Expressions.Bound;
+using Cyborg.Core.Runtime.Engine.Expressions.Evaluated;
 using Cyborg.Core.Text;
 using System.Text.Json;
 
@@ -12,6 +15,57 @@ namespace Cyborg.Core.Tests.Runtime;
 [TestClass]
 public sealed class InheritedEnvironmentResolutionTests
 {
+    [TestMethod]
+    public void DefinedNull_ShadowsInheritedVariableUntilRemoved()
+    {
+        GlobalRuntimeEnvironment root = CreateRoot();
+        InheritedRuntimeEnvironment child = Inherit(root, "child");
+        root.SetVariable("present", "parent");
+        child.SetVariable<object?>("present", null);
+        child.SetVariable("alias", "&{present}");
+
+        Assert.IsTrue(child.TryResolveVariable("present", out string? current));
+        Assert.IsNull(current);
+        Assert.IsTrue(child.TryResolveVariable("alias", out object? alias));
+        Assert.IsNull(alias);
+        Assert.IsTrue(child.TryRemoveVariable("present"));
+        Assert.IsTrue(child.TryResolveVariable("present", out string? inherited));
+        Assert.AreEqual("parent", inherited);
+    }
+
+    [TestMethod]
+    public void PresentNullOverride_ShadowsLowerPriorityIdentifiersAndInheritedValues()
+    {
+        GlobalRuntimeEnvironment root = CreateRoot();
+        InheritedRuntimeEnvironment child = Inherit(root, "child");
+        ProbeModule module = new(Port: 22, Value: "configured", Ports: [22]) { Name = "probe", Group = "group" };
+        root.SetVariable<object?>("@probe.value", null);
+        child.SetVariable("@group.value", "lower-priority");
+        root.SetVariable("@group.value", "root-group");
+        child.SetVariable("@probe.port", 40);
+        child.SetVariable<IReadOnlyCollection<int>?>("@probe.ports", null);
+        child.SetVariable("@group.ports", (IReadOnlyCollection<int>)[80]);
+
+        Assert.IsNull(child.Resolve(module, module.Value));
+        Assert.IsNull(((IRuntimeEnvironment)child).ResolveCollection(module, module.Ports, nameof(module), "module.Ports"));
+        Assert.AreEqual(40, child.Resolve(module, module.Port));
+        Assert.IsTrue(child.TryRemoveVariable("@probe.ports"));
+        Assert.AreEqual(80, ((IRuntimeEnvironment)child).ResolveCollection(module, module.Ports, nameof(module), "module.Ports")!.Single());
+        Assert.IsTrue(root.TryRemoveVariable("@probe.value"));
+        Assert.AreEqual("lower-priority", child.Resolve(module, module.Value));
+    }
+
+    [TestMethod]
+    public void NullableTypedOverride_AcceptsNullButNonNullableValueTypeRejectsIt()
+    {
+        GlobalRuntimeEnvironment root = CreateRoot();
+        ProbeModule module = new(Port: 22, Value: "configured", Ports: null) { Name = "probe" };
+        root.SetVariable<object?>("@probe.port", null);
+
+        Assert.IsNull(root.Resolve(module, (int?)module.Port, nameof(module), "module.Port"));
+        Assert.ThrowsExactly<InvalidCastException>(() => root.Resolve(module, module.Port));
+    }
+
     [TestMethod]
     public void TypedOverride_NearestMatchingViewWinsAcrossMultipleParents()
     {
@@ -59,7 +113,7 @@ public sealed class InheritedEnvironmentResolutionTests
     }
 
     [TestMethod]
-    public void RawTaggedOverride_FromAncestorRetainsTemplateAndTags()
+    public void StructuralOverride_FromAncestorRetainsTemplateAndTags()
     {
         GlobalRuntimeEnvironment root = CreateRoot();
         InheritedRuntimeEnvironment middle = Inherit(root, "middle");
@@ -68,10 +122,16 @@ public sealed class InheritedEnvironmentResolutionTests
         root.SetVariable("value", "resolved");
         root.SetVariable("@probe.value", new TaggedString("before ${value}", ["secret"]));
 
-        TaggedString actual = ((IRuntimeEnvironment)child).SelectRawTaggedStringOverride(module, new TaggedString("configured"), nameof(module), "module.Value", shieldInterpolation: false);
+        Assert.IsTrue(child.TrySelectBoundOverride(module, nameof(module), "module.Value", out BoundValue? selected));
+        TaggedString stored = (TaggedString)selected.PresentStoredValue()!;
+        Assert.AreEqual("before ${value}", stored.Value);
+        Assert.IsTrue(stored.Tags.Contains("secret"));
 
-        Assert.AreEqual("before ${value}", actual.Value);
-        Assert.IsTrue(actual.Tags.Contains("secret"));
+        object? materialized = new ExpressionMaterializer().Materialize(child.EvaluateStructuralValue(selected));
+        Assert.IsInstanceOfType<TaggedString>(materialized);
+        TaggedString resolved = (TaggedString)materialized;
+        Assert.AreEqual("before resolved", resolved.Value);
+        Assert.IsTrue(resolved.Tags.Contains("secret"));
     }
 
     [TestMethod]
@@ -107,7 +167,7 @@ public sealed class InheritedEnvironmentResolutionTests
     }
 
     [TestMethod]
-    public void RawStringOverride_CapturedValueShieldsInterpolationOnlyWhenRequested()
+    public void StructuralOverride_CapturedValueRemainsTerminalWithoutShielding()
     {
         GlobalRuntimeEnvironment root = CreateRoot();
         InheritedRuntimeEnvironment child = Inherit(root, "child");
@@ -116,11 +176,11 @@ public sealed class InheritedEnvironmentResolutionTests
         root.SetVariable("source", "${#HOME}");
         root.SetVariable("@probe.value", "*{source}");
 
-        string? raw = ((IRuntimeEnvironment)child).SelectRawStringOverride(module, "fallback", nameof(module), "module.Value", shieldInterpolation: false);
-        string? shielded = ((IRuntimeEnvironment)child).SelectRawStringOverride(module, "fallback", nameof(module), "module.Value", shieldInterpolation: true);
-
-        Assert.AreEqual("${HOME}", raw);
-        Assert.AreEqual("${#HOME}", shielded);
+        Assert.IsTrue(child.TrySelectBoundOverride(module, nameof(module), "module.Value", out BoundValue? selected));
+        Assert.AreEqual("${HOME}", selected.PresentStoredValue());
+        object? materialized = new ExpressionMaterializer().Materialize(child.EvaluateStructuralValue(selected));
+        Assert.AreEqual("${HOME}", materialized);
+        Assert.AreEqual("${HOME}", child.Resolve(module, module.Value));
     }
 
     [TestMethod]

@@ -12,15 +12,15 @@ internal sealed class InterpolationSectionRenderer(ValidationContractInfo contra
 
     protected override bool ShouldSkip(PropertyModel property) => property.HasAspect<IgnoreInterpolationAspect>();
 
-    protected override string CreateStringExpression(PropertyModel property, string accessExpression)
+    protected override string CreateStringExpression(PropertyModel property, string accessExpression, string preparationKey)
     {
-        string interpolated = $"{ContextVariable}.Interpolate({accessExpression})";
+        string interpolated = $"{ContextVariable}.Interpolate({accessExpression}, preparationKey: {preparationKey})";
         return property.Symbol.Type.EqualsIgnoreNullability(ContractInfo.TaggedString) ? interpolated : $"{interpolated}.Value";
     }
 
-    protected override string CreateElementExpression(ITypeSymbol elementType, string accessExpression)
+    protected override string CreateElementExpression(ITypeSymbol elementType, string accessExpression, string preparationKey)
     {
-        string interpolated = $"{ContextVariable}.Interpolate({accessExpression})";
+        string interpolated = $"{ContextVariable}.Interpolate({accessExpression}, preparationKey: {preparationKey})";
         return elementType.EqualsIgnoreNullability(ContractInfo.TaggedString) ? interpolated : $"{interpolated}.Value";
     }
 }

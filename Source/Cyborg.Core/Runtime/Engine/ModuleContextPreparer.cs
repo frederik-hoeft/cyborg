@@ -1,5 +1,6 @@
 ﻿using Cyborg.Core.Runtime.Engine.Environments;
 using Cyborg.Core.Runtime.Engine.Environments.Syntax;
+using Cyborg.Core.Runtime.Engine.Expressions.Evaluated;
 using Cyborg.Core.Runtime.Model;
 using Cyborg.Core.Text;
 using Microsoft.Extensions.Logging;
@@ -49,7 +50,7 @@ internal sealed class ModuleContextPreparer(VariableSyntaxBuilder syntaxFactory,
         string? argumentNamespaceValue = requirements.ArgumentNamespace;
         IReadOnlyCollection<string> arguments = requirements.Arguments;
         List<string> errors = [];
-        List<(string Argument, object Value)> resolvedArguments = [];
+        List<(string Argument, EvaluatedValue Value)> resolvedArguments = [];
         string argumentNamespace = argumentNamespaceValue ?? "(none)";
         _logger.LogTemplateArgumentsResolving(arguments.Count, moduleContext.Module.ModuleId, argumentNamespace);
         if (!string.IsNullOrEmpty(argumentNamespaceValue) && !syntaxFactory.IsValidIdentifier(argumentNamespaceValue))
@@ -67,9 +68,18 @@ internal sealed class ModuleContextPreparer(VariableSyntaxBuilder syntaxFactory,
             }
             PathSyntax path = syntaxFactory.Path(argument);
             PathSyntax argumentPath = syntaxFactory.Path(argumentNamespaceValue).Child(path);
-            if (environment.TryResolveVariable(argumentPath, out object? value) || environment.TryResolveVariable(path, out value))
+            if (environment is EnvironmentLike structural)
             {
-                resolvedArguments.Add((argument, value));
+                if (structural.TryResolveStructuralValue(argumentPath, out EvaluatedValue? namespaced)
+                    || structural.TryResolveStructuralValue(path, out namespaced))
+                {
+                    resolvedArguments.Add((argument, namespaced.SnapshotForCapture()));
+                    continue;
+                }
+            }
+            else if (environment.TryResolveVariable(argumentPath, out object? value) || environment.TryResolveVariable(path, out value))
+            {
+                resolvedArguments.Add((argument, new EvaluatedTerminal(value)));
                 continue;
             }
             errors.Add($"Unable to resolve template argument: '{argument}'");
@@ -81,10 +91,17 @@ internal sealed class ModuleContextPreparer(VariableSyntaxBuilder syntaxFactory,
             throw new InvalidOperationException(errorMessage);
         }
 
-        foreach ((string argument, object value) in resolvedArguments)
+        foreach ((string argument, EvaluatedValue terminal) in resolvedArguments)
         {
-            object storedValue = value is string or TaggedString ? ExpressionShield.ShieldText(value) : value;
-            environment.SetVariable(argument, storedValue);
+            if (environment is EnvironmentLike target)
+            {
+                target.SetTerminalVariable(argument, terminal);
+            }
+            else
+            {
+                object? value = new Cyborg.Core.Runtime.Engine.Expressions.ExpressionMaterializer().Materialize(terminal);
+                environment.SetVariable(argument, value);
+            }
         }
     }
 }

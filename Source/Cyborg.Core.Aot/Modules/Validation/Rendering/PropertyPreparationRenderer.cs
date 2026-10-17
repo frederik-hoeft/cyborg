@@ -10,13 +10,16 @@ namespace Cyborg.Core.Aot.Modules.Validation.Rendering;
 
 internal abstract class PropertyPreparationRenderer(SectionRenderer parent)
 {
-    public bool AppendPreparationForObject(IndentedStringBuilder builder, ImmutableArray<PropertyModel> properties, string targetVariable, string diagnosticsPhase)
+    public bool AppendPreparationForObject(IndentedStringBuilder builder, ImmutableArray<PropertyModel> properties, string targetVariable, string diagnosticsPhase, PreparationPath? path = null)
     {
         List<(string PropertyName, string LocalName)> assignments = [];
         foreach (PropertyModel property in properties)
         {
             string propertyAccessExpression = $"{targetVariable}.{property.Name}";
-            PropertyRewriteContext rewriteContext = new(property, parent, propertyAccessExpression);
+            PropertyRewriteContext rewriteContext = new(property, parent, propertyAccessExpression)
+            {
+                PreparationPath = path?.AppendProperty(property.Name)
+            };
             string? directExpression = CreatePreparedValueExpression(rewriteContext);
             bool hasDirectAssignment = !string.IsNullOrEmpty(directExpression);
             bool hasNestedValidatableAssignments = property.Object is { HasChildren: true } objectModel
@@ -76,7 +79,7 @@ internal abstract class PropertyPreparationRenderer(SectionRenderer parent)
         builder.AppendLine($"{rewriteContext.PropertyAccessExpression} = {preparedExpression};");
     }
 
-    public void AppendCollectionPreparationForProperty(IndentedStringBuilder builder, PropertyModel property, string localName, string diagnosticsPhase)
+    public void AppendCollectionPreparationForProperty(IndentedStringBuilder builder, PropertyModel property, string localName, string diagnosticsPhase, PreparationPath? preparationPath = null)
     {
         CollectionModel collection = property.Collection!;
         ValueAccess access = collection.Shape.Renderer.Access(localName);
@@ -89,7 +92,7 @@ internal abstract class PropertyPreparationRenderer(SectionRenderer parent)
                 {
                     {{property.NonNullableTypeName}} {{collectionCurrentVariable}} = {{access.ValueExpression}};
                 """);
-            AppendCollectionPreparationBody(builder.IncreaseIndent(), collection, collectionCurrentVariable, diagnosticsPhase);
+            AppendCollectionPreparationBody(builder.IncreaseIndent(), collection, collectionCurrentVariable, diagnosticsPhase, preparationPath);
             builder.AppendBlock(
                 $$"""
                     {{localName}} = {{collectionCurrentVariable}};
@@ -102,7 +105,7 @@ internal abstract class PropertyPreparationRenderer(SectionRenderer parent)
             return;
         }
 
-        AppendCollectionPreparationBody(builder, collection, localName, diagnosticsPhase);
+        AppendCollectionPreparationBody(builder, collection, localName, diagnosticsPhase, preparationPath);
     }
 
     public bool HasPreparationWork(PropertyModel property, PropertyRewriteContext rewriteContext)
@@ -139,10 +142,10 @@ internal abstract class PropertyPreparationRenderer(SectionRenderer parent)
             builder,
             localName,
             nestedVariable,
-            (nestedBuilder, currentVariable) => AppendPreparationForObject(nestedBuilder, objectModel.Children, currentVariable, diagnosticsPhase));
+            (nestedBuilder, currentVariable) => AppendPreparationForObject(nestedBuilder, objectModel.Children, currentVariable, diagnosticsPhase, rewriteContext.PreparationPath));
     }
 
-    private void AppendCollectionPreparationBody(IndentedStringBuilder builder, CollectionModel collection, string collectionVariable, string diagnosticsPhase)
+    private void AppendCollectionPreparationBody(IndentedStringBuilder builder, CollectionModel collection, string collectionVariable, string diagnosticsPhase, PreparationPath? preparationPath)
     {
         string safeIdentifier = CreateSafeIdentifier(collectionVariable);
         string rewrittenItemsVariable = $"{safeIdentifier}Items";
@@ -150,6 +153,11 @@ internal abstract class PropertyPreparationRenderer(SectionRenderer parent)
         string elementCurrentVariable = $"{safeIdentifier}ElementCurrent";
         string elementValueVariable = $"{safeIdentifier}ElementValue";
 
+        string indexVariable = $"{safeIdentifier}Index";
+        if (preparationPath is not null)
+        {
+            builder.AppendLine($"int {indexVariable} = 0;");
+        }
         builder.AppendBlock(
             $$"""
             {{KnownTypes.ListOfT(collection.ElementNullableTypeName)}} {{rewrittenItemsVariable}} = [];
@@ -165,8 +173,13 @@ internal abstract class PropertyPreparationRenderer(SectionRenderer parent)
             loopBuilder,
             elementCurrentVariable,
             elementValueVariable,
-            (elementBuilder, currentVariable) => AppendPreparationForObject(elementBuilder, elementObject.Children, currentVariable, diagnosticsPhase));
+            (elementBuilder, currentVariable) => AppendPreparationForObject(elementBuilder, elementObject.Children, currentVariable, diagnosticsPhase,
+                preparationPath?.AppendIndex(indexVariable)));
         loopBuilder.AppendLine($"{rewrittenItemsVariable}.Add({elementCurrentVariable});");
+        if (preparationPath is not null)
+        {
+            loopBuilder.AppendLine($"++{indexVariable};");
+        }
 
         builder.AppendLine("}");
         collection.Renderer.AppendMaterialization(builder, collectionVariable, rewrittenItemsVariable);

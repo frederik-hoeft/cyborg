@@ -23,32 +23,13 @@ public interface IRuntimeEnvironment : IEnvironmentLike
     /// <param name="value">The value being resolved. This is used to ensure type safety during variable resolution and can be used to apply overrides based on the type of the variable being accessed.</param>
     /// <param name="moduleExpression">The expression representing the module for which the variable is being resolved. Used to construct the environment variable name for override resolution based on the module context.</param>
     /// <param name="valueExpression">The value expression representing the variable being resolved. Used to construct the environment variable name for override resolution based on the variable context.</param>
-    /// <returns>The resolved value of the variable, or null if the variable could not be resolved. The return value is determined based on the module and value expressions, allowing for overrides based on the context of the module and variable being accessed.</returns>
+    /// <returns>The selected override, including null when explicitly defined, or the supplied value if no override exists.</returns>
     /// <remarks>Non-terminal string results are fully interpolated and finalize one layer of escaped literals. Terminal snapshots are returned unchanged.</remarks>
-    [return: NotNullIfNotNull(nameof(value))]
     T? Resolve<TModule, T>(TModule module, T? value, [CallerArgumentExpression(nameof(module))] string? moduleExpression = null, [CallerArgumentExpression(nameof(value))] string? valueExpression = null)
         where TModule : ModuleBase, IModuleDefinition;
 
-    [return: NotNullIfNotNull(nameof(value))]
-    internal string? SelectRawStringOverride<TModule>(TModule module, string? value, string moduleExpression, string valueExpression, bool shieldInterpolation)
-        where TModule : ModuleBase, IModuleDefinition;
-
-    internal TaggedString SelectRawTaggedStringOverride<TModule>(TModule module, TaggedString value, string moduleExpression, string valueExpression, bool shieldInterpolation)
-        where TModule : ModuleBase, IModuleDefinition;
-
-    [return: NotNullIfNotNull(nameof(value))]
-    internal TaggedString? SelectRawTaggedStringOverride<TModule>(TModule module, TaggedString? value, string moduleExpression, string valueExpression, bool shieldInterpolation)
-        where TModule : ModuleBase, IModuleDefinition;
-
-    [return: NotNullIfNotNull(nameof(value))]
     internal IReadOnlyCollection<T>? ResolveCollection<TModule, T>(TModule module, IReadOnlyCollection<T>? value, string moduleExpression, string valueExpression)
         where TModule : ModuleBase, IModuleDefinition;
-
-    internal string ResolveValueExpression(string value, bool willInterpolate);
-
-    internal TaggedString ResolveValueExpression(TaggedString value, bool willInterpolate);
-
-    internal TaggedString? ResolveValueExpression(TaggedString? value, bool willInterpolate);
 
     void Publish<TModule, T>(TModule module, string root, T decomposable)
         where TModule : ModuleBase, IModuleDefinition

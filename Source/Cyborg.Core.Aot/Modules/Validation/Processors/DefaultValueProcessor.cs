@@ -63,7 +63,13 @@ internal sealed class DefaultValueProcessor : AttributeProcessorBase
                 triggerExpression = string.Join(" || ", checks);
             }
 
-            return $"{triggerExpression} ? {valueExpression} : {propertyAccessExpression}";
+            string replacement = valueExpression;
+            if (rewriteContext.PreparationPath is { } preparationPath
+                && rewriteContext.Property.Symbol.Type.IsStringLike(rewriteContext.ContractInfo.TaggedString))
+            {
+                replacement = $"{rewriteContext.ContextVariable}.ApplyDefaultReplacement({replacement}, {preparationPath.RenderExpression()})";
+            }
+            return $"{triggerExpression} ? {replacement} : {propertyAccessExpression}";
         }
     }
 }

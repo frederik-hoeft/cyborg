@@ -55,31 +55,5 @@ public sealed class TypedValueSyntaxTests
         Assert.AreEqual("*{host.port}", syntax);
     }
 
-    [TestMethod]
-    public void Test_Shield_InsertsOneHashPerOperatorBrace()
-    {
-        Assert.AreEqual("hello ${#name}", ExpressionShield.Shield("hello ${name}"));
-        Assert.AreEqual("${##name}", ExpressionShield.Shield("${#name}"));
-        Assert.AreEqual("&{#port}", ExpressionShield.Shield("&{port}"));
-        Assert.AreEqual("*{#port}", ExpressionShield.Shield("*{port}"));
-        Assert.AreEqual("plain", ExpressionShield.Shield("plain"));
-    }
-
-    [TestMethod]
-    public void Test_ShieldValueExpressions_LeavesInterpolationUntouched()
-    {
-        object shielded = ExpressionShield.ShieldValueExpressions("${name} &{port} *{other}");
-
-        Assert.AreEqual("${name} &{#port} *{#other}", shielded);
-    }
-
-    [TestMethod]
-    public void Test_FinalizeValueExpressionLiterals_LeavesInterpolationEscapesUntouched()
-    {
-        string finalized = ExpressionShield.FinalizeValueExpressionLiterals("${#name} &{#port} *{#other}");
-
-        Assert.AreEqual("${#name} &{port} *{other}", finalized);
-    }
-
     private static VariableSyntaxBuilder CreateBuilder() => new(JsonNamingPolicy.SnakeCaseLower);
 }

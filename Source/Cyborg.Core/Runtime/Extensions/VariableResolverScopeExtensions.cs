@@ -7,7 +7,7 @@ public static class VariableResolverScopeExtensions
 {
     extension(IVariableResolverScope self)
     {
-        [return: NotNullIfNotNull(nameof(defaultValue))]
+        /// <summary>Returns the resolved value, including null when defined, or the default only when the variable is absent.</summary>
         public T? ResolveVariableOrDefault<T>(string name, T? defaultValue = default)
         {
             if (self.TryResolveVariable(name, out T? result))
