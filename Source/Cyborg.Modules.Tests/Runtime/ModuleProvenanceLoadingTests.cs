@@ -1,4 +1,4 @@
-using Cyborg.Core.Runtime.Configuration;
+﻿using Cyborg.Core.Runtime.Configuration;
 using Cyborg.Core.Runtime.Engine;
 using Cyborg.Core.Runtime.Model;
 using Cyborg.Modules.Configuration.ConfigMap;
@@ -88,11 +88,16 @@ public sealed class ModuleProvenanceLoadingTests : ModuleTestBase
             IModuleConfigurationLoader loader = services.GetRequiredService<IModuleConfigurationLoader>();
             Task<ModuleConfigurationLoadResult> firstTask = loader.LoadModuleAsync(firstPath, TestContext.CancellationToken);
             Task<ModuleConfigurationLoadResult> secondTask = loader.LoadModuleAsync(secondPath, TestContext.CancellationToken);
-            await Task.WhenAll(firstTask, secondTask);
+            ModuleConfigurationLoadResult[] taskResults = await Task.WhenAll(firstTask, secondTask);
+            if (taskResults is not [{ } firstResult, { } secondResult])
+            {
+                TestAssert.Fail("ModuleConfigurationLoadResult array did not contain two results.");
+                return;
+            }
 
-            TestAssert.AreEqual(new ModuleOrigin(firstPath), firstTask.Result.ModuleContext.Module.Origin);
-            TestAssert.AreEqual(new ModuleOrigin(secondPath), secondTask.Result.ModuleContext.Module.Origin);
-            TestAssert.AreNotEqual(firstTask.Result.ModuleContext.Module.Origin, secondTask.Result.ModuleContext.Module.Origin);
+            TestAssert.AreEqual(new ModuleOrigin(firstPath), firstResult.ModuleContext.Module.Origin);
+            TestAssert.AreEqual(new ModuleOrigin(secondPath), secondResult.ModuleContext.Module.Origin);
+            TestAssert.AreNotEqual(firstResult.ModuleContext.Module.Origin, secondResult.ModuleContext.Module.Origin);
         }
         finally
         {
