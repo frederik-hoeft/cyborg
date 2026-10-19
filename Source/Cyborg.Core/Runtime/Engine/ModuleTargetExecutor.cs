@@ -29,15 +29,8 @@ internal sealed class ModuleTargetExecutor(
 
         IRuntimeEnvironment scopedEnvironment = environmentContext.BindToCurrentTransaction(environment);
         // Definition-site bindings must exist before requirements and the configuration child run.
-        ModuleReference? reference = target.Kind switch
-        {
-            ModuleExecutionKind.Context => target.Context!.Module,
-            ModuleExecutionKind.Configuration => target.Configuration!.ModuleContext.Module,
-            ModuleExecutionKind.RootModule => target.Configuration!.ModuleContext.Module,
-            ModuleExecutionKind.Reference => target.Reference,
-            _ => null
-        };
-        scopedEnvironment = scopedEnvironment.WithContext(new EnvironmentContext(reference?.Origin));
+        // An inspected worker may carry an explicitly supplied origin without a ModuleReference.
+        scopedEnvironment = scopedEnvironment.WithContext(new EnvironmentContext(target.Origin));
         return target.Kind switch
         {
             ModuleExecutionKind.Context => ExecuteContextAsync(target.Context!, scopedEnvironment, target.CancellationToken),

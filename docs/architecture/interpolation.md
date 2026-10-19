@@ -23,7 +23,7 @@ Key grammar is not value grammar. Override addresses and other keys continue to 
 | `&{@.origin.file}` / `&{@@.origin.file}` | Lazy typed references to the current or entry-point origin; the `directory` property works likewise. |
 | `*{@.origin.file}` / `*{@@.origin.file}` | Eagerly capture the current or entry-point defining file; the `directory` property works likewise. |
 
-`&{...}` and `*{...}` are valid only when they are the entire value. Eager capture permits the explicit origin paths, but other `*{@...}` expressions remain invalid. `${@}` and `${@@}` remain string interpolation, including inside larger text.
+`&{...}` and `*{...}` are valid only when they are the entire value. Eager capture permits contextual `@.` paths (including registered extensions), but ordinary entry-point references such as `*{@identifier}` remain invalid. `${@}` and `${@@}` remain string interpolation, including inside larger text.
 
 Unresolved `${...}` placeholders remain unchanged. Undefined targets of `&{...}` and `*{...}` fail with `InvalidOperationException`. Cyclic references fail with `InvalidOperationException`. A value whose CLR type is not the requested type fails with `InvalidCastException`.
 

@@ -16,6 +16,32 @@ public sealed class ModuleRuntimeBaseTests
     public TestContext TestContext { get; set; }
 
     [TestMethod]
+    [DataRow("@.origin.file", "container_name")]
+    [DataRow("settings", "@.origin.file")]
+    [DataRow("@.custom.path", "@.origin.directory")]
+    public async Task ExecuteAsync_ContextualRequiredArgumentNamesReportValidationErrorsAsync(string argumentNamespace, string argument)
+    {
+        GlobalRuntimeEnvironment globalEnvironment = new(JsonNamingPolicy.SnakeCaseLower);
+        using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
+        ProbeModuleWorker worker = new();
+        using ServiceProvider serviceProvider = new ServiceCollection()
+            .AddSingleton<IModuleWorkerFactory>(new ProbeModuleWorkerFactory(worker))
+            .BuildServiceProvider();
+        RootModuleRuntime runtime = new(globalEnvironment, loggerFactory, serviceProvider);
+        ModuleContext moduleContext = new(
+            Module: new ModuleReference(worker.Module, ProbeModule.ModuleId),
+            Environment: ModuleEnvironment.Default,
+            Configuration: null,
+            Requires: new ModuleRequirements(argumentNamespace, [argument]));
+
+        InvalidOperationException error = await Assert.ThrowsExactlyAsync<InvalidOperationException>(
+            () => runtime.ExecuteAsync(moduleContext, TestContext.CancellationToken));
+
+        StringAssert.Contains(error.Message, "valid identifiers");
+        Assert.IsFalse(worker.SawContainerName);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_RequiredNullArgumentRemainsPresentAndShadowsFallbackAsync()
     {
         GlobalRuntimeEnvironment globalEnvironment = new(JsonNamingPolicy.SnakeCaseLower);

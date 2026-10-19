@@ -25,7 +25,7 @@ public sealed class TestModuleRuntimeScope : IAsyncDisposable
     /// <summary>
     /// Gets the root module runtime for this test scope.
     /// </summary>
-    public IModuleRuntime Runtime { get; }
+    public IModuleRuntime Runtime { get; private set; }
 
     /// <summary>
     /// Gets the global runtime environment where top-level variables are stored.
@@ -125,12 +125,42 @@ public sealed class TestModuleRuntimeScope : IAsyncDisposable
     }
 
     /// <summary>
+    /// Binds the reference's definition context to this test scope for direct generated validation.
+    /// The original root runtime and its transactional variable bindings remain unchanged.
+    /// </summary>
+    public void BindDefinition(ModuleReference moduleReference)
+    {
+        ArgumentNullException.ThrowIfNull(moduleReference);
+        if (Runtime is not IModuleExecutionRuntime executionRuntime)
+        {
+            throw new InvalidOperationException("Runtime does not expose Cyborg's internal module-execution capabilities.");
+        }
+        IRuntimeEnvironment environment = Runtime.Environment.WithContext(new EnvironmentContext(moduleReference.Origin));
+        Runtime = executionRuntime.CreateEnvironmentView(environment);
+    }
+
+    /// <summary>
     /// Executes a module worker within this scope's runtime and returns the execution result.
     /// </summary>
     /// <param name="worker">The module worker to execute.</param>
     /// <param name="cancellationToken">A cancellation token for the execution.</param>
     /// <returns>The module execution result.</returns>
-    public Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker worker, CancellationToken cancellationToken = default)
+    public Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker worker, CancellationToken cancellationToken = default) =>
+        ExecuteWorkerAsync(worker, origin: null, cancellationToken);
+
+    /// <summary>Executes an inspected worker while preserving its originating module reference's definition context.</summary>
+    public Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker worker, ModuleReference moduleReference, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(moduleReference);
+        ArgumentNullException.ThrowIfNull(worker);
+        if (!ReferenceEquals(worker.Module, moduleReference.Definition))
+        {
+            throw new ArgumentException("The module reference must be the definition used to activate the worker.", nameof(moduleReference));
+        }
+        return ExecuteWorkerAsync(worker, moduleReference.Origin, cancellationToken);
+    }
+
+    private Task<IModuleExecutionResult> ExecuteWorkerAsync(IModuleWorker worker, ModuleOrigin? origin, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(worker);
         if (Runtime is not IModuleExecutionRuntime executionRuntime)
@@ -138,7 +168,7 @@ public sealed class TestModuleRuntimeScope : IAsyncDisposable
             throw new InvalidOperationException("Runtime does not expose Cyborg's internal module-execution capabilities.");
         }
         IRuntimeEnvironment environment = Runtime.PrepareEnvironment(new ModuleEnvironment { Scope = EnvironmentScope.Global });
-        return executionRuntime.ExecuteActivatedWorkerAsync(worker, environment, cancellationToken);
+        return executionRuntime.ExecuteActivatedWorkerAsync(worker, environment, cancellationToken, origin);
     }
 
     /// <summary>

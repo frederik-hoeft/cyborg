@@ -235,6 +235,7 @@ public abstract class CyborgTestBase
         await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
         ModuleReference moduleReference = scope.DeserializeModule(resolvedJson, ModuleOrigin);
         TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(moduleReference);
+        scope.BindDefinition(moduleReference);
         IValidationResult<TModule> validationResult = await module.ValidateAsync(scope.Runtime, scope.ServiceProvider, TestContext.CancellationToken);
         await assertion(validationResult);
     }
@@ -284,6 +285,7 @@ public abstract class CyborgTestBase
         await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
         ModuleReference moduleReference = scope.DeserializeModule(resolvedJson, ModuleOrigin);
         TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(moduleReference);
+        scope.BindDefinition(moduleReference);
         IValidationResult<TModule> validationResult = await module.ValidateAsync(scope.Runtime, scope.ServiceProvider, TestContext.CancellationToken);
         validationResult.EnsureValid();
         await assertion(validationResult.Module, scope);
@@ -320,6 +322,7 @@ public abstract class CyborgTestBase
         environmentSetup(scope.GlobalEnvironment);
         ModuleReference moduleReference = scope.DeserializeModule(resolvedJson, ModuleOrigin);
         TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(moduleReference);
+        scope.BindDefinition(moduleReference);
         IValidationResult<TModule> validationResult = await module.ValidateAsync(scope.Runtime, scope.ServiceProvider, TestContext.CancellationToken);
         validationResult.EnsureValid();
         await assertion(validationResult.Module);
@@ -382,7 +385,7 @@ public abstract class CyborgTestBase
         ModuleReference moduleReference = scope.DeserializeModule(resolvedJson, ModuleOrigin);
         TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(moduleReference);
         IModuleWorker worker = scope.ActivateWorker(moduleReference);
-        IModuleExecutionResult result = await scope.ExecuteAsync(worker, TestContext.CancellationToken);
+        IModuleExecutionResult result = await scope.ExecuteAsync(worker, moduleReference, TestContext.CancellationToken);
         if (worker is not TWorker typedWorker)
         {
             throw new InvalidOperationException(
