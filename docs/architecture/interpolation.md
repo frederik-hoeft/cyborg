@@ -14,14 +14,24 @@ Key grammar is not value grammar. Override addresses and other keys continue to 
 | `${@identifier}` | Interpolate `identifier` relative to the original resolution entry point. |
 | `${@}` | Interpolate the current scope's namespace. |
 | `${@@}` | Interpolate the original entry point's namespace. |
+| `${@.origin.file}` / `${@.origin.directory}` | Interpolate the defining file or directory bound to the scope where resolution occurs. |
+| `${@@.origin.file}` / `${@@.origin.directory}` | Interpolate the defining file or directory bound to the original resolution entry-point view. |
 | `&{identifier}` | Lazy typed indirection. The entire value is a reference; each read yields the target's current type and value. |
 | `&{@identifier}` | Lazy typed indirection resolved from the original entry point. |
 | `&{@}` / `&{@@}` | Lazy typed references to the current scope namespace and the entry-point namespace. |
 | `*{identifier}` | Eager typed capture. The target is resolved once when the variable is defined, and the variable stores that value. |
+| `&{@.origin.file}` / `&{@@.origin.file}` | Lazy typed references to the current or entry-point origin; the `directory` property works likewise. |
+| `*{@.origin.file}` / `*{@@.origin.file}` | Eagerly capture the current or entry-point defining file; the `directory` property works likewise. |
 
-`&{...}` and `*{...}` are valid only when they are the entire value. `*{@...}` is reserved and invalid. `${@}` and `${@@}` remain string interpolation, including inside larger text.
+`&{...}` and `*{...}` are valid only when they are the entire value. Eager capture permits contextual `@.` paths (including registered extensions), but ordinary entry-point references such as `*{@identifier}` remain invalid. `${@}` and `${@@}` remain string interpolation, including inside larger text.
 
 Unresolved `${...}` placeholders remain unchanged. Undefined targets of `&{...}` and `*{...}` fail with `InvalidOperationException`. Cyclic references fail with `InvalidOperationException`. A value whose CLR type is not the requested type fails with `InvalidCastException`.
+
+### Definition-site contextual variables
+
+A file-backed `ModuleReference` carries an immutable, absolute definition-file origin. `@.origin.file` and `@.origin.directory` resolve through the **current structural environment view**; their `@@` variants use the original resolution entry-point view. A module executing in a named environment uses its own origin in its current view even if the named environment was created elsewhere. A lazy value inherited from a parent is evaluated in the parent's captured view, which can have a different origin. Existing bare `@` and `@@` namespace references follow the same current-versus-entry-point distinction.
+
+These names are runtime-owned contextual properties, not environment variable bindings or module-property override keys. They cannot be set or removed through `SetVariable` / `TryRemoveVariable` and are not published through transaction joins. An originless reference, including one constructed in code without origin metadata, leaves both properties undefined; resolution never falls back to an ancestor's origin. As with ordinary undefined variables, interpolation retains the placeholder while typed indirection and eager capture fail. Capture freezes the path value at assignment time; ordinary `${...}` and `&{...}` values remain late-bound.
 
 ## Literal Escape Syntax
 
@@ -49,7 +59,7 @@ Environment inheritance, copying, and transactional forks preserve bound nodes i
 
 `SetVariable(...)` is the definition boundary.
 
-- `*{identifier}` resolves the target immediately and stores a snapshot of its type and value. The expression text is not retained. The snapshot is the reference returned by that resolution; Cyborg does not deep-clone it. A missing target fails the write. `*{@...}` is rejected.
+- `*{identifier}` resolves the target immediately and stores a snapshot of its type and value. The expression text is not retained. The snapshot is the reference returned by that resolution; Cyborg does not deep-clone it. A missing target fails the write. `*{@...}` is accepted for contextual paths, but rejects ordinary entry-point references.
 - `&{...}` is stored as an immutable lazy reference to the target and its resolution-origin semantics.
 - Other textual inputs are compiled into bound structural text after rejecting embedded unescaped `&{...}` and `*{...}`. `${...}` inside them is not evaluated yet.
 - Ordinary CLR values are stored inside terminal bound nodes, not mixed indiscriminately with internal expression objects.
@@ -75,7 +85,7 @@ When a required argument is resolved and subsequently bound into another Cyborg 
 
 Generated preparation separates override selection from value-expression evaluation:
 
-- **Textual properties:** the generated validation support context selects the first matching stored override without evaluating its contents. For Cyborg runtime environments, a per-validation structural preparation state retains the selected expression and its `TaggedString` tags through subsequent phases. Captured snapshots remain terminal without adding escape characters.
+- **Textual properties:** the generated validation support context selects the first matching stored override without evaluating its contents. For Cyborg runtime environments, a per-validation structural preparation state retains the selected expression, the structural view actually containing it, and its `TaggedString` tags through subsequent phases. Deferred evaluation uses the source view for current-scope references and the invoking module view as the entry point for `@`-prefixed entry-point references, matching ordinary inherited-variable semantics. Captured snapshots remain terminal without adding escape characters.
 - **Non-text properties:** the context performs full typed resolution. `&{...}` yields the current target and a capture yields the snapshot taken at definition. Collections use the collection-specific resolver before generated code materializes the declared collection shape. Capture of a collection is shallow; its elements are not recursively terminalized.
 
 Raw textual selection is required so `[IgnoreInterpolation]` applies to the effective value regardless of whether it came from JSON, a default, or an override. It also keeps override precedence/selection independent from the semantics of the selected text.

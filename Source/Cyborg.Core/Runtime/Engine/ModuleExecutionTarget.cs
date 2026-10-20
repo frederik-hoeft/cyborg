@@ -23,6 +23,15 @@ internal sealed class ModuleExecutionTarget
 
     public string ModuleId { get; }
 
+    public ModuleOrigin? Origin => Kind switch
+    {
+        ModuleExecutionKind.Context => Context!.Module.Origin,
+        ModuleExecutionKind.Configuration or ModuleExecutionKind.RootModule => Configuration!.ModuleContext.Module.Origin,
+        ModuleExecutionKind.Reference => Reference!.Origin,
+        ModuleExecutionKind.ActivatedWorker => WorkerOrigin,
+        _ => null
+    };
+
     public IModule Module { get; }
 
     public IRuntimeEnvironment Environment { get; }
@@ -36,6 +45,8 @@ internal sealed class ModuleExecutionTarget
     public ModuleReference? Reference { get; private init; }
 
     public IModuleWorker? Worker { get; private init; }
+
+    private ModuleOrigin? WorkerOrigin { get; init; }
 
     public static ModuleExecutionTarget ForContext(ModuleContext context, IRuntimeEnvironment environment, CancellationToken cancellationToken) =>
         new(ModuleExecutionKind.Context, context.Module.ModuleId, context.Module.Definition, environment, cancellationToken) { Context = context };
@@ -51,8 +62,8 @@ internal sealed class ModuleExecutionTarget
     public static ModuleExecutionTarget ForReference(ModuleReference reference, IRuntimeEnvironment environment, CancellationToken cancellationToken) =>
         new(ModuleExecutionKind.Reference, reference.ModuleId, reference.Definition, environment, cancellationToken) { Reference = reference };
 
-    public static ModuleExecutionTarget ForWorker(IModuleWorker worker, IRuntimeEnvironment environment, CancellationToken cancellationToken) =>
-        new(ModuleExecutionKind.ActivatedWorker, worker.ModuleId, worker.Module, environment, cancellationToken) { Worker = worker };
+    public static ModuleExecutionTarget ForWorker(IModuleWorker worker, IRuntimeEnvironment environment, CancellationToken cancellationToken, ModuleOrigin? origin = null) =>
+        new(ModuleExecutionKind.ActivatedWorker, worker.ModuleId, worker.Module, environment, cancellationToken) { Worker = worker, WorkerOrigin = origin };
 }
 
 internal enum ModuleExecutionKind

@@ -3,6 +3,8 @@ using Cyborg.Core.Runtime.Engine.Environments;
 using Cyborg.Core.Runtime.Engine.Expressions;
 using Cyborg.Core.Runtime.Engine.Expressions.Bound;
 using Cyborg.Core.Runtime.Engine.Expressions.Evaluated;
+using Cyborg.Core.Runtime.Model;
+using Cyborg.Core.Runtime.Services.Validation.Internal;
 using Cyborg.Core.Text;
 using System.Text.Json;
 
@@ -122,16 +124,69 @@ public sealed class InheritedEnvironmentResolutionTests
         root.SetVariable("value", "resolved");
         root.SetVariable("@probe.value", new TaggedString("before ${value}", ["secret"]));
 
-        Assert.IsTrue(child.TrySelectBoundOverride(module, nameof(module), "module.Value", out BoundValue? selected));
-        TaggedString stored = (TaggedString)selected.PresentStoredValue()!;
+        Assert.IsTrue(child.TrySelectBoundOverride(module, nameof(module), "module.Value", out SelectedBoundOverride? selected));
+        TaggedString stored = (TaggedString)selected.Value.PresentStoredValue()!;
         Assert.AreEqual("before ${value}", stored.Value);
         Assert.IsTrue(stored.Tags.Contains("secret"));
 
-        object? materialized = new ExpressionMaterializer().Materialize(child.EvaluateStructuralValue(selected));
+        object? materialized = new ExpressionMaterializer().Materialize(selected.Source.EvaluateStructuralValue(selected.Value, child));
         Assert.IsInstanceOfType<TaggedString>(materialized);
         TaggedString resolved = (TaggedString)materialized;
         Assert.AreEqual("before resolved", resolved.Value);
         Assert.IsTrue(resolved.Tags.Contains("secret"));
+    }
+
+    [TestMethod]
+    public void StructuralOverride_FromGrandparentResolvesInStorageViewWithChildEntryPoint()
+    {
+        ModuleOrigin definingOrigin = new(Path.Combine(Path.GetTempPath(), "cyborg-overrides", "a.jconf"));
+        ModuleOrigin invokingOrigin = new(Path.Combine(Path.GetTempPath(), "cyborg-overrides", "b.jconf"));
+        GlobalRuntimeEnvironment root = CreateRoot() with { Namespace = "root", Context = new EnvironmentContext(definingOrigin) };
+        InheritedRuntimeEnvironment middle = Inherit(root, "middle") with { Context = new EnvironmentContext(invokingOrigin) };
+        InheritedRuntimeEnvironment child = Inherit(middle, "child") with { Context = new EnvironmentContext(invokingOrigin) };
+        ProbeModule module = new(Port: 0, Value: "configured", Ports: null) { Name = "probe", Group = "group" };
+        const string expression = "${@.origin.file}|${@@.origin.file}|${@}|${@@}";
+        root.SetVariable("ordinary", expression);
+        root.SetVariable("@probe.value", new TaggedString(expression, ["source-tag"]));
+        child.SetVariable("@group.value", "lower-priority");
+
+        Assert.IsTrue(child.TryResolveVariable("ordinary", out string? inherited));
+        string expected = $"{definingOrigin.File}|{invokingOrigin.File}|root|child";
+        Assert.AreEqual(expected, inherited);
+
+        // The first candidate is found recursively from the child even though its actual owner is the grandparent.
+        Assert.IsTrue(child.TrySelectBoundOverride(module, nameof(module), "module.Value", out SelectedBoundOverride? selected));
+        Assert.AreSame(root, selected.Source);
+
+        StructuralModulePreparation preparation = new(child);
+        Assert.IsTrue(preparation.TrySelectOverride(module, nameof(module), "module.Value", "module.Value", out object? raw));
+        Assert.AreEqual(expression, Assert.IsInstanceOfType<TaggedString>(raw).Value);
+        object? prepared = preparation.ResolveValueExpression(raw!, willInterpolate: true, "module.Value");
+        TaggedString evaluated = preparation.Interpolate(prepared!, "module.Value");
+        Assert.AreEqual(expected, evaluated.Value);
+        Assert.IsTrue(evaluated.HasTag("source-tag"));
+
+        StructuralModulePreparation ignored = new(child);
+        Assert.IsTrue(ignored.TrySelectOverride(module, nameof(module), "module.Value", "module.Value", out object? ignoredRaw));
+        object? uninterpolated = ignored.ResolveValueExpression(ignoredRaw!, willInterpolate: false, "module.Value");
+        Assert.AreEqual(expression, Assert.IsInstanceOfType<TaggedString>(uninterpolated).Value);
+    }
+
+    [TestMethod]
+    public void StructuralOverride_LazyIndirectionResolvesAgainstStorageView()
+    {
+        ModuleOrigin definingOrigin = new(Path.Combine(Path.GetTempPath(), "cyborg-overrides", "a.jconf"));
+        ModuleOrigin invokingOrigin = new(Path.Combine(Path.GetTempPath(), "cyborg-overrides", "b.jconf"));
+        GlobalRuntimeEnvironment root = CreateRoot() with { Context = new EnvironmentContext(definingOrigin) };
+        InheritedRuntimeEnvironment child = Inherit(root, "child") with { Context = new EnvironmentContext(invokingOrigin) };
+        ProbeModule module = new(Port: 0, Value: "configured", Ports: null) { Name = "probe" };
+        root.SetVariable("@probe.value", "&{@.origin.file}");
+
+        StructuralModulePreparation preparation = new(child);
+        Assert.IsTrue(preparation.TrySelectOverride(module, nameof(module), "module.Value", "module.Value", out object? raw));
+        object? prepared = preparation.ResolveValueExpression(raw!, willInterpolate: true, "module.Value");
+        TaggedString evaluated = preparation.Interpolate(prepared!, "module.Value");
+        Assert.AreEqual(definingOrigin.File, evaluated.Value);
     }
 
     [TestMethod]
@@ -176,9 +231,9 @@ public sealed class InheritedEnvironmentResolutionTests
         root.SetVariable("source", "${#HOME}");
         root.SetVariable("@probe.value", "*{source}");
 
-        Assert.IsTrue(child.TrySelectBoundOverride(module, nameof(module), "module.Value", out BoundValue? selected));
-        Assert.AreEqual("${HOME}", selected.PresentStoredValue());
-        object? materialized = new ExpressionMaterializer().Materialize(child.EvaluateStructuralValue(selected));
+        Assert.IsTrue(child.TrySelectBoundOverride(module, nameof(module), "module.Value", out SelectedBoundOverride? selected));
+        Assert.AreEqual("${HOME}", selected.Value.PresentStoredValue());
+        object? materialized = new ExpressionMaterializer().Materialize(selected.Source.EvaluateStructuralValue(selected.Value, child));
         Assert.AreEqual("${HOME}", materialized);
         Assert.AreEqual("${HOME}", child.Resolve(module, module.Value));
     }

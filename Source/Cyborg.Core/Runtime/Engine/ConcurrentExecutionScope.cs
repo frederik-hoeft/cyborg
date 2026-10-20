@@ -41,7 +41,7 @@ internal sealed class ConcurrentExecutionScope : IConcurrentExecutionScope
         try
         {
             ModuleInvocationScope invocationScope = await _invocationCoordinator.CreateInvocationScopeAsync(
-                childTransaction, moduleContext.Module.ModuleId, moduleContext.Module.Definition, childCancellation.Token);
+                childTransaction, moduleContext.Module.ModuleId, moduleContext.Module.Definition, moduleContext.Module.Origin, childCancellation.Token);
             ConcurrentModuleExecution execution = new(invocationScope, moduleContext.Module.Definition, moduleContext, childCancellation);
             _executions.Add(execution);
             execution.Start();

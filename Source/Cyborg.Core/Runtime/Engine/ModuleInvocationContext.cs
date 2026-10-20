@@ -1,4 +1,6 @@
-﻿namespace Cyborg.Core.Runtime.Engine;
+﻿using Cyborg.Core.Runtime.Model;
+
+namespace Cyborg.Core.Runtime.Engine;
 
 /// <summary>
 /// Stable identity carried by every runtime view that belongs to the same logical module invocation.
@@ -9,4 +11,5 @@ internal sealed record ModuleInvocationContext(
     string ModuleId,
     string? Name,
     string? Group,
-    IModule Module);
+    IModule Module,
+    ModuleOrigin? Origin);

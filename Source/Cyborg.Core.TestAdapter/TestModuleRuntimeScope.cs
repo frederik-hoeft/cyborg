@@ -25,7 +25,7 @@ public sealed class TestModuleRuntimeScope : IAsyncDisposable
     /// <summary>
     /// Gets the root module runtime for this test scope.
     /// </summary>
-    public IModuleRuntime Runtime { get; }
+    public IModuleRuntime Runtime { get; private set; }
 
     /// <summary>
     /// Gets the global runtime environment where top-level variables are stored.
@@ -64,12 +64,12 @@ public sealed class TestModuleRuntimeScope : IAsyncDisposable
     /// </summary>
     /// <param name="moduleJson">The JSON string representing a module reference (e.g., <c>{ "cyborg.modules.subprocess.v1": { ... } }</c>).</param>
     /// <returns>The deserialized immutable module reference.</returns>
-    public ModuleReference DeserializeModule(string moduleJson)
+    public ModuleReference DeserializeModule(string moduleJson, ModuleOrigin? origin = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(moduleJson);
         IJsonLoaderContext loaderContext = _serviceProvider.GetRequiredService<IJsonLoaderContext>();
-        ModuleReference moduleReference = JsonSerializer.Deserialize<ModuleReference>(moduleJson, loaderContext.JsonSerializerOptions)
-            ?? throw new InvalidOperationException("Deserialization of the module JSON returned null. Verify the JSON is a valid module reference.");
+        ModuleConfigurationDeserializer deserializer = new(loaderContext);
+        ModuleReference moduleReference = deserializer.DeserializeReference(moduleJson, origin);
         return moduleReference;
     }
 
@@ -79,18 +79,18 @@ public sealed class TestModuleRuntimeScope : IAsyncDisposable
     /// </summary>
     /// <param name="moduleContextJson">The JSON string representing a full module context.</param>
     /// <returns>The deserialized module context.</returns>
-    public ModuleContext DeserializeModuleContext(string moduleContextJson) =>
-        DeserializeModuleConfiguration(moduleContextJson).ModuleContext;
+    public ModuleContext DeserializeModuleContext(string moduleContextJson, ModuleOrigin? origin = null) =>
+        DeserializeModuleConfiguration(moduleContextJson, origin).ModuleContext;
 
     /// <summary>
     /// Deserializes a full module configuration while preserving load artifacts required when the context is executed.
     /// </summary>
-    public ModuleConfigurationLoadResult DeserializeModuleConfiguration(string moduleContextJson)
+    public ModuleConfigurationLoadResult DeserializeModuleConfiguration(string moduleContextJson, ModuleOrigin? origin = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(moduleContextJson);
         IJsonLoaderContext loaderContext = _serviceProvider.GetRequiredService<IJsonLoaderContext>();
         ModuleConfigurationDeserializer deserializer = new(loaderContext);
-        ModuleConfigurationLoadResult configuration = deserializer.Deserialize(moduleContextJson)
+        ModuleConfigurationLoadResult configuration = deserializer.Deserialize(moduleContextJson, origin)
             ?? throw new InvalidOperationException("Deserialization of the module context JSON returned null. Verify the JSON is a valid module context.");
         return configuration;
     }
@@ -125,12 +125,42 @@ public sealed class TestModuleRuntimeScope : IAsyncDisposable
     }
 
     /// <summary>
+    /// Binds the reference's definition context to this test scope for direct generated validation.
+    /// The original root runtime and its transactional variable bindings remain unchanged.
+    /// </summary>
+    public void BindDefinition(ModuleReference moduleReference)
+    {
+        ArgumentNullException.ThrowIfNull(moduleReference);
+        if (Runtime is not IModuleExecutionRuntime executionRuntime)
+        {
+            throw new InvalidOperationException("Runtime does not expose Cyborg's internal module-execution capabilities.");
+        }
+        IRuntimeEnvironment environment = Runtime.Environment.WithContext(new EnvironmentContext(moduleReference.Origin));
+        Runtime = executionRuntime.CreateEnvironmentView(environment);
+    }
+
+    /// <summary>
     /// Executes a module worker within this scope's runtime and returns the execution result.
     /// </summary>
     /// <param name="worker">The module worker to execute.</param>
     /// <param name="cancellationToken">A cancellation token for the execution.</param>
     /// <returns>The module execution result.</returns>
-    public Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker worker, CancellationToken cancellationToken = default)
+    public Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker worker, CancellationToken cancellationToken = default) =>
+        ExecuteWorkerAsync(worker, origin: null, cancellationToken);
+
+    /// <summary>Executes an inspected worker while preserving its originating module reference's definition context.</summary>
+    public Task<IModuleExecutionResult> ExecuteAsync(IModuleWorker worker, ModuleReference moduleReference, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(moduleReference);
+        ArgumentNullException.ThrowIfNull(worker);
+        if (!ReferenceEquals(worker.Module, moduleReference.Definition))
+        {
+            throw new ArgumentException("The module reference must be the definition used to activate the worker.", nameof(moduleReference));
+        }
+        return ExecuteWorkerAsync(worker, moduleReference.Origin, cancellationToken);
+    }
+
+    private Task<IModuleExecutionResult> ExecuteWorkerAsync(IModuleWorker worker, ModuleOrigin? origin, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(worker);
         if (Runtime is not IModuleExecutionRuntime executionRuntime)
@@ -138,7 +168,7 @@ public sealed class TestModuleRuntimeScope : IAsyncDisposable
             throw new InvalidOperationException("Runtime does not expose Cyborg's internal module-execution capabilities.");
         }
         IRuntimeEnvironment environment = Runtime.PrepareEnvironment(new ModuleEnvironment { Scope = EnvironmentScope.Global });
-        return executionRuntime.ExecuteActivatedWorkerAsync(worker, environment, cancellationToken);
+        return executionRuntime.ExecuteActivatedWorkerAsync(worker, environment, cancellationToken, origin);
     }
 
     /// <summary>

@@ -1,4 +1,4 @@
-﻿using Cyborg.Core.Runtime.Engine.Environments.Syntax;
+using Cyborg.Core.Runtime.Engine.Environments.Syntax;
 using Cyborg.Core.Runtime.Engine.Transactions;
 using Cyborg.Core.Runtime.Engine.Transactions.Internal;
 
@@ -41,17 +41,19 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
         VariableStore = new TransactionalEnvironmentVariableStore(environmentId, participant, activeTransaction);
     }
 
-    internal protected override bool TryGetStoredVariableRecursiveCore(string name, out object? value)
+    internal protected override bool TryGetStoredVariableRecursiveCore(string name, out object? value, [NotNullWhen(true)] out EnvironmentLike? source)
     {
         if (TryGetStoredVariableInCurrentScopeCore(name, out value))
         {
+            source = this;
             return true;
         }
         if (Parent is EnvironmentLike parent)
         {
-            return parent.TryGetStoredVariableRecursiveCore(name, out value);
+            return parent.TryGetStoredVariableRecursiveCore(name, out value, out source);
         }
         value = default;
+        source = null;
         return false;
     }
 
@@ -60,6 +62,12 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
         if (TryResolveStructuralInCurrentScopeCore(context, out value))
         {
             return true;
+        }
+        // Contextual paths are owned by the selected view, even when undefined.
+        if (ContextualVariableRegistry.IsContextualName(context.Name))
+        {
+            value = null;
+            return false;
         }
         if (Parent is EnvironmentLike parent)
         {
@@ -79,6 +87,13 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
         if (TryResolveVariableInCurrentScopeCore(context, out evaluation))
         {
             return true;
+        }
+        // Contextual names are owned by the selected view, even when undefined.
+        // Never fall back to an ancestor's provenance.
+        if (ContextualVariableRegistry.IsContextualName(context.Name))
+        {
+            evaluation = default;
+            return false;
         }
         if (Parent is EnvironmentLike parent)
         {

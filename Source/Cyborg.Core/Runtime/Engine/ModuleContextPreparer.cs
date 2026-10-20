@@ -53,7 +53,8 @@ internal sealed class ModuleContextPreparer(VariableSyntaxBuilder syntaxFactory,
         List<(string Argument, EvaluatedValue Value)> resolvedArguments = [];
         string argumentNamespace = argumentNamespaceValue ?? "(none)";
         _logger.LogTemplateArgumentsResolving(arguments.Count, moduleContext.Module.ModuleId, argumentNamespace);
-        if (!string.IsNullOrEmpty(argumentNamespaceValue) && !syntaxFactory.IsValidIdentifier(argumentNamespaceValue))
+        bool validArgumentNamespace = string.IsNullOrEmpty(argumentNamespaceValue) || syntaxFactory.IsValidIdentifier(argumentNamespaceValue);
+        if (!validArgumentNamespace)
         {
             errors.Add($"Template namespaces must be valid identifiers: '{argumentNamespaceValue}'");
         }
@@ -64,6 +65,10 @@ internal sealed class ModuleContextPreparer(VariableSyntaxBuilder syntaxFactory,
             if (!syntaxFactory.IsValidIdentifier(argument))
             {
                 errors.Add($"Template argument names must be valid identifiers: argv[{i}] = '{argument}'");
+                continue;
+            }
+            if (!validArgumentNamespace)
+            {
                 continue;
             }
             PathSyntax path = syntaxFactory.Path(argument);

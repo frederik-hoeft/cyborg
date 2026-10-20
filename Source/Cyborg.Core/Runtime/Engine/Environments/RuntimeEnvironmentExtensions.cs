@@ -7,6 +7,14 @@ public static class RuntimeEnvironmentExtensions
 {
     extension(IRuntimeEnvironment environment)
     {
+        internal IRuntimeEnvironment WithContext(EnvironmentContext context)
+        {
+            ArgumentNullException.ThrowIfNull(context);
+            return environment is RuntimeEnvironment runtimeEnvironment
+                ? runtimeEnvironment with { Context = context }
+                : throw new InvalidOperationException($"Runtime environment type '{environment.GetType().FullName}' cannot receive contextual bindings.");
+        }
+
         public string NamespaceOf<TModule>(TModule module) where TModule : IModuleDefinition
         {
             ArgumentNullException.ThrowIfNull(module);

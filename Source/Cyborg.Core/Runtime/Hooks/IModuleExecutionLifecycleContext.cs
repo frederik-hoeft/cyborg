@@ -1,4 +1,5 @@
 ﻿using Cyborg.Core.Runtime.Engine;
+using Cyborg.Core.Runtime.Model;
 
 namespace Cyborg.Core.Runtime.Hooks;
 
@@ -18,6 +19,9 @@ public interface IModuleExecutionLifecycleContext
     string? Group { get; }
 
     IModule Module { get; }
+
+    /// <summary>Immutable definition-site origin of the invoked module, when known.</summary>
+    ModuleOrigin? Origin => null;
 
     IModuleRuntime Runtime { get; }
 }

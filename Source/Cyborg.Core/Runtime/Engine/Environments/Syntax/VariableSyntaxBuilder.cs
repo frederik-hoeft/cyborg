@@ -25,7 +25,8 @@ public sealed class VariableSyntaxBuilder(JsonNamingPolicy namingPolicy)
         // Reusing the same parser keeps validation consistent with indirection and interpolation.
         return VariableReferenceParser.Instance.TryParseComplete(identifier.ToString(), out ISyntaxNode? node)
             && node is VariableReferenceNode reference
-            && reference.Evaluate() is { Identifier: not null, Anchor: ReferenceAnchor.CurrentScope };
+            && reference.Evaluate() is { Identifier: not null, Anchor: ReferenceAnchor.CurrentScope } parsed
+            && !ContextualVariableSyntax.IsContextualName(parsed.Identifier);
     }
 
     public bool IsValidNamespace([NotNullWhen(true)] string? ns) =>

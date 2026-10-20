@@ -78,11 +78,18 @@ internal abstract class ModuleRuntimeBase
 
     public IConcurrentExecutionScope OpenConcurrentExecution() => CreateInvocationCoordinator().OpenConcurrentExecution();
 
-    Task<IModuleExecutionResult> IModuleExecutionRuntime.ExecuteActivatedWorkerAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken)
+    IModuleRuntime IModuleExecutionRuntime.CreateEnvironmentView(IRuntimeEnvironment environment)
+    {
+        ArgumentNullException.ThrowIfNull(environment);
+        RuntimeEnvironmentContext childContext = environmentContext.CreateChildFrame(environment);
+        return new EnvironmentViewRuntime(Root, childContext, runtimeServices, activeTransaction, RequireExecutionServices(), invocationContext);
+    }
+
+    Task<IModuleExecutionResult> IModuleExecutionRuntime.ExecuteActivatedWorkerAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken, ModuleOrigin? origin)
     {
         ArgumentNullException.ThrowIfNull(module);
         ArgumentNullException.ThrowIfNull(environment);
-        return CreateInvocationCoordinator().ExecuteAsync(ModuleExecutionTarget.ForWorker(module, environment, cancellationToken));
+        return CreateInvocationCoordinator().ExecuteAsync(ModuleExecutionTarget.ForWorker(module, environment, cancellationToken, origin));
     }
 
     public IRuntimeEnvironment PrepareEnvironment(ModuleEnvironment moduleEnvironment, IReadOnlyCollection<string>? overrideResolutionTags = null) =>
@@ -106,4 +113,17 @@ internal abstract class ModuleRuntimeBase
 
     private IServiceProvider RequireExecutionServices() =>
         serviceProvider ?? throw new InvalidOperationException("Module execution requires a service provider capable of creating execution scopes.");
+
+    /// <summary>Environment-only view used by direct test validation, which does not create a module invocation.</summary>
+    private sealed class EnvironmentViewRuntime(
+        IModuleRuntime root,
+        RuntimeEnvironmentContext viewContext,
+        ModuleRuntimeServices services,
+        ActiveTransaction active,
+        IServiceProvider executionServices,
+        ModuleInvocationContext? parentInvocation)
+        : ModuleRuntimeBase(viewContext, services, active, executionServices, parentInvocation)
+    {
+        protected override IModuleRuntime Root => root;
+    }
 }

@@ -14,5 +14,9 @@ internal interface IModuleExecutionRuntime : IModuleRuntime
 
     IServiceProvider? ExecutionServices { get; }
 
-    Task<IModuleExecutionResult> ExecuteActivatedWorkerAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken);
+    /// <summary>Creates a runtime view for direct validation without establishing an invocation or changing the owning runtime.</summary>
+    IModuleRuntime CreateEnvironmentView(IRuntimeEnvironment environment);
+
+    /// <summary>Executes a pre-activated worker. Origin is explicit because the worker alone has no definition reference.</summary>
+    Task<IModuleExecutionResult> ExecuteActivatedWorkerAsync(IModuleWorker module, IRuntimeEnvironment environment, CancellationToken cancellationToken, ModuleOrigin? origin = null);
 }

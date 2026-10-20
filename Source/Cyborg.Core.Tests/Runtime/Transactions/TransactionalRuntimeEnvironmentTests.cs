@@ -140,7 +140,7 @@ public sealed class TransactionalRuntimeEnvironmentTests
         RuntimeEnvironmentId transientParentId = RuntimeEnvironmentId.Create();
         RuntimeEnvironmentId namedChildId = RuntimeEnvironmentId.Create();
         RuntimeEnvironmentNode transientParent = new("temporary-parent", IsTransient: true, Parent: null);
-        RuntimeEnvironmentParent parentReference = new(transientParentId, Namespace: "parent", OverrideResolutionTags: []);
+        RuntimeEnvironmentParent parentReference = new(transientParentId, Namespace: "parent", OverrideResolutionTags: [], Context: EnvironmentContext.Empty);
         RuntimeEnvironmentNode namedChild = new("named-child", IsTransient: false, parentReference);
         childState.AddEnvironment(
             transientParentId,

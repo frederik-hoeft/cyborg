@@ -35,6 +35,9 @@ namespace Cyborg.Core.TestAdapter;
 /// </remarks>
 public abstract class CyborgTestBase
 {
+    /// <summary>Optional definition-site provenance for module references loaded by the test adapter.</summary>
+    protected virtual ModuleOrigin? ModuleOrigin => null;
+
     /// <summary>
     /// Gets or sets the MSTest <see cref="TestContext"/> for the current test run.
     /// Automatically injected by the MSTest framework.
@@ -140,7 +143,7 @@ public abstract class CyborgTestBase
         ArgumentNullException.ThrowIfNull(assertion);
         string resolvedJson = await ResolveModuleJsonAsync(moduleJson);
         await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
-        ModuleReference moduleReference = scope.DeserializeModule(resolvedJson);
+        ModuleReference moduleReference = scope.DeserializeModule(resolvedJson, ModuleOrigin);
         TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(moduleReference);
         await assertion(module);
     }
@@ -181,7 +184,7 @@ public abstract class CyborgTestBase
         ArgumentNullException.ThrowIfNull(assertion);
         string resolvedJson = await ResolveModuleJsonAsync(moduleContextJson);
         await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
-        ModuleContext moduleContext = scope.DeserializeModuleContext(resolvedJson);
+        ModuleContext moduleContext = scope.DeserializeModuleContext(resolvedJson, ModuleOrigin);
         await assertion(moduleContext);
     }
 
@@ -230,8 +233,9 @@ public abstract class CyborgTestBase
         ArgumentNullException.ThrowIfNull(assertion);
         string resolvedJson = await ResolveModuleJsonAsync(moduleJson);
         await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
-        ModuleReference moduleReference = scope.DeserializeModule(resolvedJson);
+        ModuleReference moduleReference = scope.DeserializeModule(resolvedJson, ModuleOrigin);
         TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(moduleReference);
+        scope.BindDefinition(moduleReference);
         IValidationResult<TModule> validationResult = await module.ValidateAsync(scope.Runtime, scope.ServiceProvider, TestContext.CancellationToken);
         await assertion(validationResult);
     }
@@ -279,8 +283,9 @@ public abstract class CyborgTestBase
         ArgumentNullException.ThrowIfNull(assertion);
         string resolvedJson = await ResolveModuleJsonAsync(moduleJson);
         await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
-        ModuleReference moduleReference = scope.DeserializeModule(resolvedJson);
+        ModuleReference moduleReference = scope.DeserializeModule(resolvedJson, ModuleOrigin);
         TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(moduleReference);
+        scope.BindDefinition(moduleReference);
         IValidationResult<TModule> validationResult = await module.ValidateAsync(scope.Runtime, scope.ServiceProvider, TestContext.CancellationToken);
         validationResult.EnsureValid();
         await assertion(validationResult.Module, scope);
@@ -315,8 +320,9 @@ public abstract class CyborgTestBase
         string resolvedJson = await ResolveModuleJsonAsync(moduleJson);
         await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
         environmentSetup(scope.GlobalEnvironment);
-        ModuleReference moduleReference = scope.DeserializeModule(resolvedJson);
+        ModuleReference moduleReference = scope.DeserializeModule(resolvedJson, ModuleOrigin);
         TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(moduleReference);
+        scope.BindDefinition(moduleReference);
         IValidationResult<TModule> validationResult = await module.ValidateAsync(scope.Runtime, scope.ServiceProvider, TestContext.CancellationToken);
         validationResult.EnsureValid();
         await assertion(validationResult.Module);
@@ -376,10 +382,10 @@ public abstract class CyborgTestBase
         string resolvedJson = await ResolveModuleJsonAsync(moduleJson);
         await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
         environmentSetup?.Invoke(scope.GlobalEnvironment);
-        ModuleReference moduleReference = scope.DeserializeModule(resolvedJson);
+        ModuleReference moduleReference = scope.DeserializeModule(resolvedJson, ModuleOrigin);
         TModule module = TestModuleRuntimeScope.ExtractModule<TModule>(moduleReference);
         IModuleWorker worker = scope.ActivateWorker(moduleReference);
-        IModuleExecutionResult result = await scope.ExecuteAsync(worker, TestContext.CancellationToken);
+        IModuleExecutionResult result = await scope.ExecuteAsync(worker, moduleReference, TestContext.CancellationToken);
         if (worker is not TWorker typedWorker)
         {
             throw new InvalidOperationException(
@@ -438,7 +444,7 @@ public abstract class CyborgTestBase
         string resolvedJson = await ResolveModuleJsonAsync(moduleJson);
         await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
         environmentSetup?.Invoke(scope.GlobalEnvironment);
-        ModuleReference moduleReference = scope.DeserializeModule(resolvedJson);
+        ModuleReference moduleReference = scope.DeserializeModule(resolvedJson, ModuleOrigin);
         IModuleExecutionResult result = await scope.ExecuteAsync(moduleReference, TestContext.CancellationToken);
         await assertion(result);
     }
@@ -484,7 +490,7 @@ public abstract class CyborgTestBase
         string resolvedJson = await ResolveModuleJsonAsync(moduleJson);
         await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
         environmentSetup?.Invoke(scope.GlobalEnvironment);
-        ModuleReference moduleReference = scope.DeserializeModule(resolvedJson);
+        ModuleReference moduleReference = scope.DeserializeModule(resolvedJson, ModuleOrigin);
         TException exception = await Assert.ThrowsExactlyAsync<TException>(
             () => scope.ExecuteAsync(moduleReference, TestContext.CancellationToken));
         if (assertion is not null)
@@ -542,7 +548,7 @@ public abstract class CyborgTestBase
         string resolvedJson = await ResolveModuleJsonAsync(moduleContextJson);
         await using TestModuleRuntimeScope scope = await CreateScopeAsync(configureServices, buildConfiguration);
         environmentSetup?.Invoke(scope.GlobalEnvironment);
-        ModuleConfigurationLoadResult configuration = scope.DeserializeModuleConfiguration(resolvedJson);
+        ModuleConfigurationLoadResult configuration = scope.DeserializeModuleConfiguration(resolvedJson, ModuleOrigin);
         IModuleExecutionResult result = await scope.ExecuteAsync(configuration, TestContext.CancellationToken);
         await assertion(result, scope);
     }

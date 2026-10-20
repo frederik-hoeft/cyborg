@@ -12,22 +12,22 @@ namespace Cyborg.Core.Runtime.Services.Validation.Internal;
 /// </summary>
 internal sealed class StructuralModulePreparation(RuntimeEnvironment environment)
 {
-    private readonly Dictionary<string, BoundValue> _selectedOverrides = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, SelectedBoundOverride> _selectedOverrides = new(StringComparer.Ordinal);
     private readonly Dictionary<string, PreparedExpression> _prepared = new(StringComparer.Ordinal);
     private readonly ExpressionMaterializer _materializer = new();
 
-    private sealed record PreparedExpression(BoundValue? PendingText, bool Terminal);
+    private sealed record PreparedExpression(SelectedBoundOverride? PendingText, bool Terminal);
 
     public bool TrySelectOverride<TModule>(TModule module, string moduleExpression, string valueExpression, string preparationKey, out object? value)
         where TModule : ModuleBase, IModuleDefinition
     {
-        if (!environment.TrySelectBoundOverride(module, moduleExpression, valueExpression, out BoundValue? selected))
+        if (!environment.TrySelectBoundOverride(module, moduleExpression, valueExpression, out SelectedBoundOverride? selected))
         {
             value = null;
             return false;
         }
         _selectedOverrides[preparationKey] = selected;
-        value = selected.PresentStoredValue();
+        value = selected.Value.PresentStoredValue();
         return true;
     }
 
@@ -35,13 +35,14 @@ internal sealed class StructuralModulePreparation(RuntimeEnvironment environment
 
     public object? ResolveValueExpression(object value, bool willInterpolate, string preparationKey)
     {
-        BoundValue bound = _selectedOverrides.Remove(preparationKey, out BoundValue? selected)
+        SelectedBoundOverride expression = _selectedOverrides.Remove(preparationKey, out SelectedBoundOverride? selected)
             ? selected
-            : environment.BindStructuralValue(value);
+            : new SelectedBoundOverride(environment.BindStructuralValue(value), environment);
+        BoundValue bound = expression.Value;
 
         if (!bound.IsTextual)
         {
-            EvaluatedValue evaluated = environment.EvaluateStructuralValue(bound);
+            EvaluatedValue evaluated = expression.Source.EvaluateStructuralValue(bound, environment);
             _prepared[preparationKey] = new PreparedExpression(PendingText: null, Terminal: true);
             return _materializer.Materialize(evaluated);
         }
@@ -58,7 +59,7 @@ internal sealed class StructuralModulePreparation(RuntimeEnvironment environment
             return value;
         }
 
-        _prepared[preparationKey] = new PreparedExpression(PendingText: bound, Terminal: false);
+        _prepared[preparationKey] = new PreparedExpression(PendingText: expression, Terminal: false);
         return value;
     }
 
@@ -77,12 +78,12 @@ internal sealed class StructuralModulePreparation(RuntimeEnvironment environment
         // [IgnoreValueExpression] leaves this as a separate, explicit text-input boundary.
         // Binding textual syntax does not capture; evaluation uses the current runtime environment.
         BoundValue bound = environment.BindStructuralText(value is TaggedString tagged ? tagged.Value : (string)value);
-        return EvaluateText(bound, value);
+        return EvaluateText(new SelectedBoundOverride(bound, environment), value);
     }
 
-    private TaggedString EvaluateText(BoundValue bound, object currentValue)
+    private TaggedString EvaluateText(SelectedBoundOverride expression, object currentValue)
     {
-        object? materialized = _materializer.Materialize(environment.EvaluateStructuralValue(bound));
+        object? materialized = _materializer.Materialize(expression.Source.EvaluateStructuralValue(expression.Value, environment));
         TaggedString result = ToTaggedString(materialized);
         if (currentValue is TaggedString original && original.HasTags)
         {

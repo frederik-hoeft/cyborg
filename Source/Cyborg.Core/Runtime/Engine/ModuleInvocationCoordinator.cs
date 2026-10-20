@@ -34,7 +34,7 @@ internal sealed class ModuleInvocationCoordinator(
         ModuleInvocationScope? invocationScope = null;
         try
         {
-            invocationScope = await CreateInvocationScopeAsync(childTransaction, request.ModuleId, request.Module, request.CancellationToken);
+            invocationScope = await CreateInvocationScopeAsync(childTransaction, request.ModuleId, request.Module, request.Origin, request.CancellationToken);
             IRuntimeEnvironment scopedEnvironment = invocationScope.BindEnvironment(request.Environment);
             IModuleExecutionResult result = await invocationScope.Runtime.DispatchInCurrentScopeAsync(request, scopedEnvironment);
             await invocationScope.NotifyCompletedAsync(result);
@@ -75,7 +75,7 @@ internal sealed class ModuleInvocationCoordinator(
     }
 
     internal async ValueTask<ModuleInvocationScope> CreateInvocationScopeAsync(
-        ModuleTransaction childTransaction, string moduleId, IModule module, CancellationToken cancellationToken)
+        ModuleTransaction childTransaction, string moduleId, IModule module, ModuleOrigin? origin, CancellationToken cancellationToken)
     {
         IServiceScopeFactory scopeFactory = RequireExecutionServices().GetRequiredService<IServiceScopeFactory>();
         AsyncServiceScope executionScope = scopeFactory.CreateAsyncScope();
@@ -85,7 +85,7 @@ internal sealed class ModuleInvocationCoordinator(
             runtimeServices.ModuleRegistry.BindExecutionScope(executionScope.ServiceProvider, childActiveTransaction);
             runtimeServices.Transactional.BindExecutionScope(executionScope.ServiceProvider, childActiveTransaction);
             RuntimeEnvironmentContext childEnvironmentContext = environmentContext.RebindTransaction(childActiveTransaction);
-            ModuleInvocationContext childInvocation = new(ModuleExecutionId.Create(), parentInvocation?.ExecutionId, moduleId, module.Name, module.Group, module);
+            ModuleInvocationContext childInvocation = new(ModuleExecutionId.Create(), parentInvocation?.ExecutionId, moduleId, module.Name, module.Group, module, origin);
             ScopedRuntime scopedRuntime = new(root, childEnvironmentContext, runtimeServices, childActiveTransaction, executionScope.ServiceProvider, childInvocation);
             ModuleInvocationScope invocationScope = new(childTransaction, executionScope, scopedRuntime, childEnvironmentContext, childInvocation);
             await invocationScope.NotifyStartedAsync(cancellationToken);

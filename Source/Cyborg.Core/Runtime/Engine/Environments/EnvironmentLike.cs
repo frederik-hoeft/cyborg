@@ -20,6 +20,10 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
 
     internal ITaggedStringConversionObserver? TaggedStringConversionObserver { get; init; }
 
+    internal EnvironmentContext Context { get; init; } = EnvironmentContext.Empty;
+
+    internal ContextualVariableRegistry ContextualVariables { get; init; } = ContextualVariableRegistry.Default;
+
     protected JsonNamingPolicy NamingPolicy => SyntaxFactory.NamingPolicy;
 
     internal protected virtual bool TryResolveVariableInCurrentScopeCore(ResolutionContext context, out Evaluation evaluation)
@@ -36,10 +40,11 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
     internal virtual bool TryResolveStructuralInCurrentScopeCore(ResolutionContext context, [NotNullWhen(true)] out EvaluatedValue? value)
     {
         ArgumentNullException.ThrowIfNull(context);
-        if (context.Name.Equals(SyntaxFactory.Self(), StringComparison.Ordinal))
+        if (ContextualVariableRegistry.IsContextualName(context.Name))
         {
-            value = new EvaluatedTerminal(Namespace);
-            return true;
+            bool resolved = ContextualVariables.TryResolve(context.Name, Context, Namespace, out object? contextualValue);
+            value = resolved ? new EvaluatedTerminal(contextualValue) : null;
+            return resolved;
         }
         if (VariableStore.TryGetValue(context.Name, out object? stored) && stored is BoundValue bound)
         {
@@ -77,7 +82,19 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
     }
 
     internal protected virtual bool TryGetStoredVariableRecursiveCore(string name, out object? value) =>
-        TryGetStoredVariableInCurrentScopeCore(name, out value);
+        TryGetStoredVariableRecursiveCore(name, out value, out _);
+
+    /// <summary>Returns the stored value and the actual structural view that owns it.</summary>
+    internal protected virtual bool TryGetStoredVariableRecursiveCore(string name, out object? value, [NotNullWhen(true)] out EnvironmentLike? source)
+    {
+        if (TryGetStoredVariableInCurrentScopeCore(name, out value))
+        {
+            source = this;
+            return true;
+        }
+        source = null;
+        return false;
+    }
 
     internal protected virtual bool TryResolveVariableRecursiveCore(ResolutionContext context, out Evaluation evaluation) =>
         TryResolveVariableInCurrentScopeCore(context, out evaluation);
@@ -100,6 +117,7 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
 
     public virtual void SetVariable<T>(string name, T value)
     {
+        EnsureWritableName(name);
         BoundValue bound = ValueGrammar.Instance.Compile(value).Bind(new EnvironmentExpressionContext(this, ResolutionContext.CreateRoot(this)));
         VariableStore.SetValue(name, bound);
     }
@@ -116,19 +134,36 @@ public partial record EnvironmentLike(VariableSyntaxBuilder SyntaxFactory, strin
     internal BoundValue BindStructuralText(string text) =>
         ValueGrammar.Instance.ParseText(text).Bind(new EnvironmentExpressionContext(this, ResolutionContext.CreateRoot(this)));
 
-    /// <summary>Evaluates a bound value with the current runtime view; does not modify its binding.</summary>
-    internal EvaluatedValue EvaluateStructuralValue(BoundValue bound) =>
-        bound.Evaluate(new EnvironmentExpressionContext(this, ResolutionContext.CreateRoot(this)));
+    /// <summary>Evaluates a bound value in this view while preserving an independent original resolution entry point.</summary>
+    internal EvaluatedValue EvaluateStructuralValue(BoundValue bound, EnvironmentLike entryPoint)
+    {
+        ArgumentNullException.ThrowIfNull(bound);
+        ArgumentNullException.ThrowIfNull(entryPoint);
+        return bound.Evaluate(new EnvironmentExpressionContext(this, ResolutionContext.CreateRoot(entryPoint)));
+    }
 
     /// <summary>Publishes an already evaluated value as a terminal binding, retaining captured expression text as literal data.</summary>
     internal void SetTerminalVariable(string name, EvaluatedValue terminal)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        EnsureWritableName(name);
         ArgumentNullException.ThrowIfNull(terminal);
         VariableStore.SetValue(name, new BoundCapture(terminal));
     }
 
-    public virtual bool TryRemoveVariable(string name) => VariableStore.TryRemove(name);
+    public virtual bool TryRemoveVariable(string name)
+    {
+        EnsureWritableName(name);
+        return VariableStore.TryRemove(name);
+    }
+
+    private static void EnsureWritableName(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (ContextualVariableRegistry.IsContextualName(name))
+        {
+            throw new ArgumentException($"Contextual variable '{name}' is runtime-owned and cannot be modified.", nameof(name));
+        }
+    }
 
     public virtual TaggedString Interpolate(string template)
     {
