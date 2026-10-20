@@ -41,17 +41,19 @@ internal sealed record InheritedRuntimeEnvironment(string Name, IRuntimeEnvironm
         VariableStore = new TransactionalEnvironmentVariableStore(environmentId, participant, activeTransaction);
     }
 
-    internal protected override bool TryGetStoredVariableRecursiveCore(string name, out object? value)
+    internal protected override bool TryGetStoredVariableRecursiveCore(string name, out object? value, [NotNullWhen(true)] out EnvironmentLike? source)
     {
         if (TryGetStoredVariableInCurrentScopeCore(name, out value))
         {
+            source = this;
             return true;
         }
         if (Parent is EnvironmentLike parent)
         {
-            return parent.TryGetStoredVariableRecursiveCore(name, out value);
+            return parent.TryGetStoredVariableRecursiveCore(name, out value, out source);
         }
         value = default;
+        source = null;
         return false;
     }
 

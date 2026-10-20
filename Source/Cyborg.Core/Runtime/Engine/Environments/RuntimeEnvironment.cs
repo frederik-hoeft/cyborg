@@ -150,12 +150,12 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
         return false;
     }
 
-    /// <summary>Retrieves a selected textual override as structural state without materializing or reinterpreting its expression.</summary>
+    /// <summary>Retrieves a selected textual override and its actual storage view without evaluating or reinterpreting it.</summary>
     internal bool TrySelectBoundOverride<TModule>(
         TModule module,
         string moduleExpression,
         string valueExpression,
-        [NotNullWhen(true)] out BoundValue? bound)
+        [NotNullWhen(true)] out SelectedBoundOverride? selected)
         where TModule : ModuleBase, IModuleDefinition
     {
         ArgumentNullException.ThrowIfNull(module);
@@ -165,14 +165,14 @@ public partial record RuntimeEnvironment(string Name, bool IsTransient, Variable
             foreach (string identifier in scope.EnumerateOverrideIdentifiers(module.Name, module.Group, TModule.ModuleId))
             {
                 string overridePath = scope.SyntaxFactory.Path(identifier, valuePath).Override();
-                if (scope.TryGetStoredVariableRecursiveCore(overridePath, out object? stored) && stored is BoundValue expression)
+                if (scope.TryGetStoredVariableRecursiveCore(overridePath, out object? stored, out EnvironmentLike? source) && stored is BoundValue expression)
                 {
-                    bound = expression;
+                    selected = new SelectedBoundOverride(expression, source);
                     return true;
                 }
             }
         }
-        bound = null;
+        selected = null;
         return false;
     }
 
