@@ -43,8 +43,8 @@ public sealed class DebugExecutionTopologyTests : CyborgCoreTestBase
         Assert.HasCount(2, stack);
         Assert.AreEqual(pausedId, stack[0].ExecutionId);
         Assert.AreEqual(rootId, stack[1].ExecutionId);
-        Assert.HasCount(0, stack[0].Children);
-        Assert.HasCount(0, stack[1].Children);
+        Assert.IsEmpty(stack[0].Children);
+        Assert.IsEmpty(stack[1].Children);
     }
 
     [TestMethod]
@@ -85,8 +85,8 @@ public sealed class DebugExecutionTopologyTests : CyborgCoreTestBase
         context.Joined = true;
         await topology.OnClosedAsync(context, CancellationToken.None);
 
-        Assert.HasCount(0, topology.CaptureTree().Roots);
-        Assert.HasCount(0, topology.CaptureAncestry(executionId));
+        Assert.IsEmpty(topology.CaptureTree().Roots);
+        Assert.IsEmpty(topology.CaptureAncestry(executionId));
     }
 
     [TestMethod]
@@ -193,7 +193,7 @@ public sealed class DebugExecutionTopologyTests : CyborgCoreTestBase
 
         Assert.HasCount(2, results);
         Assert.IsTrue(results.All(static result => result.Status == ModuleExitStatus.Success));
-        Assert.HasCount(0, topology.CaptureTree().Roots);
+        Assert.IsEmpty(topology.CaptureTree().Roots);
     }, ConfigureTopologyProbeServices);
 
     [TestMethod]
@@ -223,7 +223,7 @@ public sealed class DebugExecutionTopologyTests : CyborgCoreTestBase
         state.ReleaseSlow.TrySetResult();
         await Assert.ThrowsExactlyAsync<InvalidOperationException>(async () => await execution);
 
-        Assert.HasCount(0, topology.CaptureTree().Roots);
+        Assert.IsEmpty(topology.CaptureTree().Roots);
     }, ConfigureTopologyProbeServices);
 
     private static void ConfigurePreparedMetadataServices(IServiceCollection services)

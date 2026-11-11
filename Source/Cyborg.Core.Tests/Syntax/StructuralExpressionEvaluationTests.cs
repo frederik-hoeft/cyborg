@@ -133,7 +133,7 @@ public sealed class StructuralExpressionEvaluationTests
 
     private sealed class TestResolutionContext : IExpressionResolutionContext
     {
-        private readonly Dictionary<string, object?> _values = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, object?> _values = [with(StringComparer.Ordinal)];
 
         public void Set(string key, object? value) => _values[key] = value;
 

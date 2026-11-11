@@ -183,8 +183,8 @@ public sealed class DebuggerProductionFlowTests : ModuleTestBase
         IModuleExecutionResult result = await runtime.ExecuteAsync(configuration, TestContext.CancellationToken);
 
         MSAssert.AreEqual(ModuleExitStatus.Failed, result.Status);
-        MSAssert.HasCount(0, frontend.Names);
-        MSAssert.HasCount(0, topology.CaptureTree().Roots);
+        MSAssert.IsEmpty(frontend.Names);
+        MSAssert.IsEmpty(topology.CaptureTree().Roots);
     });
 
     [TestMethod]
@@ -217,7 +217,7 @@ public sealed class DebuggerProductionFlowTests : ModuleTestBase
         MSAssert.AreEqual(ModuleExitStatus.Success, result.Status);
         MSAssert.HasCount(1, frontend.Names);
         MSAssert.AreEqual(0, breakpoints.Count);
-        MSAssert.HasCount(0, topology.CaptureTree().Roots);
+        MSAssert.IsEmpty(topology.CaptureTree().Roots);
     });
 
     [TestMethod]
@@ -249,7 +249,7 @@ public sealed class DebuggerProductionFlowTests : ModuleTestBase
 
         MSAssert.AreEqual(ModuleExitStatus.Canceled, result.Status);
         MSAssert.HasCount(1, frontend.Names);
-        MSAssert.HasCount(0, topology.CaptureTree().Roots);
+        MSAssert.IsEmpty(topology.CaptureTree().Roots);
     });
 
     [TestMethod]

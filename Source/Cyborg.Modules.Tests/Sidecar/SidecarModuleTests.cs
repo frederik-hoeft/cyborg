@@ -230,9 +230,9 @@ public sealed class SidecarModuleTests : ModuleTestBase
 
         MSAssert.AreEqual(ModuleExitStatus.Failed, result.Status);
         MSAssert.AreEqual(ModuleExitStatus.Canceled, recorder.PrimaryStatus);
-        MSAssert.AreEqual(2, recorder.SidecarStatuses.Count);
-        MSAssert.IsTrue(recorder.SidecarStatuses.Contains(ModuleExitStatus.Failed));
-        MSAssert.IsTrue(recorder.SidecarStatuses.Contains(ModuleExitStatus.Canceled));
+        MSAssert.HasCount(2, recorder.SidecarStatuses);
+        MSAssert.Contains(ModuleExitStatus.Failed, recorder.SidecarStatuses);
+        MSAssert.Contains(ModuleExitStatus.Canceled, recorder.SidecarStatuses);
     }, ConfigureProbeServices);
 
     [TestMethod]

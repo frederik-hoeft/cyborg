@@ -5,7 +5,7 @@ namespace Cyborg.Core.Runtime.Configuration;
 
 internal sealed class ModuleRegistrySeedBuilder
 {
-    private readonly Dictionary<string, ModuleContext> _modules = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ModuleContext> _modules = [with(StringComparer.Ordinal)];
 
     public void Add(string name, ModuleContext module)
     {

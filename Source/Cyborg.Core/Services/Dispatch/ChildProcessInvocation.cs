@@ -13,7 +13,7 @@ public sealed class ChildProcessInvocation
 
     public List<TaggedString> ArgumentList { get; } = [];
 
-    public Dictionary<string, TaggedString> Environment { get; } = new(StringComparer.Ordinal);
+    public Dictionary<string, TaggedString> Environment { get; } = [with(StringComparer.Ordinal)];
 
     public string? WorkingDirectory { get; set; }
 

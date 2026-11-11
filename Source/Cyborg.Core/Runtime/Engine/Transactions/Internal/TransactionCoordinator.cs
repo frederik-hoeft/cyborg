@@ -26,7 +26,7 @@ internal sealed class TransactionCoordinator(IEnumerable<ITransactionParticipant
 
     private static ImmutableArray<ITransactionParticipant> ValidateParticipants(IEnumerable<ITransactionParticipant> participants)
     {
-        HashSet<ITransactionParticipant> uniqueParticipants = new(ReferenceEqualityComparer.Instance);
+        HashSet<ITransactionParticipant> uniqueParticipants = [with(ReferenceEqualityComparer.Instance)];
         foreach (ITransactionParticipant participant in participants)
         {
             ArgumentNullException.ThrowIfNull(participant);

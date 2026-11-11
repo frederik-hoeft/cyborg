@@ -55,7 +55,7 @@ public sealed class DebugPauseContextTests
 
         IReadOnlyList<IExecutionTreeNode> stack = context.Stack;
 
-        Assert.HasCount(0, stack);
+        Assert.IsEmpty(stack);
         Assert.AreEqual(0, topology.AncestryCaptureCount);
     }
 
@@ -72,8 +72,8 @@ public sealed class DebugPauseContextTests
             Diagnostics: []);
 
         Assert.IsNull(context.ExecutionId);
-        Assert.HasCount(0, context.Tree.Roots);
-        Assert.HasCount(0, context.Stack);
+        Assert.IsEmpty(context.Tree.Roots);
+        Assert.IsEmpty(context.Stack);
     }
 
     private sealed record TestModule : ModuleBase

@@ -28,7 +28,7 @@ internal sealed class TransactionalDictionaryFork<TKey, TValue>(TransactionalDic
         ArgumentNullException.ThrowIfNull(conflictStrategy);
         EnsureOwnerUnchanged();
 
-        Dictionary<TKey, List<ContributorChanges<TValue>>> changes = new(_baseline.Data.KeyComparer);
+        Dictionary<TKey, List<ContributorChanges<TValue>>> changes = [with(_baseline.Data.KeyComparer)];
         for (int contributorIndex = 0; contributorIndex < contributors.Count; ++contributorIndex)
         {
             TransactionalDictionary<TKey, TValue> contributor = contributors[contributorIndex];
@@ -49,7 +49,7 @@ internal sealed class TransactionalDictionaryFork<TKey, TValue>(TransactionalDic
             }
         }
 
-        selectedChanges = new Dictionary<TKey, TransactionalDictionaryChange<TValue>>(_baseline.Data.KeyComparer);
+        selectedChanges = [with(_baseline.Data.KeyComparer)];
         foreach ((TKey key, List<ContributorChanges<TValue>> keyChanges) in changes)
         {
             if (keyChanges.Count == 1)

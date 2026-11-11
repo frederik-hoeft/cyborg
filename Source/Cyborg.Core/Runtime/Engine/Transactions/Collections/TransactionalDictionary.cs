@@ -26,7 +26,7 @@ internal sealed class TransactionalDictionary<TKey, TValue> : IReadOnlyDictionar
     }
 
     private TransactionalDictionary(TransactionalDictionarySnapshot<TKey, TValue> baseline)
-        : this(baseline, new Dictionary<TKey, TransactionalDictionaryChange<TValue>>(baseline.Data.KeyComparer), baseline)
+        : this(baseline, [with(baseline.Data.KeyComparer)], baseline)
     {
     }
 
@@ -34,7 +34,7 @@ internal sealed class TransactionalDictionary<TKey, TValue> : IReadOnlyDictionar
     {
         Baseline = baseline;
         _changes = changes;
-        _pendingSnapshotChanges = new Dictionary<TKey, TransactionalDictionaryChange<TValue>>(baseline.Data.KeyComparer);
+        _pendingSnapshotChanges = [with(baseline.Data.KeyComparer)];
         _effectiveSnapshot = effectiveSnapshot;
     }
 
@@ -140,7 +140,7 @@ internal sealed class TransactionalDictionary<TKey, TValue> : IReadOnlyDictionar
             throw new InvalidOperationException("The dictionary changed after the fork baseline was captured.");
         }
 
-        Dictionary<TKey, TransactionalDictionaryChange<TValue>> contributorChanges = new(Baseline.Data.KeyComparer);
+        Dictionary<TKey, TransactionalDictionaryChange<TValue>> contributorChanges = [with(Baseline.Data.KeyComparer)];
         foreach (TransactionalDictionary<TKey, TValue> contributor in contributors)
         {
             ArgumentNullException.ThrowIfNull(contributor);

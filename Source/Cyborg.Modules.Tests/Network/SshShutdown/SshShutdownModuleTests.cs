@@ -52,8 +52,8 @@ public sealed class SshShutdownModuleTests : ModuleTestBase
                 MSAssert.AreEqual(ModuleExitStatus.Failed, result.Status);
                 AssertCaptureRequested(dispatcher);
                 AssertResultArtifacts(result, exitCode, string.Empty, standardError);
-                MSAssert.IsTrue(loggerFactory.Messages.Any(message => message.Contains(standardError, StringComparison.Ordinal)));
-                MSAssert.IsTrue(loggerFactory.Messages.Any(message => message.Contains($"exit code {exitCode}", StringComparison.Ordinal)));
+                MSAssert.Contains(message => message.Contains(standardError, StringComparison.Ordinal), loggerFactory.Messages);
+                MSAssert.Contains(message => message.Contains($"exit code {exitCode}", StringComparison.Ordinal), loggerFactory.Messages);
             },
             configureServices: services =>
             {
@@ -115,9 +115,6 @@ public sealed class SshShutdownModuleTests : ModuleTestBase
 
         public bool IsEnabled(LogLevel logLevel) => true;
 
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
-        {
-            messages.Add(formatter(state, exception));
-        }
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) => messages.Add(formatter(state, exception));
     }
 }

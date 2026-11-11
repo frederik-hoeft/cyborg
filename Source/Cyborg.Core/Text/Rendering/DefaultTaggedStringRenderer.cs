@@ -12,7 +12,7 @@ public sealed class DefaultTaggedStringRenderer : ITaggedStringRenderer
     {
         ArgumentNullException.ThrowIfNull(handlers);
 
-        Dictionary<string, ITaggedStringTagHandler> handlersByTag = new(StringComparer.Ordinal);
+        Dictionary<string, ITaggedStringTagHandler> handlersByTag = [with(StringComparer.Ordinal)];
         foreach (ITaggedStringTagHandler handler in handlers)
         {
             ArgumentNullException.ThrowIfNull(handler);

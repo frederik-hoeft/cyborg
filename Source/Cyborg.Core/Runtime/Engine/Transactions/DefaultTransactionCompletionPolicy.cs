@@ -14,7 +14,7 @@ internal sealed class DefaultTransactionCompletionPolicy(ITransactionOptionsProv
             return TransactionPublicationDisposition.Commit;
         }
 
-        TransactionOnError onError = module is ModuleBase { Transaction: { OnError: { } configured } }
+        TransactionOnError onError = module is ModuleBase { Transaction.OnError: { } configured }
             ? configured
             : options?.OnError ?? TransactionOnError.Commit;
         return onError switch

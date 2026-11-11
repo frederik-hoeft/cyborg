@@ -127,13 +127,13 @@ public sealed class InheritedEnvironmentResolutionTests
         Assert.IsTrue(child.TrySelectBoundOverride(module, nameof(module), "module.Value", out SelectedBoundOverride? selected));
         TaggedString stored = (TaggedString)selected.Value.PresentStoredValue()!;
         Assert.AreEqual("before ${value}", stored.Value);
-        Assert.IsTrue(stored.Tags.Contains("secret"));
+        Assert.Contains("secret", stored.Tags);
 
         object? materialized = new ExpressionMaterializer().Materialize(selected.Source.EvaluateStructuralValue(selected.Value, child));
         Assert.IsInstanceOfType<TaggedString>(materialized);
         TaggedString resolved = (TaggedString)materialized;
         Assert.AreEqual("before resolved", resolved.Value);
-        Assert.IsTrue(resolved.Tags.Contains("secret"));
+        Assert.Contains("secret", resolved.Tags);
     }
 
     [TestMethod]

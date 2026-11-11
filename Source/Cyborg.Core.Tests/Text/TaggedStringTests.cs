@@ -95,7 +95,7 @@ public sealed class TaggedStringTests
         Assert.AreEqual(string.Empty, tagged.Value);
         Assert.IsFalse(tagged.HasTags);
         Assert.IsTrue(tagged.IsEmpty);
-        Assert.AreSequenceEqual(ImmutableHashSet<string>.Empty.ToArray(), tagged.Tags.ToArray());
+        Assert.AreSequenceEqual(ImmutableHashSet<string>.Empty.ToArray(), [.. tagged.Tags]);
     }
 
     [TestMethod]

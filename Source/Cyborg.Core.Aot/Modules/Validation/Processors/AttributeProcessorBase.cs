@@ -89,7 +89,7 @@ internal abstract class AttributeProcessorBase : IPropertyAttributeProcessor
 
     protected bool TryGetNamedArgumentExpressions(AttributeData attribute, ref readonly PropertyProcessingContext context, [NotNullWhen(true)] out Dictionary<string, string?> namedArguments)
     {
-        namedArguments = new Dictionary<string, string?>(capacity: attribute.NamedArguments.Length);
+        namedArguments = [with(capacity: attribute.NamedArguments.Length)];
         foreach (KeyValuePair<string, TypedConstant> named in attribute.NamedArguments)
         {
             if (!named.Value.IsNull)

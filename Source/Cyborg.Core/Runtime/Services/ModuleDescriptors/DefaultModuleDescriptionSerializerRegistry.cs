@@ -10,7 +10,7 @@ internal sealed class DefaultModuleDescriptionSerializerRegistry : IModuleDescri
     {
         ArgumentNullException.ThrowIfNull(serializers);
 
-        Dictionary<string, IModuleDescriptionSerializer> serializersByFormat = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, IModuleDescriptionSerializer> serializersByFormat = [with(StringComparer.OrdinalIgnoreCase)];
         foreach (IModuleDescriptionSerializer serializer in serializers)
         {
             ArgumentNullException.ThrowIfNull(serializer);
