@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Build stage: compile the project with native AOT
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build
 
 # Install native AOT prerequisites (clang for linking, zlib1g-dev for compression support)
 RUN apt-get update \
@@ -18,6 +18,8 @@ COPY Cyborg.Cli/Cyborg.Cli.csproj Source/Cyborg.Cli/
 COPY Cyborg.Cli.Debugging/Cyborg.Cli.Debugging.csproj Source/Cyborg.Cli.Debugging/
 COPY Cyborg.Core/Cyborg.Core.csproj Source/Cyborg.Core/
 COPY Cyborg.Core.Aot/Cyborg.Core.Aot.csproj Source/Cyborg.Core.Aot/
+COPY Cyborg.Shared/Cyborg.Shared.csproj Source/Cyborg.Shared/
+COPY Cyborg.Shared/Cyborg.Shared.projitems Source/Cyborg.Shared/
 COPY Cyborg.Modules/Cyborg.Modules.csproj Source/Cyborg.Modules/
 COPY Cyborg.Modules.Borg/Cyborg.Modules.Borg.csproj Source/Cyborg.Modules.Borg/
 
