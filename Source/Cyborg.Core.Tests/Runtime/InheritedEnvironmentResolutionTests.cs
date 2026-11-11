@@ -145,9 +145,9 @@ public sealed class InheritedEnvironmentResolutionTests
         InheritedRuntimeEnvironment middle = Inherit(root, "middle") with { Context = new EnvironmentContext(invokingOrigin) };
         InheritedRuntimeEnvironment child = Inherit(middle, "child") with { Context = new EnvironmentContext(invokingOrigin) };
         ProbeModule module = new(Port: 0, Value: "configured", Ports: null) { Name = "probe", Group = "group" };
-        const string expression = "${@.origin.file}|${@@.origin.file}|${@}|${@@}";
-        root.SetVariable("ordinary", expression);
-        root.SetVariable("@probe.value", new TaggedString(expression, ["source-tag"]));
+        const string EXPRESSION = "${@.origin.file}|${@@.origin.file}|${@}|${@@}";
+        root.SetVariable("ordinary", EXPRESSION);
+        root.SetVariable("@probe.value", new TaggedString(EXPRESSION, ["source-tag"]));
         child.SetVariable("@group.value", "lower-priority");
 
         Assert.IsTrue(child.TryResolveVariable("ordinary", out string? inherited));
@@ -160,7 +160,7 @@ public sealed class InheritedEnvironmentResolutionTests
 
         StructuralModulePreparation preparation = new(child);
         Assert.IsTrue(preparation.TrySelectOverride(module, nameof(module), "module.Value", "module.Value", out object? raw));
-        Assert.AreEqual(expression, Assert.IsInstanceOfType<TaggedString>(raw).Value);
+        Assert.AreEqual(EXPRESSION, Assert.IsInstanceOfType<TaggedString>(raw).Value);
         object? prepared = preparation.ResolveValueExpression(raw!, willInterpolate: true, "module.Value");
         TaggedString evaluated = preparation.Interpolate(prepared!, "module.Value");
         Assert.AreEqual(expected, evaluated.Value);
@@ -169,7 +169,7 @@ public sealed class InheritedEnvironmentResolutionTests
         StructuralModulePreparation ignored = new(child);
         Assert.IsTrue(ignored.TrySelectOverride(module, nameof(module), "module.Value", "module.Value", out object? ignoredRaw));
         object? uninterpolated = ignored.ResolveValueExpression(ignoredRaw!, willInterpolate: false, "module.Value");
-        Assert.AreEqual(expression, Assert.IsInstanceOfType<TaggedString>(uninterpolated).Value);
+        Assert.AreEqual(EXPRESSION, Assert.IsInstanceOfType<TaggedString>(uninterpolated).Value);
     }
 
     [TestMethod]

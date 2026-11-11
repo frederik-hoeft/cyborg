@@ -13,7 +13,7 @@ namespace Cyborg.Core.Tests.Runtime;
 [TestClass]
 public sealed class ModuleRuntimeBaseTests
 {
-    public TestContext TestContext { get; set; }
+    public required TestContext TestContext { get; set; }
 
     [TestMethod]
     [DataRow("@.origin.file", "container_name")]

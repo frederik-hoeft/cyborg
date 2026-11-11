@@ -5,7 +5,7 @@ namespace Cyborg.Core.Tests.Metrics;
 [TestClass]
 public sealed class PrometheusBuilderTests
 {
-    public TestContext TestContext { get; set; }
+    public required TestContext TestContext { get; set; }
 
     [TestMethod]
     public async Task Test_WriteToAsync_DoesNotEmitUtf8BomAsync()
