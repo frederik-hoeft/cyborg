@@ -62,10 +62,8 @@ For detailed reference material, see:
 - [Supporting Infrastructure](#supporting-infrastructure)
   - [Host Configuration Composition](#host-configuration-composition)
   - [Parsing Infrastructure](#parsing-infrastructure)
-    - [Parser Combinators](#parser-combinators)
-    - [Terminal Parsers](#terminal-parsers)
-    - [Syntax Tree and Data Extraction](#syntax-tree-and-data-extraction)
-    - [Integration Points](#integration-points)
+    - [Grammar Construction](#grammar-construction)
+    - [Syntax Nodes and Visitors](#syntax-nodes-and-visitors)
   - [Process Execution](#process-execution)
   - [Metrics Collection](#metrics-collection)
 - [Cross-Cutting Concerns](#cross-cutting-concerns)
@@ -81,7 +79,7 @@ For detailed reference material, see:
 
 ## Overview
 
-Cyborg is a .NET 10 application providing modular, JSON-configured workflow orchestration with native AOT compilation support. Its architecture is driven by six design goals:
+Cyborg is a .NET 11 application providing modular, JSON-configured workflow orchestration with native AOT compilation support. Its architecture is driven by six design goals:
 
 1. **AOT Compilation** — Native AOT publishing for minimal startup time and memory footprint on Linux servers, and minimal external dependencies (no .NET runtime requirement, no external dynamic libraries).
 2. **Extensibility** — A plugin-like module system allowing orchestration behavior to be composed from JSON configuration without code changes.
@@ -96,13 +94,13 @@ The production solution is organized into seven primary projects, each with a sp
 
 | Layer | Target | Purpose |
 |-------|--------|---------|
-| `Cyborg.Core` | net10.0 | Core abstractions: module interfaces, runtime, environment scoping, configuration, parsing, and cross-cutting services. Contains no module-specific logic. |
+| `Cyborg.Core` | net11.0 | Core abstractions: module interfaces, runtime, environment scoping, configuration, parsing, and cross-cutting services. Contains no module-specific logic. |
 | `Cyborg.Core.Aot` | netstandard2.0 | Roslyn incremental source generators distributed as analyzers. Targets netstandard2.0 as required by the Roslyn analyzer hosting model. |
 | `Cyborg.Shared` | netstandard2.0 | Source-shared utilities compiled into both `Cyborg.Core` and `Cyborg.Core.Aot` where a direct project dependency would cross the runtime/analyzer boundary. |
-| `Cyborg.Modules` | net10.0 | Built-in, domain-agnostic module implementations supplemented by generated code from `Cyborg.Core.Aot`, e.g., for model validation and instance activation. |
-| `Cyborg.Modules.Borg` | net10.0 | Borg-specific modules (create, prune, compact) with JSON output parsing and borg-specific configuration types. |
-| `Cyborg.Cli.Debugging` | net10.0 | Console debugger frontend and its isolated ConsoleAppFramework-generated REPL command surface. |
-| `Cyborg.Cli` | net10.0 | Application entry point using its own ConsoleAppFramework command surface, with Jab for compile-time dependency injection composition. |
+| `Cyborg.Modules` | net11.0 | Built-in, domain-agnostic module implementations supplemented by generated code from `Cyborg.Core.Aot`, e.g., for model validation and instance activation. |
+| `Cyborg.Modules.Borg` | net11.0 | Borg-specific modules (create, prune, compact) with JSON output parsing and borg-specific configuration types. |
+| `Cyborg.Cli.Debugging` | net11.0 | Console debugger frontend and its isolated ConsoleAppFramework-generated REPL command surface. |
+| `Cyborg.Cli` | net11.0 | Application entry point using its own ConsoleAppFramework command surface, with Jab for compile-time dependency injection composition. |
 
 `Cyborg.Core` defines the runtime interfaces and abstractions. `Cyborg.Core.Aot` generates code that implements those interfaces for specific module types. `Cyborg.Shared` supplies a small common source surface to both projects without making the analyzer depend on the runtime assembly. `Cyborg.Modules` and `Cyborg.Modules.Borg` provide the built-in module library. `Cyborg.Cli.Debugging` provides the console debugger adapter in a separate CAF compilation, and `Cyborg.Cli` composes everything into the final executable. Each module library exposes a Jab `[ServiceProviderModule]` interface (e.g., `ICyborgModuleServices`, `ICyborgBorgServices`) that the CLI project imports into its composition root.
 

@@ -1,6 +1,6 @@
 # Cyborg Repository Instructions
 
-Cyborg is a .NET 10 application for modular, JSON-configured workflow orchestration with native AOT compilation support. Workflows are immutable module trees that are loaded through source-generated JSON metadata, prepared through generated validation code, and executed inside hierarchical runtime environments.
+Cyborg is a .NET 11 application for modular, JSON-configured workflow orchestration with native AOT compilation support. Workflows are immutable module trees that are loaded through source-generated JSON metadata, prepared through generated validation code, and executed inside hierarchical runtime environments.
 
 ## Start Here
 
