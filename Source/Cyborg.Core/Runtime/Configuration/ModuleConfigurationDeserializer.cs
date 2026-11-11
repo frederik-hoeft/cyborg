@@ -7,11 +7,11 @@ namespace Cyborg.Core.Runtime.Configuration;
 
 internal sealed class ModuleConfigurationDeserializer(IJsonLoaderContext context)
 {
-    public async ValueTask<ModuleConfigurationLoadResult?> DeserializeAsync(Stream stream, CancellationToken cancellationToken = default, ModuleOrigin? origin = null)
+    public async ValueTask<ModuleConfigurationLoadResult?> DeserializeAsync(Stream stream, ModuleOrigin? origin = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(stream);
         (JsonSerializerOptions options, ModuleRegistrySeedBuilder seedBuilder) = CreateLoadState(origin);
-        JsonTypeInfo<ModuleContext> typeInfo = (JsonTypeInfo<ModuleContext>)options.GetTypeInfo(typeof(ModuleContext));
+        JsonTypeInfo<ModuleContext> typeInfo = options.GetTypeInfo<ModuleContext>();
         ModuleContext? moduleContext = await JsonSerializer.DeserializeAsync(stream, typeInfo, cancellationToken);
         return CreateResult(moduleContext, seedBuilder);
     }
@@ -20,7 +20,7 @@ internal sealed class ModuleConfigurationDeserializer(IJsonLoaderContext context
     {
         ArgumentNullException.ThrowIfNull(json);
         (JsonSerializerOptions options, ModuleRegistrySeedBuilder seedBuilder) = CreateLoadState(origin);
-        JsonTypeInfo<ModuleContext> typeInfo = (JsonTypeInfo<ModuleContext>)options.GetTypeInfo(typeof(ModuleContext));
+        JsonTypeInfo<ModuleContext> typeInfo = options.GetTypeInfo<ModuleContext>();
         ModuleContext? moduleContext = JsonSerializer.Deserialize(json, typeInfo);
         return CreateResult(moduleContext, seedBuilder);
     }
@@ -29,7 +29,7 @@ internal sealed class ModuleConfigurationDeserializer(IJsonLoaderContext context
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(json);
         (JsonSerializerOptions options, _) = CreateLoadState(origin);
-        JsonTypeInfo<ModuleReference> typeInfo = (JsonTypeInfo<ModuleReference>)options.GetTypeInfo(typeof(ModuleReference));
+        JsonTypeInfo<ModuleReference> typeInfo = options.GetTypeInfo<ModuleReference>();
         return JsonSerializer.Deserialize(json, typeInfo) ?? throw new InvalidOperationException("Module reference deserialization returned null.");
     }
 

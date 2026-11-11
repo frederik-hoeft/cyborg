@@ -17,7 +17,7 @@ public sealed class DefaultModuleConfigurationLoader
         trustService.Enforce(trustDecision);
         await using FileStream stream = File.OpenRead(trustDecision.Path);
         ModuleConfigurationDeserializer deserializer = new(configurationContext);
-        ModuleConfigurationLoadResult? configuration = await deserializer.DeserializeAsync(stream, cancellationToken, new ModuleOrigin(trustDecision.Path));
+        ModuleConfigurationLoadResult? configuration = await deserializer.DeserializeAsync(stream, new ModuleOrigin(trustDecision.Path), cancellationToken);
         return configuration ?? throw new InvalidOperationException($"Failed to load module configuration from configuration file '{trustDecision.Path}'.");
     }
 }
