@@ -57,6 +57,6 @@ internal sealed class ValueGrammar
         }
         TextSyntaxCollector collector = new();
         root.Accept(collector);
-        return new TextValueSyntax(ImmutableArray.CreateRange(collector.Parts)) { Source = input };
+        return new TextValueSyntax([.. collector.Parts]) { Source = input };
     }
 }

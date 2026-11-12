@@ -48,7 +48,7 @@ internal static class DecompositionGenerationCandidateFactory
 
     private static IEnumerable<IPropertySymbol> EnumerateDecomposableProperties(INamedTypeSymbol typeSymbol)
     {
-        HashSet<string> propertyNames = new(StringComparer.Ordinal);
+        HashSet<string> propertyNames = [with(StringComparer.Ordinal)];
         for (INamedTypeSymbol? currentType = typeSymbol; currentType is not null; currentType = currentType.BaseType)
         {
             foreach (IPropertySymbol property in currentType.GetMembers().OfType<IPropertySymbol>())

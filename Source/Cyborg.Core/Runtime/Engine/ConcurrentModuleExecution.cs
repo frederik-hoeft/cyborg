@@ -4,26 +4,15 @@ using Cyborg.Core.Runtime.Model;
 
 namespace Cyborg.Core.Runtime.Engine;
 
-internal sealed class ConcurrentModuleExecution : IConcurrentModuleExecution
+internal sealed class ConcurrentModuleExecution(ModuleInvocationScope scope, IModule module, ModuleContext moduleContext, CancellationTokenSource cancellation) : IConcurrentModuleExecution
 {
-    private readonly ModuleInvocationScope _scope;
-    private readonly ModuleContext _moduleContext;
-    private readonly CancellationTokenSource _cancellation;
     private Task<IModuleExecutionResult>? _completion;
 
-    public ConcurrentModuleExecution(ModuleInvocationScope scope, IModule module, ModuleContext moduleContext, CancellationTokenSource cancellation)
-    {
-        _scope = scope;
-        Module = module;
-        _moduleContext = moduleContext;
-        _cancellation = cancellation;
-    }
+    public IModule Module { get; } = module;
 
-    public IModule Module { get; }
+    public ModuleInvocationScope Scope => scope;
 
-    public ModuleInvocationScope Scope => _scope;
-
-    public ModuleTransaction Transaction => _scope.Transaction;
+    public ModuleTransaction Transaction => scope.Transaction;
 
     public Task<IModuleExecutionResult> Completion => _completion ?? throw new InvalidOperationException("The concurrent child execution has not been started.");
 
@@ -41,7 +30,7 @@ internal sealed class ConcurrentModuleExecution : IConcurrentModuleExecution
     {
         try
         {
-            _cancellation.Cancel();
+            cancellation.Cancel();
         }
         catch (ObjectDisposedException)
         {
@@ -50,9 +39,9 @@ internal sealed class ConcurrentModuleExecution : IConcurrentModuleExecution
 
     private async Task<IModuleExecutionResult> ExecuteAsync()
     {
-        IRuntimeEnvironment environment = _scope.Runtime.PrepareEnvironment(_moduleContext.Environment ?? ModuleEnvironment.Default);
-        IModuleExecutionResult result = await _scope.Runtime.DispatchInCurrentScopeAsync(ModuleExecutionTarget.ForContext(_moduleContext, environment, _cancellation.Token), environment);
-        await _scope.NotifyCompletedAsync(result);
+        IRuntimeEnvironment environment = scope.Runtime.PrepareEnvironment(moduleContext.Environment ?? ModuleEnvironment.Default);
+        IModuleExecutionResult result = await scope.Runtime.DispatchInCurrentScopeAsync(ModuleExecutionTarget.ForContext(moduleContext, environment, cancellation.Token), environment);
+        await scope.NotifyCompletedAsync(result);
         return result;
     }
 }

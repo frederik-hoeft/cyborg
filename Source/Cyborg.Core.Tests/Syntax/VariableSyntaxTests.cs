@@ -218,7 +218,7 @@ public sealed class VariableSyntaxTests
     public void Test_InterpolationGrammar_Input_ReturnsExpectedMatches(string value, int expectedCount, string expectedExpressions)
     {
         TextValueSyntax expression = ValueGrammar.Instance.ParseText(value);
-        List<string> actualExpressions = expression.Parts.OfType<InterpolationPartSyntax>().Select(part => part.Reference.ToString()).ToList();
+        List<string> actualExpressions = [.. expression.Parts.OfType<InterpolationPartSyntax>().Select(part => part.Reference.ToString())];
 
         Assert.HasCount(expectedCount, actualExpressions);
         Assert.AreEqual(expectedExpressions, string.Join("|", actualExpressions));

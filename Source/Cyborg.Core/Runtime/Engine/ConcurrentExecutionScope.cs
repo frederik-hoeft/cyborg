@@ -1,17 +1,18 @@
-﻿using Cyborg.Core.Runtime.Engine.Environments;
-using Cyborg.Core.Runtime.Engine.Transactions;
+﻿using Cyborg.Core.Runtime.Engine.Transactions;
 using Cyborg.Core.Runtime.Engine.Transactions.Internal;
 using Cyborg.Core.Runtime.Model;
 
 namespace Cyborg.Core.Runtime.Engine;
 
-internal sealed class ConcurrentExecutionScope : IConcurrentExecutionScope
+internal sealed class ConcurrentExecutionScope
+(
+    ActiveTransaction activeTransaction,
+    ModuleTransaction restoreTransaction,
+    ModuleTransactionForkGroup fork,
+    ITransactionCompletionPolicy completionPolicy,
+    ModuleInvocationCoordinator invocationCoordinator
+) : IConcurrentExecutionScope
 {
-    private readonly ActiveTransaction _activeTransaction;
-    private readonly ModuleTransaction _restoreTransaction;
-    private readonly ModuleTransactionForkGroup _fork;
-    private readonly ITransactionCompletionPolicy _completionPolicy;
-    private readonly ModuleInvocationCoordinator _invocationCoordinator;
     private readonly CancellationTokenSource _scopeCancellation = new();
     private readonly List<ConcurrentModuleExecution> _executions = [];
     private readonly List<CancellationTokenSource> _childCancellations = [];
@@ -20,27 +21,17 @@ internal sealed class ConcurrentExecutionScope : IConcurrentExecutionScope
     private bool _resourcesDisposed;
     private bool _scopeCancellationDisposed;
 
-    public ConcurrentExecutionScope(ActiveTransaction activeTransaction, ModuleTransaction restoreTransaction, ModuleTransactionForkGroup fork,
-        ITransactionCompletionPolicy completionPolicy, ModuleInvocationCoordinator invocationCoordinator)
-    {
-        _activeTransaction = activeTransaction;
-        _restoreTransaction = restoreTransaction;
-        _fork = fork;
-        _completionPolicy = completionPolicy;
-        _invocationCoordinator = invocationCoordinator;
-    }
-
     public async ValueTask<IConcurrentModuleExecution> StartAsync(ModuleContext moduleContext, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(moduleContext);
         EnsureOpen();
 
-        ModuleTransaction childTransaction = _fork.CreateChild();
+        ModuleTransaction childTransaction = fork.CreateChild();
         CancellationTokenSource childCancellation = CancellationTokenSource.CreateLinkedTokenSource(_scopeCancellation.Token, cancellationToken);
         _childCancellations.Add(childCancellation);
         try
         {
-            ModuleInvocationScope invocationScope = await _invocationCoordinator.CreateInvocationScopeAsync(
+            ModuleInvocationScope invocationScope = await invocationCoordinator.CreateInvocationScopeAsync(
                 childTransaction, moduleContext.Module.ModuleId, moduleContext.Module.Definition, moduleContext.Module.Origin, childCancellation.Token);
             ConcurrentModuleExecution execution = new(invocationScope, moduleContext.Module.Definition, moduleContext, childCancellation);
             _executions.Add(execution);
@@ -80,10 +71,10 @@ internal sealed class ConcurrentExecutionScope : IConcurrentExecutionScope
         {
             for (int i = 0; i < _executions.Count; i++)
             {
-                _executions[i].Transaction.Complete(_completionPolicy.Resolve(_executions[i].Module, results[i].Status));
+                _executions[i].Transaction.Complete(completionPolicy.Resolve(_executions[i].Module, results[i].Status));
             }
-            _fork.Continuation.Complete();
-            bool joined = _fork.TryJoin(out TransactionConflict? conflict);
+            fork.Continuation.Complete();
+            bool joined = fork.TryJoin(out TransactionConflict? conflict);
             await NotifyClosedAsync(joined);
             RestoreOwner();
             _state = ScopeState.Closed;
@@ -107,7 +98,7 @@ internal sealed class ConcurrentExecutionScope : IConcurrentExecutionScope
     {
         try
         {
-            if (_state == ScopeState.Closed || _state == ScopeState.Closing)
+            if (_state is ScopeState.Closed or ScopeState.Closing)
             {
                 return;
             }
@@ -137,7 +128,7 @@ internal sealed class ConcurrentExecutionScope : IConcurrentExecutionScope
 
     private bool HasNestedOwnerFork()
     {
-        if (_fork.Continuation.HasOpenFork)
+        if (fork.Continuation.HasOpenFork)
         {
             return true;
         }
@@ -181,9 +172,9 @@ internal sealed class ConcurrentExecutionScope : IConcurrentExecutionScope
             return;
         }
 
-        if (_fork.Lifecycle == ModuleTransactionForkLifecycle.Active)
+        if (fork.Lifecycle == ModuleTransactionForkLifecycle.Active)
         {
-            _fork.Discard();
+            fork.Discard();
         }
 
         await NotifyClosedAsync(joined: false);
@@ -208,9 +199,9 @@ internal sealed class ConcurrentExecutionScope : IConcurrentExecutionScope
 
     private void RestoreOwner()
     {
-        if (!ReferenceEquals(_activeTransaction.Current, _restoreTransaction))
+        if (!ReferenceEquals(activeTransaction.Current, restoreTransaction))
         {
-            _activeTransaction.Retarget(_restoreTransaction);
+            activeTransaction.Retarget(restoreTransaction);
         }
     }
 

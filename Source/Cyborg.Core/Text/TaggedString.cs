@@ -115,8 +115,8 @@ public readonly struct TaggedString : IEquatable<TaggedString>
 
     internal static ImmutableHashSet<string> UnionTags(IEnumerable<string>? left, IEnumerable<string>? right)
     {
-        ImmutableHashSet<string> leftTags = NormalizeTags(left) ?? ImmutableHashSet<string>.Empty;
-        ImmutableHashSet<string> rightTags = NormalizeTags(right) ?? ImmutableHashSet<string>.Empty;
+        ImmutableHashSet<string> leftTags = NormalizeTags(left) ?? [];
+        ImmutableHashSet<string> rightTags = NormalizeTags(right) ?? [];
         if (rightTags.IsEmpty)
         {
             return leftTags;

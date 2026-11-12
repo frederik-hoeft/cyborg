@@ -1,4 +1,4 @@
-namespace Cyborg.Core.Runtime.Engine.Environments.Syntax;
+﻿namespace Cyborg.Core.Runtime.Engine.Environments.Syntax;
 
 /// <summary>Reserves bare self and dotted self paths independently of which contextual properties are registered.</summary>
 internal static class ContextualVariableSyntax

@@ -53,7 +53,7 @@ public sealed class BorgPruneLineGrammarTests
         ArchiveName parser = new();
         MSAssert.IsTrue(parser.CanAccept<BorgPruneVisitor>());
         MSAssert.IsFalse(parser.CanAccept<UnrelatedVisitor>());
-        MSAssert.ThrowsExactly<InvalidOperationException>(() => parser.RequireVisitor<UnrelatedVisitor>());
+        MSAssert.ThrowsExactly<InvalidOperationException>(parser.RequireVisitor<UnrelatedVisitor>);
 
         MSAssert.IsTrue(parser.TryParse("archive-name", 0, out ISyntaxNode? node, out _));
         MSAssert.IsNotNull(node);

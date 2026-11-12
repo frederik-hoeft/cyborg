@@ -21,7 +21,8 @@ public sealed class ModuleContextJsonConverter : JsonConverter<ModuleContext>
 
     public override ModuleContext Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
-        JsonTypeInfo<ModuleContextDeserializationDummy> typeInfo = (JsonTypeInfo<ModuleContextDeserializationDummy>)options.GetTypeInfo(typeof(ModuleContextDeserializationDummy));
+        ArgumentNullException.ThrowIfNull(options);
+        JsonTypeInfo<ModuleContextDeserializationDummy> typeInfo = options.GetTypeInfo<ModuleContextDeserializationDummy>();
         ModuleContextDeserializationDummy result = JsonSerializer.Deserialize(ref reader, typeInfo)
             ?? throw new JsonException("Failed to deserialize ModuleContext.");
         if (result.Module.Definition.Name is { Length: > 0 } name)

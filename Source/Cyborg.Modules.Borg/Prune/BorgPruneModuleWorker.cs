@@ -107,7 +107,7 @@ public sealed class BorgPruneModuleWorker
         int deletedArchives = 0;
         DateTime? latestRetainedArchive = null;
         DateTime? oldestRetainedArchive = null;
-        Dictionary<string, List<BorgPruneLineModel>> retainedArchivesByRule = new(StringComparer.Ordinal);
+        Dictionary<string, List<BorgPruneLineModel>> retainedArchivesByRule = [with(StringComparer.Ordinal)];
 
         metricsCollector.AddGauge(BORG_PRUNE_LAST_EXIT_CODE, "Exit code of the borg prune command", samples => samples
             .Add(executionResult.ExitCode, defaultLabels));

@@ -1,6 +1,6 @@
 ﻿# Cyborg Architecture
 
-Cyborg is a .NET 10 application providing modular, JSON-configured workflow orchestration with native AOT compilation support.
+Cyborg is a .NET 11 application providing modular, JSON-configured workflow orchestration with native AOT compilation support.
 
 ## Documentation
 

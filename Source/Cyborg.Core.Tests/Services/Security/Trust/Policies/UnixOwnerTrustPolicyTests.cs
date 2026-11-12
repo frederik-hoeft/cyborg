@@ -7,7 +7,7 @@ namespace Cyborg.Core.Tests.Services.Security.Trust.Policies;
 [TestClass]
 public sealed class UnixOwnerTrustPolicyTests
 {
-    public TestContext TestContext { get; set; }
+    public required TestContext TestContext { get; set; }
 
     [TestMethod]
     public async Task EvaluateAsync_AcceptsFileOwnedByAllowedUserOrGroup_OnLinuxAsync()

@@ -18,7 +18,7 @@ namespace Cyborg.Core.Tests.Runtime.Transactions;
 [TestClass]
 public sealed class TransactionalRuntimeEnvironmentTests
 {
-    public TestContext TestContext { get; set; }
+    public required TestContext TestContext { get; set; }
 
     [TestMethod]
     public void RuntimeEnvironmentParticipant_NullBindingRemainsPresentAcrossForkAndJoin()

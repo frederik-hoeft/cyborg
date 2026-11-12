@@ -21,7 +21,7 @@ internal static class NamedTypeSymbolExtensions
         /// specified context.</returns>
         public IEnumerable<ISymbol> EnumerateMostDerivedMembers(VisibilityContext? visibilityContext = null)
         {
-            HashSet<string> seenNames = new(StringComparer.Ordinal);
+            HashSet<string> seenNames = [with(StringComparer.Ordinal)];
 
             for (INamedTypeSymbol? current = self; current is not null; current = current.BaseType)
             {

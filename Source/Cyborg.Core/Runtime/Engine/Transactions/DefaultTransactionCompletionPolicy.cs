@@ -14,14 +14,14 @@ internal sealed class DefaultTransactionCompletionPolicy(ITransactionOptionsProv
             return TransactionPublicationDisposition.Commit;
         }
 
-        TransactionOnError onError = module is ModuleBase { Transaction: { OnError: { } configured } }
+        TransactionOnError onError = module is ModuleBase { Transaction.OnError: { } configured }
             ? configured
             : options?.OnError ?? TransactionOnError.Commit;
         return onError switch
         {
             TransactionOnError.Commit => TransactionPublicationDisposition.Commit,
             TransactionOnError.Rollback => TransactionPublicationDisposition.Rollback,
-            _ => throw new ArgumentOutOfRangeException(nameof(onError), onError, "Unsupported transaction failure policy."),
+            _ => throw new InvalidOperationException($"Unexpected TransactionOnError value: {onError}.")
         };
     }
 }

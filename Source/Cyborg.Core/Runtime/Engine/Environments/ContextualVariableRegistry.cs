@@ -1,4 +1,4 @@
-using Cyborg.Core.Runtime.Engine.Environments.Syntax;
+﻿using Cyborg.Core.Runtime.Engine.Environments.Syntax;
 using System.Collections.Frozen;
 
 namespace Cyborg.Core.Runtime.Engine.Environments;

@@ -75,7 +75,7 @@ public sealed class ModuleValidationContext
     {
         if (value is not { } tagged)
         {
-            return default(TaggedString?);
+            return default;
         }
         object? prepared = Expressions.ResolveValueExpression(tagged, willInterpolate, preparationKey);
         return prepared switch

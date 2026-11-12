@@ -199,7 +199,7 @@ public sealed class ModuleExecutionLifecycleTests : CyborgCoreTestBase
         await hook.FastCompleted.Task.WaitAsync(TestContext.CancellationToken);
 
         Assert.HasCount(1, hook.Get("fast", LifecycleEvent.Completed));
-        Assert.HasCount(0, hook.Get("fast", LifecycleEvent.Closed));
+        Assert.IsEmpty(hook.Get("fast", LifecycleEvent.Closed));
         Assert.HasCount(1, hook.Get("slow", LifecycleEvent.Started));
 
         state.ReleaseSlow.TrySetResult();
@@ -342,7 +342,7 @@ public sealed class ModuleExecutionLifecycleTests : CyborgCoreTestBase
         LifecycleObservation[] observations = hook.GetForModule(name);
         Assert.AreSequenceEqual(
             [LifecycleEvent.Started, LifecycleEvent.Completed, LifecycleEvent.Closed],
-            observations.Select(static observation => observation.Event).ToArray());
+            [.. observations.Select(static observation => observation.Event)]);
         Assert.AreEqual(status, observations[1].Status);
         Assert.AreEqual(joined, observations[2].Joined);
         Assert.IsFalse(observations[1].CancellationRequested);
@@ -354,7 +354,7 @@ public sealed class ModuleExecutionLifecycleTests : CyborgCoreTestBase
         LifecycleObservation[] observations = hook.GetForModule(name);
         Assert.AreSequenceEqual(
             [LifecycleEvent.Started, LifecycleEvent.Closed],
-            observations.Select(static observation => observation.Event).ToArray());
+            [.. observations.Select(static observation => observation.Event)]);
         Assert.IsFalse(observations[1].Joined);
         Assert.IsFalse(observations[1].CancellationRequested);
         return observations;

@@ -12,8 +12,8 @@ namespace Cyborg.Core.Runtime.Services.Validation.Internal;
 /// </summary>
 internal sealed class StructuralModulePreparation(RuntimeEnvironment environment)
 {
-    private readonly Dictionary<string, SelectedBoundOverride> _selectedOverrides = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, PreparedExpression> _prepared = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, SelectedBoundOverride> _selectedOverrides = [with(StringComparer.Ordinal)];
+    private readonly Dictionary<string, PreparedExpression> _prepared = [with(StringComparer.Ordinal)];
     private readonly ExpressionMaterializer _materializer = new();
 
     private sealed record PreparedExpression(SelectedBoundOverride? PendingText, bool Terminal);

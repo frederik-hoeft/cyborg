@@ -36,7 +36,7 @@ internal sealed class ModuleTransactionForkGroup
     {
         EnsureActive();
         List<ModuleTransaction> contributors = [Continuation, .. _children];
-        List<TransactionStateBundle> contributorStates = new(contributors.Count);
+        List<TransactionStateBundle> contributorStates = [with(contributors.Count)];
         foreach (ModuleTransaction contributor in contributors)
         {
             contributorStates.Add(contributor.GetStateForReconciliation(this));

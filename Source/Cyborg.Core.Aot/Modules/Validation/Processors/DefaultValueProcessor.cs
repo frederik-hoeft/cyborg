@@ -54,7 +54,7 @@ internal sealed class DefaultValueProcessor : AttributeProcessorBase
             }
             else
             {
-                List<string> checks = new(whenPresentExpressions.Length);
+                List<string> checks = [with(whenPresentExpressions.Length)];
                 foreach (string whenPresentExpression in whenPresentExpressions)
                 {
                     checks.Add($"{equalityComparer}.Equals({propertyAccessExpression}, {whenPresentExpression})");
